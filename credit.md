@@ -8,6 +8,8 @@ There exist two kinds of tokens in the system, credit tokens, the first of which
 
 A GUILD holder with above a minimum threshold of the token supply can propose a new set of lending terms.
 
+A LendingTerm is a blueprint for a loan.
+
 <details>
 
 <summary> function propose </summary>
@@ -18,17 +20,40 @@ A GUILD holder with above a minimum threshold of the token supply can propose a 
 // require that the caller stakes at least X% of GUILD supply
 
 // inputs:
+  * the label to use for this lending term (must not be already used)
   * address of the collateral token
   * number of credits mintable per collateral token
   * interest rate in terms of credits per block
-  * how long this loan term is available in blocks
+  * the last block in which this term is available
   * call fee in credits
   * number of GUILD tokens to stake on the proposal
 
-// stores the terms in a mapping uint256=>terms
+// stores the terms in a mapping uint256=>LendingTerm
 
-function propose(address collateral, uint256 maxCreditsPerCollateralToken, uint256 interestRate, uint256 termDuration, uint256 callFee, uint votingAmount) {
-    ...
+function propose(uint256 termsIndex, address collateral, uint256 maxCreditsPerCollateralToken, uint256 interestRate, uint256 expiry, uint256 callFee, uint256 votingAmount) {
+    require(terms[termsIndex].collateral == address(0)); // check that the term index has not been used
+    require(votingAmount >= minQuorum); // minQuorum is a global variable controlled by governance
+    // need a mechanism can be used to allow small users to coordinate their votes to meet quorum, keeping it simple for now
+    terms[termsIndex].collateral = collateral;
+    terms[termsIndex].maxCreditsPerCollateralToken = maxCreditsPerCollateralToken;
+    terms[termsIndex].interestRate = interestRate;
+    terms[termsIndex].expiry = expiry;
+    terms[termsIndex].callFee = callFee;
+
+    msg.Sender.transferFrom(GUILD.address, votingAmount);
+    terms[termsIndex].stakedBalances += votingAmount;
+}
+
+mapping(uint256=>LendingTerm) terms;
+
+struct LendingTerm {
+    address collateral; // the collateral token accepted
+    uint256 maxCreditsPerCollateralToken; // the liquidation threshold where no call fee need be paid
+    uint256 interestRate; // the interest rate per block
+    uint256 expiry; // the last block at which this loan is available
+    uint256 callFee; // the fee users must pay to call the loan
+    uint256 totalDebt; // how many credits are outstanding under these terms
+    mapping(address=>uint256) stakedBalances; // how many GUILD tokens have been staked to this lending term per user
 }
 
 ```
