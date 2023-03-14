@@ -1,5 +1,9 @@
 # Ethereum Credit Guild
 
+Existing lending protocols like MakerDAO, Aave, and Compound rely on trusted oracles, and have "closed" governance processes where changes to parameters are forced through a central decision-making process and thus occur at a very limited rate.
+
+The Ethereum Credit Guild seeks to change that, building an incentive aligned system with checks and balances allowing saving and credit operations without relying on trusted third parties, and responding on demand to changes in the market.
+
 The **credit** is a decentralized debt based stablecoin, which can follow an arbitrary monetary policy, but we will assume attempts to maintain stability or strength relative to major currencies, particularly the dollar, while appreciating via a floating interest income. Due to fluctuations in the value of the underlying loan book based on market rate volatility, precise price stability in regards to a reference asset cannot be guaranteed.
 
 ## Core Architecture and Mechanisms
@@ -193,3 +197,4 @@ The Electric Development Co will provide liquidity for CREDIT on AMMs to help bo
 In the early stage of the protocol, it is important to identify and onboard collateral assets that will attract borrower demand. Tokenized securities such as those offered by Ondo or proposed for development by Hexagon are likely candidates for growth in borrower demand that would benefit from removing oracle constraints. Forex such as EUROC could be a meaningful competitive category.
 
 ETH staking derivatives are all the rage right now. One of the goals of the Ethereum Credit Guild's lending model is to permit more aggressive leverage than pooled lending models generally support against top quality assets. Of all the on chain lending markets, Liquity offers (subject to certain conditions) the highest LTV against ETH at 90.91%, or a maximum acheivable leverage of 11x. Compared to Binance's 20x leverage on ETH, it's tricky to compete for the business of professional market makers. Pushing the envelope of how much leverage is allowed of course has its risks, but we expect a shorter turn around for adjusting loan terms can enable more efficient lending operations than is standard in a lending pool. In general, **the lower your latency, the tighter a spread you can quote**. On chain operations are constrained by the blocktime, but can do a lot better than traditional governance delays in tuning collateral ratios.
+
