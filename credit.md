@@ -6,9 +6,7 @@ The **credit** is a decentralized debt based stablecoin, which can follow an arb
 
 There exist two kinds of tokens in the system, the stable debt token CREDIT, and the governance and risk backstop token GUILD. So far, so familiar.
 
-A GUILD holder with above a minimum threshold of the token supply can propose a new set of lending terms.
-
-A LendingTerm is a blueprint for a loan.
+A GUILD holder with above a minimum threshold of the token supply can propose a new set of lending terms. A LendingTerm is a blueprint for a loan.
 
 <details>
 
@@ -135,11 +133,15 @@ The user can mint up to the maximum amount allowed by the loan terms, with their
 
 </details>
 
+-------------
+
+Anyone can call a loan issued by the protocol by paying the call fee in either credits or GUILD.
+
 <details>
 
 <summary> function marginCall </summary>
 
-Anyone can call a loan issued by the protocol by paying the call fee in either credits or GUILD. If the position's debt is larger than the `maxCreditsPerCollateralToken` defined in the loan's terms, which can only occur due to accrued interest, the call fee is waived. Otherwise, the call fee is deducted from the borrower's debt and burnt. A liquidation auction occurs to repay as much as possible of the borrower's debt by selling off as little as possible of the collateral position. If the auction reveals the loan to be insolvent, the one who triggered the auction is rewarded by being reimbursed the call fee if one was paid plus a liquidation reward. If the loan was insolvent, any GUILD holders voting for that loan's terms have their balances slashed, and the CREDIT that was lost is deducted from the surplus buffer.
+If the position's debt is larger than the `maxCreditsPerCollateralToken` defined in the loan's terms, which can only occur due to accrued interest, the call fee is waived. Otherwise, the call fee is deducted from the borrower's debt and burnt. A liquidation auction occurs to repay as much as possible of the borrower's debt by selling off as little as possible of the collateral position. If the auction reveals the loan to be insolvent, the one who triggered the auction is rewarded by being reimbursed the call fee if one was paid plus a liquidation reward. If the loan was insolvent, any GUILD holders voting for that loan's terms have their balances slashed, and the CREDIT that was lost is deducted from the surplus buffer.
 
 ```
 // inputs:
@@ -152,6 +154,8 @@ function marginCall(address user, uint256 terms) {
 ```
 
 </details>
+
+-------------
 
 It is possible for the surplus buffer balance to become negative if a loss exceeds the buffer's starting balance. In this case, a GUILD auction is triggered, diluting the existing GUILD holders in an attempt to recapitalize the system. If this auction is insufficient to fully recapitalize the protocol, the surplus buffer is zero'd out. The goal of this mechanism is to 1) minimize any possible loss to the CREDIT holders and 2) fairly distribute any loss that does occur.
 
