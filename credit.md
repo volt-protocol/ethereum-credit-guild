@@ -4,7 +4,7 @@ The **credit** is a decentralized debt based stablecoin, which can follow an arb
 
 ## Core Architecture and Mechanisms
 
-There exist two kinds of tokens in the system, credit tokens, the first of which we'll call CREDIT, and GUILD.
+There exist two kinds of tokens in the system, the stable debt token CREDIT, and the governance and risk backstop token GUILD. So far, so familiar.
 
 A GUILD holder with above a minimum threshold of the token supply can propose a new set of lending terms.
 
