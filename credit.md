@@ -179,3 +179,17 @@ The behavior of the CREDIT token will depend on the nature of the loan set that 
 An GUILD holder can burn their tokens for a pro rata share of the system surplus (likely with some fee) so long as this does not push the system below a minimum reserve ratio (ie, 5%), and at a maximum rate of X tokens burnt per period such that this mechanism cannot destabilize the CREDIT price.
 
 In this way, **the interest rate on CREDIT is determined entirely through a decentralized market process**. If GUILD holders want to prioritize growth, they can accumulate capital in the surplus buffer, which drives up the CREDIT price. If they want to take profits, they can do so by burning their tokens in exchange for CREDIT, effectively reducing the yield paid out to credit holders.
+
+-------------
+
+## Boostrapping Credit
+
+At first, CREDIT will have no liquidity, so it will be difficult for borrowers to use. The members of the Ethereum Credit Guild, such as the core contributors at the Electric Development Co and La Tribu, as well as early investors and advisors who hold the GUILD token, will engage in bootstrapping demand for CREDIT according to their ability and interests.
+
+GUILD will be distributed on an ongoing basis to CREDIT holders and minters, encouraging decentralization of the supply and an engaged owner-user base in the early period. GUILD will be nontransferable upon protocol launch, discouraging purely speculative yield farming and the growth of an unsustainably large capital base.
+
+The Electric Development Co will provide liquidity for CREDIT on AMMs to help bootstrap its utility and provide a smooth experience for early borrowers. This will likely take the form of USDC/CREDIT liquidity to provide the lowest cost experience for borrowers obtaining leverage using the Ethereum Credit Guild.
+
+In the early stage of the protocol, it is important to identify and onboard collateral assets that will attract borrower demand. Tokenized securities such as those offered by Ondo or proposed for development by Hexagon are likely candidates for growth in borrower demand that would benefit from removing oracle constraints. Forex such as EUROC could be a meaningful competitive category.
+
+ETH staking derivatives are all the rage right now. One of the goals of the Ethereum Credit Guild's lending model is to permit more aggressive leverage than pooled lending models generally support against top quality assets. Of all the on chain lending markets, Liquity offers (subject to certain conditions) the highest LTV against ETH at 90.91%, or a maximum acheivable leverage of 11x. Compared to Binance's 20x leverage on ETH, it's tricky to compete for the business of professional market makers. Pushing the envelope of how much leverage is allowed of course has its risks, but we expect a shorter turn around for adjusting loan terms can enable more efficient lending operations than is standard in a lending pool. In general, **the lower your latency, the tighter a spread you can quote**. On chain operations are constrained by the blocktime, but can do a lot better than traditional governance delays in tuning collateral ratios.
