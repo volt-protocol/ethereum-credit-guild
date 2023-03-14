@@ -123,10 +123,12 @@ function mintAsDebt(uint256 terms, uint256 amountCollateralIn, uint256 amountToM
 }
 
 struct userPosition {
-    uint256 collateralBalance;
+    uint256 collateralBalance; 
     uint256 debtBalance;
+    uint256 callBlock; // if the position has been called, record the block in which this occured to start the liquidation auction. A value of zero prevents liquidation.
+    uint256 caller; // record who calls the loan so they can be reimbursed if the loan was underwater
 }
-mapping(address=>mapping(uint256=>userPositio )) userPositions; // a mapping, per set of lending terms, of a user's collateral and debt balances
+mapping(address=>mapping(uint256=>userPosition )) userPositions; // a mapping, per set of lending terms, of a user's collateral and debt balances
 ```
 
 The user can mint up to the maximum amount allowed by the loan terms, with their collateral locked and unavailable for transfer or use in other loans until the loan is repaid. The protocol checks that the requested mint amount and collateral provided conform to the available terms, and if so, the user can mint CREDIT. When a user repays their loan, they must repay a greater amount of CREDIT than they borrowed due to the accrued interest. The initial loan amount is burnt, while the profits go to the surplus buffer.
@@ -148,8 +150,13 @@ If the position's debt is larger than the `maxCreditsPerCollateralToken` defined
    * user to margin call
    * which loan to call
 function marginCall(address user, uint256 terms) {
-    ...
+    if(userPositions[user].debtBalance < terms.maxCreditsPerCollateralToken){
+        msgSender.transferFrom(CREDIT.address, terms[terms].callFee); // claim the call fee from the caller if the loan is not underwater according to the issuance terms
+    } 
+    userPositions[user].callDate = block.number; // mark the position as called, allowing the liquidation module to act on it
+    userPositions[user].caller = msgSender; // record who called the loan so they can be reimbursed if the auction reveals it is underwater and slashing occurs
 }
+
 
 ```
 
@@ -172,4 +179,3 @@ The behavior of the CREDIT token will depend on the nature of the loan set that 
 An GUILD holder can burn their tokens for a pro rata share of the system surplus (likely with some fee) so long as this does not push the system below a minimum reserve ratio (ie, 5%), and at a maximum rate of X tokens burnt per period such that this mechanism cannot destabilize the CREDIT price.
 
 In this way, **the interest rate on CREDIT is determined entirely through a decentralized market process**. If GUILD holders want to prioritize growth, they can accumulate capital in the surplus buffer, which drives up the CREDIT price. If they want to take profits, they can do so by burning their tokens in exchange for CREDIT, effectively reducing the yield paid out to credit holders.
-
