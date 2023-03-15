@@ -2,7 +2,7 @@
 
 Existing lending protocols like MakerDAO, Aave, and Compound rely on trusted oracles, and have "closed" governance processes where changes to parameters are forced through a central decision-making process and thus occur at a very limited rate.
 
-The Ethereum Credit Guild seeks to change that, building an incentive aligned system with checks and balances allowing saving and credit operations without relying on trusted third parties, and responding on demand to changes in the market.
+The Ethereum Credit Guild seeks to change that, building an incentive aligned system with checks and balances allowing saving and credit operations without relying on trusted third parties, and responding on demand to changes in the market through an open parameter control process.
 
 The **credit** is a decentralized debt based stablecoin, which can follow an arbitrary monetary policy, but we will assume attempts to maintain stability or strength relative to major currencies, particularly the dollar, while appreciating via a floating interest income. Due to fluctuations in the value of the underlying loan book based on market rate volatility, precise price stability in regards to a reference asset cannot be guaranteed.
 
@@ -101,7 +101,7 @@ function vote(uint256 terms, uint256 amountToStake) {
 }
 ```
 
-The debt ceiling of a given loan is determined based on the amount of GUILD staked to it, and the protocol's currently allowed leverage ratio. For example, if the max global leverage is 20x, and the surplus buffer is 1m CREDIT, then there is a global debt ceiling of 20m CREDIT. A holder of 10% of the GUILD supply can thus allocate a debt ceiling of 2m CREDIT.
+The global debt ceiling is determined by governance (and may be set at some constant inflation rate, or subjected to other policies). The debt ceiling of a particular loan is determined based on the amount of GUILD staked to it. For example, if the global debt ceiling is 20m credit, a holder of 10% of the GUILD supply can allocate a debt ceiling of 2m CREDIT to lend against rETH.
 
 </details>
 
