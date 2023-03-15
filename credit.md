@@ -6,11 +6,22 @@ The Ethereum Credit Guild seeks to change that, building an incentive aligned sy
 
 The **credit** is a decentralized debt based stablecoin, which can follow an arbitrary monetary policy, but we will assume attempts to maintain stability or strength relative to major currencies, particularly the dollar, while appreciating via a floating interest income. Due to fluctuations in the value of the underlying loan book based on market rate volatility, precise price stability in regards to a reference asset cannot be guaranteed.
 
-## Core Architecture and Mechanisms
+## Table of Contents
+- [Ethereum Credit Guild](#ethereum-credit-guild)
+  - [Table of Contents](#table-of-contents)
+  - [Mechanisms](#mechanisms)
+    - [Lending](#lending)
+    - [Borrowing and Liquidation](#borrowing-and-liquidation)
+    - [CREDIT Price and Interest Rates](#credit-price-and-interest-rates)
+    - [Bootstrapping Credit](#bootstrapping-credit)
+
+## Mechanisms
 
 There exist two kinds of tokens in the system, the stable debt token CREDIT, and the governance and risk backstop token GUILD. So far, so familiar.
 
-A GUILD holder with above a minimum threshold of the token supply can propose a new set of lending terms. A LendingTerm is a blueprint for a loan.
+### Lending
+
+A GUILD holder with above a minimum threshold of the token supply can propose a new set of lending terms. A `LendingTerm` is a blueprint for a loan.
 
 <details>
 
@@ -107,6 +118,8 @@ The global debt ceiling is determined by governance (and may be set at some cons
 
 -------------
 
+### Borrowing and Liquidation
+
 To initiate a loan, a user must post collateral and find an acceptable set of lending terms. Deposit can occur atomically with borrowing; withdraw requires there are no active loans against the collateral in question.
 
 <details>
@@ -176,9 +189,9 @@ So long as there is an honest minority of GUILD holders, reckless loans that end
 
 -------------
 
-## CREDIT and Interest Rates
+### CREDIT Price and Interest Rates
 
-The behavior of the CREDIT token will depend on the nature of the loan set that backs it. There is no foolproof way for software to detect the quality of a collateral token or know what the market interest rate is. These inputs must be provided by humans. The goal of the Ethereum Credit Guild is to allow for market based processes with checks and balances to allow users to enagage in fair and productive lending operations without the need for trusted third parties. If the system is otherwise in equilibrium (no change in demand to hold or borrow credits, or to hold GUILD) then the value of credits will tend to increase over time as the surplus buffer accumulates credits. Based on the internal rate of return, the current value of a credit will fluctuate on the market.
+The behavior of the CREDIT token will depend on the nature of the loan set that backs it, user interest in CREDIT, and the overall market conditions. There is no foolproof way for software to detect the quality of a collateral token or know what the market interest rate is. These inputs must be provided by humans. The goal of the Ethereum Credit Guild is to allow for market based processes with checks and balances to allow users to enagage in fair and productive lending operations without the need for trusted third parties. If the system is otherwise in equilibrium (no change in demand to hold or borrow credits, or to hold GUILD) then the value of credits will tend to increase over time as the surplus buffer accumulates credits. Based on the internal rate of return, the current value of a credit will fluctuate on the market.
 
 An GUILD holder can burn their tokens for a pro rata share of the system surplus (likely with some fee) so long as this does not push the system below a minimum reserve ratio (ie, 5%), and at a maximum rate of X tokens burnt per period such that this mechanism cannot destabilize the CREDIT price.
 
@@ -186,7 +199,7 @@ In this way, **the interest rate on CREDIT is determined entirely through a dece
 
 -------------
 
-## Boostrapping Credit
+### Bootstrapping Credit
 
 At first, CREDIT will have no liquidity, so it will be difficult for borrowers to use. The members of the Ethereum Credit Guild, such as the core contributors at the Electric Development Co and La Tribu, as well as early investors and advisors who hold the GUILD token, will engage in bootstrapping demand for CREDIT according to their ability and interests.
 
