@@ -13,6 +13,7 @@ The **credit** is a decentralized debt based stablecoin, which can follow an arb
     - [Lending](#lending)
     - [Borrowing and Liquidation](#borrowing-and-liquidation)
   - [](#)
+  - [](#-1)
     - [CREDIT Price and Interest Rates](#credit-price-and-interest-rates)
     - [Bootstrapping Credit](#bootstrapping-credit)
 
@@ -135,10 +136,10 @@ To initiate a loan, a user must post collateral and find an acceptable set of le
   * the amount of collateral token to use
 
 function mintAsDebt(uint256 terms, uint256 amountCollateralIn, uint256 amountToMint) {
-    require(terms.maxCreditsPerCollateralToken * amountCollateralIn > amountToMint);
-    msgSender.transferFrom(terms.collateral, amountCollateralIn);
-    userPositions[msgSender].collateralBalance += amountCollateralIn;
-    userPositions[msgSender].debtBalance += amountToMint;
+    require(terms[terms].maxCreditsPerCollateralToken * amountCollateralIn > amountToMint);
+    msgSender.transferFrom(terms[terms].collateral, amountCollateralIn);
+    userPositions[msgSender][terms].collateralBalance += amountCollateralIn;
+    userPositions[msgSender][terms].debtBalance += amountToMint;
     CREDIT.mint(msg.Sender, amountToMint);
 }
 
@@ -151,10 +152,29 @@ struct userPosition {
 mapping(address=>mapping(uint256=>userPosition )) userPositions; // a mapping of users to their collateral and debt balances per lending term. A user may only have one position per set of lending terms.
 ```
 
-The user can mint up to the maximum amount allowed by the loan terms, with their collateral locked and unavailable for transfer or use in other loans until the loan is repaid. The protocol checks that the requested mint amount and collateral provided conform to the available terms, and if so, the user can mint CREDIT. When a user repays their loan, they must repay a greater amount of CREDIT than they borrowed due to the accrued interest. The initial loan amount is burnt, while the profits go to the surplus buffer.
+The user can mint up to the maximum amount allowed by the loan terms, with their collateral locked and unavailable for transfer or use in other loans until the loan is repaid. The protocol checks that the requested mint amount and collateral provided conform to the available terms, and if so, the user can mint CREDIT.
 
 </details>
 
+When a user repays their loan, they must repay a greater amount of CREDIT than they borrowed due to the accrued interest. The initial loan amount is burnt, while the profits go to the surplus buffer. Anyone can repay a loan, though only the user can withdraw their collateral. Partial repayments are allowed.
+
+<details>
+
+<summary> function repayBorrow </summary>
+
+```
+function repayBorrow(address user, uint256 terms, uint256 amountToRepay) {
+    msgSender.transferFrom(CREDIT.address, amountToRepay);
+    require(amountToRepay <= userPositions[user][terms].debtBalance); // you can't repay more than the total debt
+    userPositions[user][terms].debtBalance -= amountToRepay; // reduce the position's debt accordingly
+    if (userPositions[user][terms].debtBalance == 0 && userPositions[user][terms].callBlock != 0) { // if the user has fully repaid their loan, and the loan was called, make sure that no liquidation can occur by setting the call block and caller addresses to zero values. The borrower recoups the call fee.
+        userPositions[user][terms].callBlock = 0;
+        uint256 caller = address(0);
+    }
+}
+
+```
+</details>
 -------------
 
 Anyone can call a loan issued by the protocol by paying the call fee in either credits or GUILD.
@@ -170,7 +190,8 @@ If the position's debt is larger than the `maxCreditsPerCollateralToken` defined
    * user to margin call
    * which loan to call
 function marginCall(address user, uint256 terms) {
-    if(userPositions[user].debtBalance < terms.maxCreditsPerCollateralToken){
+    require(userPositions[user][terms].debtBalance > 0); // user must have an active loan to call
+    if(userPositions[user][terms].debtBalance < terms.maxCreditsPerCollateralToken){
         msgSender.transferFrom(CREDIT.address, terms[terms].callFee); // claim the call fee from the caller if the loan is not underwater according to the issuance terms
     } 
     userPositions[user].callDate = block.number; // mark the position as called, allowing the liquidation module to act on it
