@@ -6,16 +6,13 @@ The Ethereum Credit Guild seeks to change that, building an incentive aligned sy
 
 The **credit** is a decentralized debt based stablecoin, which can follow an arbitrary monetary policy, but we will assume attempts to maintain stability or strength relative to major currencies, particularly the dollar, while appreciating via a floating interest income. Due to fluctuations in the value of the underlying loan book based on market rate volatility, precise price stability in regards to a reference asset cannot be guaranteed.
 
-## Table of Contents
 - [Ethereum Credit Guild](#ethereum-credit-guild)
-  - [Table of Contents](#table-of-contents)
   - [Mechanisms](#mechanisms)
     - [Lending](#lending)
     - [Borrowing and Liquidation](#borrowing-and-liquidation)
   - [](#)
-  - [](#-1)
     - [CREDIT Price and Interest Rates](#credit-price-and-interest-rates)
-    - [Bootstrapping Credit](#bootstrapping-credit)
+  - [Bootstrapping Credit](#bootstrapping-credit)
 
 ## Mechanisms
 
@@ -174,7 +171,9 @@ function repayBorrow(address user, uint256 terms, uint256 amountToRepay) {
 }
 
 ```
+
 </details>
+
 -------------
 
 Anyone can call a loan issued by the protocol by paying the call fee in either credits or GUILD.
@@ -303,7 +302,7 @@ In this way, **the interest rate on CREDIT is determined entirely through a dece
 
 -------------
 
-### Bootstrapping Credit
+## Bootstrapping Credit
 
 At first, CREDIT will have no liquidity, so it will be difficult for borrowers to use. The members of the Ethereum Credit Guild, such as the core contributors at the Electric Development Co and La Tribu, as well as early investors and advisors who hold the GUILD token, will engage in bootstrapping demand for CREDIT according to their ability and interests.
 
