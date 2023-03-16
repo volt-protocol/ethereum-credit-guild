@@ -12,6 +12,7 @@ The **credit** is a decentralized debt based stablecoin, which can follow an arb
   - [Mechanisms](#mechanisms)
     - [Lending](#lending)
     - [Borrowing and Liquidation](#borrowing-and-liquidation)
+  - [](#)
     - [CREDIT Price and Interest Rates](#credit-price-and-interest-rates)
     - [Bootstrapping Credit](#bootstrapping-credit)
 
@@ -39,11 +40,12 @@ A GUILD holder with above a minimum threshold of the token supply can propose a 
   * interest rate in terms of credits per block
   * the last block in which this term is available
   * call fee in credits
+  * auction duration in blocks
   * number of GUILD tokens to stake on the proposal
 
 // stores the terms in a mapping uint256=>LendingTerm
 
-function propose(uint256 termsIndex, address collateral, uint256 maxCreditsPerCollateralToken, uint256 interestRate, uint256 expiry, uint256 callFee, uint256 votingAmount) {
+function propose(uint256 termsIndex, address collateral, uint256 maxCreditsPerCollateralToken, uint256 interestRate, uint256 expiry, uint256 callFee, uint256 auctionLength, uint256 votingAmount) {
     require(terms[termsIndex].collateral == address(0)); // check that the term index has not been used
     require(votingAmount >= minQuorum); // minQuorum is a global variable controlled by governance
     // need a mechanism can be used to allow small users to coordinate their votes to meet quorum, keeping it simple for now
@@ -52,6 +54,7 @@ function propose(uint256 termsIndex, address collateral, uint256 maxCreditsPerCo
     terms[termsIndex].interestRate = interestRate;
     terms[termsIndex].expiry = expiry;
     terms[termsIndex].callFee = callFee;
+    terms[termsIndex].auctionLength = auctionLength;
 
     msg.Sender.transferFrom(GUILD.address, votingAmount);
     terms[termsIndex].stakedBalances += votingAmount;
@@ -145,7 +148,7 @@ struct userPosition {
     uint256 callBlock; // if the position has been called, record the block in which this occured to start the liquidation auction. A value of zero prevents liquidation.
     uint256 caller; // record who calls the loan so they can be reimbursed if the loan was underwater
 }
-mapping(address=>mapping(uint256=>userPosition )) userPositions; // a mapping, per set of lending terms, of a user's collateral and debt balances
+mapping(address=>mapping(uint256=>userPosition )) userPositions; // a mapping of users to their collateral and debt balances per lending term. A user may only have one position per set of lending terms.
 ```
 
 The user can mint up to the maximum amount allowed by the loan terms, with their collateral locked and unavailable for transfer or use in other loans until the loan is repaid. The protocol checks that the requested mint amount and collateral provided conform to the available terms, and if so, the user can mint CREDIT. When a user repays their loan, they must repay a greater amount of CREDIT than they borrowed due to the accrued interest. The initial loan amount is burnt, while the profits go to the surplus buffer.
@@ -174,14 +177,66 @@ function marginCall(address user, uint256 terms) {
     userPositions[user].caller = msgSender; // record who called the loan so they can be reimbursed if the auction reveals it is underwater and slashing occurs
 }
 
-
 ```
 
 </details>
 
+<details>
+
+<summary> function liquidateBorrow </summary>
+
+The liquidation auction is a Dutch auction where a gradually larger portion of the borrower's collateral is offered in exchange for repaying their debt. If the borrower's entire collateral is not enough to pay their debt, a partial payment is accepted.
+
+Consider an asset with a liquidation duration of ten minutes. The moment the loan is called, 1% of the collateral is offered for auction. By five minutes, 50% is offered. By ten minutes, all the collateral is offered. By fifteen minutes, the protocol will accept repayment of only half the debt in exchange for the full collateral position, and so on.
+
+```
+// inputs:
+    * user to liquidate
+    * which loan to liquidate
+    * amount of collateral the liquidator wants
+function liquidateBorrow(address user, uint256 terms, uint256 bid, uint256 ask) {
+    // check if the bid is valid based on the loan terms and how long has passed since the loan was called
+    // if the bid is valid, pull CREDIT from the caller equal to the bid, and remit to them the requested amount of the collateral token
+    // if the bid is less than the borrower's full debt, the surplus buffer must be reduced accordingly
+    // if the surplus buffer is marked down to a negative value, a GUILD auction is triggered
+    auctionStartBlock = block.number;
+}
+
+uint256 auctionStartBlock = 0; // the start block for a guild auction. A zero value indicates there is no active auction.
+
+```
+
+</details>
 -------------
 
 It is possible for the surplus buffer balance to become negative if a loss exceeds the buffer's starting balance. In this case, a GUILD auction is triggered, diluting the existing GUILD holders in an attempt to recapitalize the system. If this auction is insufficient to fully recapitalize the protocol, the surplus buffer is zero'd out. The goal of this mechanism is to 1) minimize any possible loss to the CREDIT holders and 2) fairly distribute any loss that does occur.
+
+The GUILD auction is a Dutch auction where an increasing amount of GUILD is offered in exchange for enough CREDIT to replace the system's bad debt, up to some limit. It allows partial fills.
+
+<details>
+
+<summary> function guildAuctionBid </summary>
+
+```
+function guildAuctionBid(uint256 bidAmount) {
+
+    // pull bidAmount of CREDIT from the user
+    msgSender.transferFrom(CREDIT.address, bidAmount);
+    // based on the current auction price, remit GUILD to the user
+    // use this credit to reduce the surplus buffer's bad debt
+    require(
+        // check that surplus buffer size is not above a limit, so excess dilution does not occur
+    );
+    // once the bad debt is 0 or more, the auction is concluded
+    if {
+        // check whether the surplus buffer is >=0
+        // if so, then
+        auctionStartBlock = 0;
+    }
+}
+```
+
+</details>
 
 GUILD holders have both an individual incentive to avoid being liquidated, and a collective incentive to prevent excessive risk taking. They earn rewards proportional to the yield they generate, and thus an honest GUILD holder will pursue the highest +EV yield opportunity available to them, while preventing others from taking risk that will create a loss larger than that individual's pro rata share of the surplus buffer.
 
@@ -193,7 +248,35 @@ So long as there is an honest minority of GUILD holders, reckless loans that end
 
 The behavior of the CREDIT token will depend on the nature of the loan set that backs it, user interest in CREDIT, and the overall market conditions. There is no foolproof way for software to detect the quality of a collateral token or know what the market interest rate is. These inputs must be provided by humans. The goal of the Ethereum Credit Guild is to allow for market based processes with checks and balances to allow users to enagage in fair and productive lending operations without the need for trusted third parties. If the system is otherwise in equilibrium (no change in demand to hold or borrow credits, or to hold GUILD) then the value of credits will tend to increase over time as the surplus buffer accumulates credits. Based on the internal rate of return, the current value of a credit will fluctuate on the market.
 
-An GUILD holder can burn their tokens for a pro rata share of the system surplus (likely with some fee) so long as this does not push the system below a minimum reserve ratio (ie, 5%), and at a maximum rate of X tokens burnt per period such that this mechanism cannot destabilize the CREDIT price.
+A GUILD holder can burn their tokens for a pro rata share of the system surplus (likely with some fee) at a maximum rate of X tokens burnt per period such that this mechanism cannot destabilize the CREDIT price.
+
+<details>
+
+<summary> function redeemSurplus </summary>
+
+```
+
+function redeemSurplus(uint256 guildToRedeem) {
+    msgSender.transferFrom(GUILD.address, guildToRedeem);
+    // todo check the current price per GUILD, must be manipulation resistant value
+    require(surplusAvailableToRedeem >= guildToRedeem * getGUILDPrice());
+    surplusAvailableToRedeem -= guildToRedeem * getGUILDPrice();
+    CREDIT.transfer(msgSender, guildToRedeem * getGUILDPrice());
+}
+
+uint256 surplusAvailableToRedeem; // keep track of how much surplus is currently available for redemption, capped at X% of the CREDIT supply
+
+uint256 lastSurplusRefill; // keep track of when the redemption buffer was last refilled
+
+function refillRedemptionBuffer() {
+    require (block.number - lastSurplusRefill > ???); // set some maximum update frequency
+    lastSurplusRefill = block.number; // update the last refill block record
+    surplusAvailableToRedeem = ???; // refill the buffer to the maximum
+}
+
+```
+
+</details>
 
 In this way, **the interest rate on CREDIT is determined entirely through a decentralized market process**. If GUILD holders want to prioritize growth, they can accumulate capital in the surplus buffer, which drives up the CREDIT price. If they want to take profits, they can do so by burning their tokens in exchange for CREDIT, effectively reducing the yield paid out to credit holders.
 
