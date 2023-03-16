@@ -9,8 +9,9 @@ The **credit** is a decentralized debt based stablecoin, which can follow an arb
 - [Ethereum Credit Guild](#ethereum-credit-guild)
   - [Mechanisms](#mechanisms)
     - [Lending](#lending)
-    - [Borrowing and Liquidation](#borrowing-and-liquidation)
-  - [](#)
+    - [Borrowing and Repayment](#borrowing-and-repayment)
+    - [Calling and Liquidating Loans](#calling-and-liquidating-loans)
+    - [Handling Bad Debt](#handling-bad-debt)
     - [CREDIT Price and Interest Rates](#credit-price-and-interest-rates)
   - [Bootstrapping Credit](#bootstrapping-credit)
 
@@ -119,7 +120,7 @@ The global debt ceiling is determined by governance (and may be set at some cons
 
 -------------
 
-### Borrowing and Liquidation
+### Borrowing and Repayment
 
 To initiate a loan, a user must post collateral and find an acceptable set of lending terms. Deposit can occur atomically with borrowing; withdraw requires there are no active loans against the collateral in question.
 
@@ -176,19 +177,21 @@ function repayBorrow(address user, uint256 terms, uint256 amountToRepay) {
 
 -------------
 
+### Calling and Liquidating Loans
+
 Anyone can call a loan issued by the protocol by paying the call fee in either credits or GUILD.
 
 <details>
 
-<summary> function marginCall </summary>
+<summary> function callPositiion </summary>
 
 If the position's debt is larger than the `maxCreditsPerCollateralToken` defined in the loan's terms, which can only occur due to accrued interest, the call fee is waived. Otherwise, the call fee is deducted from the borrower's debt and burnt. A liquidation auction occurs to repay as much as possible of the borrower's debt by selling off as little as possible of the collateral position. If the auction reveals the loan to be insolvent, the one who triggered the auction is rewarded by being reimbursed the call fee if one was paid plus a liquidation reward. If the loan was insolvent, any GUILD holders voting for that loan's terms have their balances slashed, and the CREDIT that was lost is deducted from the surplus buffer.
 
 ```
 // inputs:
-   * user to margin call
+   * user to call
    * which loan to call
-function marginCall(address user, uint256 terms) {
+function callPosition(address user, uint256 terms) {
     require(userPositions[user][terms].debtBalance > 0); // user must have an active loan to call
     if(userPositions[user][terms].debtBalance < terms.maxCreditsPerCollateralToken){
         msgSender.transferFrom(CREDIT.address, terms[terms].callFee); // claim the call fee from the caller if the loan is not underwater according to the issuance terms
@@ -227,7 +230,10 @@ uint256 auctionStartBlock = 0; // the start block for a guild auction. A zero va
 ```
 
 </details>
+
 -------------
+
+### Handling Bad Debt
 
 It is possible for the surplus buffer balance to become negative if a loss exceeds the buffer's starting balance. In this case, a GUILD auction is triggered, diluting the existing GUILD holders in an attempt to recapitalize the system. If this auction is insufficient to fully recapitalize the protocol, the surplus buffer is zero'd out. The goal of this mechanism is to 1) minimize any possible loss to the CREDIT holders and 2) fairly distribute any loss that does occur.
 
@@ -260,7 +266,7 @@ function guildAuctionBid(uint256 bidAmount) {
 
 GUILD holders have both an individual incentive to avoid being liquidated, and a collective incentive to prevent excessive risk taking. They earn rewards proportional to the yield they generate, and thus an honest GUILD holder will pursue the highest +EV yield opportunity available to them, while preventing others from taking risk that will create a loss larger than that individual's pro rata share of the surplus buffer.
 
-So long as there is an honest minority of GUILD holders, reckless loans that endanger the system as a whole can be prevented, while the loans that do fail result in a decreased ownership stake for bad allocators.
+So long as there is an honest minority of GUILD holders, reckless loans that endanger the system as a whole can be prevented, while the loans that do fail result in a decreased ownership stake for bad allocators. In the early period, GUILD emissions will compensate CREDIT holders for the risk of a relatively small surplus buffer. As the system matures over a period of several years, the size of the surplus buffer and the yield on credit will "float stably" according to market conditions.
 
 -------------
 
