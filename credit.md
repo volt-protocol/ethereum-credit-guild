@@ -12,8 +12,11 @@ The **credit** is a decentralized debt based stablecoin, which can follow an arb
     - [Borrowing and Repayment](#borrowing-and-repayment)
     - [Calling and Liquidating Loans](#calling-and-liquidating-loans)
     - [Handling Bad Debt](#handling-bad-debt)
-    - [CREDIT Price and Interest Rates](#credit-price-and-interest-rates)
+    - [Surplus Buffer and Redemptions](#surplus-buffer-and-redemptions)
+  - [Pricing Credit](#pricing-credit)
   - [Bootstrapping Credit](#bootstrapping-credit)
+    - [On Competitive Advantages in Lending](#on-competitive-advantages-in-lending)
+    - [Credit Genesis](#credit-genesis)
 
 ## Mechanisms
 
@@ -270,11 +273,9 @@ So long as there is an honest minority of GUILD holders, reckless loans that end
 
 -------------
 
-### CREDIT Price and Interest Rates
+### Surplus Buffer and Redemptions
 
-The behavior of the CREDIT token will depend on the nature of the loan set that backs it, user interest in CREDIT, and the overall market conditions. There is no foolproof way for software to detect the quality of a collateral token or know what the market interest rate is. These inputs must be provided by humans. The goal of the Ethereum Credit Guild is to allow for market based processes with checks and balances to allow users to enagage in fair and productive lending operations without the need for trusted third parties. If the system is otherwise in equilibrium (no change in demand to hold or borrow credits, or to hold GUILD) then the value of credits will tend to increase over time as the surplus buffer accumulates credits. Based on the internal rate of return, the current value of a credit will fluctuate on the market.
-
-A GUILD holder can burn their tokens for a pro rata share of the system surplus (likely with some fee) at a maximum rate of X tokens burnt per period such that this mechanism cannot destabilize the CREDIT price.
+A GUILD holder can burn their tokens for a pro rata share of the system surplus (likely with some fee) at a maximum rate of X tokens burnt per period such that this mechanism cannot destabilize the CREDIT price. In this way, the size of the surplus buffer is determined by market demand to hold GUILD vs redeem for credits.
 
 <details>
 
@@ -304,19 +305,74 @@ function refillRedemptionBuffer() {
 
 </details>
 
-In this way, **the interest rate on CREDIT is determined entirely through a decentralized market process**. If GUILD holders want to prioritize growth, they can accumulate capital in the surplus buffer, which drives up the CREDIT price. If they want to take profits, they can do so by burning their tokens in exchange for CREDIT, effectively reducing the yield paid out to credit holders.
+
+-------------
+
+## Pricing Credit
+
+The behavior of the CREDIT token will depend on the nature of the loan set that backs it, user interest in CREDIT, and the overall market conditions. There is no foolproof way for software to detect the quality of a collateral token or know what the market interest rate is. These inputs must be provided by humans. The goal of the Ethereum Credit Guild is to allow for market based processes with checks and balances to allow users to enagage in fair and productive lending operations without the need for trusted third parties. If the system is otherwise in equilibrium (no change in demand to hold or borrow credits, or to hold GUILD) then the value of credits will tend to increase over time as the surplus buffer accumulates credits. Based on the internal rate of return, the current value of a credit will fluctuate on the market.
+
+The architecture of CREDIT can support arbitrary liquidity and yield properties. We can envision other versions with lower liquidity and higher yield. We expect the primary CREDIT token to have the same goals as VOLT:
+* high liquidity, such that a large portion of the supply can be redeemed in the span of a week
+* yield bearing equal to or better than off chain money markets
+
+The recent USDC peg stability has made it clear that there is no such thing as a perfectly fungible, instantly portable dollar. All stablecoins, bank deposits, Paypal balances, etc have some constraints in their fungibility and transferability under certain conditions.
+
+A traditional Peg Stability Module is possible in the architecture of CREDIT we've laid out here -- you just need a `LendingTerm` allowing minting of CREDIT 1:1 with USDC at 0% interest. This is not the desired implementation, however, instead we prefer a potentially liquidatable vault that allows for an upward drift in credit price representing the accured yield: "mint 1 credit per 1.02 USDC at 4% interest". Arbitrage does not need to be risk free, in fact, it cannot be -- if the arbitrageur is not bearing this risk, the protocol and thus the stablecoin holders are. Maintaining a small interest rate and overcollateralization on arbitrage vaults will mean sacrificing a little bit of the upward peg stability the PSM offers, in exchange for ensuring an incentive exist for new loans to be opened against productive collateral.
+
+The current price of CREDIT is determined by the market; if bad debt occurs, system is more resilient to runs than a PSM model.While it's true that if all active borrowing positions were closed, the remaining CREDIT outstanding would be worthless, this has much less run risk than a PSM allowing on demand redemptions. gand instead though some may sell in a panic, allowing borrowers to repay at or above an appropriate discount based on the amount of bad debt in the system. So long as borrowing demand continues to exist, CREDIT can stabilize at a new price that accounts for the bad debt without distributing it unfairly to certain users. 
 
 -------------
 
 ## Bootstrapping Credit
 
-At first, CREDIT will have no liquidity, so it will be difficult for borrowers to use. The members of the Ethereum Credit Guild, such as the core contributors at the Electric Development Co and La Tribu, as well as early investors and advisors who hold the GUILD token, will engage in bootstrapping demand for CREDIT according to their ability and interests.
+At first, CREDIT will have no liquidity, so it will be difficult for borrowers to use. The members of the Ethereum Credit Guild, such as the core contributors at the Electric Development Co and La Tribu, as well as early investors and advisors who hold the GUILD token, will engage in bootstrapping demand for CREDIT according to their ability and interests. The Electric Development Co will provide liquidity for CREDIT on AMMs to help bootstrap its utility and provide a smooth experience for early borrowers. This will likely take the form of USDC/CREDIT liquidity to provide the lowest cost experience for borrowers obtaining leverage using the Ethereum Credit Guild.
 
 GUILD will be distributed on an ongoing basis to CREDIT holders and minters, encouraging decentralization of the supply and an engaged owner-user base in the early period. GUILD will be nontransferable upon protocol launch, discouraging purely speculative yield farming and the growth of an unsustainably large capital base.
 
-The Electric Development Co will provide liquidity for CREDIT on AMMs to help bootstrap its utility and provide a smooth experience for early borrowers. This will likely take the form of USDC/CREDIT liquidity to provide the lowest cost experience for borrowers obtaining leverage using the Ethereum Credit Guild.
+### On Competitive Advantages in Lending
 
-In the early stage of the protocol, it is important to identify and onboard collateral assets that will attract borrower demand. Tokenized securities such as those offered by Ondo or proposed for development by Hexagon are likely candidates for growth in borrower demand that would benefit from removing oracle constraints. Forex such as EUROC could be a meaningful competitive category.
+One of the goals of the Ethereum Credit Guild's lending model is to permit more aggressive leverage than pooled lending models generally support against top quality assets. Of all the on chain lending markets, Liquity offers (subject to certain conditions) the highest LTV against ETH at 90.91%, or a maximum acheivable leverage of 11x. Flux Finance, the lending market created by Ondo to support its tokenized securities like OUSG, offers only a 92% collateral factor for OUSG, a short term US treasury ETF, and rates in the market for stablecoins have at times exceeded the underlying treasury yield. Compared to Binance's 20x leverage on ETH, or the 98% collateral factor obtainable on Treasury securities in traditional repo markets[^1], it's tricky to see these venues competing for the business of professional market makers and traders in "offchain" securities. For many traders, whether directional or arbitrage, the amount of leverage available is more important than the interest rate, since the duration of the trade is short.
 
-ETH staking derivatives are all the rage right now. One of the goals of the Ethereum Credit Guild's lending model is to permit more aggressive leverage than pooled lending models generally support against top quality assets. Of all the on chain lending markets, Liquity offers (subject to certain conditions) the highest LTV against ETH at 90.91%, or a maximum acheivable leverage of 11x. Compared to Binance's 20x leverage on ETH, it's tricky to compete for the business of professional market makers. Pushing the envelope of how much leverage is allowed of course has its risks, but we expect a shorter turn around for adjusting loan terms can enable more efficient lending operations than is standard in a lending pool. In general, **the lower your latency, the tighter a spread you can quote**. On chain operations are constrained by the blocktime, but can do a lot better than traditional governance delays in tuning collateral ratios.
+A lower latency process for governance can enable more efficient lending operations. Onchain operations are constrained by the blocktime, but can do a lot better than traditional governance delays in tuning collateral ratios and interest rates. For low volatility assets like OUSG, the main issue is managing liquidity (as even the best collateral has a varying shiftability), not the risk of a drop in the value of the collateral. In this case, borrowers can be allowed very high leverage, but interest rates should also be very high, so that both CREDIT holders and borrowers can earn an efficient return. For high volatility assets like ETH, one can clearly envision a daily adjustment in available lending terms outperform a static collateral requirement and trusted oracle feed.
 
+### Credit Genesis
+
+Let's walk through what the very beginning of the protocol will look like.
+
+The initial set of GUILD holders will include the Electric Development Company, other core contributors, investors, advisors, and those who earned GUILD/VCON through the Volt Protocol v1 airdrop. These users must reach consensus on an initial set of loan terms (or make however many forks of the code they like!). The larger the size of the protocol, the more often it makes sense to rebalance loan terms from a gas perspective. Therefore, the starting loan terms are expected to be more conservative and (and in need of less frequent updates) than those at scale. **The initial set of loan terms must be able to offer a better deal to some borrower than they can get elsewhere**. At the same time, the early loan set could facilitate efficient liquidity provision.
+
+For example, this set of loan terms might look like:
+
+| Collateral Token      | CREDIT mintable per token |   |  Interest Rate (% Annual)  |   Call Fee (bips)  |
+| ----------- | ----------- | ----------- | -----------|
+| ETH      | 1400       | 4  |  15 |
+| rETH | 800 | 3.5 | 25 | 
+| cbETH | 800 | 3.5 | 25 |
+| OUSG  | 97  | 4 | 10 |
+| stDAI | 99 | 1 | 5 |
+| USDC | 98 | 0 | 5 |
+| Univ2CREDITUSDC | .9 | 0 | 1 |
+| Univ2CREDITDAI | .9 | 0 | 1 |
+
+Market makers in the early system can take a highly leveraged exposure to CREDIT/USDC or CREDIT/DAI Uniswap v2 LP or other AMM pairing without paying an interest cost. It's possible an incentivized pair could generate profits for the system. While not necessarily highly efficient, providing AMM liquitity is a convenient and familiar way for those bootstrapping the system to provide liquidity and its early users to access it.
+
+In a mature system, it's unlikely GUILD holders will want to vote for zero-interest lending terms, when they could instead vote for a profitable loan. Early on they are likely to do so because they themselves are likely to be bootstrapping CREDIT liquidity.
+
+A few users begin to buy CREDIT on the AMM to start earning GUILD rewards (at first, with no loans issued, it's expected price increase or native yield is zero), pushing its price slightly up. This convinces the first 'real' borrower that it is a good time to take action. They deposit OUSG, which is yielding 4.5%, and borrow CREDIT at 4%, while selling enough CREDIT to bring its price back down to the starting level.
+
+Over time, as borrowers pay interest, the CREDIT price starts to drift up. The available lending terms are adjusted, and the bootstrappers close their AMM positions and repay their loans. Growing demand for CREDIT at this point is met mainly through borrowing against productive collateral like OUSG or stETH. When demand to repay loans or hold CREDIT spikes, users can still arbitrage against stable value collateral, but they must pay sufficient interest to justify GUILD holders voting for those loan terms.
+
+| Collateral Token      | CREDIT mintable per token |   |  Interest Rate (% Annual)  |   Call Fee (bips)  |
+| ----------- | ----------- | ----------- | -----------|
+| ETH      | 2000       | 6  |  10 |
+| stETH | 1700 | 5 | 25 | 
+| rETH | 1700 | 5 | 25 | 
+| cbETH | 1700 | 5 | 25 |
+| OUSG  | 95  | 4 | 10 |
+| stDAI | 96 | 3 | 5 |
+| USDC | 96 | 3 | 5 |
+| Univ2CREDITUSDC | .8 | 2 | 1 |
+| Univ2CREDITDAI | .8 | 2 | 1 |
+
+[^1]: Primer: Money Market Funds and the Repo Market. Viktoria Baklanova, Isaac Kuznits, Trevor Tatum. https://www.sec.gov/files/mmfs-and-the-repo-market-021721.pdf
