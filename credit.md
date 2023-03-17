@@ -344,7 +344,7 @@ The initial set of GUILD holders will include the Electric Development Company, 
 
 For example, this set of loan terms might look like:
 
-| Collateral Token      | CREDIT mintable per token |   |  Interest Rate (% Annual)  |   Call Fee (bips)  |
+| Collateral Token      | CREDIT mintable per token |  Interest Rate (% Annual)  |   Call Fee (bips)  |
 | ----------- | ----------- | ----------- | -----------|
 | ETH      | 1400       | 4  |  15 |
 | rETH | 800 | 3.5 | 25 | 
@@ -363,7 +363,7 @@ A few users begin to buy CREDIT on the AMM to start earning GUILD rewards (at fi
 
 Over time, as borrowers pay interest, the CREDIT price starts to drift up. The available lending terms are adjusted, and the bootstrappers close their AMM positions and repay their loans. Growing demand for CREDIT at this point is met mainly through borrowing against productive collateral like OUSG or stETH. When demand to repay loans or hold CREDIT spikes, users can still arbitrage against stable value collateral, but they must pay sufficient interest to justify GUILD holders voting for those loan terms.
 
-| Collateral Token      | CREDIT mintable per token |   |  Interest Rate (% Annual)  |   Call Fee (bips)  |
+|  Collateral Token      |  CREDIT mintable per token |  Interest Rate (% Annual)  |   Call Fee (bips)  |
 | ----------- | ----------- | ----------- | -----------|
 | ETH      | 2000       | 6  |  10 |
 | stETH | 1700 | 5 | 25 | 
