@@ -12,7 +12,9 @@ contract Loan {
         // this ratio is also used as the liquidation threshold
         // TODO: safemath so this can handle collateral tokens with small unit value
         uint256 interestRate; // the interest rate in terms of the borrow token, bips annual
-        uint256 callFee; // the fee users must pay to call the loan in terms of the borrow token, bips
+        uint256 callFee; // the fee users must pay to call the loan
+        // expressed in terms of the divisor to apply to the total debt
+        // 20 would imply a 5% call fee, 50 would imply a 2% call fee, and so on
     }
 
     struct DebtPosition {
@@ -85,6 +87,16 @@ contract Loan {
         ERC20(availableTerms[terms].collateralToken).transferFrom(msg.sender, address(this), collateralAmount);
         // pull debt tokens from lender and send to the borrower
         ERC20(availableTerms[terms].borrowToken).transferFrom(lender, msg.sender, borrowAmount);
+    }
+
+    function callPosition(uint256 index) public {
+        // pull the call fee from the caller, denominated in the borrow token
+        ERC20(availableTerms[debtPositions[index].terms].borrowToken).transferFrom(
+            msg.sender,
+            address(this),
+            debtPositions[index].debtBalance / availableTerms[debtPositions[index].terms].callFee
+        );
+        debtPositions[index].isCalled = true;
     }
 
     function getBorrowToken(uint256 id) external view returns (address) {
