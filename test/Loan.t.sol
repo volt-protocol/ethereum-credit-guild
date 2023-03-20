@@ -60,13 +60,16 @@ contract LoanTest is Test {
         vm.stopPrank();
         vm.startPrank(myLender);
         uint256 myBlock = block.number;
+        uint256 expectedBalance = 10000000000000000000000 - (10000000000000000000000 / 50);
         myLoan.callPosition(0);
         vm.stopPrank();
         assertEq(myLoan.getCallBlock(0), myBlock);
+        assertEq(myLoan.getDebtBalance(0), expectedBalance);
     }
 
     function testRepayBorrow() public {
         uint256 myExpectedBalance = 100000000000000000000000 - 400000000000000000;
+        uint256 myExpectedReturn = 10400000000000000000;
         vm.startPrank(myLender);
         myLendToken.approve(address(myLoan), 100000000000000000000000);
         myLoan.approveTerms(0);
@@ -77,7 +80,29 @@ contract LoanTest is Test {
         myLoan.borrowTokens(0, myLender, 10000000000000000000000, 10000000000000000000);
         vm.warp(block.timestamp + 31536000);
         myLoan.repayBorrow(0);
-        console.log(myLendToken.balanceOf(myBorrower));
-        assertEq(myLendToken.balanceOf(myBorrower), myExpectedBalance);
+        assertEq(myLendToken.balanceOf(myBorrower), myExpectedBalance, "The borrower's balance is incorrect.");
+        assertEq(myLendToken.balanceOf(address(myLoan)), myExpectedReturn, "The borrower did not repay the expected amount.");
+    }
+
+    // if the loan has been called, the borrower's debt should be lower
+    function testCallAndRepay() public {
+        uint256 myExpectedBalance = 100000000000000000000000 + (10000000000000000000 / 50);
+
+        vm.startPrank(myLender);
+        myLendToken.approve(address(myLoan), 100000000000000000000000);
+        myLoan.approveTerms(0);
+        vm.stopPrank();
+        vm.startPrank(myBorrower);
+        myCollateralToken.approve(address(myLoan), 100000000000000000000000);
+        myLendToken.approve(address(myLoan), 100000000000000000000000);
+        myLoan.borrowTokens(0, myLender, 10000000000000000000000, 10000000000000000000);
+        vm.stopPrank();
+        vm.startPrank(myLender);
+        myLoan.callPosition(0);
+        vm.stopPrank();
+        vm.startPrank(myBorrower);
+        myLoan.repayBorrow(0);
+        vm.stopPrank();
+        assertEq(myLendToken.balanceOf(myBorrower), myExpectedBalance, "The borrower's balance is incorrect.");
     }
 }

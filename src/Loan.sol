@@ -111,7 +111,7 @@ contract Loan {
         require(debtPositions[index].callBlock == 0); // require that the loan has not already been called
         require(debtPositions[index].debtBalance > 0); // require there is a nonzero debt balance
         debtPositions[index].callBlock = block.number; // set the call block to the current block
-        debtPositions[index].debtBalance -= debtPositions[index].debtBalance / availableTerms[debtPositions[index].terms].callFee; // deduct the call fee from the borrower's debt
+        debtPositions[index].debtBalance -= (debtPositions[index].debtBalance / availableTerms[debtPositions[index].terms].callFee); // deduct the call fee from the borrower's debt
     }
 
     // anyone can repay a debt on behalf of the borrower
@@ -137,7 +137,7 @@ contract Loan {
         debtPositions[index].callBlock = 0; // the loan can no longer be called or collateral seized once the debt is repaid
     }
 
-    function getDebtBalance(uint256 id) external view returns (uint256) {
+    function getDebtBalanceCurrent(uint256 id) external view returns (uint256) {
         return(
             debtPositions[id].debtBalance +
             (
@@ -154,5 +154,9 @@ contract Loan {
 
     function getBorrowToken(uint256 id) external view returns (address) {
         return availableTerms[id].borrowToken;
+    }
+
+    function getDebtBalance(uint256 id) external view returns (uint256) {
+        return debtPositions[id].debtBalance;
     }
 }
