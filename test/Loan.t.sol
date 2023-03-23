@@ -69,7 +69,7 @@ contract LoanTest is Test {
 
     function testRepayBorrow() public {
         uint256 myExpectedBalance = 100000000000000000000000 - 400000000000000000;
-        uint256 myExpectedReturn = 10400000000000000000;
+        uint256 myExpectedReturn = 100000000000000000000000 + 400000000000000000;
         vm.startPrank(myLender);
         myLendToken.approve(address(myLoan), 100000000000000000000000);
         vm.stopPrank();
@@ -80,7 +80,7 @@ contract LoanTest is Test {
         vm.warp(block.timestamp + 31536000);
         myLoan.repayBorrow(0);
         assertEq(myLendToken.balanceOf(myBorrower), myExpectedBalance, "The borrower's balance is incorrect.");
-        assertEq(myLendToken.balanceOf(address(myLoan)), myExpectedReturn, "The borrower did not repay the expected amount.");
+        assertEq(myLendToken.balanceOf(address(myLender)), myExpectedReturn, "The borrower did not repay the expected amount.");
     }
 
     // if the loan has been called, the borrower's debt should be lower

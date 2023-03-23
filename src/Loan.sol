@@ -41,7 +41,7 @@ contract LendingTerm {
         address lender;
         address borrower;
         uint256 debtBalance;
-        uint256 underlyingBalance;
+        uint256 collateralBalance;
         uint256 originationTime;
         uint256 callBlock;
     }
@@ -64,7 +64,7 @@ contract LendingTerm {
                     lender: lender,
                     borrower: msg.sender,
                     debtBalance: borrowAmount,
-                    underlyingBalance: 0,
+                    collateralBalance: collateralAmount,
                     originationTime: block.timestamp,
                     callBlock: 0 // a call block of zero indicates that the loan has not been called
                 }
@@ -104,11 +104,21 @@ contract LendingTerm {
                 (block.timestamp - debtPositions[index].originationTime) / 3153600000 // get the amount of time elapsed since borrow and convert to years
             );
 
+        // repay the lender
         ERC20(borrowToken).transferFrom(
             msg.sender,
-            address(this),
-            amountToPay);
-        debtPositions[index].underlyingBalance += amountToPay;
+            debtPositions[index].lender,
+            amountToPay
+        );
+
+        // release the borrower's collateral
+        uint256 amountToRelease = debtPositions[index].collateralBalance;
+        debtPositions[index].collateralBalance = 0;
+        ERC20(collateralToken).transfer(
+            msg.sender,
+            amountToRelease
+        );
+
         debtPositions[index].debtBalance = 0;
         debtPositions[index].callBlock = 0; // the loan can no longer be called or collateral seized once the debt is repaid
     }
