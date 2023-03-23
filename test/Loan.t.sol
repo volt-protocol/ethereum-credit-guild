@@ -15,7 +15,9 @@ contract testERC20 is ERC20 {
 }
 
 contract LoanTest is Test {
-    Loan public myLoan;
+
+    TermFactory public myTermFactory;
+    LendingTerm public myLoan;
     ERC20 public myLendToken;
     ERC20 public myCollateralToken;
 
@@ -24,26 +26,25 @@ contract LoanTest is Test {
 //function deal(address token, address to, uint256 give, bool adjust) external;
 
     function setUp() public {
-        myLoan = new Loan();
+        myTermFactory = new TermFactory();
         myLendToken = new testERC20("DAI Stablecoin", "DAI", 18, myLender, myBorrower, 100000000000000000000000);
         myCollateralToken = new testERC20("Wrapped Ether", "WETH", 18, myLender, myBorrower, 100000000000000000000000);
-        myLoan.defineTerms(address(myLendToken), address(myCollateralToken), 98, 4, 50, 100);
+        myLoan = LendingTerm(myTermFactory.defineTerms(address(myLendToken), address(myCollateralToken), 98, 4, 50, 100));
     }
 
     // test that a new loan term can be defined and that the borrow token is encoded correctly
     function testDefineTerms() public {
-        assertEq(myLoan.getBorrowToken(0), address(myLendToken));
+        assertEq(myLoan.borrowToken(), address(myLendToken));
     }
 //    function borrowTokens(uint256 terms, address lender, uint256 collateralAmount, uint256 borrowAmount) public {
 
     function testBorrowTokens() public {
         vm.startPrank(myLender);
         myLendToken.approve(address(myLoan), 100000000000000000000000);
-        myLoan.approveTerms(0);
         vm.stopPrank();
         vm.startPrank(myBorrower);
         myCollateralToken.approve(address(myLoan), 100000000000000000000000);
-        myLoan.borrowTokens(0, myLender, 100000000000000000000000, 100000000000000000000000);
+        myLoan.borrowTokens(myLender, 100000000000000000000000, 100000000000000000000000);
         vm.stopPrank();
         assertEq(myLendToken.balanceOf(myBorrower), 200000000000000000000000, "Borrow token balance is not correct.");
         assertEq(myCollateralToken.balanceOf(myBorrower), 0, "Collateral token balance is not correct.");
@@ -52,11 +53,10 @@ contract LoanTest is Test {
     function testCallLoan() public {
         vm.startPrank(myLender);
         myLendToken.approve(address(myLoan), 100000000000000000000000);
-        myLoan.approveTerms(0);
         vm.stopPrank();
         vm.startPrank(myBorrower);
         myCollateralToken.approve(address(myLoan), 100000000000000000000000);
-        myLoan.borrowTokens(0, myLender, 10000000000000000000000, 10000000000000000000000);
+        myLoan.borrowTokens(myLender, 10000000000000000000000, 10000000000000000000000);
         vm.stopPrank();
         vm.startPrank(myLender);
         uint256 myBlock = block.number;
@@ -72,12 +72,11 @@ contract LoanTest is Test {
         uint256 myExpectedReturn = 10400000000000000000;
         vm.startPrank(myLender);
         myLendToken.approve(address(myLoan), 100000000000000000000000);
-        myLoan.approveTerms(0);
         vm.stopPrank();
         vm.startPrank(myBorrower);
         myCollateralToken.approve(address(myLoan), 100000000000000000000000);
         myLendToken.approve(address(myLoan), 100000000000000000000000);
-        myLoan.borrowTokens(0, myLender, 10000000000000000000000, 10000000000000000000);
+        myLoan.borrowTokens(myLender, 10000000000000000000000, 10000000000000000000);
         vm.warp(block.timestamp + 31536000);
         myLoan.repayBorrow(0);
         assertEq(myLendToken.balanceOf(myBorrower), myExpectedBalance, "The borrower's balance is incorrect.");
@@ -90,12 +89,11 @@ contract LoanTest is Test {
 
         vm.startPrank(myLender);
         myLendToken.approve(address(myLoan), 100000000000000000000000);
-        myLoan.approveTerms(0);
         vm.stopPrank();
         vm.startPrank(myBorrower);
         myCollateralToken.approve(address(myLoan), 100000000000000000000000);
         myLendToken.approve(address(myLoan), 100000000000000000000000);
-        myLoan.borrowTokens(0, myLender, 10000000000000000000000, 10000000000000000000);
+        myLoan.borrowTokens(myLender, 10000000000000000000000, 10000000000000000000);
         vm.stopPrank();
         vm.startPrank(myLender);
         myLoan.callPosition(0);
