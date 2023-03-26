@@ -4,9 +4,38 @@ pragma solidity ^0.8.13;
 import "./Loan.sol";
 import "lib/solmate/src/tokens/ERC20.sol";
 
+contract Guild is ERC20 {
+    address public governor;
+    uint256 public voteRatio; // the amount of credit allocated per GUILD token when voting
+
+    modifier onlyGovernor() {
+        require(msg.sender == governor, "Only the governor can do that.");
+        _;
+    }
+
+    constructor(address _governor, uint256 _voteRatio) ERC20("Guild", "GUILD", 18) {
+        governor = _governor;
+        voteRatio = _voteRatio;
+    }
+
+    function mint(address account, uint256 amount) public onlyGovernor {
+        _mint(account, amount);
+    }
+
+    function burn(address account, uint256 amount) public onlyGovernor {
+        _burn(account, amount);
+    }
+
+    function setVoteRatio(uint256 _voteRatio) public onlyGovernor {
+        voteRatio = _voteRatio;
+    }
+
+}
+
 contract CreditLendingTerm {
 
     address public governor;
+    address public guild;
     address public credit;
     address public collateralToken;
     uint256 public collateralRatio;
@@ -14,13 +43,19 @@ contract CreditLendingTerm {
     uint256 public callFee;
     uint256 public callPeriod;
 
+    uint256 public availableCredit;
+
+    // keep track of how many GUILD tokens are voting for this lending term per address
+    mapping(address => uint256) public votes;
+
     modifier onlyGovernor() {
         require(msg.sender == governor, "Only the governor can do that.");
         _;
     }
 
-    constructor(address _governor, address _credit, address _collateralToken, uint256 _collateralRatio, uint256 _interestRate, uint256 _callFee, uint256 _callPeriod) {
+    constructor(address _governor, address _guild, address _credit, address _collateralToken, uint256 _collateralRatio, uint256 _interestRate, uint256 _callFee, uint256 _callPeriod) {
         governor = _governor;
+        guild = _guild;
         credit = _credit;
         collateralToken = _collateralToken;
         collateralRatio = _collateralRatio;
@@ -58,8 +93,6 @@ contract CreditLendingTerm {
     }
 
     DebtPosition[] public debtPositions;
-
-    uint256 public availableCredit;
 
     function setAvailableCredit(uint256 _availableCredit) public onlyGovernor {
         availableCredit = _availableCredit;
@@ -119,6 +152,29 @@ contract CreditLendingTerm {
         // transfer the collateral token to the governor
         ERC20(collateralToken).transfer(governor, debtPosition.collateralBalance);
     }
+
+    function voteForLendingTerm(uint256 amount) public {
+        // transfer the GUILD tokens from the caller to this contract
+        ERC20(guild).transferFrom(msg.sender, address(this), amount);
+        // increment the caller's vote balance
+        votes[msg.sender] = votes[msg.sender] + amount;
+        // increment the available credit based on the vote ratio
+        availableCredit = availableCredit + amount * Guild(guild).voteRatio();
+    }
+
+    // allow withdrawing votes only if there is available credit
+    function withdrawVotes(uint256 amount) public {
+        // require that the caller has enough votes
+        require(votes[msg.sender] >= amount, "You don't have enough votes.");
+        // require that the available credit is greater than the amount of votes being withdrawn
+        require(availableCredit >= amount * Guild(guild).voteRatio(), "There is not enough credit available.");
+        // decrement the caller's vote balance
+        votes[msg.sender] = votes[msg.sender] - amount;
+        // decrement the available credit based on the vote ratio
+        availableCredit = availableCredit - amount * Guild(guild).voteRatio();
+        // transfer the GUILD tokens from this contract to the caller
+        ERC20(guild).transfer(msg.sender, amount);
+    } 
 }
 
 contract Credit is ERC20 {
@@ -127,9 +183,11 @@ contract Credit is ERC20 {
     mapping(address => uint256) public availableCredit;
 
     address public governor;
+    address public guild;
 
-    constructor(string memory _name, string memory _symbol, address _governor) ERC20(_name, _symbol, 18) {
+    constructor(string memory _name, string memory _symbol, address _governor, address _guild) ERC20(_name, _symbol, 18) {
         governor = _governor;
+        guild = _guild;
     }
 
     mapping(address => bool) public approvedLendingTerms;
@@ -146,7 +204,7 @@ contract Credit is ERC20 {
 
     // define a new lending term
     function defineLendingTerm(address collateralToken, uint256 collateralRatio, uint256 interestRate, uint256 callFee, uint256 callPeriod) public returns (address) {
-        CreditLendingTerm lendingTerm = new CreditLendingTerm(governor, address(this), collateralToken, collateralRatio, interestRate, callFee, callPeriod);
+        CreditLendingTerm lendingTerm = new CreditLendingTerm(governor, guild, address(this), collateralToken, collateralRatio, interestRate, callFee, callPeriod);
         return address(lendingTerm);
     }
 

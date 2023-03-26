@@ -16,10 +16,14 @@ contract CreditTest is Test {
 
     Credit credit;
     address governor;
+    Guild guild;
 
     function setUp() public {
         governor = address(0x1);
-        credit = new Credit("Credit", "CREDIT", governor);
+
+        guild = new Guild(governor, 100);
+
+        credit = new Credit("Credit", "CREDIT", governor, address(guild));
     }
 
 //     // test define lending term
