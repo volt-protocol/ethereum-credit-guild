@@ -14,6 +14,7 @@ contract myCollateralToken is ERC20 {
 
 contract CreditTest is Test {
 
+    Core core;
     Credit credit;
     address governor;
     Guild guild;
@@ -21,9 +22,11 @@ contract CreditTest is Test {
     function setUp() public {
         governor = address(0x1);
 
-        guild = new Guild(governor, 100);
+        core = new Core(governor, 50, 100);
 
-        credit = new Credit("Credit", "CREDIT", governor, address(guild));
+        credit = Credit(core.credit());
+        guild = Guild(core.guild());
+
     }
 
 //     // test define lending term
@@ -34,8 +37,6 @@ contract CreditTest is Test {
         uint256 callFee = 20;
         uint256 callPeriod = 100;
         address lendingTerm = address(credit.defineLendingTerm(collateralToken, collateralRatio, interestRate, callFee, callPeriod));
-        assertEq(CreditLendingTerm(lendingTerm).governor(), governor);
-        assertEq(CreditLendingTerm(lendingTerm).credit(), address(credit));
         assertEq(CreditLendingTerm(lendingTerm).collateralToken(), collateralToken);
         assertEq(CreditLendingTerm(lendingTerm).collateralRatio(), collateralRatio);
         assertEq(CreditLendingTerm(lendingTerm).interestRate(), interestRate);
