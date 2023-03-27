@@ -33,7 +33,7 @@ contract CreditTest is Test {
     function testDefineLendingTerm() public {
         address collateralToken = address(new myCollateralToken(address(this), 1000));
         uint256 collateralRatio = 2;
-        uint256 interestRate = 10;
+        uint256 interestRate = 2e16;
         uint256 callFee = 20;
         uint256 callPeriod = 100;
         address lendingTerm = address(credit.defineLendingTerm(collateralToken, collateralRatio, interestRate, callFee, callPeriod));
@@ -110,7 +110,43 @@ contract CreditTest is Test {
 
         // check that the borrower's credit balance is equal to 100 minus the interest
         assertEq(credit.balanceOf(borrower), 100 - interest);
+    }
 
-
+    // test calling a loan
+    function testcallPosition() public {
+        // create a borrower and a collateral token
+        address borrower = address(0x2);
+        address collateralToken = address(new myCollateralToken(borrower, 1000));
+        // create a new lending term
+        uint256 collateralRatio = 2;
+        uint256 interestRate = 10;
+        uint256 callFee = 20;
+        uint256 callPeriod = 100;
+        address lendingTerm = address(credit.defineLendingTerm(collateralToken, collateralRatio, interestRate, callFee, callPeriod));
+        // as the governor, approve the lending term and set its credit limit to 10^20
+        vm.startPrank(governor);
+        credit.approveLendingTerm(lendingTerm);
+        CreditLendingTerm(lendingTerm).setAvailableCredit(10**20);
+        vm.stopPrank();
+        // as the borrower, borrow 100 tokens
+        vm.startPrank(borrower);
+        myCollateralToken(collateralToken).approve(lendingTerm, 100);
+        CreditLendingTerm(lendingTerm).borrowTokens(100, 100);
+        vm.stopPrank();
+        // create a caller address and give them 100 credit tokens
+        address caller = address(0x3);
+        vm.startPrank(governor);
+        credit.mintForGovernor(caller, 100);
+        vm.stopPrank();
+        // warp to 10 minutes later and call the loan
+        vm.warp(block.timestamp + 10 minutes);
+        vm.startPrank(caller);
+        credit.approve(lendingTerm, 100);
+        CreditLendingTerm(lendingTerm).callPosition(0);
+        vm.stopPrank();
+        // check that the caller's credit balance is 100 minus the call fee
+        // calculate the fee paid based on the call fee and the borrow amount
+        uint256 fee = 100 / 20;
+        assertEq(credit.balanceOf(caller), 100 - fee);
     }
 }

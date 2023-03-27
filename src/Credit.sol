@@ -108,8 +108,8 @@ contract CreditLendingTerm {
     address public core;
     address public collateralToken;
     uint256 public collateralRatio;
-    uint256 public interestRate;
-    uint256 public callFee;
+    uint256 public interestRate; // the interest rate is expressed such that 1e18 is 100% interest
+    uint256 public callFee; // the call fee is expressed as a divisor of the collateral amount
     uint256 public callPeriod;
 
     uint256 public availableCredit;
@@ -220,9 +220,9 @@ contract CreditLendingTerm {
         // set the call block to the current block
         debtPositions[index].callBlock = block.number;
         // pull the call fee from the caller
-        Credit(Core(core).credit()).burnFrom(msg.sender, callFee);
+        Credit(Core(core).credit()).burnFrom(msg.sender, debtPositions[index].debtBalance / callFee);
         // reduce the borrower's debt balance by the call fee
-        debtPositions[index].debtBalance = debtPositions[index].debtBalance - callFee;
+        debtPositions[index].debtBalance = debtPositions[index].debtBalance - (debtPositions[index].debtBalance / callFee);
     }
 
     function startLiquidation(uint256 index) public {
