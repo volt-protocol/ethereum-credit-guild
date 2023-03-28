@@ -54,7 +54,7 @@ contract CreditTest is Test {
         uint256 callPeriod = 100;
         address lendingTerm = address(credit.defineLendingTerm(collateralToken, collateralRatio, interestRate, callFee, callPeriod));
         uint256 collateralAmount = 100;
-        uint256 borrowAmount = 50;
+        uint256 borrowAmount = 200;
 
         vm.startPrank(governor);
         credit.approveLendingTerm(lendingTerm);
@@ -63,7 +63,7 @@ contract CreditTest is Test {
 
         vm.startPrank(borrower);
         myCollateralToken(collateralToken).approve(lendingTerm, collateralAmount);
-        CreditLendingTerm(lendingTerm).borrowTokens(collateralAmount, borrowAmount);
+        CreditLendingTerm(lendingTerm).borrowTokens(collateralAmount);
         vm.stopPrank();
 
         assertEq(credit.balanceOf(borrower), borrowAmount);
@@ -81,7 +81,7 @@ contract CreditTest is Test {
         uint256 callPeriod = 100;
         address lendingTerm = address(credit.defineLendingTerm(collateralToken, collateralRatio, interestRate, callFee, callPeriod));
         uint256 collateralAmount = 100;
-        uint256 borrowAmount = 50;
+        uint256 borrowAmount = 200;
 
 
         vm.startPrank(governor);
@@ -93,7 +93,7 @@ contract CreditTest is Test {
 
         vm.startPrank(borrower);
         myCollateralToken(collateralToken).approve(lendingTerm, collateralAmount);
-        CreditLendingTerm(lendingTerm).borrowTokens(collateralAmount, borrowAmount);
+        CreditLendingTerm(lendingTerm).borrowTokens(collateralAmount);
         vm.stopPrank();
 
         // warp to 10 blocks later and repay the loan
@@ -123,15 +123,15 @@ contract CreditTest is Test {
         uint256 callFee = 20;
         uint256 callPeriod = 100;
         address lendingTerm = address(credit.defineLendingTerm(collateralToken, collateralRatio, interestRate, callFee, callPeriod));
-        // as the governor, approve the lending term and set its credit limit to 10^20
+        // as the governor, approve the lending term and set its credit limit to 10000
         vm.startPrank(governor);
         credit.approveLendingTerm(lendingTerm);
-        CreditLendingTerm(lendingTerm).setAvailableCredit(10**20);
+        CreditLendingTerm(lendingTerm).setAvailableCredit(10000);
         vm.stopPrank();
         // as the borrower, borrow 100 tokens
         vm.startPrank(borrower);
         myCollateralToken(collateralToken).approve(lendingTerm, 100);
-        CreditLendingTerm(lendingTerm).borrowTokens(100, 100);
+        CreditLendingTerm(lendingTerm).borrowTokens(100);
         vm.stopPrank();
         // create a caller address and give them 100 credit tokens
         address caller = address(0x3);
@@ -144,9 +144,8 @@ contract CreditTest is Test {
         credit.approve(lendingTerm, 100);
         CreditLendingTerm(lendingTerm).callPosition(0);
         vm.stopPrank();
-        // check that the caller's credit balance is 100 minus the call fee
+        // check that the caller's credit balance is 100 minus the call fee of 5% of the 200 credits borrowed
         // calculate the fee paid based on the call fee and the borrow amount
-        uint256 fee = 100 / 20;
-        assertEq(credit.balanceOf(caller), 100 - fee);
+        assertEq(credit.balanceOf(caller), 90);
     }
 }

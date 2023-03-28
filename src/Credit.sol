@@ -107,8 +107,8 @@ contract CreditLendingTerm {
 
     address public core;
     address public collateralToken;
-    uint256 public collateralRatio;
-    uint256 public interestRate; // the interest rate is expressed such that 1e18 is 100% interest
+    uint256 public collateralRatio; // in terms of how many credits borrowable per collateral token
+    uint256 public interestRate; // the interest rate is expressed in terms
     uint256 public callFee; // the call fee is expressed as a divisor of the collateral amount
     uint256 public callPeriod;
 
@@ -177,13 +177,12 @@ contract CreditLendingTerm {
         isSlashable = _isSlashable;
     }
 
-    function borrowTokens(uint256 collateralAmount, uint256 borrowAmount) public {
-        require(collateralRatio * collateralAmount >= borrowAmount, "You can't borrow that much.");
-        require(borrowAmount <= availableCredit, "Not enough credit available.");
-        availableCredit = availableCredit - borrowAmount;
-        debtPositions.push(DebtPosition(msg.sender, borrowAmount, collateralAmount, block.timestamp, block.number + callPeriod, false));
+    function borrowTokens(uint256 collateralAmount) public {
+        require(collateralRatio * collateralAmount <= availableCredit, "Not enough credit available.");
+        availableCredit = availableCredit - collateralRatio * collateralAmount;
+        debtPositions.push(DebtPosition(msg.sender, collateralRatio * collateralAmount, collateralAmount, block.timestamp, block.number + callPeriod, false));
         ERC20(collateralToken).transferFrom(msg.sender, address(this), collateralAmount);
-        Credit(Core(core).credit()).mintForLoan(msg.sender, borrowAmount);
+        Credit(Core(core).credit()).mintForLoan(msg.sender, collateralRatio * collateralAmount);
     }
 
     // anyone can repay a loan
