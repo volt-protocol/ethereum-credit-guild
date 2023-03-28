@@ -4,6 +4,20 @@ pragma solidity ^0.8.13;
 import "./Loan.sol";
 import "lib/solmate/src/tokens/ERC20.sol";
 
+/*
+
+System overview
+
+GUILD holders can propose new lending terms and allocate debt limits
+collateral holders can borrow credits
+borrowers can repay credits
+anyone can call loans by paying the call fee
+anyone can bid on loans by paying the debt amount after the call period
+the market price of credit depends on the nature of the collateral, the call fees, and the interest rates available
+at start the system will target $1 by convention, but this is not hardcoded anywhere
+
+*/
+
 contract Core {
     address public governor;
     address public credit;
