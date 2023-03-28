@@ -39,7 +39,7 @@ contract AuctionHouse {
         // at the call block, auction offers none of the collateral, and increments each block after by the increment
         // the auction ends when an amount of the collateral is accepted in exchange for enough credit to pay off the debt,
         // or when a partial repayment is accepted
-        uint256 amountToAccept = block.number - CreditLendingTerm(terms).getCallBlock(position) * CreditLendingTerm(terms).getCollateralBalance(position) / duration;
+        uint256 amountToAccept = block.timestamp - CreditLendingTerm(terms).getCallBlock(position) * CreditLendingTerm(terms).getCollateralBalance(position) / duration;
 
         // if the amount of collateral  is less than or equal to the available collateralAmount,
         if (amountToAccept <= CreditLendingTerm(terms).getCollateralBalance(position)) {
@@ -144,7 +144,7 @@ contract CreditLendingTerm {
         uint256 debtBalance;
         uint256 collateralBalance;
         uint256 originationTime;
-        uint256 callBlock;
+        uint256 callTime;
         bool isInLiquidation;
     }
 
@@ -165,7 +165,7 @@ contract CreditLendingTerm {
     }
 
     function getCallBlock(uint256 index) public view returns (uint256) {
-        return debtPositions[index].callBlock;
+        return debtPositions[index].callTime;
     }
 
     function getLiquidationStatus(uint256 index) public view returns (bool) {
@@ -220,9 +220,9 @@ contract CreditLendingTerm {
 
     function callPosition(uint256 index) public {
         // require that the loan has not yet been called
-        require(debtPositions[index].callBlock == 0, "This loan has already been called.");
+        require(debtPositions[index].callTime == 0, "This loan has already been called.");
         // set the call block to the current block
-        debtPositions[index].callBlock = block.number;
+        debtPositions[index].callTime = block.timestamp;
         // pull the call fee from the caller
         Credit(Core(core).credit()).burnFrom(msg.sender, debtPositions[index].debtBalance / callFee);
         // reduce the borrower's debt balance by the call fee
@@ -231,7 +231,7 @@ contract CreditLendingTerm {
 
     function startLiquidation(uint256 index) public {
         // require that the loan has been called
-        require(debtPositions[index].callBlock > 0, "This loan has not been called.");
+        require(debtPositions[index].callTime > 0, "This loan has not been called.");
 
         // calculate the interest based on the time elapsed since origination
         uint256 interest = debtPositions[index].debtBalance / interestRate * (block.timestamp - debtPositions[index].originationTime) / 365 days;
