@@ -45,7 +45,10 @@ contract AuctionHouse {
         // calculate the amount of collateral that is available to be claimed
         uint256 collateralAvailable = CreditLendingTerm(terms).getCollateralBalance(index) * timePassed / duration;
         // pull an amount of credits from the bidder equal to the debt amount
-        ERC20(Core(core).credit()).transferFrom(msg.sender, address(this), CreditLendingTerm(terms).getDebtBalance(index));
+        ERC20(Core(core).credit()).transferFrom(msg.sender, 
+                                                address(this), 
+                                                CreditLendingTerm(terms).getDebtBalance(index) + 
+                                                (CreditLendingTerm(terms).getDebtBalance(index) * Credit(Core(core).credit()).debtDiscountRate()));
         // transfer the collateral to the bidder
         ERC20(CreditLendingTerm(terms).collateralToken()).transfer(msg.sender, collateralAvailable);
         // transfer the remaining collateral to the borrower
@@ -62,7 +65,10 @@ contract AuctionHouse {
         // calculate how much time has passed since the loan was called
         uint256 timePassed = block.timestamp - CreditLendingTerm(terms).getCallTime(index);
         // calculate the amount of debt the protocol will accept for partial repayment
-        uint256 debtAccepted = CreditLendingTerm(terms).getDebtBalance(index) / timePassed * duration;
+        uint256 debtAccepted = (CreditLendingTerm(terms).getDebtBalance(index) + 
+                                (CreditLendingTerm(terms).getDebtBalance(index) * (Credit(Core(core).credit()).debtDiscountRate()))) 
+                                / timePassed 
+                                * duration;
         // pull an amount of credits from the bidder equal to the debt accepted
         ERC20(Core(core).credit()).transferFrom(msg.sender, address(this), debtAccepted);
         // transfer the collateral to the bidder
@@ -73,7 +79,7 @@ contract AuctionHouse {
         // calculate the ratio between the bad debt and the credit total supply
         uint256 badDebtRatio = ERC20(Core(core).credit()).totalSupply() / (CreditLendingTerm(terms).getDebtBalance(index) - debtAccepted);
         // update the debtDiscountRate of the credit token
-        Credit(Core(core).credit()).setDebtDiscountRate(badDebtRatio);
+        Credit(Core(core).credit()).setDebtDiscountRate(Credit(Core(core).credit()).debtDiscountRate() + (10**18 / badDebtRatio));
 
         // delete the debt position
         CreditLendingTerm(terms).deleteDebtPosition(index);
@@ -223,12 +229,6 @@ contract CreditLendingTerm {
         delete debtPositions[index];
     }
 
-    // TODO: two mechanisms for calling
-    // if a GUILD holder calls, charge them a fee in GUILD and reduce debt in CREDIT
-    // if a CREDIT holder calls, charge them a larger fee in CREDIT and burn it
-    // goal: incentivize GUILD holders to call loans
-    // prevent bank runs by making it expensive for CREDIT holders to call loans,
-    // and burn the CREDIT tokens to reduce bad debt outstanding
     function callPosition(uint256 index) public {
         // require that the loan has not yet been called
         require(debtPositions[index].callTime == 0, "This loan has already been called.");
@@ -292,12 +292,14 @@ contract Credit is ERC20 {
 
     address public core;
     uint256 public debtDiscountRate; // the discount applied to the credit supply to account for bad debt
-    // in terms of a divisor to apply to the exchange rate between CREDIT tokens and credit-denominated debt
-    // starts at 1, meaning no discount
+    // in terms of the difference 1 debt credit - 1 credit token (18 decimals)
+    // zero means they are equal
+    // 10**17 means that 1 credit token is worth 0.9 debt credit tokens
+    // 10**18 means that 1 credit token is worth nothing
 
     constructor(string memory _name, string memory _symbol, address _core) ERC20(_name, _symbol, 18) {
         core = _core;
-        debtDiscountRate = 1;
+        debtDiscountRate = 0;
     }
 
     mapping(address => bool) public approvedLendingTerms;
