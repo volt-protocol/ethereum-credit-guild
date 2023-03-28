@@ -22,7 +22,7 @@ contract CreditTest is Test {
     function setUp() public {
         governor = address(0x1);
 
-        core = new Core(governor, 50, 100);
+        core = new Core(governor, 1000, 100);
 
         credit = Credit(core.credit());
         guild = Guild(core.guild());
@@ -190,5 +190,65 @@ contract CreditTest is Test {
         assertEq(CreditLendingTerm(lendingTerm).getLiquidationStatus(0), true);
         // check that the debt balance was decreased by the call fee and then increased by the interest
         assertEq(CreditLendingTerm(lendingTerm).getDebtBalance(0), 191);
+    }
+
+    function testBid() public {
+                // create a borrower and a collateral token
+        address borrower = address(0x2);
+        address collateralToken = address(new myCollateralToken(borrower, 1000));
+        // create a new lending term
+        uint256 collateralRatio = 2;
+        uint256 interestRate = 10;
+        uint256 callFee = 20;
+        uint256 callPeriod = 100;
+        address lendingTerm = address(credit.defineLendingTerm(collateralToken, collateralRatio, interestRate, callFee, callPeriod));
+        // as the governor, approve the lending term and set its credit limit to 10000
+        vm.startPrank(governor);
+        credit.approveLendingTerm(lendingTerm);
+        CreditLendingTerm(lendingTerm).setAvailableCredit(10000);
+        vm.stopPrank();
+        // as the borrower, borrow 100 tokens
+        vm.startPrank(borrower);
+        myCollateralToken(collateralToken).approve(lendingTerm, 100);
+        CreditLendingTerm(lendingTerm).borrowTokens(100);
+        vm.stopPrank();
+        // create a caller address and give them 100 credit tokens
+        address caller = address(0x3);
+        vm.startPrank(governor);
+        credit.mintForGovernor(caller, 100);
+        vm.stopPrank();
+        // warp to 1 month later and call the loan
+        vm.warp(block.timestamp + 30 days);
+        vm.startPrank(caller);
+        credit.approve(lendingTerm, 100);
+        CreditLendingTerm(lendingTerm).callPosition(0);
+        vm.stopPrank();
+        // warp to 500 seconds later and start a liquidation
+        vm.warp(block.timestamp + 500);
+        vm.startPrank(caller);
+        CreditLendingTerm(lendingTerm).startLiquidation(0);
+        vm.stopPrank();
+       
+        // create a bidder address and give them 1000 credit tokens
+        address bidder = address(0x4);
+        vm.startPrank(governor);
+        credit.mintForGovernor(bidder, 1000);
+        vm.stopPrank();
+
+        // store the current debt balance
+        uint256 debtBalance = CreditLendingTerm(lendingTerm).getDebtBalance(0);
+        
+        // bid in the auction
+        vm.startPrank(bidder);
+        credit.approve(Core(core).auctionHouse(), 300);
+        AuctionHouse(Core(core).auctionHouse()).bid(lendingTerm, 0);
+        vm.stopPrank();
+
+        // check that the bidder received 50 collateral tokens
+        assertEq(myCollateralToken(collateralToken).balanceOf(bidder), 50);
+        // check that the bidder's credit balance decreased by the debt balance
+        assertEq(credit.balanceOf(bidder), 1000 - debtBalance);
+        // check that the borrower's collateral balance increased by 50
+        assertEq(myCollateralToken(collateralToken).balanceOf(borrower), 950);
     }
 }

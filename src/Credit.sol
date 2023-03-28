@@ -22,7 +22,7 @@ contract Core {
 
 contract AuctionHouse {
     address public core;
-    uint256 public duration;
+    uint256 public duration; // the time until the borrower's full collateral is available since the call time, in seconds
 
     constructor(address _core, uint256 _duration) {
         core = _core;
@@ -34,44 +34,43 @@ contract AuctionHouse {
         _;
     }
 
-    // starting from zero tokens, increment up the amount of collateral offered in exchange for enough credit to pay off the debt
-    function bid(address terms, uint256 position) public {
-        // at the call block, auction offers none of the collateral, and increments each block after by the increment
-        // the auction ends when an amount of the collateral is accepted in exchange for enough credit to pay off the debt,
-        // or when a partial repayment is accepted
-        uint256 amountToAccept = block.timestamp - CreditLendingTerm(terms).getCallBlock(position) * CreditLendingTerm(terms).getCollateralBalance(position) / duration;
+    // inputs: the address of the lendingTerm, and the index of the debtPosition
+    function bid(address terms, uint256 index) public {
+        // require that the position is under liquidation
+        require(CreditLendingTerm(terms).getLiquidationStatus(index), "The position is not under liquidation.");
+        // require that the position is not past the duration
+        require(block.timestamp - CreditLendingTerm(terms).getCallTime(index) <= duration, "The position is past the duration.");
+        // calculate how much time has passed since the loan was called
+        uint256 timePassed = block.timestamp - CreditLendingTerm(terms).getCallTime(index);
+        // calculate the amount of collateral that is available to be claimed
+        uint256 collateralAvailable = CreditLendingTerm(terms).getCollateralBalance(index) * timePassed / duration;
+        // pull an amount of credits from the bidder equal to the debt amount
+        ERC20(Core(core).credit()).transferFrom(msg.sender, address(this), CreditLendingTerm(terms).getDebtBalance(index));
+        // transfer the collateral to the bidder
+        ERC20(CreditLendingTerm(terms).collateralToken()).transfer(msg.sender, collateralAvailable);
+        // transfer the remaining collateral to the borrower
+        ERC20(CreditLendingTerm(terms).collateralToken()).transfer(CreditLendingTerm(terms).getBorrower(index), CreditLendingTerm(terms).getCollateralBalance(index) - collateralAvailable);
+        // delete the debt position
+        CreditLendingTerm(terms).deleteDebtPosition(index);
+    }
 
-        // if the amount of collateral  is less than or equal to the available collateralAmount,
-        if (amountToAccept <= CreditLendingTerm(terms).getCollateralBalance(position)) {
-            // send that amount of collateral from this contract to the bidder and pull credit tokens from the bidder to this contract to repay the debt
-            ERC20(CreditLendingTerm(terms).collateralToken()).transfer(msg.sender, amountToAccept);
-            // pull credit tokens from the bidder equal to the debt amount
-            ERC20(Core(core).credit()).transferFrom(msg.sender, address(this), CreditLendingTerm(terms).getDebtBalance(position));
-            // send any remaining collateral to the borrower
-            ERC20(CreditLendingTerm(terms).collateralToken()).transfer(CreditLendingTerm(terms).getBorrower(position), CreditLendingTerm(terms).getCollateralBalance(position) - amountToAccept);
-            // burn the credit tokens
-            Credit(Core(core).credit()).burnFromAuctionHouse(CreditLendingTerm(terms).getDebtBalance(position));
-        }
-
-        // otherwise, if the amount of collateral is greater than the available collateralAmount,
-        else {
-            // send the entire collateralAmount from this contract to the bidder and pull credit tokens from the bidder to this contract to repay the debt
-            ERC20(CreditLendingTerm(terms).collateralToken()).transfer(msg.sender, CreditLendingTerm(terms).getCollateralBalance(position));
-            // pull credit tokens from the bidder equal to the debt amount times the collateralAmount divided by the amountToAccept
-            ERC20(Core(core).credit()).transferFrom(
-                msg.sender, 
-                address(this), 
-                (CreditLendingTerm(terms).getDebtBalance(position) * CreditLendingTerm(terms).getCollateralBalance(position) / amountToAccept));
-            // burn the credit tokens
-            Credit(Core(core).credit()).burnFromAuctionHouse(CreditLendingTerm(terms).getDebtBalance(position) * CreditLendingTerm(terms).getCollateralBalance(position) / amountToAccept);
-            // set the isSlashable flag to true on the LendingTerm contract
-            // in this MVP, if any bad debt occurs in a lending term, it is defunct and voters there can be slashed
-            // governance may reenable it later if appropriate
-            CreditLendingTerm(terms).setIsSlashable(true);
-        }
-
-        // delete the associated debt position
-        CreditLendingTerm(terms).deleteDebtPosition(position);
+    function bidPartial(address terms, uint256 index) public {
+        // require that the position is under liquidation
+        require(CreditLendingTerm(terms).getLiquidationStatus(index), "The position is not under liquidation.");
+        // require that the position is past the duration
+        require(block.timestamp - CreditLendingTerm(terms).getCallTime(index) > duration, "The position is not past the duration.");
+        // calculate how much time has passed since the loan was called
+        uint256 timePassed = block.timestamp - CreditLendingTerm(terms).getCallTime(index);
+        // calculate the amount of debt the protocol will accept for partial repayment
+        uint256 debtAccepted = CreditLendingTerm(terms).getDebtBalance(index) / timePassed * duration;
+        // pull an amount of credits from the bidder equal to the debt accepted
+        ERC20(Core(core).credit()).transferFrom(msg.sender, address(this), debtAccepted);
+        // transfer the collateral to the bidder
+        ERC20(CreditLendingTerm(terms).collateralToken()).transfer(msg.sender, CreditLendingTerm(terms).getCollateralBalance(index));
+        // set the lending term to slashable
+        CreditLendingTerm(terms).setSlashable(true);
+        // delete the debt position
+        CreditLendingTerm(terms).deleteDebtPosition(index);
     }
 }
 
@@ -164,7 +163,7 @@ contract CreditLendingTerm {
         return debtPositions[index].originationTime;
     }
 
-    function getCallBlock(uint256 index) public view returns (uint256) {
+    function getCallTime(uint256 index) public view returns (uint256) {
         return debtPositions[index].callTime;
     }
 
@@ -178,7 +177,7 @@ contract CreditLendingTerm {
         availableCredit = _availableCredit;
     }
 
-    function setIsSlashable(bool _isSlashable) public onlyAuctionHouse {
+    function setSlashable(bool _isSlashable) public onlyAuctionHouse {
         isSlashable = _isSlashable;
     }
 
