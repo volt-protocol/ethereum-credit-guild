@@ -185,7 +185,7 @@ contract CreditLendingTerm {
     function borrowTokens(uint256 collateralAmount) public {
         require(collateralRatio * collateralAmount <= availableCredit, "Not enough credit available.");
         availableCredit = availableCredit - collateralRatio * collateralAmount;
-        debtPositions.push(DebtPosition(msg.sender, collateralRatio * collateralAmount, collateralAmount, block.timestamp, block.number + callPeriod, false));
+        debtPositions.push(DebtPosition(msg.sender, collateralRatio * collateralAmount, collateralAmount, block.timestamp, 0, false));
         ERC20(collateralToken).transferFrom(msg.sender, address(this), collateralAmount);
         Credit(Core(core).credit()).mintForLoan(msg.sender, collateralRatio * collateralAmount);
     }
@@ -220,7 +220,7 @@ contract CreditLendingTerm {
 
     function callPosition(uint256 index) public {
         // require that the loan has not yet been called
-        require(debtPositions[index].callBlock > block.number, "This loan has already been called.");
+        require(debtPositions[index].callBlock == 0, "This loan has already been called.");
         // set the call block to the current block
         debtPositions[index].callBlock = block.number;
         // pull the call fee from the caller

@@ -96,8 +96,8 @@ contract CreditTest is Test {
         CreditLendingTerm(lendingTerm).borrowTokens(collateralAmount);
         vm.stopPrank();
 
-        // warp to 10 blocks later and repay the loan
-        vm.warp(block.number + 10);
+        // warp to 10 minutes later and repay the loan
+        vm.warp(block.timestamp + 10 minutes);
         vm.startPrank(borrower);
         credit.approve(lendingTerm, borrowAmount);
         CreditLendingTerm(lendingTerm).closePosition(0);
