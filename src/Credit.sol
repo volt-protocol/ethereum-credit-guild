@@ -168,6 +168,10 @@ contract CreditLendingTerm {
         return debtPositions[index].callBlock;
     }
 
+    function getLiquidationStatus(uint256 index) public view returns (bool) {
+        return debtPositions[index].isInLiquidation;
+    }
+
     DebtPosition[] public debtPositions;
 
     function setAvailableCredit(uint256 _availableCredit) public onlyGovernor {

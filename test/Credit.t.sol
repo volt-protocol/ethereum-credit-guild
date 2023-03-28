@@ -148,4 +148,47 @@ contract CreditTest is Test {
         // calculate the fee paid based on the call fee and the borrow amount
         assertEq(credit.balanceOf(caller), 90);
     }
+
+    // test starting a liquidation after calling a loan
+    function testStartLiquidation() public {
+        // create a borrower and a collateral token
+        address borrower = address(0x2);
+        address collateralToken = address(new myCollateralToken(borrower, 1000));
+        // create a new lending term
+        uint256 collateralRatio = 2;
+        uint256 interestRate = 10;
+        uint256 callFee = 20;
+        uint256 callPeriod = 100;
+        address lendingTerm = address(credit.defineLendingTerm(collateralToken, collateralRatio, interestRate, callFee, callPeriod));
+        // as the governor, approve the lending term and set its credit limit to 10000
+        vm.startPrank(governor);
+        credit.approveLendingTerm(lendingTerm);
+        CreditLendingTerm(lendingTerm).setAvailableCredit(10000);
+        vm.stopPrank();
+        // as the borrower, borrow 100 tokens
+        vm.startPrank(borrower);
+        myCollateralToken(collateralToken).approve(lendingTerm, 100);
+        CreditLendingTerm(lendingTerm).borrowTokens(100);
+        vm.stopPrank();
+        // create a caller address and give them 100 credit tokens
+        address caller = address(0x3);
+        vm.startPrank(governor);
+        credit.mintForGovernor(caller, 100);
+        vm.stopPrank();
+        // warp to 1 month later and call the loan
+        vm.warp(block.timestamp + 30 days);
+        vm.startPrank(caller);
+        credit.approve(lendingTerm, 100);
+        CreditLendingTerm(lendingTerm).callPosition(0);
+        vm.stopPrank();
+        // warp to 10 minutes later and start a liquidation
+        vm.warp(block.timestamp + 10 minutes);
+        vm.startPrank(caller);
+        CreditLendingTerm(lendingTerm).startLiquidation(0);
+        vm.stopPrank();
+        // check that the liquidation has started
+        assertEq(CreditLendingTerm(lendingTerm).getLiquidationStatus(0), true);
+        // check that the debt balance was decreased by the call fee and then increased by the interest
+        assertEq(CreditLendingTerm(lendingTerm).getDebtBalance(0), 191);
+    }
 }
