@@ -215,8 +215,11 @@ contract CreditLendingTerm {
         // calculate the interest based on the time elapsed since origination
         uint256 interest = debtPosition.debtBalance / interestRate * (block.timestamp - debtPosition.originationTime) / 365 days;
 
+        // calculate the amount of credit tokens to repay accounting for the debt discount rate
+        uint256 debtAccepted = debtPosition.debtBalance + interest + ((debtPosition.debtBalance + interest) * Credit(Core(core).credit()).debtDiscountRate());
+
         // burn credit tokens from the caller to repay the loan plus interest
-        Credit(Core(core).credit()).burnFrom(msg.sender, debtPosition.debtBalance + interest);
+        Credit(Core(core).credit()).burnFrom(msg.sender, debtAccepted);
 
         // transfer the collateral token to the borrower
         ERC20(collateralToken).transfer(debtPosition.borrower, debtPosition.collateralBalance);
