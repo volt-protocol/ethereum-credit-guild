@@ -108,7 +108,8 @@ contract CreditLendingTerm {
     address public core;
     address public collateralToken;
     uint256 public collateralRatio; // in terms of how many credits borrowable per collateral token
-    uint256 public interestRate; // the interest rate is expressed in terms
+    uint256 public interestRate; // the interest rate is expressed in terms of a divisor of the loan per year
+    // for example, if the interestRate is 20, that implies a 5% interest rate per year
     uint256 public callFee; // the call fee is expressed as a divisor of the collateral amount
     uint256 public callPeriod;
 
@@ -197,7 +198,7 @@ contract CreditLendingTerm {
         delete debtPositions[index];
 
         // calculate the interest based on the time elapsed since origination
-        uint256 interest = debtPosition.debtBalance * interestRate * (block.timestamp - debtPosition.originationTime) / 365 days / 100;
+        uint256 interest = debtPosition.debtBalance / interestRate * (block.timestamp - debtPosition.originationTime) / 365 days;
 
         // burn credit tokens from the caller to repay the loan plus interest
         Credit(Core(core).credit()).burnFrom(msg.sender, debtPosition.debtBalance + interest);
@@ -227,6 +228,12 @@ contract CreditLendingTerm {
     function startLiquidation(uint256 index) public {
         // require that the loan has been called
         require(debtPositions[index].callBlock > 0, "This loan has not been called.");
+
+        // calculate the interest based on the time elapsed since origination
+        uint256 interest = debtPositions[index].debtBalance / interestRate * (block.timestamp - debtPositions[index].originationTime) / 365 days;
+        
+        // update the debtPosition to include the interest
+        debtPositions[index].debtBalance = debtPositions[index].debtBalance + interest;
 
         // transfer the collateral token to the auction house
         ERC20(collateralToken).transfer(Core(core).auctionHouse(), debtPositions[index].collateralBalance);
