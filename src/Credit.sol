@@ -69,6 +69,12 @@ contract AuctionHouse {
         ERC20(CreditLendingTerm(terms).collateralToken()).transfer(msg.sender, CreditLendingTerm(terms).getCollateralBalance(index));
         // set the lending term to slashable
         CreditLendingTerm(terms).setSlashable(true);
+
+        // calculate the ratio between the bad debt and the credit total supply
+        uint256 badDebtRatio = ERC20(Core(core).credit()).totalSupply() / (CreditLendingTerm(terms).getDebtBalance(index) - debtAccepted);
+        // update the debtDiscountRate of the credit token
+        Credit(Core(core).credit()).setDebtDiscountRate(badDebtRatio);
+
         // delete the debt position
         CreditLendingTerm(terms).deleteDebtPosition(index);
     }
@@ -285,9 +291,13 @@ contract Credit is ERC20 {
     mapping(address => uint256) public availableCredit;
 
     address public core;
+    uint256 public debtDiscountRate; // the discount applied to the credit supply to account for bad debt
+    // in terms of a divisor to apply to the exchange rate between CREDIT tokens and credit-denominated debt
+    // starts at 1, meaning no discount
 
     constructor(string memory _name, string memory _symbol, address _core) ERC20(_name, _symbol, 18) {
         core = _core;
+        debtDiscountRate = 1;
     }
 
     mapping(address => bool) public approvedLendingTerms;
@@ -300,6 +310,15 @@ contract Credit is ERC20 {
     modifier onlyAuctionHouse() {
         require(msg.sender == Core(core).auctionHouse(), "Only the auction house can do that.");
         _;
+    }
+
+    // when bad debt occurs, the auctionhouse will mark down the ratio between the circulating credits and the credit debt of the loanbook
+    // this ensures that the circulating supply of credit is always backed 1:1 by the outstanding debt
+    // bad debt leads directly to a reduction in the unit value of credit, and does not produce incentives for a bank run,
+    // since once a liquidation auction has started, any new loan being called and liquidated will resolve at a credit price
+    // accounting for the auctions that resolve prior to the new loan's auction closing
+    function setDebtDiscountRate(uint256 _debtDiscountRate) public onlyAuctionHouse {
+        debtDiscountRate = _debtDiscountRate;
     }
 
     // approve a lending term for credit allocation
