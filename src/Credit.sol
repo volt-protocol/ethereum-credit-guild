@@ -217,6 +217,12 @@ contract CreditLendingTerm {
         delete debtPositions[index];
     }
 
+    // TODO: two mechanisms for calling
+    // if a GUILD holder calls, charge them a fee in GUILD and reduce debt in CREDIT
+    // if a CREDIT holder calls, charge them a larger fee in CREDIT and burn it
+    // goal: incentivize GUILD holders to call loans
+    // prevent bank runs by making it expensive for CREDIT holders to call loans,
+    // and burn the CREDIT tokens to reduce bad debt outstanding
     function callPosition(uint256 index) public {
         // require that the loan has not yet been called
         require(debtPositions[index].callTime == 0, "This loan has already been called.");
