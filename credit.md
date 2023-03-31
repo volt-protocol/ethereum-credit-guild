@@ -77,53 +77,17 @@ The current MVP auction house has a fixed duration for auctions, but this might 
 
 ### Handling Bad Debt
 
-When partial repayment is accepted in a liquidation auction, it means the unit value of CREDIT is reduced, since there are more credits in circulation compared to the amount of credit owed as debt. While there exist mechanisms to attempt to recapitalize bad debt, such as a GUILD auction, it is critical that the protocol be able to respond to bad debt larger than can be recapitalized on demand. There is no sure, certain way to protect against bad debt and bank runs, since there is no way to instantly and continuously monitor the value of loans. What we can do is:
-1) avoid easily runnable mechanisms
-2) allow for market pricing of credit under normal and abnormal conditions
-3) allow flexible governance that can adjust to market conditions
+Existing decentralized finance protocols like Aave, Compound, or MakerDAO lack mechanisms to swiftly mark down bad debt and prevent bank runs. Users who withdraw (in the case of Aave or Compound) or redeem via the Peg Stability Module (in the case of MakerDAO) can avoid any loss, while those who are too slow risk a 100% loss.
 
-Without a 1:1 PSM, the risk of bank runs is sharply reduced, since there is no opportunity for some CREDIT holders to redeem at a greater value than others by acting expeditiously. Instead, the degree to which CREDIT price is impacted by bad debt depends on the relative demand to hold vs borrow CREDIT. If bad debt leads to CREDIT sales and drove down the price, there is a corresponding incentive for borrowers to purchase CREDIT to close their debt positions. While this happens, the GUILD holders may adjust the terms for new loans according to the new CREDIT price, allowing more CREDIT to be minted per unit collateral in recognition of the lower book value of credits. Minting more credits per unit collateral will reduce the portion of the supply that is unbacked, and will also encourage a higher credit-denominated interest income, assisting in reconciling the bad debt.
+We mitigate this risk by eliminating atomic, on demand withdrawals, in favor of the mechanic of callable loans. Most loans will have a call period during which the borrower can repay. A loan may have a call period of zero to simulate the function of a PSM or Compound pool, but since liquidation occurs by auction, it will still set a market price instead of allowing some users to redeem above peg after a loss has occurred.
 
-If bad debt occurs in the system, the optimal policy is a normal market real rate of interest, but high credit-denominated interest, with a high rate of inflation in the credit supply to match, until the bad debt is resolved, at which time the system can normalize. So long as the outstanding CREDIT supply exceeds the total CREDIT-denominated debt, there is risk of a run if all of the CREDIT holders decide to call all the outstanding loans. This can be mitigated with a sufficiently high call fee charged to the caller and burnt to reduce the outstanding bad debt. We could consider the idea of a floating global "additional call fee" that works like a rate limiter, such that a high pace of withdrawals leads to a very high call fee.
-
-GUILD holders have both an individual incentive to avoid being liquidated, and a collective incentive to prevent excessive risk taking. They earn rewards proportional to the yield they generate, and thus an honest GUILD holder will pursue the highest +EV yield opportunity available to them, while preventing others from taking risk that will create a loss larger than that individual's pro rata share of the surplus buffer.
-
-So long as there is an honest minority of GUILD holders, reckless loans that endanger the system as a whole can be prevented, while the loans that do fail result in a decreased ownership stake for bad allocators. In the early period, GUILD emissions will compensate CREDIT holders for the risk of a relatively small surplus buffer. As the system matures over a period of several years, the size of the surplus buffer and the yield on credit will "float stably" according to market conditions.
+This alone does not solve bank run risk, as when partial repayment is accepted in a liquidation auction, there are more credits in circulation compared to the amount of credit owed as debt, and so the 'leftover' credits are worthless if all the loans are called or repaid. This is addressed by separately tracking the circulating credit supply, and the total credits issued as debt. When the ratio is not 1:1, the amount of credits required to repay debts is adjusted accordingly, such that if the entire protocol is unwound, every credit must be used to repay the outstanding loans.
 
 -------------
 
 ### Surplus Buffer and Redemptions
 
-A GUILD holder can burn their tokens for a pro rata share of the system surplus (likely with some fee) at a maximum rate of X tokens burnt per period such that this mechanism cannot destabilize the CREDIT price. In this way, the size of the surplus buffer is determined by market demand to hold GUILD vs redeem for credits.
-
-<details>
-
-<summary> function redeemSurplus </summary>
-
-```
-
-function redeemSurplus(uint256 guildToRedeem) {
-    msgSender.transferFrom(GUILD.address, guildToRedeem);
-    // todo check the current price per GUILD, must be manipulation resistant value
-    require(surplusAvailableToRedeem >= guildToRedeem * getGUILDPrice());
-    surplusAvailableToRedeem -= guildToRedeem * getGUILDPrice();
-    CREDIT.transfer(msgSender, guildToRedeem * getGUILDPrice());
-}
-
-uint256 surplusAvailableToRedeem; // keep track of how much surplus is currently available for redemption, capped at X% of the CREDIT supply
-
-uint256 lastSurplusRefill; // keep track of when the redemption buffer was last refilled
-
-function refillRedemptionBuffer() {
-    require (block.number - lastSurplusRefill > ???); // set some maximum update frequency
-    lastSurplusRefill = block.number; // update the last refill block record
-    surplusAvailableToRedeem = ???; // refill the buffer to the maximum
-}
-
-```
-
-</details>
-
+GUILD holders can take profits by burning GUILD for a share of the surplus buffer. This mechanism is rate limited such that it cannot destabilize the CREDIT price. The objective of this mechanism is to facilitate a market based rate for CREDIT, which is discussed below, and allow the market to determine the optimal size for the surplus buffer. A GUILD price higher than the intrinsic value implies the system is growing and should increase its first loss capital supply, and the intrinsic value provides a gradually increasing floor price for GUILD barring losses from bad loans.
 
 -------------
 
@@ -137,7 +101,7 @@ The architecture of CREDIT can support arbitrary liquidity and yield properties.
 
 The recent USDC peg stability has made it clear that there is no such thing as a perfectly fungible, instantly portable dollar. All stablecoins, bank deposits, Paypal balances, etc have some constraints in their fungibility and transferability under certain conditions.
 
-A traditional Peg Stability Module is possible in the architecture of CREDIT we've laid out here -- you just need a `LendingTerm` allowing minting of CREDIT 1:1 with USDC at 0% interest. This is not the desired implementation, however, instead we prefer a potentially liquidatable vault that allows for an upward drift in credit price representing the accured yield: "mint 1 credit per 1.02 USDC at 4% interest". Arbitrage does not need to be risk free, in fact, it cannot be -- if the arbitrageur is not bearing this risk, the protocol and thus the stablecoin holders are. Maintaining a small interest rate and overcollateralization on arbitrage vaults will mean sacrificing a little bit of the upward peg stability the PSM offers, in exchange for ensuring an incentive exist for new loans to be opened against productive collateral.
+A traditional Peg Stability Module is possible in the architecture of CREDIT we've laid out here -- you just need a `LendingTerm` allowing minting of CREDIT 1:1 with USDC at 0% interest, a call fee of 0, and a call period of 0. This is not the desired implementation, however, instead we prefer a potentially liquidatable vault that allows for an upward drift in credit price representing the accured yield: "mint 1 credit per 1.02 USDC at 4% interest". Arbitrage does not need to be risk free, in fact, it cannot be -- if the arbitrageur is not bearing this risk, the protocol and thus the stablecoin holders are. Maintaining a small interest rate and overcollateralization on arbitrage vaults will mean sacrificing a little bit of the upward peg stability the PSM offers, in exchange for ensuring an incentive exist for new loans to be opened against productive collateral.
 
 The current price of CREDIT is determined by the market; if bad debt occurs, system is more resilient to runs than a PSM model.While it's true that if all active borrowing positions were closed, the remaining CREDIT outstanding would be worthless, this has much less run risk than a PSM allowing on demand redemptions. gand instead though some may sell in a panic, allowing borrowers to repay at or above an appropriate discount based on the amount of bad debt in the system. So long as borrowing demand continues to exist, CREDIT can stabilize at a new price that accounts for the bad debt without distributing it unfairly to certain users. 
 
