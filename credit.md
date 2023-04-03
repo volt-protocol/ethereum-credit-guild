@@ -8,7 +8,8 @@ The **credit** is a decentralized debt based stablecoin, which can follow an arb
 
 - [Ethereum Credit Guild](#ethereum-credit-guild)
   - [Mechanisms](#mechanisms)
-    - [Lending](#lending)
+    - [Lending Terms](#lending-terms)
+    - [Exogenous vs Endogenous Asset Borrowing and CREDIT Accounting](#exogenous-vs-endogenous-asset-borrowing-and-credit-accounting)
     - [Borrowing and Repayment](#borrowing-and-repayment)
     - [Calling and Liquidating Loans](#calling-and-liquidating-loans)
     - [Handling Bad Debt](#handling-bad-debt)
@@ -22,7 +23,7 @@ The **credit** is a decentralized debt based stablecoin, which can follow an arb
 
 There exist two kinds of tokens in the system, the stable debt token CREDIT, and the governance and risk backstop token GUILD. So far, so familiar.
 
-### Lending
+### Lending Terms
 
 A GUILD holder with above a minimum threshold of the token supply can propose a new set of lending terms. A `CreditLendingTerm` is a blueprint for a loan. Anyone can define a new lending term, but only those terms whitelisted via the governor and voted for by GUILD holders can be used to mint CREDIT.
 
@@ -47,6 +48,9 @@ A loan term stores information such as:
     uint256 public availableCredit;
     // whether bad debt has accured resulting in slashing for voters
     bool public isSlashable;
+    // if the collateral asset is eligible for borrowing, the terms under which this is allowed
+    // the zero address means it cannot be borrowed
+    address public collateralBorrowTerms;
 ```
 
 GUILD holders can propose to whitelist a new term, and there is a period during which this can be vetoed.
@@ -55,11 +59,17 @@ If not denied during the dispute window, any GUILD holder can vote for that loan
 
 The global debt ceiling is determined determined implicitly based on the `voteWeight` and `totalSupply` in the Guild token contract. The debt ceiling of a particular loan is determined based on the amount of GUILD staked to it. For example, if the `voteWeight` is 1, and there are 10m GUILD tokens, a holder of 10% of the GUILD supply can allocate a debt ceiling of 1m CREDIT to lend against a collateral of their choice.
 
+### Exogenous vs Endogenous Asset Borrowing and CREDIT Accounting
+
+Credits are a synthetic asset whose supply is bounded by the votes of GUILD holders defining lending terms, the willngness of borrowers to mint CREDIT, and of others to hold. On the other hand, deposited collateral assets like ETH have a fixed total in-protocol liquidity distributed across the `LendingTerm`s where collateral is deposited. The protocol will not collect reserve fees or charge interest in any denomination other than CREDIT.
+
+If a user wants to borrow a non-CREDIT asset, they can use CREDIT collateral, and the interest rate is assessed in CREDIT at the time of loan repayment or liquidation. To borrow a non-CREDIT asset using CREDIT collateral, such as borrowing ETH using USDC as collateral, there is a double hop from borrow CREDIT with USDC, then borrow ETH against CREDIT. Using CREDIT as a common unit of account reduces the number of loan terms that must be defined and managed by GUILD holders.
+
 -------------
 
 ### Borrowing and Repayment
 
-To initiate a loan, a user must find an acceptable set of lending terms and post collateral. The collateral tokens are held in the associated `CreditLendingTerm` contract while the loan is active. When the loan is repaid, the collateral is automatically withdrawn.
+To initiate a loan, a user must find an acceptable set of lending terms and post collateral. The collateral tokens are held in the associated `CreditLendingTerm` contract while the loan is active, unless they are eligible for borrowing, in which case they may be lent out.
 
 A given lending term mints a fixed number of credits per collateral token, until the available credit is used up. When a user repays their loan, they must repay a greater amount of CREDIT than they borrowed due to the accrued interest. All the credits repaid are burnt. Anyone can repay a loan, though only the user can withdraw their collateral. Partial repayments are not allowed except during the liquidation auction.
 
