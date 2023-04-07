@@ -11,6 +11,7 @@ The Ethereum Credit Guild seeks to change that, building an incentive aligned sy
     - [Borrowing and Repayment](#borrowing-and-repayment)
     - [Calling and Liquidating Loans](#calling-and-liquidating-loans)
     - [Handling Bad Debt](#handling-bad-debt)
+    - [Swaps](#swaps)
   - [Pricing Credit](#pricing-credit)
   - [Bootstrapping Credit](#bootstrapping-credit)
     - [On Competitive Advantages in Lending](#on-competitive-advantages-in-lending)
@@ -118,6 +119,20 @@ Existing decentralized finance protocols like Aave, Compound, or MakerDAO lack m
 We mitigate this risk by eliminating atomic, on demand withdrawals, in favor of the mechanic of callable loans. Most loans will have a call period during which the borrower can repay. A loan may have a call period of zero to simulate the function of a PSM or Compound pool, but since liquidation occurs by auction, it will still set a market price instead of allowing some users to redeem above peg after a loss has occurred.
 
 This alone does not solve bank run risk, as when partial repayment is accepted in a liquidation auction, there are more credits in circulation compared to the amount of credit owed as debt, and so the 'leftover' credits are worthless if all the loans are called or repaid. This is addressed by separately tracking the circulating credit supply, and the total credits issued as debt. When the ratio is not 1:1, the amount of credits minted against collateral or required to repay debts is adjusted accordingly, such that if the entire protocol is unwound, every credit must be used to repay the outstanding loans, and more credits can be issued against the same collateral proportional to the bad debt. The above is true for each credit denomination, meaning bad debt in one denomination will be transparently marked down and legibile throughout the protocol as a whole.
+
+-------------
+
+### Swaps
+
+A "swap" is a special variant on a `LendingTerm` that has the following properties:
+
+* `callFee == 0`
+* `callPeriod == 0`
+* `interestRate == 0`
+
+A swap is the "callable loan" replacement for a Peg Stability Module as seen in MakerDAO, Fei Protocol, or Volt Protocol. The main difference is that while minting of the "borrow token" is on demand, redemption is by auction, the same as any other callable loan. As discussed [above](#handling-bad-debt), this is to prevent runs in the event of bad debt, as well as adverse selection in the event that a collateral rises in price after the swap terms are set.
+
+Unlike a regular loan, after the auction is complete, any remaining collateral is retained by the protocol. `GUILD` holders can vote to allocate exogenous assets obtained through swaps into new swap terms, or allocate credit limits as in the usual callable loans mechanism.
 
 -------------
 
