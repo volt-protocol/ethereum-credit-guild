@@ -1,4 +1,6 @@
 [profile.default]
+fs_permissions = [{ access = "read", path = "./"}]
+
 # compilation
 optimizer = true
 optimizer_runs = 200

@@ -7,17 +7,21 @@ contract Addresses is Test {
     mapping(string => address) private _mainnet;
 
     struct RecordedAddress {
-        string name;
         address addr;
+        string name;
     }
     RecordedAddress[] private recordedAddresses;
 
     constructor() {
-        // TODO: read a json file
-        _addMainnet("TEAM_MULTISIG", 0xcBB83206698E8788F85EFbEeeCAd17e53366EBDf);
-        _addMainnet("EOA_1", 0x6ef71cA9cD708883E129559F5edBFb9d9D5C6148);
-        _addMainnet("EOA_2", 0xd90E9181B20D8D1B5034d9f5737804Da182039F6);
-        _addMainnet("ERC20_USDC", 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/protocol-configuration/addresses.mainnet.json");
+        string memory json = vm.readFile(path);
+        bytes memory parsedJson = vm.parseJson(json);
+        RecordedAddress[] memory addresses = abi.decode(parsedJson, (RecordedAddress[]));
+
+        for (uint256 i = 0; i < addresses.length; i++) {
+            _addMainnet(addresses[i].name, addresses[i].addr);
+        }
     }
 
     function _addMainnet(string memory name, address addr) private {
