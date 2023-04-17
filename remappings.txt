@@ -1,0 +1,4 @@
+@openzeppelin/=node_modules/@openzeppelin/
+@forge-std/=test/forge-std/src/
+@src/=src/
+@test/=test/
