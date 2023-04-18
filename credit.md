@@ -12,6 +12,7 @@ The Ethereum Credit Guild seeks to change that, building an incentive aligned sy
     - [Calling and Liquidating Loans](#calling-and-liquidating-loans)
     - [Handling Bad Debt](#handling-bad-debt)
     - [Swaps](#swaps)
+    - [Bonds](#bonds)
   - [Pricing Credit](#pricing-credit)
   - [Bootstrapping Credit](#bootstrapping-credit)
     - [On Competitive Advantages in Lending](#on-competitive-advantages-in-lending)
@@ -133,6 +134,14 @@ A "swap" is a special variant on a `LendingTerm` that has the following properti
 A swap is the "callable loan" replacement for a Peg Stability Module as seen in MakerDAO, Fei Protocol, or Volt Protocol. The main difference is that while minting of the "borrow token" is on demand, redemption is by auction, the same as any other callable loan. As discussed [above](#handling-bad-debt), this is to prevent runs in the event of bad debt, as well as adverse selection in the event that a collateral rises in price after the swap terms are set.
 
 Unlike a regular loan, after the auction is complete, any remaining collateral is retained by the protocol. `GUILD` holders can vote to allocate exogenous assets obtained through swaps into new swap terms, or allocate credit limits as in the usual callable loans mechanism.
+
+-------------
+
+### Bonds
+
+A "bond" is a variant on a `LendingTerm` where the protocol is the borrower.
+
+Users stake `CREDIT` in a gauge, the same as voting with `GUILD`, to vote for a `BondTerm` and increase its debt ceiling. `GUILD` holders can then vote for a composite lending strategy combining a bond and lending term. Bonds are intended primarily to allow the protocol to price duration. Users will be able to lock their `CREDIT` and accept a longer call period or higher call fee to obtain more yield, and market forces can create a yield curve in the protocol.
 
 -------------
 
