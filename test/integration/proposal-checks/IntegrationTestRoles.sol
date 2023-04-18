@@ -1,73 +1,67 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+
 import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
 
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 
 contract IntegrationTestRoles is PostProposalCheck {
+
+    bytes32[] roleHashes;
+    mapping(bytes32=>string) roleHashToLabel;
+    mapping(bytes32=>uint256) roleMemberCount;
+    mapping(bytes32=>mapping(uint256=>address)) roleMember;
+
+    struct CoreRole {
+        string name;
+        string role;
+    }
+
     function testMainnetRoles() public {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/protocol-configuration/roles.mainnet.json");
+        string memory json = vm.readFile(path);
+        bytes memory parsedJson = vm.parseJson(json);
+        CoreRole[] memory roles = abi.decode(parsedJson, (CoreRole[]));
+
         Core core = Core(addresses.mainnet("CORE"));
+        for (uint256 i = 0; i < roles.length; i++) {
+            address addr = addresses.mainnet(roles[i].name);
+            bytes32 role = keccak256(bytes(roles[i].role));
+            
+            assertEq(
+                core.getRoleAdmin(role),
+                CoreRoles.GOVERNOR,
+                string.concat("Wrong admin for role ", roles[i].role, ", expected GOVERNOR")
+            );
+            assertEq(
+                core.hasRole(role, addr),
+                true,
+                string.concat("Expected ", roles[i].name, " to have role ", roles[i].role)
+            );
 
-        // GOVERNOR
-        /*assertEq(core.getRoleAdmin(CoreRoles.GOVERNOR), CoreRoles.GOVERNOR);
-        assertEq(core.getRoleMemberCount(CoreRoles.GOVERNOR), 2);
-        assertEq(
-            core.getRoleMember(CoreRoles.GOVERNOR, 0),
-            addresses.mainnet("CORE")
-        );
-        assertEq(
-            core.getRoleMember(CoreRoles.GOVERNOR, 1),
-            addresses.mainnet("TIMELOCK_CONTROLLER")
-        );
+            roleHashes.push(role);
+            roleMember[role][roleMemberCount[role]++] = addr;
+            roleHashToLabel[role] = roles[i].role;
+        }
 
-        // GUARDIAN
-        assertEq(core.getRoleAdmin(CoreRoles.GUARDIAN), CoreRoles.GOVERNOR);
-        assertEq(core.getRoleMemberCount(CoreRoles.GUARDIAN), 1);
-        assertEq(
-            core.getRoleMember(CoreRoles.GUARDIAN, 0),
-            addresses.mainnet("TEAM_MULTISIG")
-        );
-
-        // CREDIT_MINTER
-        assertEq(core.getRoleAdmin(CoreRoles.CREDIT_MINTER), CoreRoles.GOVERNOR);
-        assertEq(core.getRoleMemberCount(CoreRoles.CREDIT_MINTER), 1);
-        assertEq(
-            core.getRoleMember(CoreRoles.CREDIT_MINTER, 0),
-            addresses.mainnet("RATE_LIMITED_CREDIT_MINTER")
-        );
-
-        /// TIMELOCK ROLES
-        /// Proposer
-        assertEq(
-            core.getRoleAdmin(CoreRoles.TIMELOCK_PROPOSER),
-            CoreRoles.GOVERNOR
-        );
-        assertEq(core.getRoleMemberCount(CoreRoles.TIMELOCK_PROPOSER), 1);
-        assertEq(
-            core.getRoleMember(CoreRoles.TIMELOCK_PROPOSER, 0),
-            addresses.mainnet("TEAM_MULTISIG")
-        );
-        /// Executor
-        assertEq(
-            core.getRoleAdmin(CoreRoles.TIMELOCK_EXECUTOR),
-            CoreRoles.GOVERNOR
-        );
-        assertEq(core.getRoleMemberCount(CoreRoles.TIMELOCK_EXECUTOR), 1);
-        assertEq(
-            core.getRoleMember(CoreRoles.TIMELOCK_EXECUTOR, 0),
-            address(0)
-        );
-        /// Canceller
-        assertEq(
-            core.getRoleAdmin(CoreRoles.TIMELOCK_CANCELLER),
-            CoreRoles.GOVERNOR
-        );
-        assertEq(core.getRoleMemberCount(CoreRoles.TIMELOCK_CANCELLER), 1);
-        assertEq(
-            core.getRoleMember(CoreRoles.TIMELOCK_CANCELLER, 0),
-            addresses.mainnet("TEAM_MULTISIG")
-        );*/
+        for (uint256 i = 0; i < roleHashes.length; i++) {
+            bytes32 roleHash = roleHashes[i];
+            assertEq(
+                core.getRoleMemberCount(roleHash),
+                roleMemberCount[roleHash],
+                string.concat("Expected role ", roleHashToLabel[roleHash], " to have ", Strings.toString(roleMemberCount[roleHash]), " members")
+            );
+            for (uint256 j = 0; j < roleMemberCount[roleHash]; j++) {
+                assertEq(
+                    core.getRoleMember(roleHash, j),
+                    roleMember[roleHash][j],
+                    string.concat("Expected role ", roleHashToLabel[roleHash], " member ", Strings.toString(j), " to be ", addresses.mainnetLabel(roleMember[roleHash][j]))
+                );
+            }
+        }
     }
 }

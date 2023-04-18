@@ -1,5 +1,9 @@
 [
   {
+    "addr": "0x0000000000000000000000000000000000000000",
+    "name": "ZERO_ADDRESS"
+  },
+  {
     "addr": "0xcBB83206698E8788F85EFbEeeCAd17e53366EBDf",
     "name": "TEAM_MULTISIG"
   },

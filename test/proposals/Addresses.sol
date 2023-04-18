@@ -5,6 +5,7 @@ import {Test} from "@forge-std/Test.sol";
 
 contract Addresses is Test {
     mapping(string => address) private _mainnet;
+    mapping(address => string) private _mainnetLabel;
 
     struct RecordedAddress {
         address addr;
@@ -26,11 +27,16 @@ contract Addresses is Test {
 
     function _addMainnet(string memory name, address addr) private {
         _mainnet[name] = addr;
+        _mainnetLabel[addr] = name;
         vm.label(addr, name);
     }
 
     function mainnet(string memory name) public view returns (address) {
         return _mainnet[name];
+    }
+
+    function mainnetLabel(address addr) public view returns (string memory) {
+        return _mainnetLabel[addr];
     }
 
     function addMainnet(string memory name, address addr) public {
