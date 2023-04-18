@@ -1,3 +1,29 @@
+17 April 2023
+
+I've been considering mechanisms by which GUILD holders can lend at longer durations safely. The first that came to mind was credit token denominations based on the maximum call time or call fee for the underlying loans, but this makes pricing more difficult and fragments liquidity.
+
+Erwan had what I think is a better idea, which is applying the callable loan mechanism more directly to credit lockups. The version of this I've worked out is roughly as follows:
+
+Use a special type of LendingTerm which we can call a CreditBond where borrowing occurs via a special BondBorrow contract and the protocol is the only borrower. This can be combined with a regular loan into a strategy such that credits are borrowed from the credit bond, and lend in an ordinary lending term.
+
+A more tangible example:
+
+Consider a CreditBond A offering these terms:
+
+* 2% interest on top of the base CREDIT rate
+* 1 month call period
+* 50 bips call fee
+
+And a regular lending term B such as:
+
+* collateral token OP
+* interest rate 10%
+* call fee 1%
+* call period 3 months
+
+A GUILD holder in the gauges might then vote for a strategy like "borrow CREDIT under terms A, and lend it under terms B". The CREDIT holders who vote for A don't need to decide which terms the rehypothecation occurs under, only their own liquidity preferences. This is reasonably simple while allowing some more expressiveness on the maturity side.
+
+
 7 April 2023
 
 Notes on removal of surplus buffer redemption:
