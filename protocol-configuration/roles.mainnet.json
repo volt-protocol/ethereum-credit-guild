@@ -7,26 +7,32 @@
     "name": "CORE",
     "role": "GOVERNOR_ROLE"
   },
+
   {
     "name": "TEAM_MULTISIG",
     "role": "GUARDIAN_ROLE"
   },
+
   {
     "name": "RATE_LIMITED_CREDIT_MINTER",
     "role": "RATE_LIMITED_CREDIT_MINTER_ROLE"
   },
+
   {
     "name": "TIMELOCK",
     "role": "GAUGE_ADD_ROLE"
   },
+
   {
     "name": "TIMELOCK",
     "role": "GAUGE_REMOVE_ROLE"
   },
+
   {
     "name": "TIMELOCK",
     "role": "GAUGE_PARAMETERS_ROLE"
   },
+
   {
     "name": "GOVERNOR",
     "role": "PROPOSER_ROLE"
@@ -35,10 +41,12 @@
     "name": "TEAM_MULTISIG",
     "role": "PROPOSER_ROLE"
   },
+
   {
     "name": "ZERO_ADDRESS",
     "role": "EXECUTOR_ROLE"
   },
+
   {
     "name": "VETO_GOVERNOR",
     "role": "CANCELLER_ROLE"
