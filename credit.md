@@ -13,6 +13,7 @@ The Ethereum Credit Guild seeks to change that, building an incentive aligned sy
     - [Handling Bad Debt](#handling-bad-debt)
     - [Swaps](#swaps)
     - [Bonds](#bonds)
+    - [GUILD Minting and Redemption](#guild-minting-and-redemption)
   - [Pricing Credit](#pricing-credit)
   - [Bootstrapping Credit](#bootstrapping-credit)
     - [On Competitive Advantages in Lending](#on-competitive-advantages-in-lending)
@@ -145,6 +146,12 @@ Users stake `CREDIT` in a gauge, the same as voting with `GUILD`, to vote for a 
 
 -------------
 
+### GUILD Minting and Redemption
+
+The `GUILD` governance token can use the same mechanisms as the `CREDIT` token for its issuance and redemption. Existing `GUILD` holders can vote on a global debt ceiling, and then stake in gauges to allocate this debt ceiling among various collateral tokens and into swaps. This allows a market based process to distribute or accumulate surplus capital, instead of the simplistic automated buyback or mint mechanisms seen in MakerDAO that have demonstrated poor performance[^1].
+
+-------------
+
 ## Pricing Credit
 
 The behavior of the each credit token will depend on the nature of the loan set that backs it, user interest in CREDIT, and the overall market conditions. There is no foolproof way for software to detect the quality of a collateral token or know what the market interest rate is. These inputs must be provided by humans. The goal of the Ethereum Credit Guild is to allow for market based processes with checks and balances to allow users to enagage in fair and productive lending operations without the need for trusted third parties. If the system is otherwise in equilibrium (no change in demand to hold or borrow credits, or to hold GUILD) then the value of credits will tend to increase over time as the surplus buffer accumulates credits. In reality, the current value of a credit will fluctuate on the market based on net buy and sell demand, as well as changes in the overall market risk and interest environment.
@@ -169,7 +176,7 @@ GUILD will be distributed on an ongoing basis to CREDIT holders and minters, enc
 
 ### On Competitive Advantages in Lending
 
-One of the goals of the Ethereum Credit Guild's lending model is to permit more aggressive leverage than pooled lending models generally support against top quality assets. Of all the on chain lending markets, Liquity offers (subject to certain conditions) the highest LTV against ETH at 90.91%, or a maximum acheivable leverage of 11x. Flux Finance, the lending market created by Ondo to support its tokenized securities like OUSG, offers only a 92% collateral factor for OUSG, a short term US treasury ETF, and rates in the market for stablecoins have at times exceeded the underlying treasury yield. Compared to Binance's 20x leverage on ETH, or the 98% collateral factor obtainable on Treasury securities in traditional repo markets[^1], it's tricky to see these venues competing for the business of professional market makers and traders in "offchain" securities. For many traders, whether directional or arbitrage, the amount of leverage available is more important than the interest rate, since the duration of the trade is short.
+One of the goals of the Ethereum Credit Guild's lending model is to permit more aggressive leverage than pooled lending models generally support against top quality assets. Of all the on chain lending markets, Liquity offers (subject to certain conditions) the highest LTV against ETH at 90.91%, or a maximum acheivable leverage of 11x. Flux Finance, the lending market created by Ondo to support its tokenized securities like OUSG, offers only a 92% collateral factor for OUSG, a short term US treasury ETF, and rates in the market for stablecoins have at times exceeded the underlying treasury yield. Compared to Binance's 20x leverage on ETH, or the 98% collateral factor obtainable on Treasury securities in traditional repo markets[^2], it's tricky to see these venues competing for the business of professional market makers and traders in "offchain" securities. For many traders, whether directional or arbitrage, the amount of leverage available is more important than the interest rate, since the duration of the trade is short.
 
 A lower latency process for governance can enable more efficient lending operations. Onchain operations are constrained by the blocktime, but can do a lot better than traditional governance delays in tuning collateral ratios and interest rates. For low volatility assets like OUSG, the main issue is managing liquidity (as even the best collateral has a varying shiftability), not the risk of a drop in the value of the collateral. In this case, borrowers can be allowed very high leverage, but interest rates should also be very high, so that both CREDIT holders and borrowers can earn an efficient return. For high volatility assets like ETH, one can clearly envision a daily adjustment in available lending terms outperform a static collateral requirement and trusted oracle feed.
 
@@ -242,4 +249,6 @@ Some decentralized finance protocol are "open", in the sense that anyone can set
 
 We recognize that setting loan terms is a more specialized activity than saving, or choosing which yield bearing asset to hold. The protocol attempts to strike a balance through an optimistic governance model, where a relatively small quorum of GUILD is required to onboard new lending terms, collateral assets, and borrow denominations, but this is also vetoable. This means that outsiders have a reasonably low hurdle to making their voice heard (ie, getting just one or two major delegates to support their proposal) while large stakeholders can ensure malicious proposals do not pass. In the event of sufficient disagreement, the system should bias towards safety and stasis, and disgruntled parties who wish for change can exit. Forking is not just expected, but encouraged.
 
-[^1]: Primer: Money Market Funds and the Repo Market. Viktoria Baklanova, Isaac Kuznits, Trevor Tatum. https://www.sec.gov/files/mmfs-and-the-repo-market-021721.pdf
+[^1]: A New Mental Model for DeFi Treasuries. Hasu. https://uncommoncore.co/a-new-mental-model-for-defi-treasuries/
+
+[^2]: Primer: Money Market Funds and the Repo Market. Viktoria Baklanova, Isaac Kuznits, Trevor Tatum. https://www.sec.gov/files/mmfs-and-the-repo-market-021721.pdf
