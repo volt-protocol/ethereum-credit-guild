@@ -1,8 +1,8 @@
 # Ethereum Credit Guild
 
-Existing lending protocols like MakerDAO, Aave, and Compound rely on trusted oracles, and have "closed" governance processes where changes to parameters are forced through a central decision-making process and thus occur at a very limited rate.
+Existing lending protocols like MakerDAO, Aave, and Compound rely on trusted oracles, and have closed governance where all changes are forced through a central decision-making process. This makes them vulnerable to attacks, and also less flexible than would best suit the interests of lenders and borrowers.
 
-The Ethereum Credit Guild seeks to change that, building an incentive aligned system with checks and balances allowing saving and credit operations without relying on trusted third parties, and responding on demand to changes in the market through an open parameter control process.
+The Ethereum Credit Guild seeks to change that through an open parameter control process using appropriate checks and balances.
 
 - [Ethereum Credit Guild](#ethereum-credit-guild)
   - [Overview](#overview)
@@ -25,14 +25,16 @@ The Ethereum Credit Guild seeks to change that, building an incentive aligned sy
 
 ## Overview
 
-There exist two kinds of tokens in the system, the stable credit tokens such as `CREDIT` (along with `credit_ETH`, `credit_UNI`, and so on for those who want to lend or short in these denominations) and the governance token `GUILD`.
+There are two kinds of tokens in the system:
+* stable credit tokens such as `CREDIT`, `CREDIT_ETH`, and so on, which are analogous to `DAI` or to Compound cTokens
+* the governance token `GUILD`
 
-The set of actions possible in the system are tightly constrained.
+The set of actions possible in the system are tightly constrained:
 
 * in several cases, a certain quorum of `GUILD` holders can perform a system action or make a parameter change, and another quorum veto it. Each also has its own duration:
   * adjust the global debt ceiling of any credit token
   * whitelist a new collateral asset
-  * approve a new `LendingTerm`, which defines collateral ratios, interest rates, etc
+  * approve a new `LendingTerm` or `BondTerm`, which defines collateral ratios, interest rates, etc
   * adjust the split between `GUILD` stakers and the surplus buffer
   * adjust the voting duration or quorum threshold for any of the above processes
 
@@ -42,13 +44,19 @@ The set of actions possible in the system are tightly constrained.
   * upon unstaking, the credit limit is also reduced
   * staked `GUILD` holders earn a share of the interest paid under the terms they vote for
   
-* anyone can mint and borrow credit tokens from a `LendingTerm` with an available credit limit by providing the requisite collateral
+* anyone can mint and borrow credit tokens from an unexpired `LendingTerm` with an available credit limit by providing the requisite collateral
+  
 * anyone can repay anyone's debt at any time
   * when the loan is repaid, part of the interest is paid to those those `GUILD` holders staking on that loan's terms, the rest along with the principal is burnt
+
 * anyone can call a loan by paying the call fee (in the borrowed token, deducted from the borrower's debt and burnt)
   * this initiates the call period during which the borrower is free to repay
+
 * anyone can liquidate a loan after the call period has passed, repaying all or part of the debt and receiving all or part of the collateral depending on auction results
   * in the event of a partial repayment, the loss is deducted from the surplus buffer, with any further loss marked down for all holders of the relevant credit token
+
+* anyone can stake `CREDIT` tokens in the gauge and vote for a bond term
+  * they can only withdraw if there is unutilized liquidity, otherwise they can pay the call fee
 
 And that's it! More detail on each of these can be found below.
 
@@ -173,6 +181,8 @@ A traditional Peg Stability Module is possible in the architecture of CREDIT we'
 At first, CREDIT will have no liquidity, so it will be difficult for borrowers to use. The members of the Ethereum Credit Guild, such as the core contributors at the Electric Development Co and La Tribu, as well as early investors and advisors who hold the GUILD token, will engage in bootstrapping demand for CREDIT according to their ability and interests. The Electric Development Co will provide liquidity for CREDIT on AMMs to help bootstrap its utility and provide a smooth experience for early borrowers. This will likely take the form of USDC/CREDIT liquidity to provide the lowest cost experience for borrowers obtaining leverage using the Ethereum Credit Guild.
 
 GUILD will be distributed on an ongoing basis to CREDIT holders and minters, encouraging decentralization of the supply and an engaged owner-user base in the early period. GUILD will be nontransferable upon protocol launch, discouraging purely speculative yield farming and the growth of an unsustainably large capital base.
+
+To encourage ample liquidity in the early system, we will recommend low interest lending terms against CREDIT AMM liquidity pairs, and GUILD incentives for the same.
 
 ### On Competitive Advantages in Lending
 
