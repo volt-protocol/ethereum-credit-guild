@@ -90,9 +90,14 @@ A `LendingTerm` is a blueprint for a loan. It is created permissionlessly throug
     // a longer call period is better for the borrower, and more dangerous for the lender
     uint256 public callPeriod;
 
-    // the unused debt ceiling of this lending term
+    // the unused debt ceiling of this lending term as voted by the gauges
+    // incremented down upon borrowing and up on repayment
     // denominated in borrowToken
     uint256 public availableCredit;
+
+    // set by governance, once this has been reached no one else can vote for it in the gauges unless raised by governance
+    // this ensures the protocol's exposure to a single lending term is capped
+    uint256 pubic maxDebtCeiling;
 
     // whether bad debt has accured resulting in slashing for voters
     bool public isSlashable;
