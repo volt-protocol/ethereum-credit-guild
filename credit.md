@@ -14,14 +14,20 @@ The Ethereum Credit Guild seeks to change that through an open parameter control
     - [Swaps](#swaps)
     - [Bonds](#bonds)
     - [GUILD Minting and Redemption](#guild-minting-and-redemption)
-  - [Pricing Credit](#pricing-credit)
-  - [Bootstrapping Credit](#bootstrapping-credit)
+  - [Layer Two](#layer-two)
+    - [GUILD Delegation and Multi-Voting](#guild-delegation-and-multi-voting)
+    - [Minting and Redeeming Credit on Optimstic Rollups](#minting-and-redeeming-credit-on-optimstic-rollups)
+    - [Coincidence of Wants](#coincidence-of-wants)
+    - [Borrower Vaults](#borrower-vaults)
+  - [Discussion](#discussion)
+    - [Pricing Credit](#pricing-credit)
+    - [Bootstrapping Credit](#bootstrapping-credit)
     - [On Competitive Advantages in Lending](#on-competitive-advantages-in-lending)
     - [Credit Genesis](#credit-genesis)
-  - [Comparisons](#comparisons)
-    - [Accounting](#accounting)
-    - [Rehypothecation](#rehypothecation)
-    - [Governance](#governance)
+    - [Comparisons](#comparisons)
+      - [Accounting](#accounting)
+      - [Rehypothecation](#rehypothecation)
+      - [Governance](#governance)
 
 ## Overview
 
@@ -165,7 +171,46 @@ The `GUILD` governance token can use the same mechanisms as the `CREDIT` token f
 
 -------------
 
-## Pricing Credit
+## Layer Two
+
+Here I use the term "layer two" broadly to refer to any and all scaling and automation technologies built on top of the core credit smart contracts existing on Ethereum L1. Our objective is to maintain a simple and immutable core from which new capacities can grow over time. These upgrades can be worked on and added as they become ready or needed.
+
+### GUILD Delegation and Multi-Voting
+
+For a small GUILD holder, frequently changing votes between individual lending terms is expensive. For groups of GUILD holders who are aligned in their risk preferences, it is optimal to vote together and reduce costs. This might mean using a voting system like Snapshot X, or entrusting their vote to a delegate. The smart contract used to support this delegation or group voting can also support multi-votes, where prospective borrowers can "pull" the contract's votes to one of its approved lending terms. There are many ways GUILD holders might choose to automate or collectivize their voting. These will exist on top of the core protocol.
+
+### Minting and Redeeming Credit on Optimstic Rollups
+
+It's possible for `GUILD` holders to approve a lending term on an L2 network like Optimism or Arbitrum. The only difference is that while voting for one of these terms on the gauges can occur atomically, withdraw is subject to the L2's fraud window, since the debt ceiling on L2 must be reduced, and we can't be sure that borrowing capacity hasn't already been used until finality is reached. Any loans issued on L2 should be sufficiently conservative in their terms to withstand sequencer downtime.
+
+AMM LP tokens from optimistic rollups can potentially be used as collateral to mint CREDIT on L1, as well as to mint GUILD. This may be worth pursuing prior to debt issuance on L2, as a bridged CREDIT/DAI or CREDIT/USDC LP still poses minimal collateral risk compared to a volatile asset held on L2.
+
+### Coincidence of Wants
+
+Prospective lenders and borrowers face a coordination challenge. GUILD holders don't know exactly how much users are willing to pay to borrow against a given collateral asset, and prospective borrowers don't know how much liquidity might be found at a rate higher than the prevailing one. It would be ideal if both parties could post all their preferences onchain, in an orderbook for lending and borrowing, but this has prohibitative costs. We're exploring the potential for offchain passing of signed messages or other peer to peer networking to resolve this problem.
+
+A few possible coincidences of wants that can occur in the Ethereum Credit Guild:
+
+* two GUILD holders want to swap what they are voting for
+* a CREDIT holder wants to exit and a borrower wants to repay their debt
+* someone wants to buy CREDIT and a prospective borrower wants a loan
+* one borrower wants to repay their loan, another wants to borrow
+* someone wants to buy CREDIT and someone else wants to sell
+* a GUILD holder wants a higher rate than they are currently earning, and a borrower is willing to pay more for additional liquidity
+
+We would like to maximize the number of successful connections like these, while minimizing the number of onchain transactions and other forms of value leakage (AMM swaps, idle liquidity) for the users. One way to do that is for users to broadcast signed messages into a mempool of loans and potential swaps, where a transaction fee must be paid only for a loan that is actually executed on mainnet. GUILD holders and borrowers can both express their preferences in this way.
+
+### Borrower Vaults
+
+Uniswap v3 simplifies the infinity of possible prices into a set of ticks, reducing the computational complexity of liquidity provision onchain into a tractable parameter space. We can do the same thing with borrower vaults and leverage ratios. A vault contract would have a certain target ratio of leverage and conduct a periodic auction to fill its demand with the best set of lending terms available. A contract which targets a 1000 CREDIT: 1 ETH ratio would each day, if its total debt was too small, offer a tip for a keeper to borrow more credits, and vice versa. This might be minting 900 CREDIT per ETH if that's the best terms that can be found. Users can withdraw and repay their pro rata share of the loan and debt at any time. A vault might also use an external oracle or price feed to target a price based leverage ratio instead of a token ratio.
+
+Besides allowing for cost savings through batching, special types of borrower vaults or smart contract wallets can define custom behavior like unwinding price movement according to an external oracle, levering up when the interest rate drops below a certain level, or automating strategies like borrow-and-LP.
+
+-------------
+
+## Discussion
+
+### Pricing Credit
 
 The behavior of the each credit token will depend on the nature of the loan set that backs it, user interest in CREDIT, and the overall market conditions. There is no foolproof way for software to detect the quality of a collateral token or know what the market interest rate is. These inputs must be provided by humans. The goal of the Ethereum Credit Guild is to allow for market based processes with checks and balances to allow users to enagage in fair and productive lending operations without the need for trusted third parties. If the system is otherwise in equilibrium (no change in demand to hold or borrow credits, or to hold GUILD) then the value of credits will tend to increase over time as the surplus buffer accumulates credits. In reality, the current value of a credit will fluctuate on the market based on net buy and sell demand, as well as changes in the overall market risk and interest environment.
 
@@ -181,7 +226,7 @@ A traditional Peg Stability Module is possible in the architecture of CREDIT we'
 
 -------------
 
-## Bootstrapping Credit
+### Bootstrapping Credit
 
 At first, CREDIT will have no liquidity, so it will be difficult for borrowers to use. The members of the Ethereum Credit Guild, such as the core contributors at the Electric Development Co and La Tribu, as well as early investors and advisors who hold the GUILD token, will engage in bootstrapping demand for CREDIT according to their ability and interests. The Electric Development Co will provide liquidity for CREDIT on AMMs to help bootstrap its utility and provide a smooth experience for early borrowers. This will likely take the form of USDC/CREDIT liquidity to provide the lowest cost experience for borrowers obtaining leverage using the Ethereum Credit Guild.
 
@@ -234,10 +279,10 @@ Over time, as borrowers pay interest, the CREDIT price starts to drift up. The a
 | Univ2CREDITUSDC | .8 | 2 | 1 |
 | Univ2CREDITDAI | .8 | 2 | 1 |
 
-## Comparisons
+### Comparisons
 > how credit compares to other lending protocols
 
-### Accounting
+#### Accounting
 
 There are a few distinguishing features we can look to in classifying "[protocols for loanable funds](https://arxiv.org/abs/2006.13922)". First is the question of how the protocol's debt accounting works. Some have shares with a hard peg to an external reference asset (1:1 mint and redeem with no fee) like Compound cTokens or Aave aTokens. We can call these protocols **deposit receipt issuers**, since their deposits are like bank deposits, ostensibly redeemable on demand and relying on interest rate management and a reserves cushion to maintain this property. The advantage of this model is that it is easy for lenders and borrowers to use, while the disadvantage is that it is vulnerable to runs or adverse selection when one or more of the backing assets lose value. Some protocols like Liquity or Reflexer issue a native debt asset, with the borrower responsible for selling this asset and then rebuying debt units to close the position. We can call these protocols **debt token issuers**. The advantage of this model is that the market can price the native debt asset, so it is resilient to runs or adverse selection. The disadvantage is that the native debt asset may go above peg if the demand to repay loans is high vs the demand to open new borrowing positions. There are also many hybrids between these poles, like MakerDAO. Hybrids will behave like deposit receipts so long as their "debt ceiling" has not been reached, whereupon behavior reverts to that of a debt token. This was demonstrated by DAI price behavior during the recent USDC depeg -- DAI price tracked USDC until the PSM filled up, then it went slighly above USDC price, reflecting partial backing by overcollateralized positions and the MKR backstop. While MakerDAO made it out okay this time, in a counterfactual world where USDC took a loss, some DAI holders would have been able to exit at no loss early through the GUSD and USDP PSMs, and this loss will be redistributed to those who are too slow or to the MKR holders.
 
@@ -248,7 +293,7 @@ Our view is that it is **impossible** to create a synthetic asset which holds a 
 
 These properties greatly mitigate the incentive to conduct runs, and help to protect passive holders of the debt asset.
 
-### Rehypothecation
+#### Rehypothecation
 
 Aave and Compound let people borrow the collateral assets deposited into the protocol, and issue deposit receipts for each (cETH, aDAI, etc) while Maker, Liquity, et al do not, and only issue a single debt asset (DAI, LUSD). The Ethereum Credit Guild exists in the middle, where spot collateral assets are not borrowable, and there is no deposit receipt token for collateral, but synthetic credit tokens can be borrowed in a variety of denominations, each against a variety of collateral assets. This allows users to obtain both long and short exposure to any asset, while mitigating some of the weaknesses of the cToken/aToken model that is vulnerable to bank runs.
 
@@ -256,7 +301,7 @@ Whenever holder demand to sell or redeem exceeds borrower demand to close their 
 
 Additionally, a separation of concerns between debt assets and collateral assets gives the protocol the ability to mark down bad debt and continue functioning smoothly. For example, in MakerDAO, if 20% of the PCV was effectively lost through a real world asset that became tied up in court for years, there would be a run on the PSM, and it would be difficult to recover in the resulting state. In the Ethereum Credit Guild, a 20% loss in PCV for `credit_ETH` tokens would result in a markdown of all credits in that denomination, such that if before 1 ETH could mint 1 `credit_ETH`, now, 0.8 ETH can mint 1 `credit_ETH`. Likewise, if a user had borrowed 1000 `credit_ETH` before the loss, they now must repay 1200 `credit_ETH`. Because `credit_ETH` was devalued, borrowers have no incentive to close their loans early, and the loss is fairly distributed across all the holders.
 
-### Governance
+#### Governance
 
 There are no arbitrary code changes possible in the Ethereum Credit Guild system after mainnet launch. Instead, governance is build around explicitly defined processes such as the onboarding and offboarding of lending terms, approving new collateral or debt denominations, or adjusting system parameters such as the surplus buffer fee.
 

@@ -1,3 +1,7 @@
+26 April 2023
+
+Added notes about scaling. Most of these add ons outside the core protocol won't be developed until after the MVP is live and on mainnet, but I consider it important to think these things through so we don't paint ourselves into any corners regarding features of the base mechanism.
+
 17 April 2023
 
 I've been considering mechanisms by which GUILD holders can lend at longer durations safely. The first that came to mind was credit token denominations based on the maximum call time or call fee for the underlying loans, but this makes pricing more difficult and fragments liquidity.
