@@ -93,7 +93,7 @@ abstract contract CoreRef is Pausable {
             (bool success, bytes memory returned) = target.call{value: value}(
                 callData
             );
-            require(success);
+            require(success, "CoreRef: underlying call reverted");
             returnData[i] = returned;
         }
     }
