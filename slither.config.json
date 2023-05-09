@@ -1,0 +1,10 @@
+{
+    "exclude_informational": false,
+    "exclude_low": false,
+    "exclude_medium": false,
+    "exclude_high": false,
+    "json": "",
+    "disable_color": false,
+    "filter_paths": "(test/|external/)",
+    "legacy_ast": false
+}

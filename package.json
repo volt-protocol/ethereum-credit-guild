@@ -1,0 +1,42 @@
+{
+  "name": "@src/ethereum-credit-guild",
+  "version": "1.0.0",
+  "private": true,
+  "description": "",
+  "files": [],
+  "scripts": {
+    "prepare": "husky install",
+    "setup": "curl -L https://foundry.paradigm.xyz | bash && foundryup",
+    "compile": "forge build",
+    "clean": "forge clean",
+    "test": "npm run test:unit",
+    "test:unit": "forge test --match-path './test/unit/**' -vvv",
+    "test:proposals": "forge test --match-path './test/proposals/**' --fork-url $ETH_RPC_URL -vvv",
+    "test:integration": "forge test --match-path './test/integration/**' --fork-url $ETH_RPC_URL -vvv",
+    "coverage": "forge coverage --fork-url $ETH_RPC_URL --match-path './test/**' --report lcov --report summary",
+    "coverage:unit": "forge coverage --match-path './test/unit/**' --report lcov --report summary",
+    "coverage:integration": "forge coverage --match-path './test/integration/**' --fork-url $ETH_RPC_URL --report lcov --report summary",
+    "deploy": "forge script scripts/DeployProposal.s.sol:DeployProposal -vvvv --rpc-url $ETH_RPC_URL",
+    "deploy:broadcast": "forge script scripts/DeployProposal.s.sol:DeployProposal -vvvv --rpc-url $ETH_RPC_URL --broadcast",
+    "prettier": "npx prettier --check 'src/**/*.sol'",
+    "prettier:fix": "npx prettier --write 'src/**/*.sol'"
+  },
+  "authors": "elliotfriedman,eswak,joeysantoro,onetruekirk",
+  "dependencies": {
+    "@openzeppelin/contracts": "4.6.0"
+  },
+  "devDependencies": {
+    "ethers": "^5.5.3",
+    "husky": "7.0.4",
+    "lint-staged": "12.2.0",
+    "prettier": "2.5.1",
+    "prettier-plugin-solidity": "1.0.0",
+    "solhint": "3.3.7",
+    "solhint-plugin-prettier": "0.0.5"
+  },
+  "lint-staged": {
+    "*.{sol}": [
+      "npx prettier --config .prettierrc 'src/**/*.sol' --write"
+    ]
+  }
+}
