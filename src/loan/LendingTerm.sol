@@ -15,6 +15,8 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 //   loan debt amounts in LendingTerm.
 // - Consider if only borrow() should be pausable, or also repay(), call(), and seize()
 // - Add events
+// - safeTransfer on collateralToken
+// - public constant DUST amount: minimum amount of CREDIT to borrow to open new loans
 
 contract LendingTerm is CoreRef {
 
@@ -303,7 +305,7 @@ contract LendingTerm is CoreRef {
         uint256 loanCallFee = loan.borrowAmount * callFee / 1e18;
 
         // pull the fee from caller and burn it
-        ERC20(creditToken).transferFrom(loan.borrower, address(this), loanCallFee);
+        ERC20(creditToken).transferFrom(msg.sender, address(this), loanCallFee);
         RateLimitedCreditMinter(creditMinter).replenishBuffer(loanCallFee);
         CreditToken(creditToken).burn(loanCallFee);
     
@@ -341,16 +343,7 @@ contract LendingTerm is CoreRef {
         address _collateralToken = collateralToken;
         uint256 _collateralAmount = loan.collateralAmount;
         ERC20(_collateralToken).approve(_auctionHouse, _collateralAmount);
-        AuctionHouse(_auctionHouse).startAuction(
-            loanId,
-            loan.caller,
-            loan.borrower,
-            _collateralToken,
-            _collateralAmount,
-            loanDebt,
-            ltvBuffer,
-            callFee
-        );
+        AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt);
     }
 
     /// @notice set the address of the auction house.
