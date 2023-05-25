@@ -74,7 +74,10 @@ contract AuctionHouse is CoreRef {
 
     /// @notice start the auction of the collateral of a loan, to be exchanged for CREDIT,
     /// in order to pay the debt of a loan.
-    function startAuction(bytes32 loanId, uint256 debtAmount) external whenNotPaused {
+    /// @param loanId the ID of the loan which collateral is auctioned
+    /// @param debtAmount the amount of CREDIT debt to recover from the collateral auction
+    /// @param callFeeDiscount true if the call fee should be discounted in the beginning of the auction
+    function startAuction(bytes32 loanId, uint256 debtAmount, bool callFeeDiscount) external whenNotPaused {
         // check that caller is an active lending term
         require(GuildToken(guildToken).isGauge(msg.sender), "AuctionHouse: invalid gauge");
 
@@ -100,7 +103,7 @@ contract AuctionHouse is CoreRef {
             collateralAmount: loan.collateralAmount,
             debtAmount: debtAmount,
             ltvBuffer: LendingTerm(msg.sender).ltvBuffer(),
-            callFeeAmount: loan.borrowAmount * LendingTerm(msg.sender).callFee() / 1e18
+            callFeeAmount: !callFeeDiscount ? 0 : loan.borrowAmount * LendingTerm(msg.sender).callFee() / 1e18
         });
 
         // pull collateral

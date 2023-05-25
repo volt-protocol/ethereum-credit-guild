@@ -340,10 +340,48 @@ contract LendingTerm is CoreRef {
 
         // auction the loan collateral
         address _auctionHouse = auctionHouse;
-        address _collateralToken = collateralToken;
-        uint256 _collateralAmount = loan.collateralAmount;
-        ERC20(_collateralToken).approve(_auctionHouse, _collateralAmount);
-        AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt);
+        ERC20(collateralToken).approve(_auctionHouse, loan.collateralAmount);
+        AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, true);
+    }
+
+    /// @notice used to call() + seize() a list of loans for emergency offboarding of a lending term.
+    /// Loans that are already called are not called again.
+    /// Does not collect the call fee.
+    function offboard(bytes32[] memory loanIds) external onlyCoreRole(CoreRoles.TERM_OFFBOARD) {
+        uint256 _newTotalBorrows = totalBorrows();
+        for (uint256 i = 0; i < loanIds.length; i++) {
+            bytes32 loanId = loanIds[i];
+            Loan storage loan = loans[loanId];
+
+            // check that the loan exists
+            require(loan.originationTime != 0, "LendingTerm: loan not found");
+
+            // check that the loan is not already closed
+            require(loan.closeTime == 0, "LendingTerm: loan closed");
+
+            // set the call info, if not set
+            bool loanCalled = false;
+            if (loan.callTime != 0) {
+                loanCalled = true;
+            } else {
+                loan.caller = msg.sender;
+                loan.callTime = block.timestamp;
+            }
+
+            // close the loan
+            uint256 loanDebt = getLoanDebt(loanId);
+            _newTotalBorrows -= loanDebt;
+            loans[loanId].closeTime = block.timestamp;
+
+            // auction the loan collateral
+            address _auctionHouse = auctionHouse;
+            ERC20(collateralToken).approve(_auctionHouse, loan.collateralAmount);
+            AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
+        }
+
+        // update total borrows
+        totalBorrowsStored = _newTotalBorrows;
+        totalBorrowsLastUpdate = block.timestamp;
     }
 
     /// @notice set the address of the auction house.

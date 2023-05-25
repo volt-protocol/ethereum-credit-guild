@@ -83,6 +83,7 @@ contract AuctionHouseUnitTest is Test {
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         core.grantRole(CoreRoles.GAUGE_REMOVE, address(this));
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        core.grantRole(CoreRoles.TERM_OFFBOARD, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(auctionHouse));
@@ -157,6 +158,18 @@ contract AuctionHouseUnitTest is Test {
         term.seize(loanId);
     }
 
+    function _setupLoanAndOffboard() private returns (bytes32 loanId) {
+        loanId = _setupLoan();
+
+        // 1 year later, interest accrued
+        // offboard term
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        bytes32[] memory loanIds = new bytes32[](1);
+        loanIds[0] = loanId;
+        term.offboard(loanIds);
+    }
+
     // auction getter
     function testGetAuction() public {
         // initially, auction not found
@@ -182,7 +195,7 @@ contract AuctionHouseUnitTest is Test {
         bytes32 loanId = _setupLoanAndSeizeCollateral();
 
         vm.expectRevert("AuctionHouse: invalid gauge");
-        auctionHouse.startAuction(loanId, 22_000e18);
+        auctionHouse.startAuction(loanId, 22_000e18, true);
     }
 
     // startAuction fail if the loan is not closed in current block
@@ -195,7 +208,7 @@ contract AuctionHouseUnitTest is Test {
         vm.warp(block.timestamp + 13);
         vm.prank(address(term));
         vm.expectRevert("AuctionHouse: loan previously closed");
-        auctionHouse.startAuction(loanId, 22_000e18);
+        auctionHouse.startAuction(loanId, 22_000e18, true);
     }
     
     // startAuction fail if the auction already exists
@@ -206,7 +219,7 @@ contract AuctionHouseUnitTest is Test {
         // (this would only happen due to invalid logic in the LendingTerm)
         vm.prank(address(term));
         vm.expectRevert("AuctionHouse: auction exists");
-        auctionHouse.startAuction(loanId, 22_000e18);
+        auctionHouse.startAuction(loanId, 22_000e18, true);
     }
 
     // startAuction fail if debt to recover < borrow amount
@@ -217,7 +230,7 @@ contract AuctionHouseUnitTest is Test {
         // (this would only happen due to invalid logic in the LendingTerm)
         vm.prank(address(term));
         vm.expectRevert("AuctionHouse: negative interest");
-        auctionHouse.startAuction(loanId, 19_000e18);
+        auctionHouse.startAuction(loanId, 19_000e18, true);
     }
 
     // startAuction fail if no collateral is available on LendingTerm
@@ -237,7 +250,7 @@ contract AuctionHouseUnitTest is Test {
     }
 
     // getBidDetail at various steps
-    function testGetBidDetail() public {
+    function testGetBidDetailWithDiscount() public {
         bytes32 loanId = _setupLoanAndSeizeCollateral();
         assertEq(auctionHouse.getAuction(loanId).collateralAmount, 15e18);
         assertEq(auctionHouse.getAuction(loanId).debtAmount, 22_000e18);
@@ -267,6 +280,105 @@ contract AuctionHouseUnitTest is Test {
             (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
             assertEq(collateralReceived, 7.5e18);
             assertEq(creditAsked, 21_000e18);
+        }
+    
+        // 90% of first phase
+        // now it also asks for the call fee because we're under LTV buffer
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_1_DURATION * 4 / 10);
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 13.5e18);
+            assertEq(creditAsked, 22_000e18);
+        }
+
+        // at midpoint
+        // offer all collateral, ask all debt (including call fee)
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_1_DURATION / 10);
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 15e18);
+            assertEq(creditAsked, 22_000e18);
+        }
+
+        // 10% of second phase
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_2_DURATION / 10);
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 15e18);
+            assertEq(creditAsked, 19_800e18);
+        }
+
+        // 50% of second phase
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_2_DURATION * 4 / 10);
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 15e18);
+            assertEq(creditAsked, 11_000e18);
+        }
+
+        // 90% of second phase
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_2_DURATION * 4 / 10);
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 15e18);
+            assertEq(creditAsked, 2_200e18);
+        }
+
+        // end of second phase (= end of auction)
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_2_DURATION / 10);
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 15e18);
+            assertEq(creditAsked, 0);
+        }
+
+        // after end of second phase
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 123456);
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 15e18);
+            assertEq(creditAsked, 0);
+        }
+    }
+
+    // getBidDetail at various steps
+    function testGetBidDetailWithoutDiscount() public {
+        bytes32 loanId = _setupLoanAndOffboard();
+        assertEq(auctionHouse.getAuction(loanId).collateralAmount, 15e18);
+        assertEq(auctionHouse.getAuction(loanId).debtAmount, 22_000e18);
+        uint256 PHASE_1_DURATION = auctionHouse.MIDPOINT();
+        uint256 PHASE_2_DURATION = auctionHouse.AUCTION_DURATION() - auctionHouse.MIDPOINT();
+
+        // right at the start of auction
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 0);
+            assertEq(creditAsked, 22_000e18);
+        }
+
+        // 10% of first phase
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_1_DURATION / 10);
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 1.5e18);
+            assertEq(creditAsked, 22_000e18);
+        }
+
+        // 50% of first phase
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_1_DURATION * 4 / 10);
+        {
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            assertEq(collateralReceived, 7.5e18);
+            assertEq(creditAsked, 22_000e18);
         }
     
         // 90% of first phase
