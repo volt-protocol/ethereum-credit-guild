@@ -212,22 +212,34 @@ contract GuildTokenUnitTest is Test {
                         LOSS MANAGEMENT
     //////////////////////////////////////////////////////////////*/
 
-    function testNotifyGaugeLoss() public {
+    function testNotifyPnL() public {
         assertEq(token.lastGaugeLoss(gauge1), 0);
+        assertEq(token.totalPnL(), 0);
+        assertEq(token.gaugePnL(gauge1), 0);
 
         // revert because user doesn't have role
         vm.expectRevert("UNAUTHORIZED");
-        token.notifyGaugeLoss(gauge1);
+        token.notifyPnL(gauge1, 0);
 
         // grant roles to test contract
         vm.startPrank(governor);
-        core.createRole(CoreRoles.GAUGE_LOSS_NOTIFIER, CoreRoles.GOVERNOR);
-        core.grantRole(CoreRoles.GAUGE_LOSS_NOTIFIER, address(this));
+        core.createRole(CoreRoles.GAUGE_PNL_NOTIFIER, CoreRoles.GOVERNOR);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
         vm.stopPrank();
 
         // successful call & check
-        token.notifyGaugeLoss(gauge1);
+        token.notifyPnL(gauge1, -100);
         assertEq(token.lastGaugeLoss(gauge1), block.timestamp);
+        assertEq(token.totalPnL(), -100);
+        assertEq(token.gaugePnL(gauge1), -100);
+
+        // successful call & check
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        token.notifyPnL(gauge1, 200);
+        assertEq(token.lastGaugeLoss(gauge1), block.timestamp - 13);
+        assertEq(token.totalPnL(), 100);
+        assertEq(token.gaugePnL(gauge1), 100);
     }
 
     function _setupAliceLossInGauge1() internal {
@@ -239,8 +251,8 @@ contract GuildTokenUnitTest is Test {
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         core.createRole(CoreRoles.GAUGE_PARAMETERS, CoreRoles.GOVERNOR);
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
-        core.createRole(CoreRoles.GAUGE_LOSS_NOTIFIER, CoreRoles.GOVERNOR);
-        core.grantRole(CoreRoles.GAUGE_LOSS_NOTIFIER, address(this));
+        core.createRole(CoreRoles.GAUGE_PNL_NOTIFIER, CoreRoles.GOVERNOR);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
         vm.stopPrank();
 
         // setup
@@ -256,7 +268,7 @@ contract GuildTokenUnitTest is Test {
         assertEq(token.getUserWeight(alice), 80e18);
 
         // loss in gauge 1
-        token.notifyGaugeLoss(gauge1);
+        token.notifyPnL(gauge1, -100);
     }
 
     function testApplyGaugeLoss() public {

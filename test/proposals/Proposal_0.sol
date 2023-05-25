@@ -87,7 +87,7 @@ contract Proposal_0 is Proposal {
         // GAUGE_PARAMETERS
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, addresses.mainnet("TIMELOCK"));
 
-        // GAUGE_LOSS_NOTIFIER
+        // GAUGE_PNL_NOTIFIER
         // no contracts should have this role yet
 
         // TIMELOCK_PROPOSER

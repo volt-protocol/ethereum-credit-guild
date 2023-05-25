@@ -82,6 +82,7 @@ contract LendingTermUnitTest is Test {
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         // add gauge and vote for it

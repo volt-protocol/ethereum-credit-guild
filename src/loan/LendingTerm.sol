@@ -17,6 +17,8 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 // - Add events
 // - safeTransfer on collateralToken
 // - public constant DUST amount: minimum amount of CREDIT to borrow to open new loans
+// - add tolerance to gauge imbalance (debtCeiling in borrow()) to avoid deadlock situations and allow organic growth of borrows
+// - refactor in smaller internal functions, so that child contracts can reuse code more conveniently
 
 contract LendingTerm is CoreRef {
 
@@ -258,6 +260,7 @@ contract LendingTerm is CoreRef {
 
         // compute interest owed
         uint256 loanDebt = getLoanDebt(loanId);
+        int256 pnl = int256(loanDebt) - int256(loan.borrowAmount);
     
         // if the loan is called and we are within the call period, deduce the callFee from
         // the amount of debt to repay
@@ -271,6 +274,9 @@ contract LendingTerm is CoreRef {
         ERC20(_creditToken).transferFrom(msg.sender, address(this), loanDebt);
         RateLimitedCreditMinter(creditMinter).replenishBuffer(loanDebt);
         CreditToken(_creditToken).burn(loanDebt);
+
+        // report profit
+        GuildToken(guildToken).notifyPnL(address(this), pnl);
 
         // close the loan
         loan.closeTime = block.timestamp;

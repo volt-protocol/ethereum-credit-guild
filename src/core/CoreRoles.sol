@@ -38,9 +38,9 @@ library CoreRoles {
     bytes32 internal constant GAUGE_PARAMETERS =
         keccak256("GAUGE_PARAMETERS_ROLE");
 
-    /// @notice can notify of losses in a given gauge
-    bytes32 internal constant GAUGE_LOSS_NOTIFIER =
-        keccak256("GAUGE_LOSS_NOTIFIER_ROLE");
+    /// @notice can notify of profits & losses in a given gauge
+    bytes32 internal constant GAUGE_PNL_NOTIFIER =
+        keccak256("GAUGE_PNL_NOTIFIER_ROLE");
 
     /// ----------- Lending Term Management --------------------
 

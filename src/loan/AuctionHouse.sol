@@ -202,9 +202,9 @@ contract AuctionHouse is CoreRef {
             RateLimitedCreditMinter(creditMinter).mint(auctions[loanId].caller, auctions[loanId].callFeeAmount);
 
             // if bad debt has been created, notify gauge system
-            uint256 badDebtCreated = _debtAmount - creditAsked;
-            if (badDebtCreated != 0) {
-                GuildToken(guildToken).notifyGaugeLoss(auctions[loanId].lendingTerm);
+            int256 pnl = int256(creditAsked) - int256(_debtAmount);
+            if (pnl < 0) {
+                GuildToken(guildToken).notifyPnL(auctions[loanId].lendingTerm, pnl);
             }
         }
     }

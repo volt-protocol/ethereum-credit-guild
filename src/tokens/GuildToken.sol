@@ -20,14 +20,22 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
     have a non-zero debt ceiling, and CREDIT will be available to borrow under these terms.
 
     When a loan is called and there is bad debt, a loss is notified in a gauge on this
-    contract (`notifyGaugeLoss`). When a loss is notified, all the GUILD token weight voting
+    contract (`notifyPnL`). When a loss is notified, all the GUILD token weight voting
     for this gauge becomes non-transferable and can be permissionlessly slashed. Until the
     loss is realized (`applyGaugeLoss`), a user cannot transfer their locked tokens or
     decrease the weight they assign to the gauge that suffered a loss.
     Even when a loss occur, users can still transfer tokens with which they vote for gauges
     that did not suffer a loss.
 */
+// TODO: figure out a way to do pro-rata distribution of profits to GUILD holders that vote in gauges that generate profits.
 contract GuildToken is CoreRef, ERC20Gauges {
+
+    /// @notice total accumulative profit & loss of GUILD holders across all gauges
+    int256 public totalPnL;
+
+    /// @notice total accumulative profit & loss of a given gauge
+    mapping(address=>int256) public gaugePnL;
+
     constructor(
         address _core,
         uint32 _gaugeCycleLength,
@@ -71,8 +79,10 @@ contract GuildToken is CoreRef, ERC20Gauges {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice emitted when a loss in a gauge is notified.
-    event GaugeLossNotification(address indexed gauge, uint256 indexed when);
-    /// @notice emitted when a loss in a gauge is applied.
+    event GaugePnL(address indexed gauge, uint256 indexed when, int256 pnl);
+    /// @notice emitted when a loss in a gauge is notified.
+    event GaugeLoss(address indexed gauge, uint256 indexed when);
+    /// @notice emitted when a loss in a gauge is applied (for each user).
     event GaugeLossApply(
         address indexed gauge,
         address indexed who,
@@ -86,12 +96,20 @@ contract GuildToken is CoreRef, ERC20Gauges {
     /// @notice last block.timestamp when a user apply a loss that occurred in a given gauge
     mapping(address => mapping(address => uint256)) public lastGaugeLossApplied;
 
-    /// @notice notify of a loss in a given gauge
-    function notifyGaugeLoss(
-        address gauge
-    ) external onlyCoreRole(CoreRoles.GAUGE_LOSS_NOTIFIER) {
-        lastGaugeLoss[gauge] = block.timestamp;
-        emit GaugeLossNotification(gauge, block.timestamp);
+    /// @notice notify profit and loss in a given gauge
+    function notifyPnL(
+        address gauge,
+        int256 amount
+    ) external onlyCoreRole(CoreRoles.GAUGE_PNL_NOTIFIER) {
+        // handling loss
+        if (amount < 0) {
+            lastGaugeLoss[gauge] = block.timestamp;
+            emit GaugeLoss(gauge, block.timestamp);
+        }
+        
+        totalPnL += amount;
+        gaugePnL[gauge] += amount;
+        emit GaugePnL(gauge, block.timestamp, amount);
     }
 
     /// @notice apply a loss that occurred in a given gauge
