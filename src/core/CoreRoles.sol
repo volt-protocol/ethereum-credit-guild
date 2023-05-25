@@ -42,6 +42,11 @@ library CoreRoles {
     bytes32 internal constant GAUGE_LOSS_NOTIFIER =
         keccak256("GAUGE_LOSS_NOTIFIER_ROLE");
 
+    /// ----------- Lending Term Management --------------------
+
+    /// @notice can set the hardcap of a lending term
+    bytes32 internal constant TERM_HARDCAP = keccak256("TERM_HARDCAP_ROLE");
+
     /// ----------- Timelock management ------------------------
     /// The hashes are the same as OpenZeppelins's roles in TimelockController
 

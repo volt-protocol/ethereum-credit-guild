@@ -353,8 +353,8 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice set the hardcap of CREDIT mintable in this term.
-    /// governor-only, to allow full governance to update a term's arbitrary hardcap without doing a gauge & loans migration.
-    function setHardCap(uint256 _newValue) external onlyCoreRole(CoreRoles.GOVERNOR) {
+    /// allows to update a term's arbitrary hardcap without doing a gauge & loans migration.
+    function setHardCap(uint256 _newValue) external onlyCoreRole(CoreRoles.TERM_HARDCAP) {
         hardCap = _newValue;
     }
 }
