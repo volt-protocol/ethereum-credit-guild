@@ -19,6 +19,10 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 // - public constant DUST amount: minimum amount of CREDIT to borrow to open new loans
 // - add tolerance to gauge imbalance (debtCeiling in borrow()) to avoid deadlock situations and allow organic growth of borrows
 // - refactor in smaller internal functions, so that child contracts can reuse code more conveniently
+// - set hardcap to 0 for terms that realized bad debt until governance raise it again
+// - add a `forgive()` function to mark to 0 a loan without trying to move the collateral token to the auction house,
+//   and report the full debt amount as a loss to the system. This is for collateral assets that can be frozen.
+// - change input to array of loanIds in call() and seize()
 
 contract LendingTerm is CoreRef {
 
@@ -105,12 +109,8 @@ contract LendingTerm is CoreRef {
     /// @notice the list of all loans that existed or are still active
     mapping(bytes32=>Loan) public loans;
 
-    /// @notice total number of CREDIT borrowed, this value is stale unless
-    /// someone opened or closed a loan in the same block
-    uint256 public totalBorrowsStored;
-
-    /// @notice last update timestamp of `totalBorrowsStored`
-    uint256 public totalBorrowsLastUpdate;
+    /// @notice current number of CREDIT issued in active loans on this term
+    uint256 public issuance;
 
     struct LendingTermParams {
         address collateralToken;
@@ -146,13 +146,6 @@ contract LendingTerm is CoreRef {
     /// @notice get a loan
     function getLoan(bytes32 loanId) external view returns (Loan memory) {
         return loans[loanId];
-    }
-
-    /// @notice total outstanding borrows, including interests
-    function totalBorrows() public view returns (uint256) {
-        uint256 _totalBorrowsStored = totalBorrowsStored;
-        uint256 interestPerYear = _totalBorrowsStored * interestRate / 1e18;
-        return _totalBorrowsStored + interestPerYear * (block.timestamp - totalBorrowsLastUpdate) / YEAR;
     }
 
     /// @notice call fee of a loan, in CREDIT base units
@@ -218,12 +211,13 @@ contract LendingTerm is CoreRef {
         require(GuildToken(_guildToken).isGauge(address(this)), "LendingTerm: terms unavailable");
 
         // check the debt ceiling & hardcap
-        uint256 _totalBorrows = totalBorrows();
-        require(_totalBorrows + borrowAmount <= hardCap, "LendingTerm: hardcap reached");
+        uint256 _issuance = issuance;
+        uint256 _postLoanIssuance = _issuance + borrowAmount;
+        require(_postLoanIssuance <= hardCap, "LendingTerm: hardcap reached");
         uint256 _totalSupply = ERC20(creditToken).totalSupply();
         if (_totalSupply != 0) {
             uint256 debtCeiling = GuildToken(_guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount);
-            require(_totalBorrows + borrowAmount <= debtCeiling, "LendingTerm: debt ceiling reached");
+            require(_postLoanIssuance <= debtCeiling, "LendingTerm: debt ceiling reached");
         }
 
         // save loan in state
@@ -236,13 +230,10 @@ contract LendingTerm is CoreRef {
             originationTime: block.timestamp,
             closeTime: 0
         });
+        issuance = _postLoanIssuance;
 
         // mint CREDIT to the borrower
         RateLimitedCreditMinter(creditMinter).mint(msg.sender, borrowAmount);
-
-        // update total borrows
-        totalBorrowsStored = _totalBorrows + borrowAmount;
-        totalBorrowsLastUpdate = block.timestamp;
 
         // pull the collateral from the borrower
         ERC20(collateralToken).transferFrom(msg.sender, address(this), collateralAmount);
@@ -280,10 +271,7 @@ contract LendingTerm is CoreRef {
 
         // close the loan
         loan.closeTime = block.timestamp;
-
-        // update total borrows
-        totalBorrowsStored = totalBorrows() - loanDebt;
-        totalBorrowsLastUpdate = block.timestamp;
+        issuance -= loan.borrowAmount;
 
         // return the collateral to the borrower
         ERC20(collateralToken).transfer(loan.borrower, loan.collateralAmount);
@@ -338,8 +326,7 @@ contract LendingTerm is CoreRef {
 
         // update total borrows
         uint256 loanDebt = getLoanDebt(loanId);
-        totalBorrowsStored = totalBorrows() - loanDebt;
-        totalBorrowsLastUpdate = block.timestamp;
+        issuance -= loan.borrowAmount;
 
         // close the loan
         loans[loanId].closeTime = block.timestamp;
@@ -354,7 +341,7 @@ contract LendingTerm is CoreRef {
     /// Loans that are already called are not called again.
     /// Does not collect the call fee.
     function offboard(bytes32[] memory loanIds) external onlyCoreRole(CoreRoles.TERM_OFFBOARD) {
-        uint256 _newTotalBorrows = totalBorrows();
+        uint256 _newIssuance = issuance;
         for (uint256 i = 0; i < loanIds.length; i++) {
             bytes32 loanId = loanIds[i];
             Loan storage loan = loans[loanId];
@@ -376,8 +363,8 @@ contract LendingTerm is CoreRef {
 
             // close the loan
             uint256 loanDebt = getLoanDebt(loanId);
-            _newTotalBorrows -= loanDebt;
             loans[loanId].closeTime = block.timestamp;
+            _newIssuance -= loan.borrowAmount;
 
             // auction the loan collateral
             address _auctionHouse = auctionHouse;
@@ -385,9 +372,8 @@ contract LendingTerm is CoreRef {
             AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
         }
 
-        // update total borrows
-        totalBorrowsStored = _newTotalBorrows;
-        totalBorrowsLastUpdate = block.timestamp;
+        // update issuance
+        issuance = _newIssuance;
     }
 
     /// @notice set the address of the auction house.

@@ -115,9 +115,7 @@ contract LendingTermUnitTest is Test {
         assertEq(term.callPeriod(), _CALL_PERIOD);
         assertEq(term.hardCap(), _HARDCAP);
         assertEq(term.ltvBuffer(), _LTV_BUFFER);
-        assertEq(term.totalBorrowsStored(), 0);
-        assertEq(term.totalBorrowsLastUpdate(), 0);
-        assertEq(term.totalBorrows(), 0);
+        assertEq(term.issuance(), 0);
         assertEq(term.getLoan(bytes32(0)).originationTime, 0);
         assertEq(term.getLoanDebt(bytes32(0)), 0);
 
@@ -151,16 +149,11 @@ contract LendingTermUnitTest is Test {
         assertEq(term.getLoan(loanId).originationTime, block.timestamp);
         assertEq(term.getLoan(loanId).closeTime, 0);
 
-        assertEq(term.totalBorrowsStored(), borrowAmount);
-        assertEq(term.totalBorrowsLastUpdate(), block.timestamp);
-        assertEq(term.totalBorrows(), borrowAmount);
+        assertEq(term.issuance(), borrowAmount);
         assertEq(term.getLoanDebt(loanId), borrowAmount);
 
         // check interest accrued over time
         vm.warp(block.timestamp + term.YEAR());
-        assertEq(term.totalBorrowsStored(), borrowAmount);
-        assertEq(term.totalBorrowsLastUpdate(), term.getLoan(loanId).originationTime);
-        assertEq(term.totalBorrows(), borrowAmount * 110 / 100); // 10% APR
         assertEq(term.getLoanDebt(loanId), borrowAmount * 110 / 100); // 10% APR
     }
 
@@ -621,9 +614,7 @@ contract LendingTermUnitTest is Test {
         // loan is closed
         assertEq(term.getLoan(loanId).closeTime, block.timestamp);
         assertEq(term.getLoanDebt(loanId), 0);
-        assertEq(term.totalBorrows(), 0);
-        assertEq(term.totalBorrowsStored(), 0);
-        assertEq(term.totalBorrowsLastUpdate(), block.timestamp);
+        assertEq(term.issuance(), 0);
         // borrower kept credit
         assertEq(credit.balanceOf(address(this)), borrowAmount - callFee);
         assertEq(credit.balanceOf(address(term)), 0);
