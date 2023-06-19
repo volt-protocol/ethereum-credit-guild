@@ -256,13 +256,16 @@ contract LendingTerm is CoreRef {
         // if the loan is called and we are within the call period, deduce the callFee from
         // the amount of debt to repay
         uint256 callTime = loan.callTime;
+        uint256 creditToPullFromBorrower = loanDebt;
         if (callTime != 0 && block.timestamp <= callTime + callPeriod) {
-            loanDebt -= getLoanCallFee(loanId);
+            creditToPullFromBorrower -= getLoanCallFee(loanId);
         }
         
-        // pull the total CREDIT owed and refill the buffer of available CREDIT mints
+        // pull the CREDIT owed and refill the buffer of available CREDIT mints
         address _creditToken = creditToken;
-        ERC20(_creditToken).transferFrom(msg.sender, address(this), loanDebt);
+        ERC20(_creditToken).transferFrom(msg.sender, address(this), creditToPullFromBorrower);
+        // loanDebt >= creditToPullFromBorrower but the extra CREDIT should sit on the
+        // LendingTerm contract from the previous call() call (provided by loan caller).
         RateLimitedCreditMinter(creditMinter).replenishBuffer(loanDebt);
         CreditToken(_creditToken).burn(loanDebt);
 
@@ -298,10 +301,8 @@ contract LendingTerm is CoreRef {
         // calculate the fee, pull it from caller, and burn the CREDIT
         uint256 loanCallFee = loan.borrowAmount * callFee / 1e18;
 
-        // pull the fee from caller and burn it
+        // pull the fee from caller
         ERC20(creditToken).transferFrom(msg.sender, address(this), loanCallFee);
-        RateLimitedCreditMinter(creditMinter).replenishBuffer(loanCallFee);
-        CreditToken(creditToken).burn(loanCallFee);
     
         // set the call info
         loan.caller = msg.sender;
@@ -329,12 +330,16 @@ contract LendingTerm is CoreRef {
         issuance -= loan.borrowAmount;
 
         // close the loan
+        uint256 loanCallFee = getLoanCallFee(loanId);
         loans[loanId].closeTime = block.timestamp;
 
         // auction the loan collateral
         address _auctionHouse = auctionHouse;
         ERC20(collateralToken).approve(_auctionHouse, loan.collateralAmount);
         AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, true);
+
+        // send CREDIT from the call fee to the auction house
+        ERC20(creditToken).transfer(_auctionHouse, loanCallFee);
     }
 
     /// @notice used to call() + seize() a list of loans for emergency offboarding of a lending term.
@@ -342,6 +347,8 @@ contract LendingTerm is CoreRef {
     /// Does not collect the call fee.
     function offboard(bytes32[] memory loanIds) external onlyCoreRole(CoreRoles.TERM_OFFBOARD) {
         uint256 _newIssuance = issuance;
+        address _auctionHouse = auctionHouse;
+        uint256 creditToSendToAuctionHouse = 0;
         for (uint256 i = 0; i < loanIds.length; i++) {
             bytes32 loanId = loanIds[i];
             Loan storage loan = loans[loanId];
@@ -356,6 +363,7 @@ contract LendingTerm is CoreRef {
             bool loanCalled = false;
             if (loan.callTime != 0) {
                 loanCalled = true;
+                creditToSendToAuctionHouse += getLoanCallFee(loanId);
             } else {
                 loan.caller = msg.sender;
                 loan.callTime = block.timestamp;
@@ -367,9 +375,13 @@ contract LendingTerm is CoreRef {
             _newIssuance -= loan.borrowAmount;
 
             // auction the loan collateral
-            address _auctionHouse = auctionHouse;
             ERC20(collateralToken).approve(_auctionHouse, loan.collateralAmount);
             AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
+        }
+
+        // send CREDIT from the call fees to the auction house
+        if (creditToSendToAuctionHouse != 0) {
+            ERC20(creditToken).transfer(_auctionHouse, creditToSendToAuctionHouse);
         }
 
         // update issuance

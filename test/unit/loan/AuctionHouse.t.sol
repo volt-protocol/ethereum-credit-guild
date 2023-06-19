@@ -533,8 +533,9 @@ contract AuctionHouseUnitTest is Test {
         // check token locations
         assertEq(collateral.balanceOf(address(auctionHouse)), 15e18);
         assertEq(collateral.totalSupply(), 15e18);
+        assertEq(credit.balanceOf(address(auctionHouse)), 1_000e18); // call fee
         assertEq(credit.balanceOf(borrower), 20_000e18);
-        assertEq(credit.totalSupply(), 20_000e18);
+        assertEq(credit.totalSupply(), 21_000e18);
 
         // somebody bid in the auction
         if (creditAsked != 0) {
@@ -550,18 +551,23 @@ contract AuctionHouseUnitTest is Test {
 
         // check token locations
         assertEq(credit.balanceOf(address(auctionHouse)), 0);
+        assertEq(credit.balanceOf(borrower), 20_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
         assertEq(collateral.balanceOf(address(auctionHouse)), 0);
         assertEq(collateral.balanceOf(borrower), collateralReturnedToBorrower);
         assertEq(collateral.balanceOf(bidder), collateralReceived);
         assertEq(collateral.totalSupply(), 15e18);
+        // loan was safe
         if (collateralReturnedToBorrower > minCollateralForASafeLoan) {
             // no new CREDIT minted to reimburse the call fee,
             // because the loan was safe
             assertEq(credit.totalSupply(), 20_000e18);
-            // all CREDIT minted by bidder to get collateral has been burnt
+            // all CREDIT minted by bidder to get collateral has been burnt, as well as the call fee
             assertEq(credit.balanceOf(borrower), 20_000e18);
             assertEq(credit.totalSupply(), 20_000e18);
-        } else {
+        }
+        // loan was unsafe of insolvent
+        else {
             assertEq(credit.balanceOf(borrower), 20_000e18);
             assertEq(credit.balanceOf(caller), 1_000e18);
             assertEq(credit.totalSupply(), 21_000e18);

@@ -13,6 +13,7 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 // - safeTransfer on collateralToken
 // - add events
 // - consider if some functions should be pausable
+// - in bid(), loss reported include the interests owed, not just the initial borrow, does it make sense ?
 
 /// @notice Auction House contract of the Ethereum Credit Guild,
 /// where collateral of borrowers is auctioned to cover their CREDIT debt.
@@ -47,9 +48,11 @@ contract AuctionHouse is CoreRef {
         address borrower;
         address collateralToken;
         uint256 collateralAmount;
+        uint256 borrowAmount;
         uint256 debtAmount;
         uint256 ltvBuffer;
         uint256 callFeeAmount;
+        bool loanCalled;
     }
 
     /// @notice the list of all auctions that existed or are still active.
@@ -76,8 +79,8 @@ contract AuctionHouse is CoreRef {
     /// in order to pay the debt of a loan.
     /// @param loanId the ID of the loan which collateral is auctioned
     /// @param debtAmount the amount of CREDIT debt to recover from the collateral auction
-    /// @param callFeeDiscount true if the call fee should be discounted in the beginning of the auction
-    function startAuction(bytes32 loanId, uint256 debtAmount, bool callFeeDiscount) external whenNotPaused {
+    /// @param loanCalled true if the call fee has been collected
+    function startAuction(bytes32 loanId, uint256 debtAmount, bool loanCalled) external whenNotPaused {
         // check that caller is an active lending term
         require(GuildToken(guildToken).isGauge(msg.sender), "AuctionHouse: invalid gauge");
 
@@ -101,9 +104,11 @@ contract AuctionHouse is CoreRef {
             borrower: loan.borrower,
             collateralToken: _collateralToken,
             collateralAmount: loan.collateralAmount,
+            borrowAmount: loan.borrowAmount,
             debtAmount: debtAmount,
             ltvBuffer: LendingTerm(msg.sender).ltvBuffer(),
-            callFeeAmount: !callFeeDiscount ? 0 : loan.borrowAmount * LendingTerm(msg.sender).callFee() / 1e18
+            callFeeAmount: loan.borrowAmount * LendingTerm(msg.sender).callFee() / 1e18,
+            loanCalled: loanCalled
         });
 
         // pull collateral
@@ -141,7 +146,7 @@ contract AuctionHouse is CoreRef {
 
             // discount debt by the call fee if collateral left is above LTV buffer
             uint256 minCollateralLeft = _collateralAmount * auctions[loanId].ltvBuffer / 1e18;
-            if (_collateralAmount - collateralReceived > minCollateralLeft) {
+            if (_collateralAmount - collateralReceived > minCollateralLeft && auctions[loanId].loanCalled) {
                 creditAsked -= auctions[loanId].callFeeAmount;
             }
         }
@@ -177,8 +182,13 @@ contract AuctionHouse is CoreRef {
         // pull CREDIT from the bidder and burn it
         if (creditAsked != 0) {
             ERC20(creditToken).transferFrom(msg.sender, address(this), creditAsked);
-            RateLimitedCreditMinter(creditMinter).replenishBuffer(creditAsked);
-            CreditToken(creditToken).burn(creditAsked);
+        }
+        bool _loanCalled = auctions[loanId].loanCalled;
+        uint256 _callFeeAmount = auctions[loanId].callFeeAmount;
+        uint256 protocolInput = creditAsked + (_loanCalled ? _callFeeAmount : 0);
+        if (protocolInput != 0) {
+            RateLimitedCreditMinter(creditMinter).replenishBuffer(protocolInput);
+            CreditToken(creditToken).burn(protocolInput);
         }
 
         // transfer collateral to bidder
@@ -196,16 +206,16 @@ contract AuctionHouse is CoreRef {
 
         // if loan was unsafe, or lending terms have been offboarded since auction start,
         // reimburse the call fee to caller.
+        uint256 protocolOutput = auctions[loanId].borrowAmount;
         uint256 minCollateralLeft = _collateralAmount * auctions[loanId].ltvBuffer / 1e18;
-        if (collateralLeft <= minCollateralLeft) {
-            uint256 _debtAmount = auctions[loanId].debtAmount;
-            RateLimitedCreditMinter(creditMinter).mint(auctions[loanId].caller, auctions[loanId].callFeeAmount);
-
-            // if bad debt has been created, notify gauge system
-            int256 pnl = int256(creditAsked) - int256(_debtAmount);
-            if (pnl < 0) {
-                GuildToken(guildToken).notifyPnL(auctions[loanId].lendingTerm, pnl);
-            }
+        address _lendingTerm = auctions[loanId].lendingTerm;
+        if (_loanCalled && (collateralLeft < minCollateralLeft || GuildToken(guildToken).isGauge(_lendingTerm) == false)) {
+            RateLimitedCreditMinter(creditMinter).mint(auctions[loanId].caller, _callFeeAmount);
+            protocolOutput += _callFeeAmount;
         }
+
+        // end of the lifecycle of a loan, notify of profit & losses created in the system.
+        int256 pnl = int256(protocolInput) - int256(protocolOutput);
+        GuildToken(guildToken).notifyPnL(_lendingTerm, pnl);
     }
 }

@@ -502,7 +502,7 @@ contract LendingTermUnitTest is Test {
         assertEq(term.getLoan(loanId).caller, address(this));
         assertEq(term.getLoan(loanId).callTime, block.timestamp);
         assertEq(credit.balanceOf(address(this)), borrowAmount - callFee);
-        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(term)), callFee);
     }
 
     // call fail because loan doesnt exist
@@ -570,28 +570,6 @@ contract LendingTermUnitTest is Test {
         term.call(loanId);
     }
 
-    // call fail because rate-limited minter role revoked
-    function testCallFailRoleRevoked() public {
-        // prepare & borrow
-        uint256 borrowAmount = 20_000e18;
-        uint256 collateralAmount = 15e18;
-        collateral.mint(address(this), collateralAmount);
-        collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
-
-        // revoke role so buffer of CREDIT cannot replenish
-        vm.prank(guardian);
-        core.guardianRevokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
-
-        // call
-        vm.warp(block.timestamp + 13);
-        vm.roll(block.number + 1);
-        uint256 callFee = 1_000e18; // 5% of borrowAmount
-        credit.approve(address(term), callFee);
-        vm.expectRevert("UNAUTHORIZED");
-        term.call(loanId);
-    }
-
     // seize success
     function testSeizeSuccess() public {
         // prepare & borrow & call & wait call period
@@ -618,6 +596,7 @@ contract LendingTermUnitTest is Test {
         // borrower kept credit
         assertEq(credit.balanceOf(address(this)), borrowAmount - callFee);
         assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(auctionHouse)), callFee);
         // collateral went to auctionHouse
         assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
         assertEq(collateral.balanceOf(address(term)), 0);
@@ -812,11 +791,12 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
 
         // call
-        credit.approve(address(term), 1_000e18);
+        uint256 callFee = 1_000e18;
+        credit.approve(address(term), callFee);
         term.call(loanId);
 
         assertEq(credit.balanceOf(address(this)), 21_000e18);
-        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(term)), callFee);
         assertEq(collateral.balanceOf(address(this)), 0);
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
 
@@ -866,11 +846,13 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
 
         // call
-        credit.approve(address(term), 1_000e18);
+        uint256 callFee = 1_000e18;
+        assertEq(term.getLoanCallFee(loanId), callFee);
+        credit.approve(address(term), callFee);
         term.call(loanId);
-
+    
         assertEq(credit.balanceOf(address(this)), 21_000e18);
-        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(term)), callFee);
         assertEq(collateral.balanceOf(address(this)), 0);
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
 
@@ -881,10 +863,13 @@ contract LendingTermUnitTest is Test {
 
         assertEq(credit.balanceOf(address(this)), 21_000e18);
         assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(auctionHouse)), callFee);
         assertEq(collateral.balanceOf(address(this)), 0);
         assertEq(collateral.balanceOf(address(term)), 0);
         assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
 
-        assertEq(term.getLoanCallFee(loanId), 0);
+        assertEq(term.getLoanCallFee(loanId), 0); // /!\ not callFee because loan is closed now
     }
+
+    // TODO: test offboard + offboard flows
 }
