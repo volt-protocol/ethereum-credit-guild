@@ -20,6 +20,7 @@ contract Proposal_0 is Proposal {
         CreditToken credit = new CreditToken(address(core));
         GuildToken guild = new GuildToken(
             address(core),
+            address(credit),
             7 days, // gaugeCycleLength,
             1 days // incrementFreezeWindow
         );

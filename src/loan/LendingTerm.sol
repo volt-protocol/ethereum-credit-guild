@@ -11,9 +11,6 @@ import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
 // TODO:
-// - Add a debtDiscountRate in CREDIT to mark down when bad debt occur, and use it to correct all
-//   loan debt amounts in LendingTerm.
-// - Consider if only borrow() should be pausable, or also repay(), call(), and seize()
 // - Add events
 // - safeTransfer on collateralToken
 // - public constant DUST amount: minimum amount of CREDIT to borrow to open new loans

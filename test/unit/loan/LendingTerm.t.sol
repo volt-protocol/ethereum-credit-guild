@@ -41,7 +41,7 @@ contract LendingTermUnitTest is Test {
 
         collateral = new MockERC20();
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
         rlcm = new RateLimitedCreditMinter(
             address(core), /*_core*/
             address(credit), /*_token*/
