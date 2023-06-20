@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
@@ -12,7 +13,6 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 
 // TODO:
 // - Add events
-// - safeTransfer on collateralToken
 // - public constant DUST amount: minimum amount of CREDIT to borrow to open new loans
 // - add tolerance to gauge imbalance (debtCeiling in borrow()) to avoid deadlock situations and allow organic growth of borrows
 // - refactor in smaller internal functions, so that child contracts can reuse code more conveniently
@@ -22,6 +22,7 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 // - change input to array of loanIds in call() and seize()
 
 contract LendingTerm is CoreRef {
+    using SafeERC20 for IERC20;
 
     /// @notice reference number of seconds in 1 year
     uint256 public constant YEAR = 31557600;
@@ -211,7 +212,7 @@ contract LendingTerm is CoreRef {
         uint256 _issuance = issuance;
         uint256 _postLoanIssuance = _issuance + borrowAmount;
         require(_postLoanIssuance <= hardCap, "LendingTerm: hardcap reached");
-        uint256 _totalSupply = ERC20(creditToken).totalSupply();
+        uint256 _totalSupply = IERC20(creditToken).totalSupply();
         if (_totalSupply != 0) {
             uint256 debtCeiling = GuildToken(_guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount);
             require(_postLoanIssuance <= debtCeiling, "LendingTerm: debt ceiling reached");
@@ -233,7 +234,7 @@ contract LendingTerm is CoreRef {
         RateLimitedCreditMinter(creditMinter).mint(msg.sender, borrowAmount);
 
         // pull the collateral from the borrower
-        ERC20(collateralToken).transferFrom(msg.sender, address(this), collateralAmount);
+        IERC20(collateralToken).safeTransferFrom(msg.sender, address(this), collateralAmount);
     }
 
     /// @notice repay an open loan
@@ -260,7 +261,7 @@ contract LendingTerm is CoreRef {
         
         // pull the CREDIT owed and refill the buffer of available CREDIT mints
         address _creditToken = creditToken;
-        ERC20(_creditToken).transferFrom(msg.sender, address(this), creditToPullFromBorrower);
+        IERC20(_creditToken).transferFrom(msg.sender, address(this), creditToPullFromBorrower);
         // loanDebt >= creditToPullFromBorrower but the extra CREDIT should sit on the
         // LendingTerm contract from the previous call() call (provided by loan caller).
         RateLimitedCreditMinter(creditMinter).replenishBuffer(loanDebt);
@@ -274,7 +275,7 @@ contract LendingTerm is CoreRef {
         issuance -= loan.borrowAmount;
 
         // return the collateral to the borrower
-        ERC20(collateralToken).transfer(loan.borrower, loan.collateralAmount);
+        IERC20(collateralToken).safeTransfer(loan.borrower, loan.collateralAmount);
     }
 
     /// @notice call a loan, borrower has `callPeriod` seconds to repay the loan,
@@ -299,7 +300,7 @@ contract LendingTerm is CoreRef {
         uint256 loanCallFee = loan.borrowAmount * callFee / 1e18;
 
         // pull the fee from caller
-        ERC20(creditToken).transferFrom(msg.sender, address(this), loanCallFee);
+        IERC20(creditToken).transferFrom(msg.sender, address(this), loanCallFee);
     
         // set the call info
         loan.caller = msg.sender;
@@ -332,11 +333,11 @@ contract LendingTerm is CoreRef {
 
         // auction the loan collateral
         address _auctionHouse = auctionHouse;
-        ERC20(collateralToken).approve(_auctionHouse, loan.collateralAmount);
+        IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
         AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, true);
 
         // send CREDIT from the call fee to the auction house
-        ERC20(creditToken).transfer(_auctionHouse, loanCallFee);
+        IERC20(creditToken).transfer(_auctionHouse, loanCallFee);
     }
 
     /// @notice used to call() + seize() a list of loans for emergency offboarding of a lending term.
@@ -372,13 +373,13 @@ contract LendingTerm is CoreRef {
             _newIssuance -= loan.borrowAmount;
 
             // auction the loan collateral
-            ERC20(collateralToken).approve(_auctionHouse, loan.collateralAmount);
+            IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
             AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
         }
 
         // send CREDIT from the call fees to the auction house
         if (creditToSendToAuctionHouse != 0) {
-            ERC20(creditToken).transfer(_auctionHouse, creditToSendToAuctionHouse);
+            IERC20(creditToken).transfer(_auctionHouse, creditToSendToAuctionHouse);
         }
 
         // update issuance

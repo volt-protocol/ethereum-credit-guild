@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
@@ -18,6 +19,7 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 /// @notice Auction House contract of the Ethereum Credit Guild,
 /// where collateral of borrowers is auctioned to cover their CREDIT debt.
 contract AuctionHouse is CoreRef {
+    using SafeERC20 for IERC20;
 
     /// @notice number of seconds before the midpoint of the auction, at which time the
     /// mechanism switches from "offer an increasing amount of collateral" to
@@ -112,7 +114,7 @@ contract AuctionHouse is CoreRef {
         });
 
         // pull collateral
-        ERC20(_collateralToken).transferFrom(msg.sender, address(this), loan.collateralAmount);
+        IERC20(_collateralToken).safeTransferFrom(msg.sender, address(this), loan.collateralAmount);
     }
 
     /// @notice Get the bid details for an active auction.
@@ -181,7 +183,7 @@ contract AuctionHouse is CoreRef {
 
         // pull CREDIT from the bidder and burn it
         if (creditAsked != 0) {
-            ERC20(creditToken).transferFrom(msg.sender, address(this), creditAsked);
+            IERC20(creditToken).transferFrom(msg.sender, address(this), creditAsked);
         }
         bool _loanCalled = auctions[loanId].loanCalled;
         uint256 _callFeeAmount = auctions[loanId].callFeeAmount;
@@ -194,14 +196,14 @@ contract AuctionHouse is CoreRef {
         // transfer collateral to bidder
         address _collateralToken = auctions[loanId].collateralToken;
         if (collateralReceived != 0) {
-            ERC20(_collateralToken).transfer(msg.sender, collateralReceived);
+            IERC20(_collateralToken).safeTransfer(msg.sender, collateralReceived);
         }
 
         // transfer what is left of collateral to borrower
         uint256 _collateralAmount = auctions[loanId].collateralAmount;
         uint256 collateralLeft = _collateralAmount - collateralReceived;
         if (collateralLeft != 0) {
-            ERC20(_collateralToken).transfer(auctions[loanId].borrower, collateralLeft);
+            IERC20(_collateralToken).safeTransfer(auctions[loanId].borrower, collateralLeft);
         }
 
         // if loan was unsafe, or lending terms have been offboarded since auction start,
