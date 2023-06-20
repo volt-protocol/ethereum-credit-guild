@@ -163,7 +163,15 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 0;
         vm.expectRevert("LendingTerm: cannot stake 0");
         term.borrow(borrowAmount, collateralAmount);
-    } 
+    }
+
+    // borrow fail because not enough borrowed
+    function testBorrowFailAmountTooSmall() public {
+        uint256 borrowAmount = 1e18;
+        uint256 collateralAmount = 1e18;
+        vm.expectRevert("LendingTerm: borrow amount too low");
+        term.borrow(borrowAmount, collateralAmount);
+    }
 
     // borrow fail because 0 debt
     function testBorrowFailNoDebt() public {
@@ -312,6 +320,9 @@ contract LendingTermUnitTest is Test {
         vm.assume(borrowAmount < 100_000_000_000_000e18); // irrealisticly large amount
         vm.assume(interestTime != 0);
         vm.assume(interestTime < 10 * 365 * 24 * 3600); // <= ~10 years
+
+        // do not fuzz reverting conditions (below MIN_BORROW or under LTV)
+        borrowAmount += term.MIN_BORROW();
         uint256 maxBorrow = collateralAmount * _CREDIT_PER_COLLATERAL_TOKEN * 1e18 / (1e18 * (1e18 + _LTV_BUFFER));
         vm.assume(borrowAmount <= maxBorrow);
 

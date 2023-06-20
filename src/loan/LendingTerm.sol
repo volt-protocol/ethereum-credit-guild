@@ -13,7 +13,6 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 
 // TODO:
 // - Add events
-// - public constant DUST amount: minimum amount of CREDIT to borrow to open new loans
 // - add tolerance to gauge imbalance (debtCeiling in borrow()) to avoid deadlock situations and allow organic growth of borrows
 // - refactor in smaller internal functions, so that child contracts can reuse code more conveniently
 // - set hardcap to 0 for terms that realized bad debt until governance raise it again
@@ -26,6 +25,9 @@ contract LendingTerm is CoreRef {
 
     /// @notice reference number of seconds in 1 year
     uint256 public constant YEAR = 31557600;
+
+    /// @notice minimum number of CREDIT to borrow when opening a new loan
+    uint256 public constant MIN_BORROW = 100e18;
 
     /// @notice reference to the GUILD token
     address public immutable guildToken;
@@ -195,6 +197,9 @@ contract LendingTerm is CoreRef {
 
         // check that the loan doesn't already exist
         require(loans[loanId].originationTime == 0, "LendingTerm: loan exists");
+
+        // check that enough CREDIT is borrowed
+        require(borrowAmount >= MIN_BORROW, "LendingTerm: borrow amount too low");
 
         // check that enough collateral is provided
         uint256 maxBorrow = collateralAmount * creditPerCollateralToken / 1e18;
