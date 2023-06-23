@@ -10,16 +10,13 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
-// TODO:
-// - safeTransfer on collateralToken
-// - add events
-// - consider if some functions should be pausable
-// - in bid(), loss reported include the interests owed, not just the initial borrow, does it make sense ?
-
 /// @notice Auction House contract of the Ethereum Credit Guild,
 /// where collateral of borrowers is auctioned to cover their CREDIT debt.
 contract AuctionHouse is CoreRef {
     using SafeERC20 for IERC20;
+
+    // events for the lifecycle of loans that happen in the auction house
+    event LoanBid(uint256 indexed when, bytes32 indexed loanId, uint256 collateralSold, uint256 collateralReturned, uint256 creditRecovered, uint256 creditIssued);
 
     /// @notice number of seconds before the midpoint of the auction, at which time the
     /// mechanism switches from "offer an increasing amount of collateral" to
@@ -219,5 +216,13 @@ contract AuctionHouse is CoreRef {
         // end of the lifecycle of a loan, notify of profit & losses created in the system.
         int256 pnl = int256(protocolInput) - int256(protocolOutput);
         GuildToken(guildToken).notifyPnL(_lendingTerm, pnl);
+
+        // if losses were realized, set the harcap of the lending term to 0 to avoid new borrows.
+        if (pnl < 0) {
+            LendingTerm(auctions[loanId].lendingTerm).setHardCap(0);
+        }
+
+        // emit event
+        emit LoanBid(block.timestamp, loanId, collateralReceived, collateralLeft, protocolInput, protocolOutput);
     }
 }

@@ -12,22 +12,29 @@ import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
 // TODO:
-// - Add events
-// - add tolerance to gauge imbalance (debtCeiling in borrow()) to avoid deadlock situations and allow organic growth of borrows
 // - refactor in smaller internal functions, so that child contracts can reuse code more conveniently
-// - set hardcap to 0 for terms that realized bad debt until governance raise it again
-// - add a `forgive()` function to mark to 0 a loan without trying to move the collateral token to the auction house,
-//   and report the full debt amount as a loss to the system. This is for collateral assets that can be frozen.
-// - change input to array of loanIds in call() and seize()
 
+/// @notice Lending Term contract of the Ethereum Credit Guild, a base implementation of
+/// smart contract issuing CREDIT debt and escrowing collateral assets.
 contract LendingTerm is CoreRef {
     using SafeERC20 for IERC20;
+
+    // events for the lifecycle of loans that happen in the lending term
+    event LoanBorrow(uint256 indexed when, bytes32 indexed loanId, address indexed borrower, uint256 collateralAmount, uint256 borrowAmount);
+    event LoanCall(uint256 indexed when, bytes32 indexed loanId);
+    event LoanRepay(uint256 indexed when, bytes32 indexed loanId);
+    event LoanSeize(uint256 indexed when, bytes32 indexed loanId, bool loanCalled, bool collateralAuctioned);
 
     /// @notice reference number of seconds in 1 year
     uint256 public constant YEAR = 31557600;
 
     /// @notice minimum number of CREDIT to borrow when opening a new loan
     uint256 public constant MIN_BORROW = 100e18;
+
+    /// @notice debt ceiling tolerance vs. ideal gauge weights to avoid deadlock situations and allow organic growth of borrows.
+    /// Expressed as a percentage, with 18 decimals, e.g. 1.2e18 = 120% tolerance, meaning if GUILD holders' gauge weights
+    /// would set a debt ceiling to 100 CREDIT, the issuance could go as high as 120 CREDIT.
+    uint256 public constant GAUGE_CAP_TOLERANCE = 1.2e18;
 
     /// @notice reference to the GUILD token
     address public immutable guildToken;
@@ -89,6 +96,11 @@ contract LendingTerm is CoreRef {
     /// @notice the absolute maximum amount of debt this lending term can create
     /// (sum of CREDIT minted), regardless of the gauge allocations.
     uint256 public hardCap;
+
+    /// @notice if true, the governance has forgiven all loans, that can be immediately closed
+    /// and marked as total losses in the system. This is meant for extreme events, where
+    /// collateral assets are frozen and can't be sent to the auctionHouse for liquidations.
+    bool public forgiveness = false;
 
     /// @notice the LTV buffer, expressed as a percentage with 18 decimals.
     /// Example: for a value of 0.1e18 (10%), the LTV buffer will waive the call fee
@@ -220,6 +232,7 @@ contract LendingTerm is CoreRef {
         uint256 _totalSupply = IERC20(creditToken).totalSupply();
         if (_totalSupply != 0) {
             uint256 debtCeiling = GuildToken(_guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount);
+            debtCeiling = debtCeiling * GAUGE_CAP_TOLERANCE / 1e18;
             require(_postLoanIssuance <= debtCeiling, "LendingTerm: debt ceiling reached");
         }
 
@@ -240,6 +253,9 @@ contract LendingTerm is CoreRef {
 
         // pull the collateral from the borrower
         IERC20(collateralToken).safeTransferFrom(msg.sender, address(this), collateralAmount);
+
+        // emit event
+        emit LoanBorrow(block.timestamp, loanId, msg.sender, collateralAmount, borrowAmount);
     }
 
     /// @notice repay an open loan
@@ -281,74 +297,61 @@ contract LendingTerm is CoreRef {
 
         // return the collateral to the borrower
         IERC20(collateralToken).safeTransfer(loan.borrower, loan.collateralAmount);
+
+        // emit event
+        emit LoanRepay(block.timestamp, loanId);
     }
 
-    /// @notice call a loan, borrower has `callPeriod` seconds to repay the loan,
-    /// or their collateral will be seized.
+    /// @notice call a list of loans, borrower has `callPeriod` seconds to repay the loan,
+    /// or their collateral will be seized. This will pull the CREDIT call fee from `msg.sender`.
+    function call(bytes32[] memory loanIds) public {
+        uint256 creditToPullForCallFees = 0;
+        for (uint256 i = 0; i < loanIds.length; i++) {
+            bytes32 loanId = loanIds[i];
+            Loan storage loan = loans[loanId];
+
+            // check that the loan exists
+            uint256 _originationTime = loan.originationTime;
+            require(_originationTime != 0, "LendingTerm: loan not found");
+
+            // check that the loan has not been created in the same block
+            require(_originationTime < block.timestamp, "LendingTerm: loan opened in same block");
+
+            // check that the loan is not already called
+            require(loan.callTime == 0, "LendingTerm: loan called");
+
+            // check that the loan is not already closed
+            require(loan.closeTime == 0, "LendingTerm: loan closed");
+        
+            // calculate the call fee
+            creditToPullForCallFees += loan.borrowAmount * callFee / 1e18;
+        
+            // set the call info
+            loan.caller = msg.sender;
+            loan.callTime = block.timestamp;
+
+            // emit event
+            emit LoanCall(block.timestamp, loanId);
+        }
+
+        // pull the call fees from caller
+        IERC20(creditToken).transferFrom(msg.sender, address(this), creditToPullForCallFees);
+    }
+
+    /// @notice call a single loan.
     function call(bytes32 loanId) external {
-        Loan storage loan = loans[loanId];
-
-        // check that the loan exists
-        uint256 _originationTime = loan.originationTime;
-        require(_originationTime != 0, "LendingTerm: loan not found");
-
-        // check that the loan has not been created in the same block
-        require(_originationTime < block.timestamp, "LendingTerm: loan opened in same block");
-
-        // check that the loan is not already called
-        require(loan.callTime == 0, "LendingTerm: loan called");
-
-        // check that the loan is not already closed
-        require(loan.closeTime == 0, "LendingTerm: loan closed");
-    
-        // calculate the fee, pull it from caller, and burn the CREDIT
-        uint256 loanCallFee = loan.borrowAmount * callFee / 1e18;
-
-        // pull the fee from caller
-        IERC20(creditToken).transferFrom(msg.sender, address(this), loanCallFee);
-    
-        // set the call info
-        loan.caller = msg.sender;
-        loan.callTime = block.timestamp;
+        bytes32[] memory loanIds = new bytes32[](1);
+        loanIds[0] = loanId;
+        call(loanIds);
     }
 
-    /// @notice seize the collateral of a loan after the call period, to repay outstanding debt.
-    function seize(bytes32 loanId) external {
-        Loan storage loan = loans[loanId];
-
-        // check that the loan exists
-        require(loan.originationTime != 0, "LendingTerm: loan not found");
-
-        // check that the loan is not already closed
-        require(loan.closeTime == 0, "LendingTerm: loan closed");
-
-        // check that the loan has been called
-        require(loan.callTime > 0, "LendingTerm: loan not called");
-
-        // check that the call period has elapsed
-        require(block.timestamp >= loan.callTime + callPeriod, "LendingTerm: call period in progress");
-
-        // update total borrows
-        uint256 loanDebt = getLoanDebt(loanId);
-        issuance -= loan.borrowAmount;
-
-        // close the loan
-        uint256 loanCallFee = getLoanCallFee(loanId);
-        loans[loanId].closeTime = block.timestamp;
-
-        // auction the loan collateral
-        address _auctionHouse = auctionHouse;
-        IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
-        AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, true);
-
-        // send CREDIT from the call fee to the auction house
-        IERC20(creditToken).transfer(_auctionHouse, loanCallFee);
-    }
-
-    /// @notice used to call() + seize() a list of loans for emergency offboarding of a lending term.
-    /// Loans that are already called are not called again.
-    /// Does not collect the call fee.
-    function offboard(bytes32[] memory loanIds) external onlyCoreRole(CoreRoles.TERM_OFFBOARD) {
+    /// @notice seize the collateral of an array of loans, to repay outstanding debt.
+    /// Under normal conditions, the loans should be call()'d first, to give the borrower an opportunity to repay (the 'call period').
+    /// Conditions that allow to skip calling a loan before seizing its collateral :
+    /// - forgiving all loans of a lending term (privileged role in the system)
+    /// - offboading of a lending term (privileged role in the system)
+    /// - issuance of lending term above hardcap set by governance
+    function seize(bytes32[] memory loanIds, bool[] memory skipCall) public {
         uint256 _newIssuance = issuance;
         address _auctionHouse = auctionHouse;
         uint256 creditToSendToAuctionHouse = 0;
@@ -362,12 +365,23 @@ contract LendingTerm is CoreRef {
             // check that the loan is not already closed
             require(loan.closeTime == 0, "LendingTerm: loan closed");
 
+            // conditions that allow seizing the collateral of a loan without waiting for the call period to elapse
+            bool canSkipCall = false;
+            if (skipCall[i]) {
+                canSkipCall = _newIssuance > hardCap || core().hasRole(CoreRoles.TERM_OFFBOARD, msg.sender);
+            }
+
             // set the call info, if not set
-            bool loanCalled = false;
-            if (loan.callTime != 0) {
-                loanCalled = true;
+            uint256 _callTime = loan.callTime;
+            bool loanCalled = _callTime != 0;
+            if (loanCalled) {
+                // check that the call period has elapsed
+                if (!canSkipCall) {
+                    require(block.timestamp >= loan.callTime + callPeriod, "LendingTerm: call period in progress");
+                }
                 creditToSendToAuctionHouse += getLoanCallFee(loanId);
             } else {
+                require(canSkipCall, "LendingTerm: loan not called");
                 loan.caller = msg.sender;
                 loan.callTime = block.timestamp;
             }
@@ -375,11 +389,24 @@ contract LendingTerm is CoreRef {
             // close the loan
             uint256 loanDebt = getLoanDebt(loanId);
             loans[loanId].closeTime = block.timestamp;
-            _newIssuance -= loan.borrowAmount;
+            uint256 _borrowAmount = loan.borrowAmount;
+            _newIssuance -= _borrowAmount;
 
-            // auction the loan collateral
-            IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
-            AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
+            if (forgiveness) {
+                // mark loans as total losses
+                int256 pnl = -int256(_borrowAmount);
+                GuildToken(guildToken).notifyPnL(address(this), pnl);
+
+                // emit event
+                emit LoanSeize(block.timestamp, loanId, loanCalled, false);
+            } else {
+                // auction the loan collateral
+                IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
+                AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
+
+                // emit event
+                emit LoanSeize(block.timestamp, loanId, loanCalled, true);
+            }
         }
 
         // send CREDIT from the call fees to the auction house
@@ -389,6 +416,24 @@ contract LendingTerm is CoreRef {
 
         // update issuance
         issuance = _newIssuance;
+    }
+
+    /// @notice seize a single loan without attempt to skip the call period.
+    function seize(bytes32 loanId) external {
+        bytes32[] memory loanIds = new bytes32[](1);
+        bool[] memory skipCall = new bool[](1);
+        loanIds[0] = loanId;
+        skipCall[0] = false;
+        seize(loanIds, skipCall);
+    }
+
+    /// @notice forgive all loans. This will allow all loans to be closed (through the `seize()`
+    /// function call) and marked as total losses in the system, without attempting to transfer
+    /// the collateral tokens to the auction house. This is meant for extreme events where collateral
+    /// assets are frozen and can't be transferred within or out of the system anymore.
+    function forgiveAllLoans() external {
+        require(canAutomaticallyForgive() || core().hasRole(CoreRoles.TERM_OFFBOARD, msg.sender), "LendingTerm: cannot forgive");
+        forgiveness = true;
     }
 
     /// @notice set the address of the auction house.
@@ -401,5 +446,10 @@ contract LendingTerm is CoreRef {
     /// allows to update a term's arbitrary hardcap without doing a gauge & loans migration.
     function setHardCap(uint256 _newValue) external onlyCoreRole(CoreRoles.TERM_HARDCAP) {
         hardCap = _newValue;
+    }
+
+    /// @notice automatic criteria for loan forgiveness, for use in inheriting contracts.
+    function canAutomaticallyForgive() public virtual view returns (bool) {
+        return false;
     }
 }

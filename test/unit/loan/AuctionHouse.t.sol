@@ -87,6 +87,7 @@ contract AuctionHouseUnitTest is Test {
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(auctionHouse));
+        core.grantRole(CoreRoles.TERM_HARDCAP, address(auctionHouse));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(auctionHouse));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
@@ -167,7 +168,9 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         bytes32[] memory loanIds = new bytes32[](1);
         loanIds[0] = loanId;
-        term.offboard(loanIds);
+        bool[] memory skipCall = new bool[](1);
+        skipCall[0] = true;
+        term.seize(loanIds, skipCall);
     }
 
     // auction getter
