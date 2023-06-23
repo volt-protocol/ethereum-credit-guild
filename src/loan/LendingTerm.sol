@@ -11,9 +11,6 @@ import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
-// TODO:
-// - refactor in smaller internal functions, so that child contracts can reuse code more conveniently
-
 /// @notice Lending Term contract of the Ethereum Credit Guild, a base implementation of
 /// smart contract issuing CREDIT debt and escrowing collateral assets.
 contract LendingTerm is CoreRef {
