@@ -107,7 +107,7 @@ contract VoltGovernor is
     /// ------------------------------------------------------------------------
 
     /// @notice Allow guardian to cancel a proposal in progress.
-    function cancel(
+    function guardianCancel(
         address[] memory targets,
         uint256[] memory values,
         bytes[] memory calldatas,
