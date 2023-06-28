@@ -2,9 +2,12 @@
 pragma solidity =0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ERC20Gauges} from "@src/tokens/ERC20Gauges.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {ERC20Gauges} from "@src/tokens/ERC20Gauges.sol";
+import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 
 /** 
 @title  GUILD ERC20 Token
@@ -28,7 +31,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
     that did not suffer a loss.
 */
 // TODO: figure out a way to do pro-rata distribution of profits to GUILD holders that vote in gauges that generate profits.
-contract GuildToken is CoreRef, ERC20Gauges {
+contract GuildToken is CoreRef, ERC20Gauges, ERC20MultiVotes {
 
     /// @notice reference to CREDIT token.
     address public credit;
@@ -56,6 +59,7 @@ contract GuildToken is CoreRef, ERC20Gauges {
     )
         CoreRef(_core)
         ERC20("Ethereum Credit Guild - GUILD", "GUILD")
+        ERC20Permit("Ethereum Credit Guild - GUILD")
         ERC20Gauges(_gaugeCycleLength, _incrementFreezeWindow)
     {
         credit = _credit;
@@ -306,5 +310,45 @@ contract GuildToken is CoreRef, ERC20Gauges {
     /// @notice burn a given amount of owned tokens
     function burn(uint256 amount) external {
         _burn(msg.sender, amount);
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                        Inheritance reconciliation
+    //////////////////////////////////////////////////////////////*/
+
+    function _burn(address from, uint256 amount)
+        internal
+        virtual
+        override(ERC20Gauges, ERC20MultiVotes)
+    {
+        _decrementWeightUntilFree(from, amount);
+        _decrementVotesUntilFree(from, amount);
+        ERC20._burn(from, amount);
+    }
+
+    function transfer(address to, uint256 amount)
+        public
+        virtual
+        override(ERC20Gauges, ERC20MultiVotes)
+        returns (bool)
+    {
+        _decrementWeightUntilFree(msg.sender, amount);
+        _decrementVotesUntilFree(msg.sender, amount);
+        return ERC20.transfer(to, amount);
+    }
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    )
+        public
+        virtual
+        override(ERC20Gauges, ERC20MultiVotes)
+        returns (bool)
+    {
+        _decrementWeightUntilFree(from, amount);
+        _decrementVotesUntilFree(from, amount);
+        return ERC20.transferFrom(from, to, amount);
     }
 }
