@@ -33,18 +33,16 @@ abstract contract ERC20RebaseDistributor is ERC20 {
     event RebaseDistribution(address indexed source, uint256 indexed timestamp, uint256 amount);
 
     /*///////////////////////////////////////////////////////////////
-                            PUBLIC STATE
-    ///////////////////////////////////////////////////////////////*/
-
-    /// @notice mapping of addresses that are rebasing.
-    mapping(address=>bool) public isRebasing;
-
-    /*///////////////////////////////////////////////////////////////
                             INTERNAL STATE
     ///////////////////////////////////////////////////////////////*/
 
+    struct RebasingState {
+        uint8 isRebasing;
+        uint248 nShares;
+    }
+
     /// @notice For internal accounting. Number of rebasing shares for each rebasing accounts. 0 if account is not rebasing.
-    mapping(address=>uint256) internal rebasingShares;
+    mapping(address=>RebasingState) internal rebasingState;
 
     /// @notice For internal accounting. Total number of rebasing shares
     uint256 internal totalRebasingShares;
@@ -63,27 +61,27 @@ abstract contract ERC20RebaseDistributor is ERC20 {
     /// @notice Enter rebasing supply. All subsequent distributions will increase the balance
     /// of `msg.sender` proportionately.
     function enterRebase() external {
-        require(!isRebasing[msg.sender], "ERC20RebaseDistributor: already rebasing");
+        require(rebasingState[msg.sender].isRebasing == 0, "ERC20RebaseDistributor: already rebasing");
         _enterRebase(msg.sender);
     }
     function _enterRebase(address account) internal {
         uint256 balance = balanceOf(account);
         uint256 shares = balance * 1e18 / rebasingSharePrice;
-        rebasingShares[account] = shares;
+        rebasingState[account].nShares = uint248(shares);
+        rebasingState[account].isRebasing = 1;
         totalRebasingShares += shares;
-        isRebasing[account] = true;
         emit RebaseEnter(account, block.timestamp, balance);
     }
 
     /// @notice Exit rebasing supply. All pending rebasing rewards are physically minted to the user,
     /// and they won't be affected by rebases anymore.
     function exitRebase() external {
-        require(isRebasing[msg.sender], "ERC20RebaseDistributor: not rebasing");
+        require(rebasingState[msg.sender].isRebasing == 1, "ERC20RebaseDistributor: not rebasing");
         _exitRebase(msg.sender);
     }
     function _exitRebase(address account) internal {
         uint256 rawBalance = ERC20.balanceOf(account);
-        uint256 shares = rebasingShares[account];
+        uint256 shares = uint256(rebasingState[account].nShares);
         uint256 rebasedBalance = shares * rebasingSharePrice / 1e18;
         uint256 mintAmount = rebasedBalance - rawBalance;
         if (mintAmount != 0) {
@@ -91,11 +89,11 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             pendingRebaseRewards -= mintAmount;
         }
 
-        rebasingShares[account] = 0;
+        rebasingState[account].nShares = 0;
+        rebasingState[account].isRebasing = 0;
         totalRebasingShares -= shares;
-        isRebasing[account] = false;
 
-        emit RebaseExit(account, block.timestamp, rawBalance);
+        emit RebaseExit(account, block.timestamp, rebasedBalance);
     }
 
     /// @notice distribute tokens proportionately to all rebasing accounts.
@@ -116,6 +114,11 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         emit RebaseDistribution(msg.sender, block.timestamp, amount);
     }
 
+    /// @notice True if an address subscribed to rebasing.
+    function isRebasing(address account) public view returns (bool) {
+        return rebasingState[account].isRebasing == 1;
+    }
+
     /// @notice Total number of the tokens that are rebasing.
     function rebasingSupply() public view returns (uint256) {
         return totalRebasingShares * rebasingSharePrice / 1e18;
@@ -132,7 +135,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
 
     /// @notice Override of balanceOf() that takes into account the pending undistributed rebase rewards.
     function balanceOf(address account) public view virtual override returns (uint256) {
-        uint256 _rebasingShares = rebasingShares[account];
+        uint256 _rebasingShares = rebasingState[account].nShares;
         if (_rebasingShares == 0) {
             return ERC20.balanceOf(account);
         } else {
@@ -148,7 +151,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
     /// @notice Override of default ERC20 behavior: exit rebase before movement (if rebasing),
     /// and re-enter rebasing after movement (if rebasing).
     function _burn(address account, uint256 amount) internal virtual override {
-        bool isRebasingAccount = isRebasing[account];
+        bool isRebasingAccount = isRebasing(account);
         if (isRebasingAccount) {
             _exitRebase(account);
         }
@@ -161,7 +164,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
     /// @notice Override of default ERC20 behavior: exit rebase before movement (if rebasing),
     /// and re-enter rebasing after movement (if rebasing).
     function _mint(address account, uint256 amount) internal virtual override {
-        bool isRebasingAccount = isRebasing[account];
+        bool isRebasingAccount = isRebasing(account);
         if (isRebasingAccount) {
             _exitRebase(account);
         }
@@ -174,8 +177,8 @@ abstract contract ERC20RebaseDistributor is ERC20 {
     /// @notice Override of default ERC20 behavior: exit rebase before movement (if rebasing),
     /// and re-enter rebasing after movement (if rebasing).
     function transfer(address to, uint256 amount) public virtual override returns (bool) {
-        bool isRebasingFrom = isRebasing[msg.sender];
-        bool isRebasingTo = isRebasing[to];
+        bool isRebasingFrom = isRebasing(msg.sender);
+        bool isRebasingTo = isRebasing(to);
         if (isRebasingFrom) {
             _exitRebase(msg.sender);
         }
@@ -199,8 +202,8 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         address to,
         uint256 amount
     ) public virtual override returns (bool) {
-        bool isRebasingFrom = isRebasing[from];
-        bool isRebasingTo = isRebasing[to];
+        bool isRebasingFrom = isRebasing(from);
+        bool isRebasingTo = isRebasing(to);
         if (isRebasingFrom) {
             _exitRebase(from);
         }
