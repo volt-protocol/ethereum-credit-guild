@@ -25,7 +25,6 @@ contract ERC20RebaseDistributorUnitTest is Test {
     function testInitialState() public {
         assertEq(token.totalSupply(), 0);
         assertEq(token.rebasingSupply(), 0);
-        assertEq(token.rebasingSupplyPendingProfits(), 0);
         assertEq(token.isRebasing(alice), false);
         assertEq(token.isRebasing(bobby), false);
         assertEq(token.isRebasing(carol), false);
@@ -83,7 +82,6 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.totalSupply(), 300);
         assertEq(token.nonRebasingSupply(), 100);
         assertEq(token.rebasingSupply(), 200);
-        assertEq(token.rebasingSupplyPendingProfits(), 0);
 
         // distribute 100 profits
         token.mint(address(this), 100);
@@ -96,8 +94,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.balanceOf(carol), 100);
         assertEq(token.totalSupply(), 400);
         assertEq(token.nonRebasingSupply(), 100);
-        assertEq(token.rebasingSupply(), 200);
-        assertEq(token.rebasingSupplyPendingProfits(), 100);
+        assertEq(token.rebasingSupply(), 300);
 
         // distribute 100 profits
         token.mint(address(this), 100);
@@ -110,8 +107,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.balanceOf(carol), 100);
         assertEq(token.totalSupply(), 500);
         assertEq(token.nonRebasingSupply(), 100);
-        assertEq(token.rebasingSupply(), 200);
-        assertEq(token.rebasingSupplyPendingProfits(), 200);
+        assertEq(token.rebasingSupply(), 400);
 
         // bobby exits rebase
         vm.prank(bobby);
@@ -123,8 +119,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.balanceOf(carol), 100);
         assertEq(token.totalSupply(), 500);
         assertEq(token.nonRebasingSupply(), 300);
-        assertEq(token.rebasingSupply(), 100);
-        assertEq(token.rebasingSupplyPendingProfits(), 100);
+        assertEq(token.rebasingSupply(), 200);
 
         // carol enters rebase
         vm.prank(carol);
@@ -136,8 +131,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.balanceOf(carol), 100);
         assertEq(token.totalSupply(), 500);
         assertEq(token.nonRebasingSupply(), 200);
-        assertEq(token.rebasingSupply(), 200);
-        assertEq(token.rebasingSupplyPendingProfits(), 100);
+        assertEq(token.rebasingSupply(), 300);
 
         // distribute 300 profits
         // should give 200 to Alice and 100 to Carol, not 150 each,
@@ -152,8 +146,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.balanceOf(carol), 200);
         assertEq(token.totalSupply(), 800);
         assertEq(token.nonRebasingSupply(), 200);
-        assertEq(token.rebasingSupply(), 200);
-        assertEq(token.rebasingSupplyPendingProfits(), 400);
+        assertEq(token.rebasingSupply(), 600);
 
         // everyone exits rebase
         vm.prank(alice);
@@ -168,7 +161,6 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.totalSupply(), 800);
         assertEq(token.nonRebasingSupply(), 800);
         assertEq(token.rebasingSupply(), 0);
-        assertEq(token.rebasingSupplyPendingProfits(), 0);
 
         // should not allow distribution of profits if nobody is going to receive
         token.mint(address(this), 100);
