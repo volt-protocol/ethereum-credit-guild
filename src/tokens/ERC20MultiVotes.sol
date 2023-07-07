@@ -6,7 +6,7 @@ pragma solidity ^0.8.0;
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {SafeCastLib} from "@src/utils/SafeCastLib.sol";
+import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
 
 /**
 @title  ERC20 Multi-Delegation Voting contract
@@ -160,9 +160,6 @@ abstract contract ERC20MultiVotes is ERC20Permit {
     /// @dev this is used for backward compatibility with OZ interfaces for ERC20Votes and ERC20VotesComp.
     event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
 
-    /// @dev thrown when attempting to delegate more votes than an address has free, or exceeding the max delegates
-    error DelegationError();
-
     /// @notice mapping from a delegator and delegatee to the delegated amount.
     mapping(address => mapping(address => uint256)) private _delegatesVotesCount;
 
@@ -233,7 +230,7 @@ abstract contract ERC20MultiVotes is ERC20Permit {
         uint256 count = delegateCount(delegator);
 
         // undefined behavior for delegateCount > 1
-        if (count > 1) revert DelegationError();
+        require(count < 2, "ERC20MultiVotes: delegation error");
 
         address oldDelegatee;
         // if already delegated, undelegate first
@@ -256,13 +253,10 @@ abstract contract ERC20MultiVotes is ERC20Permit {
     ) internal virtual {
         // Require freeVotes exceed the delegation size
         uint256 free = freeVotes(delegator);
-        if (delegatee == address(0) || free < amount) revert DelegationError();
+        require(delegatee != address(0) && free >= amount, "ERC20MultiVotes: delegation error");
 
         bool newDelegate = _delegates[delegator].add(delegatee); // idempotent add
-        if (newDelegate && delegateCount(delegator) > maxDelegates && !canContractExceedMaxDelegates[delegator]) {
-            // if new delegate and exceeds max and not approved to exceed, revert
-            revert DelegationError();
-        }
+        require(!newDelegate || delegateCount(delegator) <= maxDelegates || canContractExceedMaxDelegates[delegator], "ERC20MultiVotes: delegation error");
 
         _delegatesVotesCount[delegator][delegatee] += amount;
         userDelegatedVotes[delegator] += amount;

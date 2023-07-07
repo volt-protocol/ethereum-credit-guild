@@ -4,7 +4,7 @@ pragma solidity =0.8.13;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {SafeCastLib} from "@src/utils/SafeCastLib.sol";
+import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
 
 /** 
 @title  An ERC20 with an embedded "Gauge" style vote with liquid weights
