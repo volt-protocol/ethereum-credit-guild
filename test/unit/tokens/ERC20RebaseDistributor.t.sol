@@ -338,52 +338,76 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.rebasingSupply(), 200);
         assertEq(token.nonRebasingSupply(), 100);
 
-        // alice transfer() to bobby
-        vm.prank(alice);
-        token.transfer(bobby, 50);
+        // distribute 300 profits
+        token.mint(address(this), 300);
+        token.approve(address(token), 300);
+        token.distribute(300);
 
         // check balances
-        assertEq(token.balanceOf(alice), 150);
-        assertEq(token.balanceOf(bobby), 150);
-        assertEq(token.totalSupply(), 300);
-        assertEq(token.rebasingSupply(), 150);
-        assertEq(token.nonRebasingSupply(), 150);
+        assertEq(token.balanceOf(alice), 500);
+        assertEq(token.balanceOf(bobby), 100);
+        assertEq(token.totalSupply(), 600);
+        assertEq(token.rebasingSupply(), 500);
+        assertEq(token.nonRebasingSupply(), 100);
+
+        // alice transfer() to bobby
+        vm.prank(alice);
+        token.transfer(bobby, 200);
+
+        // check balances
+        assertEq(token.balanceOf(alice), 300);
+        assertEq(token.balanceOf(bobby), 300);
+        assertEq(token.totalSupply(), 600);
+        assertEq(token.rebasingSupply(), 300);
+        assertEq(token.nonRebasingSupply(), 300);
 
         // bobby transfer() to alice
         vm.prank(bobby);
-        token.transfer(alice, 50);
+        token.transfer(alice, 200);
+
+       // check balances
+        assertEq(token.balanceOf(alice), 500);
+        assertEq(token.balanceOf(bobby), 100);
+        assertEq(token.totalSupply(), 600);
+        assertEq(token.rebasingSupply(), 500);
+        assertEq(token.nonRebasingSupply(), 100);
+
+        // distribute 500 profits
+        token.mint(address(this), 500);
+        token.approve(address(token), 500);
+        token.distribute(500);
 
         // check balances
-        assertEq(token.balanceOf(alice), 200);
+        assertEq(token.balanceOf(alice), 1000);
         assertEq(token.balanceOf(bobby), 100);
-        assertEq(token.totalSupply(), 300);
-        assertEq(token.rebasingSupply(), 200);
+        assertEq(token.totalSupply(), 1100);
+        assertEq(token.rebasingSupply(), 1000);
         assertEq(token.nonRebasingSupply(), 100);
 
         // bobby transferFrom() alice
         vm.prank(alice);
-        token.approve(bobby, 50);
+        token.approve(bobby, 500);
         vm.prank(bobby);
-        token.transferFrom(alice, bobby, 50);
+        token.transferFrom(alice, bobby, 500);
 
         // check balances
-        assertEq(token.balanceOf(alice), 150);
-        assertEq(token.balanceOf(bobby), 150);
-        assertEq(token.totalSupply(), 300);
-        assertEq(token.rebasingSupply(), 150);
-        assertEq(token.nonRebasingSupply(), 150);
+        assertEq(token.balanceOf(alice), 500);
+        assertEq(token.balanceOf(bobby), 600);
+        assertEq(token.totalSupply(), 1100);
+        assertEq(token.rebasingSupply(), 500);
+        assertEq(token.nonRebasingSupply(), 600);
 
         // alice transferFrom() bobby
         vm.prank(bobby);
-        token.approve(alice, 50);
+        token.approve(alice, 500);
         vm.prank(alice);
-        token.transferFrom(bobby, alice, 50);
+        token.transferFrom(bobby, alice, 500);
 
         // check balances
-        assertEq(token.balanceOf(alice), 200);
+        assertEq(token.balanceOf(alice), 1000);
         assertEq(token.balanceOf(bobby), 100);
-        assertEq(token.totalSupply(), 300);
-        assertEq(token.rebasingSupply(), 200);
+        assertEq(token.totalSupply(), 1100);
+        assertEq(token.rebasingSupply(), 1000);
         assertEq(token.nonRebasingSupply(), 100);
     }
 }
