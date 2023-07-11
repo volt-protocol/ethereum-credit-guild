@@ -410,4 +410,79 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.rebasingSupply(), 1000);
         assertEq(token.nonRebasingSupply(), 100);
     }
+
+    function testDistributeFuzz(uint256 distributionAmount, uint256[3] memory userBalances) public {
+        // fuzz values in the plausibility range
+        vm.assume(distributionAmount < 10_000e18);
+        vm.assume(userBalances[0] < 1_000_000e18);
+        vm.assume(userBalances[1] < 1_000_000e18);
+        vm.assume(userBalances[2] < 1_000_000e18);
+
+        // initial state: alice & bobby rebasing, carol not rebasing
+        token.mint(alice, userBalances[0]);
+        token.mint(bobby, userBalances[1]);
+        token.mint(carol, userBalances[2]);
+        vm.prank(alice);
+        token.enterRebase();
+        vm.prank(bobby);
+        token.enterRebase();
+
+        // check initial state
+        assertEq(token.isRebasing(alice), true);
+        assertEq(token.isRebasing(bobby), true);
+        assertEq(token.isRebasing(carol), false);
+
+        // check balances
+        uint256 totalSupplyBefore = userBalances[0] + userBalances[1] + userBalances[2];
+        uint256 rebasingSupplyBefore = userBalances[0] + userBalances[1];
+        uint256 nonRebasingSupplyBefore = userBalances[2];
+        assertEq(token.balanceOf(alice), userBalances[0]);
+        assertEq(token.balanceOf(bobby), userBalances[1]);
+        assertEq(token.balanceOf(carol), userBalances[2]);
+        assertEq(token.totalSupply(), totalSupplyBefore);
+        assertEq(token.rebasingSupply(), rebasingSupplyBefore);
+        assertEq(token.nonRebasingSupply(), nonRebasingSupplyBefore);
+
+        // distribute
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        if (rebasingSupplyBefore == 0) {
+            vm.expectRevert("ERC20RebaseDistributor: no rebase recipients");
+        }
+        if (distributionAmount == 0 && rebasingSupplyBefore != 0) {
+            vm.expectRevert("ERC20RebaseDistributor: cannot distribute zero");
+        }
+        token.distribute(distributionAmount);
+        if (rebasingSupplyBefore == 0 || distributionAmount == 0) {
+            return;
+        }
+
+        // check balances
+        // max error is due to rounding down on number of shares & share price
+        uint256 maxError = 2;
+        assertApproxEqAbs(token.balanceOf(alice), userBalances[0] + distributionAmount * userBalances[0] / rebasingSupplyBefore, maxError);
+        assertApproxEqAbs(token.balanceOf(bobby), userBalances[1] + distributionAmount * userBalances[1] / rebasingSupplyBefore, maxError);
+        assertEq(token.balanceOf(carol), userBalances[2]);
+        assertApproxEqAbs(token.totalSupply(), totalSupplyBefore + distributionAmount, maxError);
+        assertApproxEqAbs(token.rebasingSupply(), rebasingSupplyBefore + distributionAmount, maxError);
+        assertApproxEqAbs(token.nonRebasingSupply(), nonRebasingSupplyBefore, maxError);
+
+        // do more distribute to study rounding errors
+        for (uint256 i = 2; i < 10; i++) {
+            // distribute
+            token.mint(address(this), distributionAmount);
+            token.approve(address(token), distributionAmount);
+            token.distribute(distributionAmount);
+
+            maxError++; // each distribute can add up to 1 wei of error
+
+            // check balances
+            assertApproxEqAbs(token.balanceOf(alice), userBalances[0] + distributionAmount * i * userBalances[0] / rebasingSupplyBefore, maxError);
+            assertApproxEqAbs(token.balanceOf(bobby), userBalances[1] + distributionAmount * i * userBalances[1] / rebasingSupplyBefore, maxError);
+            assertEq(token.balanceOf(carol), userBalances[2]);
+            assertApproxEqAbs(token.totalSupply(), totalSupplyBefore + distributionAmount * i, maxError);
+            assertApproxEqAbs(token.rebasingSupply(), rebasingSupplyBefore + distributionAmount * i, maxError);
+            assertApproxEqAbs(token.nonRebasingSupply(), nonRebasingSupplyBefore, maxError);
+        }
+    }
 }
