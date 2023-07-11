@@ -32,6 +32,22 @@ contract CreditToken is CoreRef, ERC20Burnable, ERC20MultiVotes, ERC20RebaseDist
         _mint(to, amount);
     }
 
+    /// @notice force an address to enter rebase
+    function forceEnterRebase(
+        address account
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        require(rebasingState[account].isRebasing == 0, "CreditToken: already rebasing");
+        _enterRebase(account);
+    }
+
+    /// @notice force an address to exit rebase
+    function forceExitRebase(
+        address account
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        require(rebasingState[account].isRebasing == 1, "CreditToken: not rebasing");
+        _exitRebase(account);
+    }
+
     /*///////////////////////////////////////////////////////////////
                         Inheritance reconciliation
     //////////////////////////////////////////////////////////////*/
