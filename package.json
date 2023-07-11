@@ -23,15 +23,14 @@
   },
   "authors": "elliotfriedman,eswak,joeysantoro,onetruekirk",
   "dependencies": {
-    "@openzeppelin/contracts": "4.6.0"
+    "@openzeppelin/contracts": "4.9.2"
   },
   "devDependencies": {
-    "ethers": "^5.5.3",
     "husky": "7.0.4",
     "lint-staged": "12.2.0",
     "prettier": "2.5.1",
     "prettier-plugin-solidity": "1.0.0",
-    "solhint": "3.3.7",
+    "solhint": "2.0.0",
     "solhint-plugin-prettier": "0.0.5"
   },
   "lint-staged": {

@@ -1,4 +1,4 @@
-pragma solidity =0.8.13;
+pragma solidity 0.8.13;
 
 import "@src/utils/RateLimitedV2.sol";
 import "@src/core/CoreRef.sol";

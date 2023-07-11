@@ -38,9 +38,17 @@ library CoreRoles {
     bytes32 internal constant GAUGE_PARAMETERS =
         keccak256("GAUGE_PARAMETERS_ROLE");
 
-    /// @notice can notify of losses in a given gauge
-    bytes32 internal constant GAUGE_LOSS_NOTIFIER =
-        keccak256("GAUGE_LOSS_NOTIFIER_ROLE");
+    /// @notice can notify of profits & losses in a given gauge
+    bytes32 internal constant GAUGE_PNL_NOTIFIER =
+        keccak256("GAUGE_PNL_NOTIFIER_ROLE");
+
+    /// ----------- Lending Term Management --------------------
+
+    /// @notice can offboard a lending term from the system (force-close loans)
+    bytes32 internal constant TERM_OFFBOARD = keccak256("TERM_OFFBOARD_ROLE");
+
+    /// @notice can set the hardcap of a lending term
+    bytes32 internal constant TERM_HARDCAP = keccak256("TERM_HARDCAP_ROLE");
 
     /// ----------- Timelock management ------------------------
     /// The hashes are the same as OpenZeppelins's roles in TimelockController

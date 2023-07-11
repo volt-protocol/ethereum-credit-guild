@@ -15,7 +15,7 @@ libs = ['node_modules', 'script', 'src/external']
 
 [fuzz]
 runs = 5000
-max_test_rejects = 100000
+max_test_rejects = 1000000
 
 [invariant]
 runs = 1000

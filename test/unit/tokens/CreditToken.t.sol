@@ -33,9 +33,13 @@ contract CreditTokenUnitTest is Test {
         assertEq(address(token.core()), address(core));
         assertEq(token.balanceOf(alice), 0);
         assertEq(token.totalSupply(), 0);
+        assertEq(token.rebasingSupply(), 0);
+        assertEq(token.nonRebasingSupply(), 0);
+        assertEq(token.isRebasing(alice), false);
+        assertEq(token.isRebasing(bob), false);
     }
 
-    function testMintAccessControl() public {
+    function testMint() public {
         // without role, mint reverts
         vm.expectRevert("UNAUTHORIZED");
         token.mint(alice, 100);
@@ -58,5 +62,94 @@ contract CreditTokenUnitTest is Test {
         assertEq(token.balanceOf(alice), 0);
         assertEq(token.balanceOf(bob), 100);
         assertEq(token.totalSupply(), 100);
+    }
+
+    function testForceEnterRebase() public {
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.forceEnterRebase(alice);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GOVERNOR, address(this));
+        vm.stopPrank();
+
+        // force alice to enter rebase
+        token.forceEnterRebase(alice);
+        assertEq(token.isRebasing(alice), true);
+
+        // does not work if address is already rebasing
+        vm.expectRevert("CreditToken: already rebasing");
+        token.forceEnterRebase(alice);
+    }
+
+    function testForceExitRebase() public {
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.forceExitRebase(alice);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GOVERNOR, address(this));
+        vm.stopPrank();
+
+        // force alice to enter rebase
+        token.forceEnterRebase(alice);
+        assertEq(token.isRebasing(alice), true);
+
+        // force alic to exit rebase
+        token.forceExitRebase(alice);
+        assertEq(token.isRebasing(alice), false);
+
+        // does not work if address is already rebasing
+        vm.expectRevert("CreditToken: not rebasing");
+        token.forceExitRebase(alice);
+    }
+
+    function testDistribute() public {
+        // create/grant role
+        vm.startPrank(governor);
+        core.createRole(CoreRoles.CREDIT_MINTER, CoreRoles.GOVERNOR);
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.GOVERNOR, address(this));
+        vm.stopPrank();
+
+        // initial state
+        token.mint(alice, 1000e18);
+        token.mint(bob, 1000e18);
+        token.forceEnterRebase(alice);
+
+        assertEq(token.totalSupply(), 2000e18);
+        assertEq(token.rebasingSupply(), 1000e18);
+        assertEq(token.nonRebasingSupply(), 1000e18);
+        assertEq(token.balanceOf(alice), 1000e18);
+        assertEq(token.balanceOf(bob), 1000e18);
+
+        // distribute (1)
+        token.mint(address(this), 1000e18);
+        token.approve(address(token), 1000e18);
+        token.distribute(1000e18);
+
+        // after distribute (1)
+        assertEq(token.totalSupply(), 3000e18);
+        assertEq(token.rebasingSupply(), 2000e18);
+        assertEq(token.nonRebasingSupply(), 1000e18);
+        assertEq(token.balanceOf(alice), 2000e18);
+        assertEq(token.balanceOf(bob), 1000e18);
+
+        // bob enters rebase
+        token.forceEnterRebase(bob);
+
+        // distribute (2)
+        token.mint(address(this), 3000e18);
+        token.approve(address(token), 3000e18);
+        token.distribute(3000e18);
+
+        // after distribute (2)
+        assertEq(token.totalSupply(), 6000e18);
+        assertEq(token.rebasingSupply(), 6000e18);
+        assertEq(token.nonRebasingSupply(), 0);
+        assertEq(token.balanceOf(alice), 4000e18);
+        assertEq(token.balanceOf(bob), 2000e18);
     }
 }

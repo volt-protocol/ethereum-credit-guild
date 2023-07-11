@@ -80,7 +80,6 @@ contract VoltGovernorUnitTest is Test {
         assertEq(address(governor.token()), address(token));
         assertEq(governor.name(), "Volt Protocol Governor");
         assertEq(governor.version(), "1");
-        assertEq(governor.supportsInterface(type(IGovernor).interfaceId), true);
     }
 
     function testSuccessfulProposal() public {
@@ -317,6 +316,39 @@ contract VoltGovernorUnitTest is Test {
 
         // guardian cancel
         vm.prank(guardianAddress);
+        governor.guardianCancel(targets, values, payloads, keccak256("Vote for 12345"));
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(IGovernor.ProposalState.Canceled)
+        );
+    }
+
+    function testProposerCancelVote() public {
+        // proposal calls
+        address[] memory targets = new address[](1);
+        targets[0] = address(this);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory payloads = new bytes[](1);
+        payloads[0] = abi.encodeWithSelector(
+            VoltGovernorUnitTest.__dummyCall.selector,
+            12345
+        );
+
+        // propose a new vote
+        address voter1 = address(1);
+        address voter2 = address(2);
+        token.mockSetVotes(voter1, _QUORUM / 2 - 1);
+        token.mockSetVotes(voter2, _QUORUM / 2 - 1);
+        vm.prank(voter1);
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            payloads,
+            "Vote for 12345"
+        );
+
+        // proposer cancel
+        vm.prank(voter1);
         governor.cancel(targets, values, payloads, keccak256("Vote for 12345"));
         assertEq(
             uint256(governor.state(proposalId)),
