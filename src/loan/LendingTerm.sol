@@ -195,12 +195,12 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice generate a loan ID for new borrows.
-    function _borrow_getNextLoanId() internal view returns (bytes32) {
+    function _borrow_getNextLoanId() internal virtual view returns (bytes32) {
         return keccak256(abi.encode(msg.sender, address(this), block.timestamp));
     }
 
     /// @notice check debt ceiling for new borrows
-    function _borrow_checkDebtCeiling(uint256 borrowAmount, uint256 postBorrowIssuance) internal view {
+    function _borrow_checkDebtCeiling(uint256 borrowAmount, uint256 postBorrowIssuance) internal virtual view {
         uint256 _totalSupply = IERC20(creditToken).totalSupply();
         uint256 debtCeiling = GuildToken(guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount) * GAUGE_CAP_TOLERANCE / 1e18;
         if (_totalSupply == 0) {
@@ -214,7 +214,7 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice mint debt to the borrower during borrows.
-    function _borrow_mintDebt(address account, uint256 amount) internal {
+    function _borrow_mintDebt(address account, uint256 amount) internal virtual {
         RateLimitedCreditMinter(creditMinter).mint(account, amount);
     }
 
@@ -279,7 +279,7 @@ contract LendingTerm is CoreRef {
     /// amount has to be pulled from the borrower. The full `debtAmount` is burnt & replenished
     /// in the buffer, but because the extra debt tokens should sit on the contract from a previous
     /// `call()`, this doesn't revert.
-    function _repay_pullAndBurnDebt(address pullFrom, uint256 pullAmount, uint256 debtAmount) internal {
+    function _repay_pullAndBurnDebt(address pullFrom, uint256 pullAmount, uint256 debtAmount) internal virtual {
         address _creditToken = creditToken;
         IERC20(_creditToken).transferFrom(pullFrom, address(this), pullAmount);
         CreditToken(_creditToken).burn(debtAmount);
@@ -288,7 +288,7 @@ contract LendingTerm is CoreRef {
 
     /// @notice During `repay()` or `seize()` of forgiven loans, notify the protocol accounting
     /// from profits & losses.
-    function _notifyPnL(int256 pnl) internal {
+    function _notifyPnL(int256 pnl) internal virtual {
         GuildToken(guildToken).notifyPnL(address(this), pnl);
     }
 
@@ -332,7 +332,7 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice call a loan in state, and return the amount of debt tokens to pull for call fee.
-    function _call(bytes32 loanId) internal returns (uint256 debtToPull) {
+    function _call(bytes32 loanId) internal virtual returns (uint256 debtToPull) {
         Loan storage loan = loans[loanId];
 
         // check that the loan exists
@@ -431,7 +431,7 @@ contract LendingTerm is CoreRef {
             if (_forgiveness) {
                 // mark loans as total losses
                 int256 pnl = -int256(_borrowAmount);
-                GuildToken(guildToken).notifyPnL(address(this), pnl);
+                _notifyPnL(pnl);
 
                 // emit event
                 emit LoanSeize(block.timestamp, loanId, loanCalled, false);
