@@ -24,7 +24,7 @@ contract CreditToken is CoreRef, ERC20Burnable, ERC20MultiVotes, ERC20RebaseDist
         ERC20Permit("Ethereum Credit Guild - CREDIT")
     {}
 
-    /// @notice mint new tokens to the target address
+    /// @notice Mint new tokens to the target address
     function mint(
         address to,
         uint256 amount
@@ -32,18 +32,33 @@ contract CreditToken is CoreRef, ERC20Burnable, ERC20MultiVotes, ERC20RebaseDist
         _mint(to, amount);
     }
 
-    /// @notice force an address to enter rebase
+    /// @notice Set `maxDelegates`, the maximum number of addresses any account can delegate voting power to.
+    function setMaxDelegates(
+        uint256 newMax
+    ) external onlyCoreRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS) {
+        _setMaxDelegates(newMax);
+    }
+
+    /// @notice Allow or disallow an address to delegate voting power to more addresses than `maxDelegates`.
+    function setContractExceedMaxDelegates(
+        address account,
+        bool canExceedMax
+    ) external onlyCoreRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS) {
+        _setContractExceedMaxDelegates(account, canExceedMax);
+    }
+
+    /// @notice Force an address to enter rebase.
     function forceEnterRebase(
         address account
-    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+    ) external onlyCoreRole(CoreRoles.CREDIT_REBASE_PARAMETERS) {
         require(rebasingState[account].isRebasing == 0, "CreditToken: already rebasing");
         _enterRebase(account);
     }
 
-    /// @notice force an address to exit rebase
+    /// @notice Force an address to exit rebase.
     function forceExitRebase(
         address account
-    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+    ) external onlyCoreRole(CoreRoles.CREDIT_REBASE_PARAMETERS) {
         require(rebasingState[account].isRebasing == 1, "CreditToken: not rebasing");
         _exitRebase(account);
     }

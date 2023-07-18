@@ -64,6 +64,42 @@ contract CreditTokenUnitTest is Test {
         assertEq(token.totalSupply(), 100);
     }
 
+    function testSetMaxDelegates() public {
+        assertEq(token.maxDelegates(), 0);
+
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.setMaxDelegates(1);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // set max delegates
+        token.setMaxDelegates(1);
+        assertEq(token.maxDelegates(), 1);
+    }
+
+    function testSetContractExceedMaxDelegates() public {
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.setContractExceedMaxDelegates(address(this), true);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // set flag
+        token.setContractExceedMaxDelegates(address(this), true);
+        assertEq(token.canContractExceedMaxDelegates(address(this)), true);
+
+        // does not work if address is an eoa
+        vm.expectRevert("ERC20MultiVotes: not a smart contract");
+        token.setContractExceedMaxDelegates(alice, true);
+    }
+
     function testForceEnterRebase() public {
         // without role, reverts
         vm.expectRevert("UNAUTHORIZED");
@@ -71,7 +107,7 @@ contract CreditTokenUnitTest is Test {
 
         // grant role
         vm.startPrank(governor);
-        core.grantRole(CoreRoles.GOVERNOR, address(this));
+        core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, address(this));
         vm.stopPrank();
 
         // force alice to enter rebase
@@ -90,7 +126,7 @@ contract CreditTokenUnitTest is Test {
 
         // grant role
         vm.startPrank(governor);
-        core.grantRole(CoreRoles.GOVERNOR, address(this));
+        core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, address(this));
         vm.stopPrank();
 
         // force alice to enter rebase
@@ -111,7 +147,7 @@ contract CreditTokenUnitTest is Test {
         vm.startPrank(governor);
         core.createRole(CoreRoles.CREDIT_MINTER, CoreRoles.GOVERNOR);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
-        core.grantRole(CoreRoles.GOVERNOR, address(this));
+        core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, address(this));
         vm.stopPrank();
 
         // initial state

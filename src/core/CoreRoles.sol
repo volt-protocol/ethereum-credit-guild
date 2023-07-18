@@ -46,6 +46,16 @@ library CoreRoles {
     bytes32 internal constant GUILD_GOVERNANCE_PARAMETERS =
         keccak256("GUILD_GOVERNANCE_PARAMETERS_ROLE");
 
+    /// ----------- CREDIT Token Management ---------------
+    
+    /// @notice can update governance parameters for CREDIT delegations
+    bytes32 internal constant CREDIT_GOVERNANCE_PARAMETERS =
+        keccak256("CREDIT_GOVERNANCE_PARAMETERS_ROLE");
+
+    /// @notice can update rebase parameters for CREDIT holders
+    bytes32 internal constant CREDIT_REBASE_PARAMETERS =
+        keccak256("CREDIT_REBASE_PARAMETERS_ROLE");
+
     /// ----------- Lending Term Management --------------------
 
     /// @notice can offboard a lending term from the system (force-close loans)
