@@ -58,9 +58,6 @@ library CoreRoles {
 
     /// ----------- Lending Term Management --------------------
 
-    /// @notice can offboard a lending term from the system (force-close loans)
-    bytes32 internal constant TERM_OFFBOARD = keccak256("TERM_OFFBOARD_ROLE");
-
     /// @notice can set the hardcap of a lending term
     bytes32 internal constant TERM_HARDCAP = keccak256("TERM_HARDCAP_ROLE");
 

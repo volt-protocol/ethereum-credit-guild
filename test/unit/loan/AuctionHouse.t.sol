@@ -66,7 +66,7 @@ contract AuctionHouseUnitTest is Test {
             address(credit), /*_creditToken*/
             LendingTerm.LendingTermParams({
                 collateralToken: address(collateral),
-                creditPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
                 interestRate: _INTEREST_RATE,
                 callFee: _CALL_FEE,
                 callPeriod: _CALL_PERIOD,

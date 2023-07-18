@@ -88,7 +88,7 @@ contract Proposal_0 is Proposal {
                 addresses.mainnet("ERC20_CREDIT"),
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet("ERC20_USDC"),
-                    creditPerCollateralToken: 0.98e30, // 0.98 CREDIT per USDC collateral + 12 decimals of correction
+                    maxDebtPerCollateralToken: 0.98e30, // 0.98 CREDIT per USDC collateral + 12 decimals of correction
                     interestRate: 0.02e18, // 2%
                     callFee: 0.02e18, // 2%
                     callPeriod: 600, // 10 minutes

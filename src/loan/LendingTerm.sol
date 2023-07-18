@@ -50,7 +50,7 @@ contract LendingTerm is CoreRef {
     /// @notice reference to the collateral token
     address public immutable collateralToken;
 
-    /// @notice number of CREDIT loaned per collateral token.
+    /// @notice max number of debt tokens issued per collateral token.
     /// @dev be mindful of the decimals here, because if collateral
     /// token doesn't have 18 decimals, this variable is used to scale
     /// the decimals.
@@ -58,7 +58,7 @@ contract LendingTerm is CoreRef {
     /// ~1e30, to allow 1e6 * 1e30 / 1e18 ~= 1e18 CREDIT to be borrowed for
     /// each 1e6 units (1 USDC) of collateral, if CREDIT is targeted to be
     /// worth around 1 USDC.
-    uint256 public immutable creditPerCollateralToken;
+    uint256 public immutable maxDebtPerCollateralToken;
 
     /// @notice interest rate paid by the borrower, expressed as an APR
     /// with 18 decimals (0.01e18 = 1% APR). The base for 1 year is the YEAR constant.
@@ -123,7 +123,7 @@ contract LendingTerm is CoreRef {
 
     struct LendingTermParams {
         address collateralToken;
-        uint256 creditPerCollateralToken;
+        uint256 maxDebtPerCollateralToken;
         uint256 interestRate;
         uint256 callFee;
         uint256 callPeriod;
@@ -144,7 +144,7 @@ contract LendingTerm is CoreRef {
         creditMinter = _creditMinter;
         creditToken = _creditToken;
         collateralToken = params.collateralToken;
-        creditPerCollateralToken = params.creditPerCollateralToken;
+        maxDebtPerCollateralToken = params.maxDebtPerCollateralToken;
         interestRate = params.interestRate;
         callFee = params.callFee;
         callPeriod = params.callPeriod;
@@ -194,6 +194,30 @@ contract LendingTerm is CoreRef {
         return loanDebt;
     }
 
+    /// @notice generate a loan ID for new borrows.
+    function _borrow_getNextLoanId() internal view returns (bytes32) {
+        return keccak256(abi.encode(msg.sender, address(this), block.timestamp));
+    }
+
+    /// @notice check debt ceiling for new borrows
+    function _borrow_checkDebtCeiling(uint256 borrowAmount, uint256 postBorrowIssuance) internal view {
+        uint256 _totalSupply = IERC20(creditToken).totalSupply();
+        uint256 debtCeiling = GuildToken(guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount) * GAUGE_CAP_TOLERANCE / 1e18;
+        if (_totalSupply == 0) {
+            // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
+            // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
+            // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
+            require(debtCeiling != 0, "LendingTerm: debt ceiling reached");
+        } else {
+            require(postBorrowIssuance <= debtCeiling, "LendingTerm: debt ceiling reached");
+        }
+    }
+
+    /// @notice mint debt to the borrower during borrows.
+    function _borrow_mintDebt(address account, uint256 amount) internal {
+        RateLimitedCreditMinter(creditMinter).mint(account, amount);
+    }
+
     /// @notice initiate a new loan
     function borrow(
         uint256 borrowAmount,
@@ -202,7 +226,7 @@ contract LendingTerm is CoreRef {
         require(borrowAmount != 0, "LendingTerm: cannot borrow 0");
         require(collateralAmount != 0, "LendingTerm: cannot stake 0");
 
-        loanId = keccak256(abi.encode(msg.sender, address(this), block.timestamp));
+        loanId = _borrow_getNextLoanId();
 
         // check that the loan doesn't already exist
         require(loans[loanId].originationTime == 0, "LendingTerm: loan exists");
@@ -211,27 +235,20 @@ contract LendingTerm is CoreRef {
         require(borrowAmount >= MIN_BORROW, "LendingTerm: borrow amount too low");
 
         // check that enough collateral is provided
-        uint256 maxBorrow = collateralAmount * creditPerCollateralToken / 1e18;
+        uint256 maxBorrow = collateralAmount * maxDebtPerCollateralToken / 1e18;
         require(borrowAmount <= maxBorrow, "LendingTerm: not enough collateral");
 
         // check that ltvBuffer is respected
         uint256 maxBorrowLtv = maxBorrow * 1e18 / (1e18 + ltvBuffer);
         require(borrowAmount <= maxBorrowLtv, "LendingTerm: not enough LTV buffer");
 
-        // check that this lending term is active
-        address _guildToken = guildToken;
-        require(GuildToken(_guildToken).isGauge(address(this)), "LendingTerm: terms unavailable");
-
-        // check the debt ceiling & hardcap
+        // check the hardcap
         uint256 _issuance = issuance;
-        uint256 _postLoanIssuance = _issuance + borrowAmount;
-        require(_postLoanIssuance <= hardCap, "LendingTerm: hardcap reached");
-        uint256 _totalSupply = IERC20(creditToken).totalSupply();
-        if (_totalSupply != 0) {
-            uint256 debtCeiling = GuildToken(_guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount);
-            debtCeiling = debtCeiling * GAUGE_CAP_TOLERANCE / 1e18;
-            require(_postLoanIssuance <= debtCeiling, "LendingTerm: debt ceiling reached");
-        }
+        uint256 _postBorrowIssuance = _issuance + borrowAmount;
+        require(_postBorrowIssuance <= hardCap, "LendingTerm: hardcap reached");
+
+        // check the debt ceiling
+        _borrow_checkDebtCeiling(borrowAmount, _postBorrowIssuance);
 
         // save loan in state
         loans[loanId] = Loan({
@@ -243,16 +260,36 @@ contract LendingTerm is CoreRef {
             originationTime: block.timestamp,
             closeTime: 0
         });
-        issuance = _postLoanIssuance;
+        issuance = _postBorrowIssuance;
 
-        // mint CREDIT to the borrower
-        RateLimitedCreditMinter(creditMinter).mint(msg.sender, borrowAmount);
+        // mint debt to the borrower
+        _borrow_mintDebt(msg.sender, borrowAmount);
 
         // pull the collateral from the borrower
         IERC20(collateralToken).safeTransferFrom(msg.sender, address(this), collateralAmount);
 
         // emit event
         emit LoanBorrow(block.timestamp, loanId, msg.sender, collateralAmount, borrowAmount);
+    }
+
+    /// @notice during repay, pull debt from the borrower and replenish the buffer of available
+    /// debt that can be minted.
+    /// @dev `pullAmount` could be smaller than `debtAmount` if the loan has been called, in this
+    /// case the caller already transferred some debt tokens to the lending term, and a reduced
+    /// amount has to be pulled from the borrower. The full `debtAmount` is burnt & replenished
+    /// in the buffer, but because the extra debt tokens should sit on the contract from a previous
+    /// `call()`, this doesn't revert.
+    function _repay_pullAndBurnDebt(address pullFrom, uint256 pullAmount, uint256 debtAmount) internal {
+        address _creditToken = creditToken;
+        IERC20(_creditToken).transferFrom(pullFrom, address(this), pullAmount);
+        CreditToken(_creditToken).burn(debtAmount);
+        RateLimitedCreditMinter(creditMinter).replenishBuffer(debtAmount);
+    }
+
+    /// @notice During `repay()` or `seize()` of forgiven loans, notify the protocol accounting
+    /// from profits & losses.
+    function _notifyPnL(int256 pnl) internal {
+        GuildToken(guildToken).notifyPnL(address(this), pnl);
     }
 
     /// @notice repay an open loan
@@ -277,16 +314,11 @@ contract LendingTerm is CoreRef {
             creditToPullFromBorrower -= getLoanCallFee(loanId);
         }
         
-        // pull the CREDIT owed and refill the buffer of available CREDIT mints
-        address _creditToken = creditToken;
-        IERC20(_creditToken).transferFrom(msg.sender, address(this), creditToPullFromBorrower);
-        // loanDebt >= creditToPullFromBorrower but the extra CREDIT should sit on the
-        // LendingTerm contract from the previous call() call (provided by loan caller).
-        RateLimitedCreditMinter(creditMinter).replenishBuffer(loanDebt);
-        CreditToken(_creditToken).burn(loanDebt);
+        // pull the debt
+        _repay_pullAndBurnDebt(msg.sender, creditToPullFromBorrower, loanDebt);
 
         // report profit
-        GuildToken(guildToken).notifyPnL(address(this), pnl);
+        _notifyPnL(pnl);
 
         // close the loan
         loan.closeTime = block.timestamp;
@@ -299,40 +331,46 @@ contract LendingTerm is CoreRef {
         emit LoanRepay(block.timestamp, loanId);
     }
 
+    /// @notice call a loan in state, and return the amount of debt tokens to pull for call fee.
+    function _call(bytes32 loanId) internal returns (uint256 debtToPull) {
+        Loan storage loan = loans[loanId];
+
+        // check that the loan exists
+        uint256 _originationTime = loan.originationTime;
+        require(_originationTime != 0, "LendingTerm: loan not found");
+
+        // check that the loan has not been created in the same block
+        require(_originationTime < block.timestamp, "LendingTerm: loan opened in same block");
+
+        // check that the loan is not already called
+        require(loan.callTime == 0, "LendingTerm: loan called");
+
+        // check that the loan is not already closed
+        require(loan.closeTime == 0, "LendingTerm: loan closed");
+    
+        // calculate the call fee
+        debtToPull = loan.borrowAmount * callFee / 1e18;
+    
+        // set the call info
+        loan.caller = msg.sender;
+        loan.callTime = block.timestamp;
+
+        // emit event
+        emit LoanCall(block.timestamp, loanId);
+    }
+
     /// @notice call a list of loans, borrower has `callPeriod` seconds to repay the loan,
     /// or their collateral will be seized. This will pull the CREDIT call fee from `msg.sender`.
     function call(bytes32[] memory loanIds) public {
         uint256 creditToPullForCallFees = 0;
         for (uint256 i = 0; i < loanIds.length; i++) {
-            bytes32 loanId = loanIds[i];
-            Loan storage loan = loans[loanId];
-
-            // check that the loan exists
-            uint256 _originationTime = loan.originationTime;
-            require(_originationTime != 0, "LendingTerm: loan not found");
-
-            // check that the loan has not been created in the same block
-            require(_originationTime < block.timestamp, "LendingTerm: loan opened in same block");
-
-            // check that the loan is not already called
-            require(loan.callTime == 0, "LendingTerm: loan called");
-
-            // check that the loan is not already closed
-            require(loan.closeTime == 0, "LendingTerm: loan closed");
-        
-            // calculate the call fee
-            creditToPullForCallFees += loan.borrowAmount * callFee / 1e18;
-        
-            // set the call info
-            loan.caller = msg.sender;
-            loan.callTime = block.timestamp;
-
-            // emit event
-            emit LoanCall(block.timestamp, loanId);
+            creditToPullForCallFees += _call(loanIds[i]);
         }
 
         // pull the call fees from caller
-        IERC20(creditToken).transferFrom(msg.sender, address(this), creditToPullForCallFees);
+        if (creditToPullForCallFees != 0) {
+            IERC20(creditToken).transferFrom(msg.sender, address(this), creditToPullForCallFees);
+        }
     }
 
     /// @notice call a single loan.
@@ -345,7 +383,7 @@ contract LendingTerm is CoreRef {
     /// @notice seize the collateral of an array of loans, to repay outstanding debt.
     /// Under normal conditions, the loans should be call()'d first, to give the borrower an opportunity to repay (the 'call period').
     /// Conditions that allow to skip calling a loan before seizing its collateral :
-    /// - forgiving all loans of a lending term (privileged role in the system)
+    /// - forgiving all loans of a lending term (see `forgiveAllLoans()`)
     /// - offboading of a lending term (privileged role in the system)
     /// - issuance of lending term above hardcap set by governance
     function seize(bytes32[] memory loanIds, bool[] memory skipCall) public {
@@ -364,8 +402,9 @@ contract LendingTerm is CoreRef {
 
             // conditions that allow seizing the collateral of a loan without waiting for the call period to elapse
             bool canSkipCall = false;
+            bool _forgiveness = forgiveness;
             if (skipCall[i]) {
-                canSkipCall = _newIssuance > hardCap || core().hasRole(CoreRoles.TERM_OFFBOARD, msg.sender);
+                canSkipCall = _newIssuance > hardCap || _forgiveness;
             }
 
             // set the call info, if not set
@@ -389,7 +428,7 @@ contract LendingTerm is CoreRef {
             uint256 _borrowAmount = loan.borrowAmount;
             _newIssuance -= _borrowAmount;
 
-            if (forgiveness) {
+            if (_forgiveness) {
                 // mark loans as total losses
                 int256 pnl = -int256(_borrowAmount);
                 GuildToken(guildToken).notifyPnL(address(this), pnl);
@@ -429,7 +468,7 @@ contract LendingTerm is CoreRef {
     /// the collateral tokens to the auction house. This is meant for extreme events where collateral
     /// assets are frozen and can't be transferred within or out of the system anymore.
     function forgiveAllLoans() external {
-        require(canAutomaticallyForgive() || core().hasRole(CoreRoles.TERM_OFFBOARD, msg.sender), "LendingTerm: cannot forgive");
+        require(canAutomaticallyForgive() || core().hasRole(CoreRoles.GOVERNOR, msg.sender), "LendingTerm: cannot forgive");
         forgiveness = true;
     }
 

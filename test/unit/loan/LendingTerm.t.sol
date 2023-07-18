@@ -63,7 +63,7 @@ contract LendingTermUnitTest is Test {
             address(credit), /*_creditToken*/
             LendingTerm.LendingTermParams({
                 collateralToken: address(collateral),
-                creditPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
                 interestRate: _INTEREST_RATE,
                 callFee: _CALL_FEE,
                 callPeriod: _CALL_PERIOD,
@@ -109,7 +109,7 @@ contract LendingTermUnitTest is Test {
         assertEq(address(term.creditMinter()), address(rlcm));
         assertEq(address(term.creditToken()), address(credit));
         assertEq(address(term.collateralToken()), address(collateral));
-        assertEq(term.creditPerCollateralToken(), _CREDIT_PER_COLLATERAL_TOKEN);
+        assertEq(term.maxDebtPerCollateralToken(), _CREDIT_PER_COLLATERAL_TOKEN);
         assertEq(term.interestRate(), _INTEREST_RATE);
         assertEq(term.callFee(), _CALL_FEE);
         assertEq(term.callPeriod(), _CALL_PERIOD);
@@ -223,7 +223,7 @@ contract LendingTermUnitTest is Test {
         collateral.approve(address(term), collateralAmount);
 
         // borrow
-        vm.expectRevert("LendingTerm: terms unavailable");
+        vm.expectRevert("LendingTerm: debt ceiling reached");
         term.borrow(borrowAmount, collateralAmount);
     }
 
@@ -936,7 +936,6 @@ contract LendingTermUnitTest is Test {
 
         // forgive all loans
         vm.prank(governor);
-        core.grantRole(CoreRoles.TERM_OFFBOARD, address(this));
         term.forgiveAllLoans();
 
         // seize
