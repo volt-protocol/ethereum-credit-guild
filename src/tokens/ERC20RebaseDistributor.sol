@@ -78,7 +78,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         _enterRebase(msg.sender);
     }
     function _enterRebase(address account) internal {
-        uint256 balance = balanceOf(account);
+        uint256 balance = ERC20.balanceOf(account);
         uint256 shares = balance * START_REBASING_SHARE_PRICE / rebasingSharePrice;
         rebasingState[account].nShares = uint248(shares);
         rebasingState[account].isRebasing = 1;
