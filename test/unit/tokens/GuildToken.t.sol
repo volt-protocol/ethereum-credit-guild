@@ -77,6 +77,46 @@ contract GuildTokenUnitTest is Test {
     }
 
     /*///////////////////////////////////////////////////////////////
+                        DELEGATION
+    //////////////////////////////////////////////////////////////*/
+
+    function testSetMaxDelegates() public {
+        assertEq(token.maxDelegates(), 0);
+
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.setMaxDelegates(1);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // set max delegates
+        token.setMaxDelegates(1);
+        assertEq(token.maxDelegates(), 1);
+    }
+
+    function testSetContractExceedMaxDelegates() public {
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.setContractExceedMaxDelegates(address(this), true);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // set flag
+        token.setContractExceedMaxDelegates(address(this), true);
+        assertEq(token.canContractExceedMaxDelegates(address(this)), true);
+
+        // does not work if address is an eoa
+        vm.expectRevert("ERC20MultiVotes: not a smart contract");
+        token.setContractExceedMaxDelegates(alice, true);
+    }
+
+    /*///////////////////////////////////////////////////////////////
                         TRANSFERABILITY
     //////////////////////////////////////////////////////////////*/
 

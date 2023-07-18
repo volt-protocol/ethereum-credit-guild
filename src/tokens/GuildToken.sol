@@ -66,6 +66,25 @@ contract GuildToken is CoreRef, ERC20Gauges, ERC20MultiVotes {
     }
 
     /*///////////////////////////////////////////////////////////////
+                        VOTING MANAGEMENT
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Set `maxDelegates`, the maximum number of addresses any account can delegate voting power to.
+    function setMaxDelegates(
+        uint256 newMax
+    ) external onlyCoreRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS) {
+        _setMaxDelegates(newMax);
+    }
+
+    /// @notice Allow or disallow an address to delegate voting power to more addresses than `maxDelegates`.
+    function setContractExceedMaxDelegates(
+        address account,
+        bool canExceedMax
+    ) external onlyCoreRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS) {
+        _setContractExceedMaxDelegates(account, canExceedMax);
+    }
+
+    /*///////////////////////////////////////////////////////////////
                         GAUGE MANAGEMENT
     //////////////////////////////////////////////////////////////*/
     function addGauge(

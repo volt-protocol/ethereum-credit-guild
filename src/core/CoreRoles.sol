@@ -26,7 +26,7 @@ library CoreRoles {
     /// @notice can mint GUILD arbitrarily
     bytes32 internal constant GUILD_MINTER = keccak256("GUILD_MINTER_ROLE");
 
-    /// ----------- GUILD Token Gauge Management ---------------
+    /// ----------- GUILD Token Management ---------------
 
     /// @notice can manage add new gauges to the system
     bytes32 internal constant GAUGE_ADD = keccak256("GAUGE_ADD_ROLE");
@@ -41,6 +41,10 @@ library CoreRoles {
     /// @notice can notify of profits & losses in a given gauge
     bytes32 internal constant GAUGE_PNL_NOTIFIER =
         keccak256("GAUGE_PNL_NOTIFIER_ROLE");
+    
+    /// @notice can update governance parameters for GUILD delegations
+    bytes32 internal constant GUILD_GOVERNANCE_PARAMETERS =
+        keccak256("GUILD_GOVERNANCE_PARAMETERS_ROLE");
 
     /// ----------- Lending Term Management --------------------
 
