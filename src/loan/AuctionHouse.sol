@@ -225,4 +225,39 @@ contract AuctionHouse is CoreRef {
         // emit event
         emit LoanBid(block.timestamp, loanId, collateralReceived, collateralLeft, protocolInput, protocolOutput);
     }
+
+    /// @notice forgive a loan, by marking the debt as a total loss & without attempting to move the collateral.
+    /// @dev this is meant to be used when an auction concludes without anyone pulling the
+    /// collateral of a loan, even if 0 CREDIT is asked in return. This situation could arise
+    /// if collateral assets are frozen within the auction house contract.
+    function forgive(bytes32 loanId) external whenNotPaused {
+        // this view function will revert if the auction is not started,
+        // or if the auction is already ended.
+        ( , uint256 creditAsked) = getBidDetail(loanId);
+        require(creditAsked == 0, "AuctionHouse: ongoing auction");
+
+        // close the auction in state
+        auctions[loanId].endTime = block.timestamp;
+
+        // if loan was called, reimburse the call fee to caller.
+        bool _loanCalled = auctions[loanId].loanCalled;
+        uint256 _callFeeAmount = auctions[loanId].callFeeAmount;
+        if (_loanCalled && _callFeeAmount != 0) {
+            CreditToken(creditToken).transfer(auctions[loanId].caller, _callFeeAmount);
+        }
+
+        // notify loss created in the system
+        address _lendingTerm = auctions[loanId].lendingTerm;
+        uint256 _borrowAmount = auctions[loanId].borrowAmount;
+        GuildToken(guildToken).notifyPnL(
+            _lendingTerm,
+            -int256(_borrowAmount)
+        );
+
+        // set the harcap of the lending term to 0 to avoid new borrows.
+        LendingTerm(_lendingTerm).setHardCap(0);
+
+        // emit event
+        emit LoanBid(block.timestamp, loanId, 0, 0, 0, _borrowAmount);
+    }
 }

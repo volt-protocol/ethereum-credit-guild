@@ -83,7 +83,7 @@ contract AuctionHouseUnitTest is Test {
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         core.grantRole(CoreRoles.GAUGE_REMOVE, address(this));
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
-        core.grantRole(CoreRoles.TERM_OFFBOARD, address(this));
+        core.grantRole(CoreRoles.TERM_HARDCAP, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(auctionHouse));
@@ -170,6 +170,7 @@ contract AuctionHouseUnitTest is Test {
         loanIds[0] = loanId;
         bool[] memory skipCall = new bool[](1);
         skipCall[0] = true;
+        term.setHardCap(0);
         term.seize(loanIds, skipCall);
     }
 
@@ -582,5 +583,40 @@ contract AuctionHouseUnitTest is Test {
                 assertEq(guild.lastGaugeLoss(address(term)), 0); // no loss
             }
         }
+    }
+
+    // forgive a loan after the bid period is ended
+    function testForgive() public {
+        bytes32 loanId = _setupLoanAndSeizeCollateral();
+        uint256 PHASE_1_DURATION = auctionHouse.MIDPOINT();
+        uint256 PHASE_2_DURATION = auctionHouse.AUCTION_DURATION() - auctionHouse.MIDPOINT();
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_1_DURATION + PHASE_2_DURATION / 2);
+
+        // cannot forgive during auction
+        vm.expectRevert("AuctionHouse: ongoing auction");
+        auctionHouse.forgive(loanId);
+
+        // At this time, get full collateral, repay 0 debt
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + PHASE_2_DURATION / 2);
+        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+        assertEq(collateralReceived, 15e18);
+        assertEq(creditAsked, 0);
+
+        // forgive
+        vm.startPrank(bidder);
+        auctionHouse.forgive(loanId);
+        vm.stopPrank();
+
+        // check token locations
+        assertEq(collateral.balanceOf(address(auctionHouse)), 15e18);
+        assertEq(collateral.totalSupply(), 15e18);
+        assertEq(credit.balanceOf(borrower), 20_000e18);
+        assertEq(credit.balanceOf(caller), 1_000e18);
+        assertEq(credit.totalSupply(), 21_000e18);
+
+        // check bad debt has been notified
+        assertEq(guild.lastGaugeLoss(address(term)), block.timestamp);
     }
 }
