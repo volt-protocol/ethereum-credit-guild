@@ -5,10 +5,12 @@ import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
+import {CreditToken} from "@src/tokens/CreditToken.sol";
 
 contract GuildTokenUnitTest is Test {
     address private governor = address(1);
     Core private core;
+    CreditToken credit;
     GuildToken token;
     address constant alice = address(0x616c696365);
     address constant bob = address(0xB0B);
@@ -23,9 +25,11 @@ contract GuildTokenUnitTest is Test {
         vm.roll(16848497);
         core = new Core();
         core.grantRole(CoreRoles.GOVERNOR, governor);
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
-        token = new GuildToken(address(core), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        credit = new CreditToken(address(core));
+        token = new GuildToken(address(core), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
 
         // labels
         vm.label(address(core), "core");
@@ -34,6 +38,9 @@ contract GuildTokenUnitTest is Test {
         vm.label(bob, "bob");
         vm.label(gauge1, "gauge1");
         vm.label(gauge2, "gauge2");
+
+        // non-zero CREDIT circulating (for notify gauge losses)
+        credit.mint(address(this), 100e18);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -67,6 +74,46 @@ contract GuildTokenUnitTest is Test {
         token.burn(100e18);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(token.totalSupply(), 0);
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                        DELEGATION
+    //////////////////////////////////////////////////////////////*/
+
+    function testSetMaxDelegates() public {
+        assertEq(token.maxDelegates(), 0);
+
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.setMaxDelegates(1);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // set max delegates
+        token.setMaxDelegates(1);
+        assertEq(token.maxDelegates(), 1);
+    }
+
+    function testSetContractExceedMaxDelegates() public {
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.setContractExceedMaxDelegates(address(this), true);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // set flag
+        token.setContractExceedMaxDelegates(address(this), true);
+        assertEq(token.canContractExceedMaxDelegates(address(this)), true);
+
+        // does not work if address is an eoa
+        vm.expectRevert("ERC20MultiVotes: not a smart contract");
+        token.setContractExceedMaxDelegates(alice, true);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -212,22 +259,34 @@ contract GuildTokenUnitTest is Test {
                         LOSS MANAGEMENT
     //////////////////////////////////////////////////////////////*/
 
-    function testNotifyGaugeLoss() public {
+    function testNotifyPnL() public {
         assertEq(token.lastGaugeLoss(gauge1), 0);
+        assertEq(token.totalPnL(), 0);
+        assertEq(token.gaugePnL(gauge1), 0);
 
         // revert because user doesn't have role
         vm.expectRevert("UNAUTHORIZED");
-        token.notifyGaugeLoss(gauge1);
+        token.notifyPnL(gauge1, 0);
 
         // grant roles to test contract
         vm.startPrank(governor);
-        core.createRole(CoreRoles.GAUGE_LOSS_NOTIFIER, CoreRoles.GOVERNOR);
-        core.grantRole(CoreRoles.GAUGE_LOSS_NOTIFIER, address(this));
+        core.createRole(CoreRoles.GAUGE_PNL_NOTIFIER, CoreRoles.GOVERNOR);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
         vm.stopPrank();
 
         // successful call & check
-        token.notifyGaugeLoss(gauge1);
+        token.notifyPnL(gauge1, -100);
         assertEq(token.lastGaugeLoss(gauge1), block.timestamp);
+        assertEq(token.totalPnL(), -100);
+        assertEq(token.gaugePnL(gauge1), -100);
+
+        // successful call & check
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        token.notifyPnL(gauge1, 200);
+        assertEq(token.lastGaugeLoss(gauge1), block.timestamp - 13);
+        assertEq(token.totalPnL(), 100);
+        assertEq(token.gaugePnL(gauge1), 100);
     }
 
     function _setupAliceLossInGauge1() internal {
@@ -239,8 +298,8 @@ contract GuildTokenUnitTest is Test {
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         core.createRole(CoreRoles.GAUGE_PARAMETERS, CoreRoles.GOVERNOR);
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
-        core.createRole(CoreRoles.GAUGE_LOSS_NOTIFIER, CoreRoles.GOVERNOR);
-        core.grantRole(CoreRoles.GAUGE_LOSS_NOTIFIER, address(this));
+        core.createRole(CoreRoles.GAUGE_PNL_NOTIFIER, CoreRoles.GOVERNOR);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
         vm.stopPrank();
 
         // setup
@@ -256,7 +315,7 @@ contract GuildTokenUnitTest is Test {
         assertEq(token.getUserWeight(alice), 80e18);
 
         // loss in gauge 1
-        token.notifyGaugeLoss(gauge1);
+        token.notifyPnL(gauge1, -100);
     }
 
     function testApplyGaugeLoss() public {
@@ -418,5 +477,48 @@ contract GuildTokenUnitTest is Test {
         token.applyGaugeLoss(gauge1, alice);
 
         assertEq(token.balanceOf(alice), 60e18);
+    }
+
+    function testCreditMultiplier() public {
+        // grant roles to test contract
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
+        vm.stopPrank();
+
+        // initial state
+        // 100 CREDIT circulating (assuming backed by >= 100 USD)
+        assertEq(token.totalPnL(), 0);
+        assertEq(token.creditMultiplier(), 1e18);
+        assertEq(credit.totalSupply(), 100e18);
+
+        // apply a loss (1)
+        // 30 CREDIT of loans completely default (~30 USD loss)
+        token.notifyPnL(address(this), -30e18);
+        assertEq(token.totalPnL(), -30e18);
+        assertEq(token.creditMultiplier(), 0.7e18); // 30% discounted
+
+        // apply a loss (2)
+        // 20 CREDIT of loans completely default (~14 USD loss because CREDIT now worth 0.7 USD)
+        token.notifyPnL(address(this), -20e18);
+        assertEq(token.totalPnL(), -50e18);
+        assertEq(token.creditMultiplier(), 0.56e18); // 56% discounted
+
+        // apply a gain on an existing loan
+        // 70 CREDIT of interest is earned by the protocol, enough to push
+        // totalPnL back into positive territory
+        token.notifyPnL(address(this), 70e18);
+        assertEq(token.totalPnL(), 20e18);
+        assertEq(token.creditMultiplier(), 0.56e18); // unchanged, does not go back up
+
+        // new CREDIT is minted
+        // new loans worth 900 CREDIT are opened
+        credit.mint(address(this), 900e18);
+        assertEq(credit.totalSupply(), 1000e18);
+
+        // apply a loss (3)
+        // 500 CREDIT of loans completely default
+        token.notifyPnL(address(this), -500e18);
+        assertEq(token.totalPnL(), -480e18);
+        assertEq(token.creditMultiplier(), 0.28e18); // half of previous value because half the supply defaulted
     }
 }

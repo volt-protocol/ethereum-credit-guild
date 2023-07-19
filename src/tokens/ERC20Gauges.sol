@@ -4,6 +4,8 @@ pragma solidity =0.8.13;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
+
 /** 
 @title  An ERC20 with an embedded "Gauge" style vote with liquid weights
 @author joeysantoro, eswak
@@ -46,11 +48,11 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
     - Consistency: make incrementGauges return a uint112 instead of uint256
     - Import OpenZeppelin ERC20 & EnumerableSet instead of Solmate's
     - Update error management style (use require + messages instead of Solidity errors)
-    - Remove SafeCast (it was only used in one place, to convert block.timestamp)
     - Implement C4 audit fixes for [M-03], [M-04], [M-07], [G-02], and [G-04].
 */
 abstract contract ERC20Gauges is ERC20 {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SafeCastLib for *;
 
     constructor(uint32 _gaugeCycleLength, uint32 _incrementFreezeWindow) {
         require(
@@ -109,8 +111,7 @@ abstract contract ERC20Gauges is ERC20 {
 
     /// @notice see `getGaugeCycleEnd()`
     function _getGaugeCycleEnd() internal view returns (uint32) {
-        // @dev timestamp of type(uint32).max is Feb 07 2106
-        uint32 nowPlusOneCycle = uint32(block.timestamp) + gaugeCycleLength;
+        uint32 nowPlusOneCycle = block.timestamp.safeCastTo32() + gaugeCycleLength;
         unchecked {
             return (nowPlusOneCycle / gaugeCycleLength) * gaugeCycleLength; // cannot divide by zero and always <= nowPlusOneCycle so no overflow
         }

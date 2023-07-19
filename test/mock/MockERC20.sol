@@ -31,7 +31,7 @@ contract MockERC20 is ERC20, ERC20Burnable {
     function getPastVotes(
         address account,
         uint256 /* blockNumber*/
-    ) external view returns (uint256) {
+    ) external view virtual returns (uint256) {
         return _votes[account];
     }
 

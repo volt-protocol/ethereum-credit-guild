@@ -26,7 +26,7 @@ library CoreRoles {
     /// @notice can mint GUILD arbitrarily
     bytes32 internal constant GUILD_MINTER = keccak256("GUILD_MINTER_ROLE");
 
-    /// ----------- GUILD Token Gauge Management ---------------
+    /// ----------- GUILD Token Management ---------------
 
     /// @notice can manage add new gauges to the system
     bytes32 internal constant GAUGE_ADD = keccak256("GAUGE_ADD_ROLE");
@@ -38,9 +38,28 @@ library CoreRoles {
     bytes32 internal constant GAUGE_PARAMETERS =
         keccak256("GAUGE_PARAMETERS_ROLE");
 
-    /// @notice can notify of losses in a given gauge
-    bytes32 internal constant GAUGE_LOSS_NOTIFIER =
-        keccak256("GAUGE_LOSS_NOTIFIER_ROLE");
+    /// @notice can notify of profits & losses in a given gauge
+    bytes32 internal constant GAUGE_PNL_NOTIFIER =
+        keccak256("GAUGE_PNL_NOTIFIER_ROLE");
+    
+    /// @notice can update governance parameters for GUILD delegations
+    bytes32 internal constant GUILD_GOVERNANCE_PARAMETERS =
+        keccak256("GUILD_GOVERNANCE_PARAMETERS_ROLE");
+
+    /// ----------- CREDIT Token Management ---------------
+    
+    /// @notice can update governance parameters for CREDIT delegations
+    bytes32 internal constant CREDIT_GOVERNANCE_PARAMETERS =
+        keccak256("CREDIT_GOVERNANCE_PARAMETERS_ROLE");
+
+    /// @notice can update rebase parameters for CREDIT holders
+    bytes32 internal constant CREDIT_REBASE_PARAMETERS =
+        keccak256("CREDIT_REBASE_PARAMETERS_ROLE");
+
+    /// ----------- Lending Term Management --------------------
+
+    /// @notice can set the hardcap of a lending term
+    bytes32 internal constant TERM_HARDCAP = keccak256("TERM_HARDCAP_ROLE");
 
     /// ----------- Timelock management ------------------------
     /// The hashes are the same as OpenZeppelins's roles in TimelockController

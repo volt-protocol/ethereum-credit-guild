@@ -16,6 +16,10 @@ contract UnitTestCoreRef is Test {
 
     event CoreUpdate(address indexed oldCore, address indexed newCore);
 
+    function revertMe() external pure {
+        revert();
+    }
+
     function setUp() public {
         core = new Core();
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -132,11 +136,25 @@ contract UnitTestCoreRef is Test {
         assertEq(address(coreRef).balance, 0);
     }
 
-    function testPauseSucceedsGuardian() public {
+    function testEmergencyActionReverting() public {
+        MockCoreRef.Call[] memory calls = new MockCoreRef.Call[](1);
+        calls[0].target = address(this);
+        calls[0].value = 0;
+        calls[0].callData = abi.encodeWithSignature("revertMe()");
+
+        vm.prank(governor);
+        vm.expectRevert("CoreRef: underlying call reverted");
+        coreRef.emergencyAction(calls);
+    }
+
+    function testPausableSucceedsGuardian() public {
         assertTrue(!coreRef.paused());
         vm.prank(guardian);
         coreRef.pause();
         assertTrue(coreRef.paused());
+        vm.prank(guardian);
+        coreRef.unpause();
+        assertTrue(!coreRef.paused());
     }
 
     function testPauseFailsNonGuardian() public {
