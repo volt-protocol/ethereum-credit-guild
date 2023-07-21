@@ -296,7 +296,7 @@ abstract contract ERC20Gauges is ERC20 {
         address gauge,
         uint112 weight,
         uint32 cycle
-    ) internal {
+    ) internal virtual {
         unchecked {
             require(
                 cycle - block.timestamp > incrementFreezeWindow,

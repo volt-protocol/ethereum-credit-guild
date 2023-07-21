@@ -191,44 +191,6 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         );
     }
 
-    /// @dev prevent weight increment for gauge if user has an unapplied loss
-    function incrementGauge(
-        address gauge,
-        uint112 weight
-    ) public override returns (uint112) {
-        uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
-        uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][msg.sender];
-        require(
-            _lastGaugeLossApplied >= _lastGaugeLoss,
-            "GuildToken: pending loss"
-        );
-
-        return super.incrementGauge(gauge, weight);
-    }
-
-    /// @dev prevent weight increment for gauges if user has an unapplied loss
-    function incrementGauges(
-        address[] calldata gaugeList,
-        uint112[] calldata weights
-    ) public override returns (uint112 newUserWeight) {
-        for (uint256 i = 0; i < gaugeList.length; ) {
-            address gauge = gaugeList[i];
-            uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
-            uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][
-                msg.sender
-            ];
-            require(
-                _lastGaugeLossApplied >= _lastGaugeLoss,
-                "GuildToken: pending loss"
-            );
-            unchecked {
-                ++i;
-            }
-        }
-
-        return super.incrementGauges(gaugeList, weights);
-    }
-
     /*///////////////////////////////////////////////////////////////
                         TRANSFERABILITY
     //////////////////////////////////////////////////////////////*/
@@ -275,6 +237,23 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         );
 
         super._decrementGaugeWeight(user, gauge, weight, cycle);
+    }
+
+    /// @dev prevent weight increment for gauge if user has an unapplied loss.
+    function _incrementGaugeWeight(
+        address user,
+        address gauge,
+        uint112 weight,
+        uint32 cycle
+    ) internal override {
+        uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
+        uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][user];
+        require(
+            _lastGaugeLossApplied >= _lastGaugeLoss,
+            "GuildToken: pending loss"
+        );
+
+        super._incrementGaugeWeight(user, gauge, weight, cycle);
     }
 
     /*///////////////////////////////////////////////////////////////
