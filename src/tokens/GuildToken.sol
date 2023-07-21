@@ -229,44 +229,6 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         return super.incrementGauges(gaugeList, weights);
     }
 
-    /// @dev prevent weight decrement for gauge if user has an unapplied loss
-    function decrementGauge(
-        address gauge,
-        uint112 weight
-    ) public override returns (uint112) {
-        uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
-        uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][msg.sender];
-        require(
-            _lastGaugeLossApplied >= _lastGaugeLoss,
-            "GuildToken: pending loss"
-        );
-
-        return super.decrementGauge(gauge, weight);
-    }
-
-    /// @dev prevent weight decrement for gauges if user has an unapplied loss
-    function decrementGauges(
-        address[] calldata gaugeList,
-        uint112[] calldata weights
-    ) public override returns (uint112 newUserWeight) {
-        for (uint256 i = 0; i < gaugeList.length; ) {
-            address gauge = gaugeList[i];
-            uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
-            uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][
-                msg.sender
-            ];
-            require(
-                _lastGaugeLossApplied >= _lastGaugeLoss,
-                "GuildToken: pending loss"
-            );
-            unchecked {
-                ++i;
-            }
-        }
-
-        return super.decrementGauges(gaugeList, weights);
-    }
-
     /*///////////////////////////////////////////////////////////////
                         TRANSFERABILITY
     //////////////////////////////////////////////////////////////*/
