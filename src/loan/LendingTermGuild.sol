@@ -41,7 +41,7 @@ contract LendingTermGuild is LendingTerm {
     }
 
     /// @notice on repay, burn GUILD as if it were the debt token
-    function _repay_pullAndBurnDebt(address pullFrom, uint256/* pullAmount*/, uint256 debtAmount) internal override {
+    function _repay_pullAndBurnDebt(address pullFrom, uint256/* pullAmount*/, uint256 debtAmount, int256/* pnl*/) internal override {
         GuildToken(guildToken).burnFrom(pullFrom, debtAmount);
     }
 

@@ -279,9 +279,14 @@ contract LendingTerm is CoreRef {
     /// amount has to be pulled from the borrower. The full `debtAmount` is burnt & replenished
     /// in the buffer, but because the extra debt tokens should sit on the contract from a previous
     /// `call()`, this doesn't revert.
-    function _repay_pullAndBurnDebt(address pullFrom, uint256 pullAmount, uint256 debtAmount) internal virtual {
+    function _repay_pullAndBurnDebt(address pullFrom, uint256 pullAmount, uint256 debtAmount, int256 pnl) internal virtual {
         address _creditToken = creditToken;
         IERC20(_creditToken).transferFrom(pullFrom, address(this), pullAmount);
+        if (pnl > 0) {
+            // forward profit portion to the GUILD token, burn the rest
+            IERC20(_creditToken).transfer(guildToken, uint256(pnl));
+            debtAmount -= uint256(pnl);
+        }
         CreditToken(_creditToken).burn(debtAmount);
         RateLimitedCreditMinter(creditMinter).replenishBuffer(debtAmount);
     }
@@ -309,13 +314,13 @@ contract LendingTerm is CoreRef {
         // if the loan is called and we are within the call period, deduce the callFee from
         // the amount of debt to repay
         uint256 callTime = loan.callTime;
-        uint256 creditToPullFromBorrower = loanDebt;
+        uint256 creditToPullForRepay = loanDebt;
         if (callTime != 0 && block.timestamp <= callTime + callPeriod) {
-            creditToPullFromBorrower -= getLoanCallFee(loanId);
+            creditToPullForRepay -= getLoanCallFee(loanId);
         }
         
         // pull the debt
-        _repay_pullAndBurnDebt(msg.sender, creditToPullFromBorrower, loanDebt);
+        _repay_pullAndBurnDebt(msg.sender, creditToPullForRepay, loanDebt, pnl);
 
         // report profit
         _notifyPnL(pnl);
