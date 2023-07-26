@@ -641,4 +641,57 @@ contract GuildTokenUnitTest is Test {
         assertEq(credit.balanceOf(bob), 20e18 + 90e18 + 100e18);
         assertEq(credit.totalSupply(), 220e18 + 200e18 + 300e18);
     }
+
+    function testGetPendingRewards() public {
+        // grant roles to test contract
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GOVERNOR, address(this));
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
+        vm.stopPrank();
+
+        // setup
+        // 50-50 profit split between GUILD & CREDIT
+        // 150 CREDIT circulating (100 rebasing on test contract, 50 non rebasing on alice)
+        // 550 GUILD, 500 voting in gauges :
+        //   - 50 on gauge1 (alice)
+        //   - 250 on gauge2 (50 alice, 200 bob)
+        //   - 200 on gauge3 (200 bob)
+        credit.mint(alice, 50e18);
+        token.setGuildPerformanceFee(0.5e18);
+        token.setMaxGauges(3);
+        token.addGauge(gauge1);
+        token.addGauge(gauge2);
+        token.addGauge(gauge3);
+        token.mint(alice, 150e18);
+        token.mint(bob, 400e18);
+        vm.startPrank(alice);
+        token.incrementGauge(gauge1, 50e18);
+        token.incrementGauge(gauge2, 50e18);
+        vm.stopPrank();
+        vm.startPrank(bob);
+        token.incrementGauge(gauge2, 200e18);
+        token.incrementGauge(gauge3, 200e18);
+        vm.stopPrank();
+
+        // simulate 20 profit on gauge1
+        // 10 goes to alice (guild voting)
+        // 10 goes to test (rebasing credit)
+        credit.mint(address(token), 20e18);
+        token.notifyPnL(gauge1, 20e18);
+
+        // check alice pending rewards
+        (address[] memory aliceGauges, uint256[] memory aliceGaugeRewards, uint256 aliceTotalRewards) = token.getPendingRewards(alice);
+        assertEq(aliceGauges.length, 2);
+        assertEq(aliceGauges[0], gauge1);
+        assertEq(aliceGauges[1], gauge2);
+        assertEq(aliceGaugeRewards.length, 2);
+        assertEq(aliceGaugeRewards[0], 10e18);
+        assertEq(aliceGaugeRewards[1], 0);
+        assertEq(aliceTotalRewards, 10e18);
+        assertEq(token.claimRewards(alice), 10e18);
+    }
 }

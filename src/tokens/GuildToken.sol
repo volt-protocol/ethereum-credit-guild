@@ -243,6 +243,39 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         }
     }
 
+    /// @notice read & return pending undistributed rewards for a given user
+    function getPendingRewards(address user) external view returns (
+        address[] memory gauges,
+        uint256[] memory creditEarned,
+        uint256 totalCreditEarned
+    ) {
+        gauges = _userGauges[user].values();
+        creditEarned = new uint256[](gauges.length);
+
+        for (uint256 i = 0; i < gauges.length; ) {
+            address gauge = gauges[i];
+            uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
+            uint256 _userGaugeProfitIndex = userGaugeProfitIndex[user][gauge];
+
+            if (_gaugeProfitIndex == 0) {
+                _gaugeProfitIndex = 1e18;
+            }
+            if (_userGaugeProfitIndex == 0) {
+                _userGaugeProfitIndex = 1e18;
+            }
+            uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
+            if (deltaIndex != 0) {
+                uint256 _userGaugeWeight = uint256(getUserGaugeWeight[user][gauge]);
+                creditEarned[i] = _userGaugeWeight * deltaIndex / 1e18;
+                totalCreditEarned += creditEarned[i];
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     /// @notice claim rewards for a given user
     function claimRewards(address user) external returns (uint256 creditEarned) {
         address[] memory gauges = _userGauges[user].values();
