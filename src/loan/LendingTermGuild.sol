@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity 0.8.13;
 
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
