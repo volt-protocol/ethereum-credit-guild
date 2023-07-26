@@ -218,6 +218,9 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// in any case, returns the new amount of credit earned.
     function _claimUserGaugeRewards(address user, address gauge, bool send) internal returns (uint256 creditEarned) {
         uint256 _userGaugeWeight = uint256(getUserGaugeWeight[user][gauge]);
+        if (_userGaugeWeight == 0) {
+            return 0;
+        }
         uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
         uint256 _userGaugeProfitIndex = userGaugeProfitIndex[user][gauge];
         if (_gaugeProfitIndex == 0) {
