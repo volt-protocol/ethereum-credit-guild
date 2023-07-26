@@ -179,7 +179,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             uint256 creditTotalSupply = ERC20(credit).totalSupply();
             uint256 newCreditMultiplier = creditMultiplier * (creditTotalSupply - uint256(-amount)) / creditTotalSupply;
             creditMultiplier = newCreditMultiplier;
-            emit CreditMultiplierUpdate(newCreditMultiplier, block.timestamp);
+            emit CreditMultiplierUpdate(block.timestamp, newCreditMultiplier);
         }
         // handling profit
         else if (amount > 0) {
