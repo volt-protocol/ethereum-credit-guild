@@ -301,9 +301,10 @@ contract GuildTokenUnitTest is Test {
         vm.stopPrank();
 
         // setup
-        token.setMaxGauges(2);
+        token.setMaxGauges(3);
         token.addGauge(gauge1);
         token.addGauge(gauge2);
+        token.addGauge(gauge3);
         token.mint(alice, 100e18);
         vm.startPrank(alice);
         token.incrementGauge(gauge1, 40e18);
@@ -311,6 +312,10 @@ contract GuildTokenUnitTest is Test {
         vm.stopPrank();
         assertEq(token.userUnusedWeight(alice), 20e18);
         assertEq(token.getUserWeight(alice), 80e18);
+
+        // roll to next block
+        vm.warp(block.timestamp + 13);
+        vm.roll(block.number + 1);
 
         // loss in gauge 1
         token.notifyPnL(gauge1, -100);
@@ -431,6 +436,31 @@ contract GuildTokenUnitTest is Test {
         token.applyGaugeLoss(gauge1, alice);
 
         assertEq(token.balanceOf(alice), 60e18);
+    }
+
+    function testCanIncrementGaugeIfZeroWeightAndPastLossUnapplied() public {
+        _setupAliceLossInGauge1();
+
+        // loss in gauge 3
+        token.notifyPnL(gauge3, -100);
+
+        // roll to next block
+        vm.warp(block.timestamp + 13);
+        vm.roll(block.number + 1);
+
+        // can increment gauge for the first time, event if it had a loss in the past
+        vm.prank(alice);
+        token.incrementGauge(gauge3, 20e18);
+    
+        assertEq(token.getUserGaugeWeight(alice, gauge1), 40e18);
+        assertEq(token.getUserGaugeWeight(alice, gauge2), 40e18);
+        assertEq(token.getUserGaugeWeight(alice, gauge3), 20e18);
+        assertEq(token.userUnusedWeight(alice), 0);
+        assertEq(token.getUserWeight(alice), 100e18);
+
+        // the past loss does not apply to alice
+        vm.expectRevert("GuildToken: no loss to apply");
+        token.applyGaugeLoss(gauge3, alice);
     }
 
     function testCannotDecrementGaugeIfLossUnapplied() public {

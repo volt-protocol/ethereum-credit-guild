@@ -340,6 +340,8 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     }
 
     /// @dev prevent weight increment for gauge if user has an unapplied loss.
+    /// If the user has 0 weight (i.e. no loss to realize), allow incrementing
+    /// gauge weight & update lastGaugeLossApplied to current time.
     /// Also update the user profit index.
     function _incrementGaugeWeight(
         address user,
@@ -349,10 +351,14 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     ) internal override {
         uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
         uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][user];
-        require(
-            _lastGaugeLossApplied >= _lastGaugeLoss,
-            "GuildToken: pending loss"
-        );
+        if (getUserGaugeWeight[user][gauge] == 0) {
+            lastGaugeLossApplied[gauge][user] = block.timestamp;
+        } else {
+            require(
+                _lastGaugeLossApplied >= _lastGaugeLoss,
+                "GuildToken: pending loss"
+            );
+        }
 
         _claimUserGaugeRewards(user, gauge, true);
 
