@@ -638,6 +638,42 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), 0);
     }
 
+    // seizeMany success
+    function testSeizeManySuccess() public {
+        // prepare & borrow & call & wait call period
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        vm.warp(block.timestamp + 13);
+        vm.roll(block.number + 1);
+        uint256 callFee = 1_000e18; // 5% of borrowAmount
+        credit.approve(address(term), callFee);
+        term.call(loanId);
+        vm.warp(block.timestamp + term.callPeriod());
+        vm.roll(block.number + 1);
+
+        // seize
+        bytes32[] memory loanIds = new bytes32[](1);
+        loanIds[0] = loanId;
+        bool[] memory skipCall = new bool[](1);
+        skipCall[0] = false;
+        term.seizeMany(loanIds, skipCall);
+
+        // loan is closed
+        assertEq(term.getLoan(loanId).closeTime, block.timestamp);
+        assertEq(term.getLoanDebt(loanId), 0);
+        assertEq(term.issuance(), 0);
+        // borrower kept credit
+        assertEq(credit.balanceOf(address(this)), borrowAmount - callFee);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(auctionHouse)), callFee);
+        // collateral went to auctionHouse
+        assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
+        assertEq(collateral.balanceOf(address(term)), 0);
+    }
+
     // seize fail because loan doesnt exist
     function testSeizeFailLoanNotFound() public {
         vm.expectRevert("LendingTerm: loan not found");

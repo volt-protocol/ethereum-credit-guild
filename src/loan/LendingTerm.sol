@@ -471,11 +471,6 @@ contract LendingTerm is EIP712, CoreRef {
         uint256 deadline,
         Signature calldata sig
     ) external {
-        uint256 creditToPull = getLoanDebt(loanId);
-        uint256 callTime = loans[loanId].callTime;
-        if (callTime != 0 && block.timestamp <= callTime + callPeriod) {
-            creditToPull -= getLoanCallFee(loanId);
-        }
         IERC20Permit(creditToken).permit(
             msg.sender,
             address(this),
@@ -507,11 +502,6 @@ contract LendingTerm is EIP712, CoreRef {
         address signer = ECDSA.recover(hash, repaySig.v, repaySig.r, repaySig.s);
         require(signer == repayer, "LendingTerm: invalid signature");
 
-        uint256 creditToPull = getLoanDebt(loanId);
-        uint256 callTime = loans[loanId].callTime;
-        if (callTime != 0 && block.timestamp <= callTime + callPeriod) {
-            creditToPull -= getLoanCallFee(loanId);
-        }
         IERC20Permit(creditToken).permit(
             repayer,
             address(this),
