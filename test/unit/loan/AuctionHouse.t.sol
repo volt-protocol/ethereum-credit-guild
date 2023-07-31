@@ -171,7 +171,7 @@ contract AuctionHouseUnitTest is Test {
         bool[] memory skipCall = new bool[](1);
         skipCall[0] = true;
         term.setHardCap(0);
-        term.seize(loanIds, skipCall);
+        term.seizeMany(loanIds, skipCall);
     }
 
     // auction getter

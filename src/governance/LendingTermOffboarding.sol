@@ -100,7 +100,7 @@ contract LendingTermOffboarding is CoreRef {
             skipCall[i] = true;
         }
         LendingTerm(term).setHardCap(0);
-        LendingTerm(term).seize(loanIds, skipCall);
+        LendingTerm(term).seizeMany(loanIds, skipCall);
         require(LendingTerm(term).issuance() == 0, "LendingTermOffboarding: not all loans closed");
         GuildToken(guildToken).removeGauge(term);
 

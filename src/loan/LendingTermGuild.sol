@@ -46,5 +46,5 @@ contract LendingTermGuild is LendingTerm {
     }
 
     /// @notice noop on loan call, disable the loan calling
-    function _call(bytes32 loanId) internal override returns (uint256 debtToPull) {}
+    function _call(bytes32 loanId, address caller) internal override returns (uint256 debtToPull) {}
 }

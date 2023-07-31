@@ -516,6 +516,31 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.balanceOf(address(term)), callFee);
     }
 
+    // callMany success
+    function testCallManySuccess() public {
+        // prepare & borrow
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32[] memory loanIds = new bytes32[](1);
+        loanIds[0] = loanId;
+
+        // call
+        vm.warp(block.timestamp + 13);
+        vm.roll(block.number + 1);
+        uint256 callFee = 1_000e18; // 5% of borrowAmount
+        assertEq(term.getLoanCallFee(loanId), callFee);
+        credit.approve(address(term), callFee);
+        term.callMany(loanIds);
+
+        assertEq(term.getLoan(loanId).caller, address(this));
+        assertEq(term.getLoan(loanId).callTime, block.timestamp);
+        assertEq(credit.balanceOf(address(this)), borrowAmount - callFee);
+        assertEq(credit.balanceOf(address(term)), callFee);
+    }
+
     // call fail because loan doesnt exist
     function testCallFailLoanNotFound() public {
         vm.expectRevert("LendingTerm: loan not found");
@@ -862,7 +887,7 @@ contract LendingTermUnitTest is Test {
         bool[] memory skipCalls = new bool[](1);
         skipCalls[0] = true;
         vm.expectRevert("LendingTerm: loan not called");
-        term.seize(loanIds, skipCalls);
+        term.seizeMany(loanIds, skipCalls);
 
         // call
         uint256 callFee = 1_000e18;
@@ -878,7 +903,7 @@ contract LendingTermUnitTest is Test {
         // cannot seize because call period isn't elapsed
         skipCalls[0] = true;
         vm.expectRevert("LendingTerm: call period in progress");
-        term.seize(loanIds, skipCalls);
+        term.seizeMany(loanIds, skipCalls);
 
         // seize
         vm.warp(block.timestamp + term.callPeriod());
@@ -943,7 +968,7 @@ contract LendingTermUnitTest is Test {
         loanIds[0] = loanId;
         bool[] memory skipCalls = new bool[](1);
         skipCalls[0] = true;
-        term.seize(loanIds, skipCalls);
+        term.seizeMany(loanIds, skipCalls);
 
         assertEq(credit.balanceOf(address(this)), 20_000e18);
         assertEq(credit.balanceOf(address(term)), 0);
@@ -998,7 +1023,7 @@ contract LendingTermUnitTest is Test {
         loanIds[0] = loanId;
         bool[] memory skipCalls = new bool[](1);
         skipCalls[0] = true;
-        term.seize(loanIds, skipCalls);
+        term.seizeMany(loanIds, skipCalls);
 
         assertEq(credit.balanceOf(address(this)), 20_000e18);
         assertEq(credit.balanceOf(address(term)), 0);
