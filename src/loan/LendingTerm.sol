@@ -226,25 +226,6 @@ contract LendingTerm is EIP712, CoreRef {
         return loanDebt;
     }
 
-    /// @notice check debt ceiling for new borrows
-    function _borrow_checkDebtCeiling(uint256 borrowAmount, uint256 postBorrowIssuance) internal virtual view {
-        uint256 _totalSupply = IERC20(creditToken).totalSupply();
-        uint256 debtCeiling = GuildToken(guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount) * GAUGE_CAP_TOLERANCE / 1e18;
-        if (_totalSupply == 0) {
-            // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
-            // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
-            // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
-            require(debtCeiling != 0, "LendingTerm: debt ceiling reached");
-        } else {
-            require(postBorrowIssuance <= debtCeiling, "LendingTerm: debt ceiling reached");
-        }
-    }
-
-    /// @notice mint debt to the borrower during borrows.
-    function _borrow_mintDebt(address account, uint256 amount) internal virtual {
-        RateLimitedCreditMinter(creditMinter).mint(account, amount);
-    }
-
     /// @notice initiate a new loan
     function _borrow(
         address borrower,
@@ -276,7 +257,16 @@ contract LendingTerm is EIP712, CoreRef {
         require(_postBorrowIssuance <= hardCap, "LendingTerm: hardcap reached");
 
         // check the debt ceiling
-        _borrow_checkDebtCeiling(borrowAmount, _postBorrowIssuance);
+        uint256 _totalSupply = IERC20(creditToken).totalSupply();
+        uint256 debtCeiling = GuildToken(guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount) * GAUGE_CAP_TOLERANCE / 1e18;
+        if (_totalSupply == 0) {
+            // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
+            // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
+            // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
+            require(debtCeiling != 0, "LendingTerm: debt ceiling reached");
+        } else {
+            require(_postBorrowIssuance <= debtCeiling, "LendingTerm: debt ceiling reached");
+        }
 
         // save loan in state
         loans[loanId] = Loan({
@@ -291,7 +281,7 @@ contract LendingTerm is EIP712, CoreRef {
         issuance = _postBorrowIssuance;
 
         // mint debt to the borrower
-        _borrow_mintDebt(borrower, borrowAmount);
+        RateLimitedCreditMinter(creditMinter).mint(borrower, borrowAmount);
 
         // pull the collateral from the borrower
         IERC20(collateralToken).safeTransferFrom(borrower, address(this), collateralAmount);
@@ -378,29 +368,6 @@ contract LendingTerm is EIP712, CoreRef {
         return _borrow(borrower, borrowAmount, collateralAmount);
     }
 
-    /// @notice during repay, pull debt from the borrower and replenish the buffer of available
-    /// debt that can be minted.
-    /// @dev `pullAmount` could be smaller than `debtAmount` if the loan has been called, in this
-    /// case the caller already transferred some debt tokens to the lending term, and a reduced
-    /// amount has to be pulled from the borrower.
-    function _repay_pullAndBurnDebt(address pullFrom, uint256 pullAmount, uint256 debtAmount, int256 pnl) internal virtual {
-        address _creditToken = creditToken;
-        IERC20(_creditToken).transferFrom(pullFrom, address(this), pullAmount);
-        if (pnl > 0) {
-            // forward profit portion to the GUILD token, burn the rest
-            IERC20(_creditToken).transfer(guildToken, uint256(pnl));
-            debtAmount -= uint256(pnl);
-        }
-        CreditToken(_creditToken).burn(debtAmount);
-        RateLimitedCreditMinter(creditMinter).replenishBuffer(debtAmount);
-    }
-
-    /// @notice During `repay()` or `seize()` of forgiven loans, notify the protocol accounting
-    /// from profits & losses.
-    function _notifyPnL(int256 pnl) internal virtual {
-        GuildToken(guildToken).notifyPnL(address(this), pnl);
-    }
-
     /// @notice repay an open loan
     function _repay(address repayer, bytes32 loanId) internal {
         Loan storage loan = loans[loanId];
@@ -414,20 +381,32 @@ contract LendingTerm is EIP712, CoreRef {
         // compute interest owed
         uint256 loanDebt = getLoanDebt(loanId);
         int256 pnl = int256(loanDebt) - int256(loan.borrowAmount);
-    
-        // if the loan is called and we are within the call period, deduce the callFee from
-        // the amount of debt to repay
+
+        /// pull debt from the borrower and replenish the buffer of available debt that can be minted.
+        /// @dev `debtToPullForRepay` could be smaller than `loanDebt` if the loan has been called, in this
+        /// case the caller already transferred some debt tokens to the lending term, and a reduced
+        /// amount has to be pulled from the borrower.
+        address _creditToken = creditToken;
         uint256 callTime = loan.callTime;
-        uint256 debtToPullForRepay = loanDebt;
-        if (callTime != 0 && block.timestamp <= callTime + callPeriod) {
-            debtToPullForRepay -= getLoanCallFee(loanId);
+        IERC20(_creditToken).transferFrom(
+            repayer,
+            address(this),
+            (callTime != 0 && block.timestamp <= callTime + callPeriod) ? (loanDebt - getLoanCallFee(loanId)) : loanDebt
+        );
+        if (pnl > 0) {
+            // forward profit portion to the GUILD token, burn the rest
+            IERC20(_creditToken).transfer(guildToken, uint256(pnl));
+            CreditToken(_creditToken).burn(loanDebt - uint256(pnl));
+            RateLimitedCreditMinter(creditMinter).replenishBuffer(loanDebt - uint256(pnl));
+        } else {
+            // no profit, burn all the received debt tokens
+            CreditToken(_creditToken).burn(loanDebt);
+            RateLimitedCreditMinter(creditMinter).replenishBuffer(loanDebt);
         }
         
-        // pull the debt
-        _repay_pullAndBurnDebt(repayer, debtToPullForRepay, loanDebt, pnl);
 
         // report profit
-        _notifyPnL(pnl);
+        GuildToken(guildToken).notifyPnL(address(this), pnl);
 
         // close the loan
         loan.closeTime = block.timestamp;
@@ -708,7 +687,7 @@ contract LendingTerm is EIP712, CoreRef {
         if (_forgiveness) {
             // mark loans as total losses
             int256 pnl = -int256(issuanceDecrease);
-            _notifyPnL(pnl);
+            GuildToken(guildToken).notifyPnL(address(this), pnl);
 
             // emit event
             emit LoanSeize(block.timestamp, loanId, loanCalled, false);
