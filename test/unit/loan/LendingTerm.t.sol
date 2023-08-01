@@ -657,9 +657,7 @@ contract LendingTermUnitTest is Test {
         // seize
         bytes32[] memory loanIds = new bytes32[](1);
         loanIds[0] = loanId;
-        bool[] memory skipCall = new bool[](1);
-        skipCall[0] = false;
-        term.seizeMany(loanIds, skipCall);
+        term.seizeMany(loanIds);
 
         // loan is closed
         assertEq(term.getLoan(loanId).closeTime, block.timestamp);
@@ -920,10 +918,8 @@ contract LendingTermUnitTest is Test {
         // cannot seize because call isn't started
         bytes32[] memory loanIds = new bytes32[](1);
         loanIds[0] = loanId;
-        bool[] memory skipCalls = new bool[](1);
-        skipCalls[0] = true;
         vm.expectRevert("LendingTerm: loan not called");
-        term.seizeMany(loanIds, skipCalls);
+        term.seizeMany(loanIds);
 
         // call
         uint256 callFee = 1_000e18;
@@ -937,9 +933,8 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
 
         // cannot seize because call period isn't elapsed
-        skipCalls[0] = true;
         vm.expectRevert("LendingTerm: call period in progress");
-        term.seizeMany(loanIds, skipCalls);
+        term.seizeMany(loanIds);
 
         // seize
         vm.warp(block.timestamp + term.callPeriod());
@@ -956,8 +951,8 @@ contract LendingTermUnitTest is Test {
         assertEq(term.getLoanCallFee(loanId), 0); // /!\ not callFee because loan is closed now
     }
 
-    // full flow test (borrow, forgive, seize)
-    function testFlowBorrowForgiveSeize() public {
+    // full flow test (borrow, forgive)
+    function testFlowBorrowForgive() public {
         bytes32 loanId = keccak256(abi.encode(address(this), address(term), block.timestamp));
         assertEq(term.getLoanCallFee(loanId), 0);
 
@@ -990,21 +985,15 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(this)), 0);
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
 
-        // test forgive all loans reverts due to access control
-        assertEq(term.canAutomaticallyForgive(), false);
-        vm.expectRevert("LendingTerm: cannot forgive");
-        term.forgiveAllLoans();
+        // test forgive reverts due to access control
+        vm.expectRevert("UNAUTHORIZED");
+        term.forgive(loanId);
 
-        // forgive all loans
+        // forgive 
         vm.prank(governor);
-        term.forgiveAllLoans();
+        term.forgive(loanId);
 
-        // seize
-        bytes32[] memory loanIds = new bytes32[](1);
-        loanIds[0] = loanId;
-        bool[] memory skipCalls = new bool[](1);
-        skipCalls[0] = true;
-        term.seizeMany(loanIds, skipCalls);
+        assertEq(term.getLoan(loanId).closeTime, block.timestamp);
 
         assertEq(credit.balanceOf(address(this)), 20_000e18);
         assertEq(credit.balanceOf(address(term)), 0);
@@ -1049,7 +1038,6 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
 
         // set hardcap to 0
-        assertEq(term.canAutomaticallyForgive(), false);
         vm.prank(governor);
         core.grantRole(CoreRoles.TERM_HARDCAP, address(this));
         term.setHardCap(0);
@@ -1057,9 +1045,7 @@ contract LendingTermUnitTest is Test {
         // seize without call
         bytes32[] memory loanIds = new bytes32[](1);
         loanIds[0] = loanId;
-        bool[] memory skipCalls = new bool[](1);
-        skipCalls[0] = true;
-        term.seizeMany(loanIds, skipCalls);
+        term.seizeMany(loanIds);
 
         assertEq(credit.balanceOf(address(this)), 20_000e18);
         assertEq(credit.balanceOf(address(term)), 0);

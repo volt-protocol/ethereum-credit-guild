@@ -24,10 +24,15 @@ contract LendingTerm is EIP712, CoreRef {
     mapping(address => Counters.Counter) private _nonces;
 
     // events for the lifecycle of loans that happen in the lending term
+    /// @notice emitted when new loans are opened (mint debt to borrower, pull collateral from borrower).
     event LoanBorrow(uint256 indexed when, bytes32 indexed loanId, address indexed borrower, uint256 collateralAmount, uint256 borrowAmount);
+    /// @notice emitted when a loan is called (repayer has `callPeriod` seconds to repay at a discount).
     event LoanCall(uint256 indexed when, bytes32 indexed loanId);
-    event LoanRepay(uint256 indexed when, bytes32 indexed loanId);
-    event LoanSeize(uint256 indexed when, bytes32 indexed loanId, bool loanCalled, bool collateralAuctioned);
+    /// @notice emitted when a loan is closed (repay, seize, forgive).
+    /// the lifecycle of the loan might continue in the AuctionHouse, but when this event is emitted, the
+    /// responsibility of the LendingTerm is over.
+    /// closeType enum : 0 = repay, 1 = seize, 2 = forgive.
+    event LoanClose(uint256 indexed when, bytes32 indexed loanId, uint8 indexed closeType, bool loanCalled);
 
     // signed messages for the lifecycle of loans
     bytes32 public constant _BORROW_TYPEHASH = keccak256("Borrow(address term,address borrower,uint256 borrowAmount,uint256 collateralAmount,uint256 nonce,uint256 deadline)");
@@ -112,11 +117,6 @@ contract LendingTerm is EIP712, CoreRef {
     /// (sum of CREDIT minted), regardless of the gauge allocations.
     uint256 public hardCap;
 
-    /// @notice if true, the governance has forgiven all loans, that can be immediately closed
-    /// and marked as total losses in the system. This is meant for extreme events, where
-    /// collateral assets are frozen and can't be sent to the auctionHouse for liquidations.
-    bool public forgiveness = false;
-
     /// @notice the LTV buffer, expressed as a percentage with 18 decimals.
     /// Example: for a value of 0.1e18 (10%), the LTV buffer will waive the call fee
     /// (reimburse CREDIT to the caller) if less than 10% of the collateral of the borrower
@@ -178,7 +178,7 @@ contract LendingTerm is EIP712, CoreRef {
         return _domainSeparatorV4();
     }
 
-    function _useNonce(address user) internal virtual returns (uint256 current) {
+    function _useNonce(address user) internal returns (uint256 current) {
         Counters.Counter storage nonce = _nonces[user];
         current = nonce.current();
         nonce.increment();
@@ -416,7 +416,7 @@ contract LendingTerm is EIP712, CoreRef {
         IERC20(collateralToken).safeTransfer(loan.borrower, loan.collateralAmount);
 
         // emit event
-        emit LoanRepay(block.timestamp, loanId);
+        emit LoanClose(block.timestamp, loanId, 0, callTime != 0);
     }
 
     /// @notice repay an open loan
@@ -495,7 +495,7 @@ contract LendingTerm is EIP712, CoreRef {
     }
 
     /// @notice call a loan in state, and return the amount of debt tokens to pull for call fee.
-    function _call(bytes32 loanId, address caller) internal virtual returns (uint256 debtToPull) {
+    function _call(bytes32 loanId, address caller) internal returns (uint256 debtToPull) {
         Loan storage loan = loans[loanId];
 
         // check that the loan exists
@@ -636,13 +636,9 @@ contract LendingTerm is EIP712, CoreRef {
 
     /// @notice seize the collateral of a loan, to repay outstanding debt.
     /// Under normal conditions, the loans should be call()'d first, to give the borrower an opportunity to repay (the 'call period').
-    /// Conditions that allow to skip calling a loan before seizing its collateral :
-    /// - forgiving all loans of a lending term (see `forgiveAllLoans()`)
-    /// - offboading of a lending term (privileged role in the system)
-    /// - issuance of lending term above hardcap set by governance
+    /// Calling of loans can be skipped if the `issuance` is above `hardCap`.
     function _seize(
         bytes32 loanId,
-        bool skipCall,
         address _auctionHouse,
         uint256 issuanceBefore
     ) internal returns (
@@ -657,16 +653,10 @@ contract LendingTerm is EIP712, CoreRef {
         // check that the loan is not already closed
         require(loan.closeTime == 0, "LendingTerm: loan closed");
 
-        // conditions that allow seizing the collateral of a loan without waiting for the call period to elapse
-        bool canSkipCall = false;
-        bool _forgiveness = forgiveness;
-        if (skipCall) {
-            canSkipCall = issuanceBefore > hardCap || _forgiveness;
-        }
-
         // set the call info, if not set
         uint256 _callTime = loan.callTime;
         bool loanCalled = _callTime != 0;
+        bool canSkipCall = issuanceBefore > hardCap;
         if (loanCalled) {
             // check that the call period has elapsed
             if (!canSkipCall) {
@@ -684,21 +674,12 @@ contract LendingTerm is EIP712, CoreRef {
         loans[loanId].closeTime = block.timestamp;
         issuanceDecrease = loan.borrowAmount;
 
-        if (_forgiveness) {
-            // mark loans as total losses
-            int256 pnl = -int256(issuanceDecrease);
-            GuildToken(guildToken).notifyPnL(address(this), pnl);
+        // auction the loan collateral
+        IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
+        AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
 
-            // emit event
-            emit LoanSeize(block.timestamp, loanId, loanCalled, false);
-        } else {
-            // auction the loan collateral
-            IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
-            AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
-
-            // emit event
-            emit LoanSeize(block.timestamp, loanId, loanCalled, true);
-        }
+        // emit event
+        emit LoanClose(block.timestamp, loanId, 1, loanCalled);
     }
 
     /// @notice seize a single loan without attempt to skip the call period.
@@ -708,7 +689,7 @@ contract LendingTerm is EIP712, CoreRef {
         (
             uint256 debtToForward,
             uint256 issuanceDecrease
-        ) = _seize(loanId, false, _auctionHouse, _issuance);
+        ) = _seize(loanId, _auctionHouse, _issuance);
 
         // send CREDIT from the call fees to the auction house
         if (debtToForward != 0) {
@@ -720,7 +701,7 @@ contract LendingTerm is EIP712, CoreRef {
     }
 
     /// @notice seize the collateral of a list of loans
-    function seizeMany(bytes32[] memory loanIds, bool[] memory skipCall) public {
+    function seizeMany(bytes32[] memory loanIds) public {
         address _auctionHouse = auctionHouse;
         uint256 newIssuance = issuance;
         uint256 totalDebtToForward;
@@ -728,7 +709,7 @@ contract LendingTerm is EIP712, CoreRef {
             (
                 uint256 debtToForward,
                 uint256 issuanceDecrease
-            ) = _seize(loanIds[i], skipCall[i], _auctionHouse, newIssuance);
+            ) = _seize(loanIds[i], _auctionHouse, newIssuance);
 
             newIssuance -= issuanceDecrease;
             totalDebtToForward += debtToForward;
@@ -743,13 +724,40 @@ contract LendingTerm is EIP712, CoreRef {
         issuance = newIssuance;
     }
 
-    /// @notice forgive all loans. This will allow all loans to be closed (through the `seize()`
-    /// function call) and marked as total losses in the system, without attempting to transfer
-    /// the collateral tokens to the auction house. This is meant for extreme events where collateral
-    /// assets are frozen and can't be transferred within or out of the system anymore.
-    function forgiveAllLoans() external {
-        require(canAutomaticallyForgive() || core().hasRole(CoreRoles.GOVERNOR, msg.sender), "LendingTerm: cannot forgive");
-        forgiveness = true;
+    /// @notice forgive a loan, marking its debt as a total loss to the system.
+    /// The loan is closed (borrower keeps the CREDIT), and the collateral stays on the LendingTerm.
+    /// Governance can later unstuck the collateral through `emergencyAction`.
+    /// This function is made for emergencies where collateral is frozen or other reverting
+    /// conditions on collateral transfers that prevent it from being sent to the auctionHouse
+    /// for a regular repay() or seize() loan closing.
+    function forgive(bytes32 loanId) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        Loan storage loan = loans[loanId];
+
+        // check that the loan exists
+        require(loan.originationTime != 0, "LendingTerm: loan not found");
+
+        // check that the loan is not already closed
+        require(loan.closeTime == 0, "LendingTerm: loan closed");
+
+        // if loan has been called, reimburse the caller
+        bool loanCalled = loan.callTime != 0;
+        if (loanCalled) {
+            IERC20(creditToken).transfer(loan.caller, getLoanCallFee(loanId));
+        }
+
+        // close the loan
+        loans[loanId].closeTime = block.timestamp;
+        issuance -= loan.borrowAmount;
+
+        // mark loan as a total loss
+        int256 pnl = -int256(loan.borrowAmount);
+        GuildToken(guildToken).notifyPnL(address(this), pnl);
+
+        // set hardcap to 0 to prevent new borrows
+        hardCap = 0;
+
+        // emit event
+        emit LoanClose(block.timestamp, loanId, 2, loanCalled);
     }
 
     /// @notice set the address of the auction house.
@@ -762,10 +770,5 @@ contract LendingTerm is EIP712, CoreRef {
     /// allows to update a term's arbitrary hardcap without doing a gauge & loans migration.
     function setHardCap(uint256 _newValue) external onlyCoreRole(CoreRoles.TERM_HARDCAP) {
         hardCap = _newValue;
-    }
-
-    /// @notice automatic criteria for loan forgiveness, for use in inheriting contracts.
-    function canAutomaticallyForgive() public virtual view returns (bool) {
-        return false;
     }
 }

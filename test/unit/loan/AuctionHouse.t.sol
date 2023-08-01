@@ -168,10 +168,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         bytes32[] memory loanIds = new bytes32[](1);
         loanIds[0] = loanId;
-        bool[] memory skipCall = new bool[](1);
-        skipCall[0] = true;
         term.setHardCap(0);
-        term.seizeMany(loanIds, skipCall);
+        term.seizeMany(loanIds);
     }
 
     // auction getter

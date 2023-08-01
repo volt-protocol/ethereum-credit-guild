@@ -99,12 +99,8 @@ contract LendingTermOffboarding is CoreRef {
         core().grantRole(CoreRoles.TERM_HARDCAP, address(this));
         core().grantRole(CoreRoles.GAUGE_REMOVE, address(this));
 
-        bool[] memory skipCall = new bool[](loanIds.length);
-        for (uint256 i = 0; i < skipCall.length; i++) {
-            skipCall[i] = true;
-        }
         LendingTerm(term).setHardCap(0);
-        LendingTerm(term).seizeMany(loanIds, skipCall);
+        LendingTerm(term).seizeMany(loanIds);
         require(LendingTerm(term).issuance() == 0, "LendingTermOffboarding: not all loans closed");
         GuildToken(guildToken).removeGauge(term);
 
