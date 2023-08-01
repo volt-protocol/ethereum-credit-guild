@@ -95,6 +95,10 @@ contract LendingTermOffboarding is CoreRef {
     function offboard(address term, bytes32[] memory loanIds) external whenNotPaused {
         require(canOffboard[term], "LendingTermOffboarding: quorum not met");
 
+        // self-grant permissions
+        core().grantRole(CoreRoles.TERM_HARDCAP, address(this));
+        core().grantRole(CoreRoles.GAUGE_REMOVE, address(this));
+
         bool[] memory skipCall = new bool[](loanIds.length);
         for (uint256 i = 0; i < skipCall.length; i++) {
             skipCall[i] = true;
@@ -103,6 +107,12 @@ contract LendingTermOffboarding is CoreRef {
         LendingTerm(term).seizeMany(loanIds, skipCall);
         require(LendingTerm(term).issuance() == 0, "LendingTermOffboarding: not all loans closed");
         GuildToken(guildToken).removeGauge(term);
+
+        // cleanup roles
+        core().revokeRole(CoreRoles.TERM_HARDCAP, address(this));
+        core().revokeRole(CoreRoles.GAUGE_REMOVE, address(this));
+        core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
+        core().revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, term);
 
         canOffboard[term] = false;
         emit Offboard(term);

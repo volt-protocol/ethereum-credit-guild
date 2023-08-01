@@ -94,8 +94,7 @@ contract LendingTermOffboardingUnitTest is Test {
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
-        core.grantRole(CoreRoles.TERM_HARDCAP, address(offboarder));
-        core.grantRole(CoreRoles.GAUGE_REMOVE, address(offboarder));
+        core.grantRole(CoreRoles.GOVERNOR, address(offboarder));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         // add gauge and vote for it
