@@ -13,7 +13,6 @@ import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {LendingTermUSDC} from "@src/loan/LendingTermUSDC.sol";
 
 contract Proposal_0 is Proposal {
     string public name = "Proposal_0";
@@ -80,7 +79,7 @@ contract Proposal_0 is Proposal {
                 addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
                 addresses.mainnet("ERC20_CREDIT")
             );
-            LendingTermUSDC termUsdc1 = new LendingTermUSDC(
+            LendingTerm termUsdc1 = new LendingTerm(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("ERC20_GUILD"),
                 address(auctionHouse),
