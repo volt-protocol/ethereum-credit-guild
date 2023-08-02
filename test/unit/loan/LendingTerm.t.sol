@@ -29,6 +29,8 @@ contract LendingTermUnitTest is Test {
     // LendingTerm params
     uint256 constant _CREDIT_PER_COLLATERAL_TOKEN = 2000e18; // 2000, same decimals
     uint256 constant _INTEREST_RATE = 0.10e18; // 10% APR
+    uint256 constant _MAX_DELAY_BETWEEN_PARTIAL_REPAY = 63115200; // 2 years
+    uint256 constant _MIN_PARTIAL_REPAY_PERCENT = 0.2e18; // 20%
     uint256 constant _CALL_FEE = 0.05e18; // 5%
     uint256 constant _CALL_PERIOD = 1 hours;
     uint256 constant _HARDCAP = 20_000_000e18;
@@ -65,6 +67,8 @@ contract LendingTermUnitTest is Test {
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
                 interestRate: _INTEREST_RATE,
+                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
                 callFee: _CALL_FEE,
                 callPeriod: _CALL_PERIOD,
                 hardCap: _HARDCAP,
@@ -111,6 +115,8 @@ contract LendingTermUnitTest is Test {
         assertEq(address(term.collateralToken()), address(collateral));
         assertEq(term.maxDebtPerCollateralToken(), _CREDIT_PER_COLLATERAL_TOKEN);
         assertEq(term.interestRate(), _INTEREST_RATE);
+        assertEq(term.maxDelayBetweenPartialRepay(), _MAX_DELAY_BETWEEN_PARTIAL_REPAY);
+        assertEq(term.minPartialRepayPercent(), _MIN_PARTIAL_REPAY_PERCENT);
         assertEq(term.callFee(), _CALL_FEE);
         assertEq(term.callPeriod(), _CALL_PERIOD);
         assertEq(term.hardCap(), _HARDCAP);
@@ -342,6 +348,112 @@ contract LendingTermUnitTest is Test {
         vm.roll(block.timestamp + interestTime / 13);
         uint256 interestAccrued = borrowAmount * _INTEREST_RATE * interestTime / term.YEAR() / 1e18;
         assertEq(term.getLoanDebt(loanId), borrowAmount + interestAccrued);
+    }
+
+    // addCollateral success
+    function testAddCollateralSuccess() public {
+        // prepare & borrow
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
+
+        // addCollateral
+        vm.warp(block.timestamp + 13);
+        vm.roll(block.number + 1);
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        term.addCollateral(loanId, collateralAmount);
+
+        // checks
+        assertEq(term.getLoan(loanId).collateralAmount, collateralAmount * 2);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount * 2);
+        assertEq(collateral.balanceOf(address(this)), 0);
+    }
+
+    // addCollateral reverts
+    function testAddCollateralFailures() public {
+        // prepare & borrow
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // repay
+        vm.warp(block.timestamp + 13);
+        vm.roll(block.number + 1);
+        uint256 debt = term.getLoanDebt(loanId);
+        credit.mint(address(this), debt - borrowAmount);
+        credit.approve(address(term), debt);
+        term.repay(loanId);
+
+        // addCollateral failures
+        vm.expectRevert("LendingTerm: cannot add 0");
+        term.addCollateral(loanId, 0);
+        vm.expectRevert("LendingTerm: loan closed");
+        term.addCollateral(loanId, 123);
+        vm.expectRevert("LendingTerm: loan not found");
+        term.addCollateral(bytes32(0), 123);
+    }
+
+    // partialRepay success
+    function testPartialRepaySuccess() public {
+        // prepare & borrow
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
+
+        // partialRepay
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        credit.mint(address(this), 11_000e18);
+        credit.approve(address(term), 11_000e18);
+        term.partialRepay(loanId, 11_000e18);
+
+        // checks
+        assertEq(term.getLoanDebt(loanId), 11_000e18);
+        assertEq(term.getLoan(loanId).borrowAmount, 10_000e18);
+    }
+
+    // partialRepay reverts
+    function testPartialRepayReverts() public {
+        // prepare & borrow
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // partialRepay
+        vm.expectRevert("LendingTerm: loan opened in same block");
+        term.partialRepay(loanId, 123);
+        vm.expectRevert("LendingTerm: loan not found");
+        term.partialRepay(bytes32(0), 123);
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        credit.mint(address(this), 11_000e18);
+        credit.approve(address(term), 11_000e18);
+        term.partialRepay(loanId, 11_000e18);
+        assertEq(term.getLoanDebt(loanId), 11_000e18);
+        credit.mint(address(this), 11_000e18);
+        credit.approve(address(term), 11_000e18);
+        vm.expectRevert("LendingTerm: full repayment");
+        term.partialRepay(loanId, 11_000e18);
+        vm.expectRevert("LendingTerm: repay too small");
+        term.partialRepay(loanId, 1);
+        vm.expectRevert("LendingTerm: repay below min");
+        term.partialRepay(loanId, 2_100e18); // min would be 20% = 2_200e18
+        term.repay(loanId);
+        vm.expectRevert("LendingTerm: loan closed");
+        term.partialRepay(loanId, 123);
     }
 
     // repay success
@@ -633,6 +745,36 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.balanceOf(address(this)), borrowAmount - callFee);
         assertEq(credit.balanceOf(address(term)), 0);
         assertEq(credit.balanceOf(address(auctionHouse)), callFee);
+        // collateral went to auctionHouse
+        assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
+        assertEq(collateral.balanceOf(address(term)), 0);
+    }
+
+    // seize success even without call, if loan missed a period partialRepay
+    function testSeizeWithoutCallAfterPartialRepayDelay() public {
+        // prepare & borrow & call & wait call period
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        assertEq(term.partialRepayDelayPassed(loanId), false);
+        vm.warp(block.timestamp + term.YEAR() * 2 + 1);
+        vm.roll(block.number + 1);
+        assertEq(term.partialRepayDelayPassed(loanId), true);
+
+        // seize
+        term.seize(loanId);
+
+        // loan is closed
+        assertEq(term.getLoan(loanId).closeTime, block.timestamp);
+        assertEq(term.getLoanDebt(loanId), 0);
+        assertEq(term.issuance(), 0);
+        // borrower kept credit
+        assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(auctionHouse)), 0); // no call fee collected & forwarded
         // collateral went to auctionHouse
         assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
         assertEq(collateral.balanceOf(address(term)), 0);

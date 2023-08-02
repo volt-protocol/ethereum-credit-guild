@@ -33,6 +33,10 @@ contract LendingTerm is EIP712, CoreRef {
     /// responsibility of the LendingTerm is over.
     /// closeType enum : 0 = repay, 1 = seize, 2 = forgive.
     event LoanClose(uint256 indexed when, bytes32 indexed loanId, uint8 indexed closeType, bool loanCalled);
+    /// @notice emitted when someone adds collateral to a loan
+    event LoanAddCollateral(uint256 indexed when, bytes32 indexed loanId, address indexed borrower, uint256 collateralAmount);
+    /// @notice emitted when someone partially repays a loan
+    event LoanPartialRepay(uint256 indexed when, bytes32 indexed loanId, address indexed repayer, uint256 repayAmount);
 
     // signed messages for the lifecycle of loans
     bytes32 public constant _BORROW_TYPEHASH = keccak256("Borrow(address term,address borrower,uint256 borrowAmount,uint256 collateralAmount,uint256 nonce,uint256 deadline)");
@@ -86,6 +90,22 @@ contract LendingTerm is EIP712, CoreRef {
     /// @notice interest rate paid by the borrower, expressed as an APR
     /// with 18 decimals (0.01e18 = 1% APR). The base for 1 year is the YEAR constant.
     uint256 public immutable interestRate;
+
+    /// @notice maximum delay, in seconds, between partial debt repayments.
+    /// if set to 0, no periodic partial repayments are expected.
+    /// if a partial repayment is missed (delay has passed), the loan
+    /// can be called without paying the call fee.
+    uint256 public immutable maxDelayBetweenPartialRepay;
+
+    /// @notice minimum percent of the total debt (principal + interests) to
+    /// repay during partial debt repayments.
+    /// percentage is expressed with 18 decimals, e.g. 0.05e18 = 5% debt.
+    uint256 public immutable minPartialRepayPercent;
+
+    /// @notice timestamp of last partial repayment for a given loanId.
+    /// during borrow(), this is initialized to the borrow timestamp, if
+    /// maxDelayBetweenPartialRepay is != 0
+    mapping(bytes32=>uint256) public lastPartialRepay;
 
     /// @notice the call fee is a small amount of CREDIT provided by the caller
     /// when the loan is called.
@@ -143,6 +163,8 @@ contract LendingTerm is EIP712, CoreRef {
         address collateralToken;
         uint256 maxDebtPerCollateralToken;
         uint256 interestRate;
+        uint256 maxDelayBetweenPartialRepay;
+        uint256 minPartialRepayPercent;
         uint256 callFee;
         uint256 callPeriod;
         uint256 hardCap;
@@ -164,6 +186,8 @@ contract LendingTerm is EIP712, CoreRef {
         collateralToken = params.collateralToken;
         maxDebtPerCollateralToken = params.maxDebtPerCollateralToken;
         interestRate = params.interestRate;
+        maxDelayBetweenPartialRepay = params.maxDelayBetweenPartialRepay;
+        minPartialRepayPercent = params.minPartialRepayPercent;
         callFee = params.callFee;
         callPeriod = params.callPeriod;
         hardCap = params.hardCap;
@@ -226,6 +250,22 @@ contract LendingTerm is EIP712, CoreRef {
         return loanDebt;
     }
 
+    /// @notice returns true if the term has a maximum delay between partial repays
+    /// and the loan has passed the delay for partial repayments.
+    function partialRepayDelayPassed(bytes32 loanId) public view returns (bool) {
+        // if no periodic partial repays are expected, always return false
+        if (maxDelayBetweenPartialRepay == 0) return false;
+
+        // if loan doesn't exist, return false
+        if (loans[loanId].originationTime == 0) return false;
+
+        // if loan is closed, return false
+        if (loans[loanId].closeTime != 0) return false;
+        
+        // return true if delay is passed
+        return lastPartialRepay[loanId] < block.timestamp - maxDelayBetweenPartialRepay;
+    }
+
     /// @notice initiate a new loan
     function _borrow(
         address borrower,
@@ -279,6 +319,9 @@ contract LendingTerm is EIP712, CoreRef {
             closeTime: 0
         });
         issuance = _postBorrowIssuance;
+        if (maxDelayBetweenPartialRepay != 0) {
+            lastPartialRepay[loanId] = block.timestamp;
+        }
 
         // mint debt to the borrower
         RateLimitedCreditMinter(creditMinter).mint(borrower, borrowAmount);
@@ -366,6 +409,81 @@ contract LendingTerm is EIP712, CoreRef {
         );
 
         return _borrow(borrower, borrowAmount, collateralAmount);
+    }
+
+    /// @notice add collateral on an open loan.
+    /// a borrower might want to add collateral so that his position cannot be called for free.
+    /// if the loan is called & goes into liquidation, and less than `ltvBuffer` percent of his
+    /// collateral is left after debt repayment, the call fee is reimbursed to the caller.
+    function _addCollateral(address borrower, bytes32 loanId, uint256 collateralToAdd) internal {
+        require(collateralToAdd != 0, "LendingTerm: cannot add 0");
+
+        Loan storage loan = loans[loanId];
+
+        // check the loan is open
+        require(loan.originationTime != 0, "LendingTerm: loan not found");
+        require(loan.closeTime == 0, "LendingTerm: loan closed");
+
+        // update loan in state
+        loans[loanId].collateralAmount += collateralToAdd;
+
+        // pull the collateral from the borrower
+        IERC20(collateralToken).safeTransferFrom(borrower, address(this), collateralToAdd);
+
+        // emit event
+        emit LoanAddCollateral(block.timestamp, loanId, borrower, collateralToAdd);
+    }
+
+    /// @notice add collateral on an open loan.
+    function addCollateral(bytes32 loanId, uint256 collateralToAdd) external {
+        _addCollateral(msg.sender, loanId, collateralToAdd);
+    }
+
+    /// @notice partially repay an open loan.
+    /// a borrower might want to partially repay debt so that his position cannot be called for free.
+    /// if the loan is called & goes into liquidation, and less than `ltvBuffer` percent of his
+    /// collateral is left after debt repayment, the call fee is reimbursed to the caller.
+    /// some lending terms might also impose periodic partial repayments.
+    function _partialRepay(address repayer, bytes32 loanId, uint256 debtToRepay) internal {
+        Loan storage loan = loans[loanId];
+
+        // check the loan is open
+        uint256 originationTime = loan.originationTime;
+        require(originationTime != 0, "LendingTerm: loan not found");
+        require(originationTime < block.timestamp, "LendingTerm: loan opened in same block");
+        require(loan.closeTime == 0, "LendingTerm: loan closed");
+
+        // compute partial repayment
+        uint256 loanDebt = getLoanDebt(loanId);
+        require(debtToRepay < loanDebt, "LendingTerm: full repayment");
+        uint256 percentRepaid = debtToRepay * 1e18 / loanDebt; // [0, 1e18[
+        uint256 principalRepaid = loan.borrowAmount * percentRepaid / 1e18;
+        uint256 interestRepaid = debtToRepay- principalRepaid;
+        require(principalRepaid != 0 && interestRepaid != 0, "LendingTerm: repay too small");
+        require(debtToRepay >= loanDebt * minPartialRepayPercent / 1e18, "LendingTerm: repay below min");
+
+        // update loan in state
+        loans[loanId].borrowAmount -= principalRepaid;
+        lastPartialRepay[loanId] = block.timestamp;
+
+        // pull the debt from the borrower
+        address _creditToken = creditToken;
+        address _guildToken = guildToken;
+        IERC20(_creditToken).safeTransferFrom(repayer, address(this), debtToRepay);
+
+        // forward profit portion to the GUILD token, burn the rest
+        IERC20(_creditToken).transfer(_guildToken, interestRepaid);
+        GuildToken(_guildToken).notifyPnL(address(this), int256(interestRepaid));
+        CreditToken(_creditToken).burn(principalRepaid);
+        RateLimitedCreditMinter(creditMinter).replenishBuffer(principalRepaid);
+
+        // emit event
+        emit LoanPartialRepay(block.timestamp, loanId, repayer, debtToRepay);
+    }
+
+    /// @notice partially repay an open loan.
+    function partialRepay(bytes32 loanId, uint256 debtToRepay) external {
+        _partialRepay(msg.sender, loanId, debtToRepay);
     }
 
     /// @notice repay an open loan
@@ -632,7 +750,7 @@ contract LendingTerm is EIP712, CoreRef {
 
     /// @notice seize the collateral of a loan, to repay outstanding debt.
     /// Under normal conditions, the loans should be call()'d first, to give the borrower an opportunity to repay (the 'call period').
-    /// Calling of loans can be skipped if the `issuance` is above `hardCap`.
+    /// Calling of loans can be skipped if the `issuance` is above `hardCap` or if a loan missed a periodic partialRepay.
     function _seize(
         bytes32 loanId,
         address _auctionHouse,
@@ -652,7 +770,7 @@ contract LendingTerm is EIP712, CoreRef {
         // set the call info, if not set
         uint256 _callTime = loan.callTime;
         bool loanCalled = _callTime != 0;
-        bool canSkipCall = issuanceBefore > hardCap;
+        bool canSkipCall = issuanceBefore > hardCap || partialRepayDelayPassed(loanId);
         if (loanCalled) {
             // check that the call period has elapsed
             if (!canSkipCall) {
