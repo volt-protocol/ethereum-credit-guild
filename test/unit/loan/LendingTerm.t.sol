@@ -1003,6 +1003,62 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(auctionHouse)), 0);
     }
 
+    // full flow test (borrow, call, forgive)
+    function testFlowBorrowCallForgive() public {
+        bytes32 loanId = keccak256(abi.encode(address(this), address(term), block.timestamp));
+        assertEq(term.getLoanCallFee(loanId), 0);
+
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), collateralAmount);
+        assertEq(collateral.balanceOf(address(term)), 0);
+
+        // borrow
+        bytes32 loanIdReturned = term.borrow(borrowAmount, collateralAmount);
+        assertEq(loanId, loanIdReturned);
+
+        assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+
+        assertEq(credit.balanceOf(address(this)), 20_000e18);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // call
+        credit.mint(address(this), 1_000e18);
+        credit.approve(address(term), 1_000e18);
+        term.call(loanId);
+
+        assertEq(credit.balanceOf(address(this)), 20_000e18);
+        assertEq(credit.balanceOf(address(term)), 1_000e18);
+
+        // forgive should reimburse the call fee
+        vm.prank(governor);
+        term.forgive(loanId);
+
+        assertEq(term.getLoan(loanId).closeTime, block.timestamp);
+
+        assertEq(credit.balanceOf(address(this)), 21_000e18);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(auctionHouse)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+        assertEq(collateral.balanceOf(address(auctionHouse)), 0);
+    }
+
     // full flow test (borrow, set hardcap to 0, seize)
     function testFlowBorrowHardcap0Seize() public {
         bytes32 loanId = keccak256(abi.encode(address(this), address(term), block.timestamp));

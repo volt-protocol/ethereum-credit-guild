@@ -380,7 +380,8 @@ contract LendingTerm is EIP712, CoreRef {
 
         // compute interest owed
         uint256 loanDebt = getLoanDebt(loanId);
-        int256 pnl = int256(loanDebt) - int256(loan.borrowAmount);
+        uint256 borrowAmount = loan.borrowAmount;
+        uint256 interest = loanDebt - borrowAmount;
 
         /// pull debt from the borrower and replenish the buffer of available debt that can be minted.
         /// @dev `debtToPullForRepay` could be smaller than `loanDebt` if the loan has been called, in this
@@ -393,24 +394,19 @@ contract LendingTerm is EIP712, CoreRef {
             address(this),
             (callTime != 0 && block.timestamp <= callTime + callPeriod) ? (loanDebt - getLoanCallFee(loanId)) : loanDebt
         );
-        if (pnl > 0) {
+        if (interest != 0) {
             // forward profit portion to the GUILD token, burn the rest
-            IERC20(_creditToken).transfer(guildToken, uint256(pnl));
-            CreditToken(_creditToken).burn(loanDebt - uint256(pnl));
-            RateLimitedCreditMinter(creditMinter).replenishBuffer(loanDebt - uint256(pnl));
-        } else {
-            // no profit, burn all the received debt tokens
-            CreditToken(_creditToken).burn(loanDebt);
-            RateLimitedCreditMinter(creditMinter).replenishBuffer(loanDebt);
-        }
-        
+            IERC20(_creditToken).transfer(guildToken, interest);
+            CreditToken(_creditToken).burn(borrowAmount); // == loan.borrowAmount
+            RateLimitedCreditMinter(creditMinter).replenishBuffer(borrowAmount);
 
-        // report profit
-        GuildToken(guildToken).notifyPnL(address(this), pnl);
+            // report profit
+            GuildToken(guildToken).notifyPnL(address(this), int256(interest));
+        }
 
         // close the loan
         loan.closeTime = block.timestamp;
-        issuance -= loan.borrowAmount;
+        issuance -= borrowAmount;
 
         // return the collateral to the borrower
         IERC20(collateralToken).safeTransfer(loan.borrower, loan.collateralAmount);
