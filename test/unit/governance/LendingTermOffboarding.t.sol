@@ -76,6 +76,8 @@ contract LendingTermOffboardingUnitTest is Test {
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
                 interestRate: _INTEREST_RATE,
+                maxDelayBetweenPartialRepay: 0,
+                minPartialRepayPercent: 0,
                 callFee: _CALL_FEE,
                 callPeriod: _CALL_PERIOD,
                 hardCap: _HARDCAP,
@@ -94,8 +96,7 @@ contract LendingTermOffboardingUnitTest is Test {
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
-        core.grantRole(CoreRoles.TERM_HARDCAP, address(offboarder));
-        core.grantRole(CoreRoles.GAUGE_REMOVE, address(offboarder));
+        core.grantRole(CoreRoles.GOVERNOR, address(offboarder));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         // add gauge and vote for it

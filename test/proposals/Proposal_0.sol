@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity =0.8.13;
+pragma solidity 0.8.13;
 
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
 import {Addresses} from "@test/proposals/Addresses.sol";
@@ -13,7 +13,6 @@ import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {LendingTermUSDC} from "@src/loan/LendingTermUSDC.sol";
 
 contract Proposal_0 is Proposal {
     string public name = "Proposal_0";
@@ -80,7 +79,7 @@ contract Proposal_0 is Proposal {
                 addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
                 addresses.mainnet("ERC20_CREDIT")
             );
-            LendingTermUSDC termUsdc1 = new LendingTermUSDC(
+            LendingTerm termUsdc1 = new LendingTerm(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("ERC20_GUILD"),
                 address(auctionHouse),
@@ -90,6 +89,8 @@ contract Proposal_0 is Proposal {
                     collateralToken: addresses.mainnet("ERC20_USDC"),
                     maxDebtPerCollateralToken: 0.98e30, // 0.98 CREDIT per USDC collateral + 12 decimals of correction
                     interestRate: 0.02e18, // 2%
+                    maxDelayBetweenPartialRepay: 0,
+                    minPartialRepayPercent: 0,
                     callFee: 0.02e18, // 2%
                     callPeriod: 600, // 10 minutes
                     hardCap: 2_000_000e18, // max 2M CREDIT issued

@@ -1,4 +1,4 @@
-pragma solidity =0.8.13;
+pragma solidity 0.8.13;
 
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
 

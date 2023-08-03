@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity =0.8.13;
+pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ERC20Gauges} from "@src/tokens/ERC20Gauges.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 
@@ -23,25 +25,46 @@ import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
     holders vote for these lending terms in the gauge system, the lending terms will
     have a non-zero debt ceiling, and CREDIT will be available to borrow under these terms.
 
-    When a loan is called and there is bad debt, a loss is notified in a gauge on this
+    When a lending term creates bad debt, a loss is notified in a gauge on this
     contract (`notifyPnL`). When a loss is notified, all the GUILD token weight voting
     for this gauge becomes non-transferable and can be permissionlessly slashed. Until the
     loss is realized (`applyGaugeLoss`), a user cannot transfer their locked tokens or
     decrease the weight they assign to the gauge that suffered a loss.
     Even when a loss occur, users can still transfer tokens with which they vote for gauges
     that did not suffer a loss.
+
+    When a loan generates profit (interests), the profit is traced back to users voting for
+    this lending term (gauge), which subsequently allows pro-rata distribution of profits to
+    GUILD holders that vote for the most productive gauges.
 */
-// TODO: figure out a way to do pro-rata distribution of profits to GUILD holders that vote in gauges that generate profits.
 contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice reference to CREDIT token.
     address public credit;
 
-    /// @notice total accumulative profit & loss of GUILD holders across all gauges
-    int256 public totalPnL;
+    /// @notice profit index of a given gauge
+    mapping(address=>uint256) internal gaugeProfitIndex;
 
-    /// @notice total accumulative profit & loss of a given gauge
-    mapping(address=>int256) public gaugePnL;
+    /// @notice profit index of a given user in a given gauge
+    mapping(address=>mapping(address=>uint256)) internal userGaugeProfitIndex;
+
+    struct GuildProfitSharing {
+        uint48 guildSplit;
+        uint48 otherSplit;
+        address otherRecipient;
+    }
+
+    /// @notice configuration of profit sharing.
+    /// `guildSplit` and `otherSplit` are expressed as percentages with 14 decimals, so a value of 1e14
+    /// would direct 100% of profits. The sum should be <= 1e14.
+    /// The rest (if the sum of `guildSplit` + `otherSplit` is < 1e14) is distributed to lenders of the
+    /// system, CREDIT holders, through the rebasing mechanism.
+    /// If `otherRecipient` is set to address(0), `otherSplit` should equal 0.
+    /// The share of profit to `otherRecipient` is sent through a regular ERC20.transfer().
+    /// This structure is optimized for storage packing, all external interfaces reference
+    /// percentages encoded as uint256 with 18 decimals.
+    GuildProfitSharing internal profitSharingConfig;
 
     /// @notice multiplier for CREDIT value in the system.
     /// e.g. a value of 0.7e18 would mean that CREDIT has been discounted by 30% so far in the system,
@@ -114,10 +137,10 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     }
 
     /*///////////////////////////////////////////////////////////////
-                        LOSS MANAGEMENT
+                        PROFIT & LOSS MANAGEMENT
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice emitted when a loss in a gauge is notified.
+    /// @notice emitted when a profit or loss in a gauge is notified.
     event GaugePnL(address indexed gauge, uint256 indexed when, int256 pnl);
     /// @notice emitted when a loss in a gauge is notified.
     event GaugeLoss(address indexed gauge, uint256 indexed when);
@@ -132,13 +155,69 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// @notice emitted when CREDIT multiplier is updated.
     event CreditMultiplierUpdate(uint256 indexed when, uint256 newValue);
 
+    /// @notice emitted when GUILD profit sharing is updated.
+    event ProfitSharingConfigUpdate(
+        uint256 indexed when,
+        uint256 creditSplit,
+        uint256 guildSplit,
+        uint256 otherSplit,
+        address otherRecipient
+    );
+
+    /// @notice emitted when a GUILD member claims their CREDIT rewards.
+    event ClaimRewards(uint256 indexed when, address indexed user, address indexed gauge, uint256 amount);
+
     /// @notice last block.timestamp when a loss occurred in a given gauge
     mapping(address => uint256) public lastGaugeLoss;
 
     /// @notice last block.timestamp when a user apply a loss that occurred in a given gauge
     mapping(address => mapping(address => uint256)) public lastGaugeLossApplied;
 
+    /// @notice set the profit sharing config.
+    function setProfitSharingConfig(
+        uint256 creditSplit,
+        uint256 guildSplit,
+        uint256 otherSplit,
+        address otherRecipient
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        if (otherRecipient == address(0)) {
+            require(otherSplit == 0, "GuildToken: invalid config");
+        } else {
+            require(otherSplit != 0, "GuildToken: invalid config");
+        }
+        require(otherSplit + guildSplit + creditSplit == 1e18, "GuildToken: invalid config");
+        
+        profitSharingConfig = GuildProfitSharing({
+            guildSplit: uint48(guildSplit / 1e4),
+            otherSplit: uint48(otherSplit / 1e4),
+            otherRecipient: otherRecipient
+        });
+
+        emit ProfitSharingConfigUpdate(
+            block.timestamp,
+            creditSplit,
+            guildSplit,
+            otherSplit,
+            otherRecipient
+        );
+    }
+
+    /// @notice get the profit sharing config.
+    function getProfitSharingConfig() external view returns (
+        uint256 creditSplit,
+        uint256 guildSplit,
+        uint256 otherSplit,
+        address otherRecipient
+    ) {
+        guildSplit = uint256(profitSharingConfig.guildSplit) * 1e4;
+        otherSplit = uint256(profitSharingConfig.otherSplit) * 1e4;
+        creditSplit = 1e18 - guildSplit - otherSplit;
+        otherRecipient = profitSharingConfig.otherRecipient;
+    }
+
     /// @notice notify profit and loss in a given gauge
+    /// if `amount` is > 0, the same number of CREDIT tokens are expected to be transferred to this contract
+    /// before `notifyPnL` is called.
     function notifyPnL(
         address gauge,
         int256 amount
@@ -152,13 +231,122 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             uint256 creditTotalSupply = ERC20(credit).totalSupply();
             uint256 newCreditMultiplier = creditMultiplier * (creditTotalSupply - uint256(-amount)) / creditTotalSupply;
             creditMultiplier = newCreditMultiplier;
-            emit CreditMultiplierUpdate(newCreditMultiplier, block.timestamp);
+            emit CreditMultiplierUpdate(block.timestamp, newCreditMultiplier);
         }
-        
-        // update storage
-        totalPnL += amount;
-        gaugePnL[gauge] += amount;
+        // handling profit
+        else if (amount > 0) {
+            uint256 amountForGuild = uint256(amount) * uint256(profitSharingConfig.guildSplit) / 1e14;
+            uint256 amountForOther = uint256(amount) * uint256(profitSharingConfig.otherSplit) / 1e14;
+            uint256 amountForCredit = uint256(amount) - amountForGuild - amountForOther;
+
+            // distribute to other
+            if (amountForOther != 0) {
+                CreditToken(credit).transfer(profitSharingConfig.otherRecipient, amountForOther);
+            }
+            
+            // distribute to lenders
+            if (amountForCredit != 0) {
+                CreditToken(credit).distribute(amountForCredit);
+            }
+
+            // distribute to the guild
+            if (amountForGuild != 0) {
+                // update the gauge profit index
+                // if the gauge has 0 weight, does not update the profit index, this is unnecessary
+                // because the profit index is used to reattribute profit to users voting for the gauge,
+                // and if the weigth is 0, there are no users voting for the gauge.
+                uint256 _gaugeWeight = uint256(getGaugeWeight(gauge));
+                if (_gaugeWeight != 0) {
+                    uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
+                    if (_gaugeProfitIndex == 0) {
+                        _gaugeProfitIndex = 1e18;
+                    }
+                    gaugeProfitIndex[gauge] = _gaugeProfitIndex + amountForGuild * 1e18 / _gaugeWeight;
+                }
+            }
+        }
+
         emit GaugePnL(gauge, block.timestamp, amount);
+    }
+
+    /// @notice update a user's profit index for a given gauge.
+    /// This function should be called any time the user gauge weight changes
+    /// (increment gauge vote, decrement gauge vote).
+    /// if `send` is true, sends the CREDIT tokens to the user.
+    /// in any case, returns the new amount of credit earned.
+    function _claimUserGaugeRewards(address user, address gauge, bool send) internal returns (uint256 creditEarned) {
+        uint256 _userGaugeWeight = uint256(getUserGaugeWeight[user][gauge]);
+        if (_userGaugeWeight == 0) {
+            return 0;
+        }
+        uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
+        uint256 _userGaugeProfitIndex = userGaugeProfitIndex[user][gauge];
+        if (_gaugeProfitIndex == 0) {
+            _gaugeProfitIndex = 1e18;
+        }
+        if (_userGaugeProfitIndex == 0) {
+            _userGaugeProfitIndex = 1e18;
+        }
+        uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
+        if (deltaIndex != 0) {
+            creditEarned = _userGaugeWeight * deltaIndex / 1e18;
+            userGaugeProfitIndex[user][gauge] = _gaugeProfitIndex;
+        }
+        if (creditEarned != 0) {
+            emit ClaimRewards(block.timestamp, user, gauge, creditEarned);
+
+            if (send) {
+                CreditToken(credit).transfer(user, creditEarned);
+            }
+        }
+    }
+
+    /// @notice read & return pending undistributed rewards for a given user
+    function getPendingRewards(address user) external view returns (
+        address[] memory gauges,
+        uint256[] memory creditEarned,
+        uint256 totalCreditEarned
+    ) {
+        gauges = _userGauges[user].values();
+        creditEarned = new uint256[](gauges.length);
+
+        for (uint256 i = 0; i < gauges.length; ) {
+            address gauge = gauges[i];
+            uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
+            uint256 _userGaugeProfitIndex = userGaugeProfitIndex[user][gauge];
+
+            if (_gaugeProfitIndex == 0) {
+                _gaugeProfitIndex = 1e18;
+            }
+            if (_userGaugeProfitIndex == 0) {
+                _userGaugeProfitIndex = 1e18;
+            }
+            uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
+            if (deltaIndex != 0) {
+                uint256 _userGaugeWeight = uint256(getUserGaugeWeight[user][gauge]);
+                creditEarned[i] = _userGaugeWeight * deltaIndex / 1e18;
+                totalCreditEarned += creditEarned[i];
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice claim rewards for a given user
+    function claimRewards(address user) external returns (uint256 creditEarned) {
+        address[] memory gauges = _userGauges[user].values();
+        for (uint256 i = 0; i < gauges.length; ) {
+            creditEarned += _claimUserGaugeRewards(user, gauges[i], false);
+            unchecked {
+                ++i;
+            }
+        }
+
+        if (creditEarned != 0) {
+            CreditToken(credit).transfer(user, creditEarned);
+        }
     }
 
     /// @notice apply a loss that occurred in a given gauge
@@ -189,82 +377,6 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             uint256(_userGaugeWeight),
             block.timestamp
         );
-    }
-
-    /// @dev prevent weight increment for gauge if user has an unapplied loss
-    function incrementGauge(
-        address gauge,
-        uint112 weight
-    ) public override returns (uint112) {
-        uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
-        uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][msg.sender];
-        require(
-            _lastGaugeLossApplied >= _lastGaugeLoss,
-            "GuildToken: pending loss"
-        );
-
-        return super.incrementGauge(gauge, weight);
-    }
-
-    /// @dev prevent weight increment for gauges if user has an unapplied loss
-    function incrementGauges(
-        address[] calldata gaugeList,
-        uint112[] calldata weights
-    ) public override returns (uint112 newUserWeight) {
-        for (uint256 i = 0; i < gaugeList.length; ) {
-            address gauge = gaugeList[i];
-            uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
-            uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][
-                msg.sender
-            ];
-            require(
-                _lastGaugeLossApplied >= _lastGaugeLoss,
-                "GuildToken: pending loss"
-            );
-            unchecked {
-                ++i;
-            }
-        }
-
-        return super.incrementGauges(gaugeList, weights);
-    }
-
-    /// @dev prevent weight decrement for gauge if user has an unapplied loss
-    function decrementGauge(
-        address gauge,
-        uint112 weight
-    ) public override returns (uint112) {
-        uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
-        uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][msg.sender];
-        require(
-            _lastGaugeLossApplied >= _lastGaugeLoss,
-            "GuildToken: pending loss"
-        );
-
-        return super.decrementGauge(gauge, weight);
-    }
-
-    /// @dev prevent weight decrement for gauges if user has an unapplied loss
-    function decrementGauges(
-        address[] calldata gaugeList,
-        uint112[] calldata weights
-    ) public override returns (uint112 newUserWeight) {
-        for (uint256 i = 0; i < gaugeList.length; ) {
-            address gauge = gaugeList[i];
-            uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
-            uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][
-                msg.sender
-            ];
-            require(
-                _lastGaugeLossApplied >= _lastGaugeLoss,
-                "GuildToken: pending loss"
-            );
-            unchecked {
-                ++i;
-            }
-        }
-
-        return super.decrementGauges(gaugeList, weights);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -299,6 +411,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
 
     /// @dev prevent outbound token transfers (_decrementWeightUntilFree) and gauge weight decrease
     /// (decrementGauge, decrementGauges) for users who have an unrealized loss in a gauge.
+    /// Also update the user profit index.
     function _decrementGaugeWeight(
         address user,
         address gauge,
@@ -312,7 +425,35 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             "GuildToken: pending loss"
         );
 
+        _claimUserGaugeRewards(user, gauge, true);
+
         super._decrementGaugeWeight(user, gauge, weight, cycle);
+    }
+
+    /// @dev prevent weight increment for gauge if user has an unapplied loss.
+    /// If the user has 0 weight (i.e. no loss to realize), allow incrementing
+    /// gauge weight & update lastGaugeLossApplied to current time.
+    /// Also update the user profit index.
+    function _incrementGaugeWeight(
+        address user,
+        address gauge,
+        uint112 weight,
+        uint32 cycle
+    ) internal override {
+        uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
+        uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][user];
+        if (getUserGaugeWeight[user][gauge] == 0) {
+            lastGaugeLossApplied[gauge][user] = block.timestamp;
+        } else {
+            require(
+                _lastGaugeLossApplied >= _lastGaugeLoss,
+                "GuildToken: pending loss"
+            );
+        }
+
+        _claimUserGaugeRewards(user, gauge, true);
+
+        super._incrementGaugeWeight(user, gauge, weight, cycle);
     }
 
     /*///////////////////////////////////////////////////////////////

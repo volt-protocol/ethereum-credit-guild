@@ -1,4 +1,4 @@
-pragma solidity =0.8.13;
+pragma solidity 0.8.13;
 
 import {console} from "@forge-std/console.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";

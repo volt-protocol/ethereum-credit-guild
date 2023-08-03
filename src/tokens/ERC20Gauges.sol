@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity =0.8.13;
+pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -296,7 +296,7 @@ abstract contract ERC20Gauges is ERC20 {
         address gauge,
         uint112 weight,
         uint32 cycle
-    ) internal {
+    ) internal virtual {
         unchecked {
             require(
                 cycle - block.timestamp > incrementFreezeWindow,

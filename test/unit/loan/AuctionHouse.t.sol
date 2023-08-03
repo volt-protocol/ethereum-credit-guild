@@ -68,6 +68,8 @@ contract AuctionHouseUnitTest is Test {
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
                 interestRate: _INTEREST_RATE,
+                maxDelayBetweenPartialRepay: 0,
+                minPartialRepayPercent: 0,
                 callFee: _CALL_FEE,
                 callPeriod: _CALL_PERIOD,
                 hardCap: _HARDCAP,
@@ -168,10 +170,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         bytes32[] memory loanIds = new bytes32[](1);
         loanIds[0] = loanId;
-        bool[] memory skipCall = new bool[](1);
-        skipCall[0] = true;
         term.setHardCap(0);
-        term.seize(loanIds, skipCall);
+        term.seizeMany(loanIds);
     }
 
     // auction getter

@@ -2,10 +2,11 @@
 pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract MockERC20 is ERC20, ERC20Burnable {
-    constructor() ERC20("MockToken", "MCT") {}
+contract MockERC20 is ERC20, ERC20Permit, ERC20Burnable {
+    constructor() ERC20("MockToken", "MCT") ERC20Permit("MockToken") {}
 
     function mint(address account, uint256 amount) public returns (bool) {
         _mint(account, amount);

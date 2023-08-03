@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity 0.8.13;
 
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
@@ -13,14 +17,39 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 
 /// @notice Lending Term contract of the Ethereum Credit Guild, a base implementation of
 /// smart contract issuing CREDIT debt and escrowing collateral assets.
-contract LendingTerm is CoreRef {
+contract LendingTerm is EIP712, CoreRef {
     using SafeERC20 for IERC20;
+    using Counters for Counters.Counter;
+
+    mapping(address => Counters.Counter) private _nonces;
 
     // events for the lifecycle of loans that happen in the lending term
+    /// @notice emitted when new loans are opened (mint debt to borrower, pull collateral from borrower).
     event LoanBorrow(uint256 indexed when, bytes32 indexed loanId, address indexed borrower, uint256 collateralAmount, uint256 borrowAmount);
+    /// @notice emitted when a loan is called (repayer has `callPeriod` seconds to repay at a discount).
     event LoanCall(uint256 indexed when, bytes32 indexed loanId);
-    event LoanRepay(uint256 indexed when, bytes32 indexed loanId);
-    event LoanSeize(uint256 indexed when, bytes32 indexed loanId, bool loanCalled, bool collateralAuctioned);
+    /// @notice emitted when a loan is closed (repay, seize, forgive).
+    /// the lifecycle of the loan might continue in the AuctionHouse, but when this event is emitted, the
+    /// responsibility of the LendingTerm is over.
+    /// closeType enum : 0 = repay, 1 = seize, 2 = forgive.
+    event LoanClose(uint256 indexed when, bytes32 indexed loanId, uint8 indexed closeType, bool loanCalled);
+    /// @notice emitted when someone adds collateral to a loan
+    event LoanAddCollateral(uint256 indexed when, bytes32 indexed loanId, address indexed borrower, uint256 collateralAmount);
+    /// @notice emitted when someone partially repays a loan
+    event LoanPartialRepay(uint256 indexed when, bytes32 indexed loanId, address indexed repayer, uint256 repayAmount);
+
+    // signed messages for the lifecycle of loans
+    bytes32 public constant _BORROW_TYPEHASH = keccak256("Borrow(address term,address borrower,uint256 borrowAmount,uint256 collateralAmount,uint256 nonce,uint256 deadline)");
+    bytes32 public constant _REPAY_TYPEHASH = keccak256("Repay(address term,address repayer,bytes32 loanId,uint256 nonce,uint256 deadline)");
+    bytes32 public constant _PARTIAL_REPAY_TYPEHASH = keccak256("PartialRepay(address term,address repayer,bytes32 loanId,uint256 repayAmount,uint256 nonce,uint256 deadline)");
+    bytes32 public constant _ADD_COLLATERAL_TYPEHASH = keccak256("AddCollateral(address term,address borrower,bytes32 loanId,uint256 collateralToAdd,uint256 nonce,uint256 deadline)");
+    bytes32 public constant _CALL_TYPEHASH = keccak256("Call(address term,address caller,bytes32[] loanIds,uint256 nonce,uint256 deadline)");
+
+    struct Signature {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
 
     /// @notice reference number of seconds in 1 year
     uint256 public constant YEAR = 31557600;
@@ -64,6 +93,22 @@ contract LendingTerm is CoreRef {
     /// with 18 decimals (0.01e18 = 1% APR). The base for 1 year is the YEAR constant.
     uint256 public immutable interestRate;
 
+    /// @notice maximum delay, in seconds, between partial debt repayments.
+    /// if set to 0, no periodic partial repayments are expected.
+    /// if a partial repayment is missed (delay has passed), the loan
+    /// can be called without paying the call fee.
+    uint256 public immutable maxDelayBetweenPartialRepay;
+
+    /// @notice minimum percent of the total debt (principal + interests) to
+    /// repay during partial debt repayments.
+    /// percentage is expressed with 18 decimals, e.g. 0.05e18 = 5% debt.
+    uint256 public immutable minPartialRepayPercent;
+
+    /// @notice timestamp of last partial repayment for a given loanId.
+    /// during borrow(), this is initialized to the borrow timestamp, if
+    /// maxDelayBetweenPartialRepay is != 0
+    mapping(bytes32=>uint256) public lastPartialRepay;
+
     /// @notice the call fee is a small amount of CREDIT provided by the caller
     /// when the loan is called.
     /// The call fee is expressed as a percentage of the borrowAmount, with 18
@@ -94,11 +139,6 @@ contract LendingTerm is CoreRef {
     /// (sum of CREDIT minted), regardless of the gauge allocations.
     uint256 public hardCap;
 
-    /// @notice if true, the governance has forgiven all loans, that can be immediately closed
-    /// and marked as total losses in the system. This is meant for extreme events, where
-    /// collateral assets are frozen and can't be sent to the auctionHouse for liquidations.
-    bool public forgiveness = false;
-
     /// @notice the LTV buffer, expressed as a percentage with 18 decimals.
     /// Example: for a value of 0.1e18 (10%), the LTV buffer will waive the call fee
     /// (reimburse CREDIT to the caller) if less than 10% of the collateral of the borrower
@@ -125,6 +165,8 @@ contract LendingTerm is CoreRef {
         address collateralToken;
         uint256 maxDebtPerCollateralToken;
         uint256 interestRate;
+        uint256 maxDelayBetweenPartialRepay;
+        uint256 minPartialRepayPercent;
         uint256 callFee;
         uint256 callPeriod;
         uint256 hardCap;
@@ -138,7 +180,7 @@ contract LendingTerm is CoreRef {
         address _creditMinter,
         address _creditToken,
         LendingTermParams memory params
-    ) CoreRef(_core) {
+    ) EIP712("Ethereum Credit Guild", "1") CoreRef(_core) {
         guildToken = _guildToken;
         auctionHouse = _auctionHouse;
         creditMinter = _creditMinter;
@@ -146,10 +188,26 @@ contract LendingTerm is CoreRef {
         collateralToken = params.collateralToken;
         maxDebtPerCollateralToken = params.maxDebtPerCollateralToken;
         interestRate = params.interestRate;
+        maxDelayBetweenPartialRepay = params.maxDelayBetweenPartialRepay;
+        minPartialRepayPercent = params.minPartialRepayPercent;
         callFee = params.callFee;
         callPeriod = params.callPeriod;
         hardCap = params.hardCap;
         ltvBuffer = params.ltvBuffer;
+    }
+
+    function nonces(address user) external view returns (uint256) {
+        return _nonces[user].current();
+    }
+
+    function DOMAIN_SEPARATOR() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
+    function _useNonce(address user) internal returns (uint256 current) {
+        Counters.Counter storage nonce = _nonces[user];
+        current = nonce.current();
+        nonce.increment();
     }
 
     /// @notice get a loan
@@ -194,39 +252,32 @@ contract LendingTerm is CoreRef {
         return loanDebt;
     }
 
-    /// @notice generate a loan ID for new borrows.
-    function _borrow_getNextLoanId() internal virtual view returns (bytes32) {
-        return keccak256(abi.encode(msg.sender, address(this), block.timestamp));
-    }
+    /// @notice returns true if the term has a maximum delay between partial repays
+    /// and the loan has passed the delay for partial repayments.
+    function partialRepayDelayPassed(bytes32 loanId) public view returns (bool) {
+        // if no periodic partial repays are expected, always return false
+        if (maxDelayBetweenPartialRepay == 0) return false;
 
-    /// @notice check debt ceiling for new borrows
-    function _borrow_checkDebtCeiling(uint256 borrowAmount, uint256 postBorrowIssuance) internal virtual view {
-        uint256 _totalSupply = IERC20(creditToken).totalSupply();
-        uint256 debtCeiling = GuildToken(guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount) * GAUGE_CAP_TOLERANCE / 1e18;
-        if (_totalSupply == 0) {
-            // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
-            // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
-            // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
-            require(debtCeiling != 0, "LendingTerm: debt ceiling reached");
-        } else {
-            require(postBorrowIssuance <= debtCeiling, "LendingTerm: debt ceiling reached");
-        }
-    }
+        // if loan doesn't exist, return false
+        if (loans[loanId].originationTime == 0) return false;
 
-    /// @notice mint debt to the borrower during borrows.
-    function _borrow_mintDebt(address account, uint256 amount) internal virtual {
-        RateLimitedCreditMinter(creditMinter).mint(account, amount);
+        // if loan is closed, return false
+        if (loans[loanId].closeTime != 0) return false;
+        
+        // return true if delay is passed
+        return lastPartialRepay[loanId] < block.timestamp - maxDelayBetweenPartialRepay;
     }
 
     /// @notice initiate a new loan
-    function borrow(
+    function _borrow(
+        address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount
-    ) external whenNotPaused returns (bytes32 loanId) {
+    ) internal returns (bytes32 loanId) {
         require(borrowAmount != 0, "LendingTerm: cannot borrow 0");
         require(collateralAmount != 0, "LendingTerm: cannot stake 0");
 
-        loanId = _borrow_getNextLoanId();
+        loanId = keccak256(abi.encode(borrower, address(this), block.timestamp));
 
         // check that the loan doesn't already exist
         require(loans[loanId].originationTime == 0, "LendingTerm: loan exists");
@@ -248,11 +299,20 @@ contract LendingTerm is CoreRef {
         require(_postBorrowIssuance <= hardCap, "LendingTerm: hardcap reached");
 
         // check the debt ceiling
-        _borrow_checkDebtCeiling(borrowAmount, _postBorrowIssuance);
+        uint256 _totalSupply = IERC20(creditToken).totalSupply();
+        uint256 debtCeiling = GuildToken(guildToken).calculateGaugeAllocation(address(this), _totalSupply + borrowAmount) * GAUGE_CAP_TOLERANCE / 1e18;
+        if (_totalSupply == 0) {
+            // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
+            // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
+            // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
+            require(debtCeiling != 0, "LendingTerm: debt ceiling reached");
+        } else {
+            require(_postBorrowIssuance <= debtCeiling, "LendingTerm: debt ceiling reached");
+        }
 
         // save loan in state
         loans[loanId] = Loan({
-            borrower: msg.sender,
+            borrower: borrower,
             borrowAmount: borrowAmount,
             collateralAmount: collateralAmount,
             caller: address(0),
@@ -261,39 +321,317 @@ contract LendingTerm is CoreRef {
             closeTime: 0
         });
         issuance = _postBorrowIssuance;
+        if (maxDelayBetweenPartialRepay != 0) {
+            lastPartialRepay[loanId] = block.timestamp;
+        }
 
         // mint debt to the borrower
-        _borrow_mintDebt(msg.sender, borrowAmount);
+        RateLimitedCreditMinter(creditMinter).mint(borrower, borrowAmount);
 
         // pull the collateral from the borrower
-        IERC20(collateralToken).safeTransferFrom(msg.sender, address(this), collateralAmount);
+        IERC20(collateralToken).safeTransferFrom(borrower, address(this), collateralAmount);
 
         // emit event
-        emit LoanBorrow(block.timestamp, loanId, msg.sender, collateralAmount, borrowAmount);
+        emit LoanBorrow(block.timestamp, loanId, borrower, collateralAmount, borrowAmount);
     }
 
-    /// @notice during repay, pull debt from the borrower and replenish the buffer of available
-    /// debt that can be minted.
-    /// @dev `pullAmount` could be smaller than `debtAmount` if the loan has been called, in this
-    /// case the caller already transferred some debt tokens to the lending term, and a reduced
-    /// amount has to be pulled from the borrower. The full `debtAmount` is burnt & replenished
-    /// in the buffer, but because the extra debt tokens should sit on the contract from a previous
-    /// `call()`, this doesn't revert.
-    function _repay_pullAndBurnDebt(address pullFrom, uint256 pullAmount, uint256 debtAmount) internal virtual {
+    /// @notice initiate a new loan
+    function borrow(
+        uint256 borrowAmount,
+        uint256 collateralAmount
+    ) external whenNotPaused returns (bytes32 loanId) {
+        loanId = _borrow(msg.sender, borrowAmount, collateralAmount);
+    }
+
+    /// @notice borrow with a signature to open the loan
+    function borrowBySig(
+        address borrower,
+        uint256 borrowAmount,
+        uint256 collateralAmount,
+        uint256 deadline,
+        Signature calldata sig
+    ) external whenNotPaused returns (bytes32 loanId) {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_BORROW_TYPEHASH, address(this), borrower, borrowAmount, collateralAmount, _useNonce(borrower), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
+        require(signer == borrower, "LendingTerm: invalid signature");
+
+        return _borrow(borrower, borrowAmount, collateralAmount);
+    }
+
+    /// @notice borrow with a permit on collateral token
+    function borrowWithPermit(
+        uint256 borrowAmount,
+        uint256 collateralAmount,
+        uint256 deadline,
+        Signature calldata sig
+    ) external whenNotPaused returns (bytes32 loanId) {
+        IERC20Permit(collateralToken).permit(
+            msg.sender,
+            address(this),
+            collateralAmount,
+            deadline,
+            sig.v,
+            sig.r,
+            sig.s
+        );
+        return _borrow(msg.sender, borrowAmount, collateralAmount);
+    }
+
+    /// @notice borrow with a signature to open the loan and a permit on collateral token
+    function borrowBySigWithPermit(
+        address borrower,
+        uint256 borrowAmount,
+        uint256 collateralAmount,
+        uint256 deadline,
+        Signature calldata borrowSig,
+        Signature calldata permitSig
+    ) external whenNotPaused returns (bytes32 loanId) {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_BORROW_TYPEHASH, address(this), borrower, borrowAmount, collateralAmount, _useNonce(borrower), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, borrowSig.v, borrowSig.r, borrowSig.s);
+        require(signer == borrower, "LendingTerm: invalid signature");
+
+        IERC20Permit(collateralToken).permit(
+            borrower,
+            address(this),
+            collateralAmount,
+            deadline,
+            permitSig.v,
+            permitSig.r,
+            permitSig.s
+        );
+
+        return _borrow(borrower, borrowAmount, collateralAmount);
+    }
+
+    /// @notice add collateral on an open loan.
+    /// a borrower might want to add collateral so that his position cannot be called for free.
+    /// if the loan is called & goes into liquidation, and less than `ltvBuffer` percent of his
+    /// collateral is left after debt repayment, the call fee is reimbursed to the caller.
+    function _addCollateral(address borrower, bytes32 loanId, uint256 collateralToAdd) internal {
+        require(collateralToAdd != 0, "LendingTerm: cannot add 0");
+
+        Loan storage loan = loans[loanId];
+
+        // check the loan is open
+        require(loan.originationTime != 0, "LendingTerm: loan not found");
+        require(loan.closeTime == 0, "LendingTerm: loan closed");
+
+        // update loan in state
+        loans[loanId].collateralAmount += collateralToAdd;
+
+        // pull the collateral from the borrower
+        IERC20(collateralToken).safeTransferFrom(borrower, address(this), collateralToAdd);
+
+        // emit event
+        emit LoanAddCollateral(block.timestamp, loanId, borrower, collateralToAdd);
+    }
+
+    /// @notice add collateral on an open loan.
+    function addCollateral(bytes32 loanId, uint256 collateralToAdd) external {
+        _addCollateral(msg.sender, loanId, collateralToAdd);
+    }
+
+    /// @notice add collateral on an open loan by signature
+    function addCollateralBySig(
+        address borrower,
+        bytes32 loanId,
+        uint256 collateralToAdd,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_ADD_COLLATERAL_TYPEHASH, address(this), borrower, loanId, collateralToAdd, _useNonce(borrower), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
+        require(signer == borrower, "LendingTerm: invalid signature");
+        
+        _addCollateral(borrower, loanId, collateralToAdd);
+    }
+
+    /// @notice add collateral on an open loan with a permit on collateral token
+    function addCollateralWithPermit(
+        bytes32 loanId,
+        uint256 collateralToAdd,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        IERC20Permit(collateralToken).permit(
+            msg.sender,
+            address(this),
+            collateralToAdd,
+            deadline,
+            sig.v,
+            sig.r,
+            sig.s
+        );
+        
+        _addCollateral(msg.sender, loanId, collateralToAdd);
+    }
+
+    /// @notice add collateral on an open loan by signature with permit on collateral token
+    function addCollateralBySigWithPermit(
+        address borrower,
+        bytes32 loanId,
+        uint256 collateralToAdd,
+        uint256 deadline,
+        Signature calldata addCollateralSig,
+        Signature calldata permitSig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_ADD_COLLATERAL_TYPEHASH, address(this), borrower, loanId, collateralToAdd, _useNonce(borrower), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, addCollateralSig.v, addCollateralSig.r, addCollateralSig.s);
+        require(signer == borrower, "LendingTerm: invalid signature");
+
+        IERC20Permit(collateralToken).permit(
+            borrower,
+            address(this),
+            collateralToAdd,
+            deadline,
+            permitSig.v,
+            permitSig.r,
+            permitSig.s
+        );
+        
+        _addCollateral(borrower, loanId, collateralToAdd);
+    }
+
+    /// @notice partially repay an open loan.
+    /// a borrower might want to partially repay debt so that his position cannot be called for free.
+    /// if the loan is called & goes into liquidation, and less than `ltvBuffer` percent of his
+    /// collateral is left after debt repayment, the call fee is reimbursed to the caller.
+    /// some lending terms might also impose periodic partial repayments.
+    function _partialRepay(address repayer, bytes32 loanId, uint256 debtToRepay) internal {
+        Loan storage loan = loans[loanId];
+
+        // check the loan is open
+        uint256 originationTime = loan.originationTime;
+        require(originationTime != 0, "LendingTerm: loan not found");
+        require(originationTime < block.timestamp, "LendingTerm: loan opened in same block");
+        require(loan.closeTime == 0, "LendingTerm: loan closed");
+
+        // compute partial repayment
+        uint256 loanDebt = getLoanDebt(loanId);
+        require(debtToRepay < loanDebt, "LendingTerm: full repayment");
+        uint256 percentRepaid = debtToRepay * 1e18 / loanDebt; // [0, 1e18[
+        uint256 principalRepaid = loan.borrowAmount * percentRepaid / 1e18;
+        uint256 interestRepaid = debtToRepay- principalRepaid;
+        require(principalRepaid != 0 && interestRepaid != 0, "LendingTerm: repay too small");
+        require(debtToRepay >= loanDebt * minPartialRepayPercent / 1e18, "LendingTerm: repay below min");
+
+        // update loan in state
+        loans[loanId].borrowAmount -= principalRepaid;
+        lastPartialRepay[loanId] = block.timestamp;
+
+        // pull the debt from the borrower
         address _creditToken = creditToken;
-        IERC20(_creditToken).transferFrom(pullFrom, address(this), pullAmount);
-        CreditToken(_creditToken).burn(debtAmount);
-        RateLimitedCreditMinter(creditMinter).replenishBuffer(debtAmount);
+        address _guildToken = guildToken;
+        IERC20(_creditToken).safeTransferFrom(repayer, address(this), debtToRepay);
+
+        // forward profit portion to the GUILD token, burn the rest
+        IERC20(_creditToken).transfer(_guildToken, interestRepaid);
+        GuildToken(_guildToken).notifyPnL(address(this), int256(interestRepaid));
+        CreditToken(_creditToken).burn(principalRepaid);
+        RateLimitedCreditMinter(creditMinter).replenishBuffer(principalRepaid);
+
+        // emit event
+        emit LoanPartialRepay(block.timestamp, loanId, repayer, debtToRepay);
     }
 
-    /// @notice During `repay()` or `seize()` of forgiven loans, notify the protocol accounting
-    /// from profits & losses.
-    function _notifyPnL(int256 pnl) internal virtual {
-        GuildToken(guildToken).notifyPnL(address(this), pnl);
+    /// @notice partially repay an open loan.
+    function partialRepay(bytes32 loanId, uint256 debtToRepay) external {
+        _partialRepay(msg.sender, loanId, debtToRepay);
+    }
+
+    /// @notice partially repay an open loan by signature
+    function partialRepayBySig(
+        address repayer,
+        bytes32 loanId,
+        uint256 debtToRepay,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_PARTIAL_REPAY_TYPEHASH, address(this), repayer, loanId, debtToRepay, _useNonce(repayer), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
+        require(signer == repayer, "LendingTerm: invalid signature");
+        
+        _partialRepay(repayer, loanId, debtToRepay);
+    }
+
+    /// @notice partially repay an open loan with a permit on CREDIT token
+    function partialRepayWithPermit(
+        bytes32 loanId,
+        uint256 debtToRepay,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        IERC20Permit(creditToken).permit(
+            msg.sender,
+            address(this),
+            debtToRepay,
+            deadline,
+            sig.v,
+            sig.r,
+            sig.s
+        );
+        
+        _partialRepay(msg.sender, loanId, debtToRepay);
+    }
+
+    /// @notice partially repay an open loan by signature with permit on CREDIT token
+    function partialRepayBySigWithPermit(
+        address repayer,
+        bytes32 loanId,
+        uint256 debtToRepay,
+        uint256 deadline,
+        Signature calldata repaySig,
+        Signature calldata permitSig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_PARTIAL_REPAY_TYPEHASH, address(this), repayer, loanId, debtToRepay, _useNonce(repayer), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, repaySig.v, repaySig.r, repaySig.s);
+        require(signer == repayer, "LendingTerm: invalid signature");
+
+        IERC20Permit(creditToken).permit(
+            repayer,
+            address(this),
+            debtToRepay,
+            deadline,
+            permitSig.v,
+            permitSig.r,
+            permitSig.s
+        );
+        
+        _partialRepay(repayer, loanId, debtToRepay);
     }
 
     /// @notice repay an open loan
-    function repay(bytes32 loanId) external {
+    function _repay(address repayer, bytes32 loanId) internal {
         Loan storage loan = loans[loanId];
 
         // check the loan is open
@@ -304,35 +642,118 @@ contract LendingTerm is CoreRef {
 
         // compute interest owed
         uint256 loanDebt = getLoanDebt(loanId);
-        int256 pnl = int256(loanDebt) - int256(loan.borrowAmount);
-    
-        // if the loan is called and we are within the call period, deduce the callFee from
-        // the amount of debt to repay
-        uint256 callTime = loan.callTime;
-        uint256 creditToPullFromBorrower = loanDebt;
-        if (callTime != 0 && block.timestamp <= callTime + callPeriod) {
-            creditToPullFromBorrower -= getLoanCallFee(loanId);
-        }
-        
-        // pull the debt
-        _repay_pullAndBurnDebt(msg.sender, creditToPullFromBorrower, loanDebt);
+        uint256 borrowAmount = loan.borrowAmount;
+        uint256 interest = loanDebt - borrowAmount;
 
-        // report profit
-        _notifyPnL(pnl);
+        /// pull debt from the borrower and replenish the buffer of available debt that can be minted.
+        /// @dev `debtToPullForRepay` could be smaller than `loanDebt` if the loan has been called, in this
+        /// case the caller already transferred some debt tokens to the lending term, and a reduced
+        /// amount has to be pulled from the borrower.
+        address _creditToken = creditToken;
+        uint256 callTime = loan.callTime;
+        IERC20(_creditToken).transferFrom(
+            repayer,
+            address(this),
+            (callTime != 0 && block.timestamp <= callTime + callPeriod) ? (loanDebt - getLoanCallFee(loanId)) : loanDebt
+        );
+        if (interest != 0) {
+            // forward profit portion to the GUILD token, burn the rest
+            IERC20(_creditToken).transfer(guildToken, interest);
+            CreditToken(_creditToken).burn(borrowAmount); // == loan.borrowAmount
+            RateLimitedCreditMinter(creditMinter).replenishBuffer(borrowAmount);
+
+            // report profit
+            GuildToken(guildToken).notifyPnL(address(this), int256(interest));
+        }
 
         // close the loan
         loan.closeTime = block.timestamp;
-        issuance -= loan.borrowAmount;
+        issuance -= borrowAmount;
 
         // return the collateral to the borrower
         IERC20(collateralToken).safeTransfer(loan.borrower, loan.collateralAmount);
 
         // emit event
-        emit LoanRepay(block.timestamp, loanId);
+        emit LoanClose(block.timestamp, loanId, 0, callTime != 0);
+    }
+
+    /// @notice repay an open loan
+    function repay(bytes32 loanId) external {
+        _repay(msg.sender, loanId);
+    }
+
+    /// @notice repay an open loan by signature
+    function repayBySig(
+        address repayer,
+        bytes32 loanId,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_REPAY_TYPEHASH, address(this), repayer, loanId, _useNonce(repayer), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
+        require(signer == repayer, "LendingTerm: invalid signature");
+
+        _repay(repayer, loanId);
+    }
+
+    /// @notice repay an open loan with a permit on CREDIT token
+    function repayWithPermit(
+        bytes32 loanId,
+        uint256 maxDebt,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        IERC20Permit(creditToken).permit(
+            msg.sender,
+            address(this),
+            maxDebt,
+            deadline,
+            sig.v,
+            sig.r,
+            sig.s
+        );
+        
+        _repay(msg.sender, loanId);
+    }
+
+    /// @notice repay an open loan by signature and with a permit on CREDIT token
+    function repayBySigWithPermit(
+        address repayer,
+        bytes32 loanId,
+        uint256 maxDebt,
+        uint256 deadline,
+        Signature calldata repaySig,
+        Signature calldata permitSig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_REPAY_TYPEHASH, address(this), repayer, loanId, _useNonce(repayer), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, repaySig.v, repaySig.r, repaySig.s);
+        require(signer == repayer, "LendingTerm: invalid signature");
+
+        IERC20Permit(creditToken).permit(
+            repayer,
+            address(this),
+            maxDebt,
+            deadline,
+            permitSig.v,
+            permitSig.r,
+            permitSig.s
+        );
+        
+        _repay(repayer, loanId);
     }
 
     /// @notice call a loan in state, and return the amount of debt tokens to pull for call fee.
-    function _call(bytes32 loanId) internal virtual returns (uint256 debtToPull) {
+    function _call(bytes32 loanId, address caller) internal returns (uint256 debtToPull) {
         Loan storage loan = loans[loanId];
 
         // check that the loan exists
@@ -352,124 +773,249 @@ contract LendingTerm is CoreRef {
         debtToPull = loan.borrowAmount * callFee / 1e18;
     
         // set the call info
-        loan.caller = msg.sender;
+        loan.caller = caller;
         loan.callTime = block.timestamp;
 
         // emit event
         emit LoanCall(block.timestamp, loanId);
     }
 
-    /// @notice call a list of loans, borrower has `callPeriod` seconds to repay the loan,
-    /// or their collateral will be seized. This will pull the CREDIT call fee from `msg.sender`.
-    function call(bytes32[] memory loanIds) public {
-        uint256 creditToPullForCallFees = 0;
+    /// @notice call a single loan.
+    /// Borrower has `callPeriod` seconds to repay the loan, or their collateral will be seized.
+    function call(bytes32 loanId) external {
+        uint256 callFeeAmount = _call(loanId, msg.sender);
+        if (callFeeAmount != 0) {
+            IERC20(creditToken).transferFrom(msg.sender, address(this), callFeeAmount);
+        }
+    }
+
+    /// @notice call a list of loans
+    function callMany(bytes32[] memory loanIds) external {
+        uint256 debtToPullForCallFees = 0;
         for (uint256 i = 0; i < loanIds.length; i++) {
-            creditToPullForCallFees += _call(loanIds[i]);
+            debtToPullForCallFees += _call(loanIds[i], msg.sender);
         }
 
         // pull the call fees from caller
-        if (creditToPullForCallFees != 0) {
-            IERC20(creditToken).transferFrom(msg.sender, address(this), creditToPullForCallFees);
+        if (debtToPullForCallFees != 0) {
+            IERC20(creditToken).transferFrom(msg.sender, address(this), debtToPullForCallFees);
         }
     }
 
-    /// @notice call a single loan.
-    function call(bytes32 loanId) external {
-        bytes32[] memory loanIds = new bytes32[](1);
-        loanIds[0] = loanId;
-        call(loanIds);
-    }
+    /// @notice call a list of loans using a signed Call message
+    function callManyBySig(
+        address caller,
+        bytes32[] memory loanIds,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
 
-    /// @notice seize the collateral of an array of loans, to repay outstanding debt.
-    /// Under normal conditions, the loans should be call()'d first, to give the borrower an opportunity to repay (the 'call period').
-    /// Conditions that allow to skip calling a loan before seizing its collateral :
-    /// - forgiving all loans of a lending term (see `forgiveAllLoans()`)
-    /// - offboading of a lending term (privileged role in the system)
-    /// - issuance of lending term above hardcap set by governance
-    function seize(bytes32[] memory loanIds, bool[] memory skipCall) public {
-        uint256 _newIssuance = issuance;
-        address _auctionHouse = auctionHouse;
-        uint256 creditToSendToAuctionHouse = 0;
+        bytes32 structHash = keccak256(abi.encode(_CALL_TYPEHASH, address(this), caller, keccak256(abi.encodePacked(loanIds)), _useNonce(caller), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
+        require(signer == caller, "LendingTerm: invalid signature");
+
+        uint256 debtToPullForCallFees = 0;
         for (uint256 i = 0; i < loanIds.length; i++) {
-            bytes32 loanId = loanIds[i];
-            Loan storage loan = loans[loanId];
-
-            // check that the loan exists
-            require(loan.originationTime != 0, "LendingTerm: loan not found");
-
-            // check that the loan is not already closed
-            require(loan.closeTime == 0, "LendingTerm: loan closed");
-
-            // conditions that allow seizing the collateral of a loan without waiting for the call period to elapse
-            bool canSkipCall = false;
-            bool _forgiveness = forgiveness;
-            if (skipCall[i]) {
-                canSkipCall = _newIssuance > hardCap || _forgiveness;
-            }
-
-            // set the call info, if not set
-            uint256 _callTime = loan.callTime;
-            bool loanCalled = _callTime != 0;
-            if (loanCalled) {
-                // check that the call period has elapsed
-                if (!canSkipCall) {
-                    require(block.timestamp >= loan.callTime + callPeriod, "LendingTerm: call period in progress");
-                }
-                creditToSendToAuctionHouse += getLoanCallFee(loanId);
-            } else {
-                require(canSkipCall, "LendingTerm: loan not called");
-                loan.caller = msg.sender;
-                loan.callTime = block.timestamp;
-            }
-
-            // close the loan
-            uint256 loanDebt = getLoanDebt(loanId);
-            loans[loanId].closeTime = block.timestamp;
-            uint256 _borrowAmount = loan.borrowAmount;
-            _newIssuance -= _borrowAmount;
-
-            if (_forgiveness) {
-                // mark loans as total losses
-                int256 pnl = -int256(_borrowAmount);
-                _notifyPnL(pnl);
-
-                // emit event
-                emit LoanSeize(block.timestamp, loanId, loanCalled, false);
-            } else {
-                // auction the loan collateral
-                IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
-                AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
-
-                // emit event
-                emit LoanSeize(block.timestamp, loanId, loanCalled, true);
-            }
+            debtToPullForCallFees += _call(loanIds[i], caller);
         }
 
-        // send CREDIT from the call fees to the auction house
-        if (creditToSendToAuctionHouse != 0) {
-            IERC20(creditToken).transfer(_auctionHouse, creditToSendToAuctionHouse);
+        // pull the call fees from caller
+        if (debtToPullForCallFees != 0) {
+            IERC20(creditToken).transferFrom(caller, address(this), debtToPullForCallFees);
+        }
+    }
+
+    /// @notice call with a permit on CREDIT token to pull call fees
+    function callManyWithPermit(
+        bytes32[] memory loanIds,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        uint256 debtToPullForCallFees = 0;
+        for (uint256 i = 0; i < loanIds.length; i++) {
+            debtToPullForCallFees += _call(loanIds[i], msg.sender);
         }
 
-        // update issuance
-        issuance = _newIssuance;
+        // pull the call fees from caller
+        if (debtToPullForCallFees != 0) {
+            IERC20Permit(creditToken).permit(
+                msg.sender,
+                address(this),
+                debtToPullForCallFees,
+                deadline,
+                sig.v,
+                sig.r,
+                sig.s
+            );
+            IERC20(creditToken).transferFrom(msg.sender, address(this), debtToPullForCallFees);
+        }
+    }
+
+    /// @notice call by signature with a permit on CREDIT token to pull call fees
+    function callManyBySigWithPermit(
+        address caller,
+        bytes32[] memory loanIds,
+        uint256 deadline,
+        Signature calldata callSig,
+        Signature calldata permitSig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_CALL_TYPEHASH, address(this), caller, keccak256(abi.encodePacked(loanIds)), _useNonce(caller), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, callSig.v, callSig.r, callSig.s);
+        require(signer == caller, "LendingTerm: invalid signature");
+
+        uint256 debtToPullForCallFees = 0;
+        for (uint256 i = 0; i < loanIds.length; i++) {
+            debtToPullForCallFees += _call(loanIds[i], caller);
+        }
+
+        // pull the call fees from caller
+        if (debtToPullForCallFees != 0) {
+            IERC20Permit(creditToken).permit(
+                caller,
+                address(this),
+                debtToPullForCallFees,
+                deadline,
+                permitSig.v,
+                permitSig.r,
+                permitSig.s
+            );
+            IERC20(creditToken).transferFrom(caller, address(this), debtToPullForCallFees);
+        }
+    }
+
+    /// @notice seize the collateral of a loan, to repay outstanding debt.
+    /// Under normal conditions, the loans should be call()'d first, to give the borrower an opportunity to repay (the 'call period').
+    /// Calling of loans can be skipped if the `issuance` is above `hardCap` or if a loan missed a periodic partialRepay.
+    function _seize(
+        bytes32 loanId,
+        address _auctionHouse,
+        uint256 issuanceBefore
+    ) internal returns (
+        uint256 debtToForward,
+        uint256 issuanceDecrease
+    ) {
+        Loan storage loan = loans[loanId];
+
+        // check that the loan exists
+        require(loan.originationTime != 0, "LendingTerm: loan not found");
+
+        // check that the loan is not already closed
+        require(loan.closeTime == 0, "LendingTerm: loan closed");
+
+        // set the call info, if not set
+        uint256 _callTime = loan.callTime;
+        bool loanCalled = _callTime != 0;
+        bool canSkipCall = issuanceBefore > hardCap || partialRepayDelayPassed(loanId);
+        if (loanCalled) {
+            // check that the call period has elapsed
+            if (!canSkipCall) {
+                require(block.timestamp >= loan.callTime + callPeriod, "LendingTerm: call period in progress");
+            }
+            debtToForward = getLoanCallFee(loanId);
+        } else {
+            require(canSkipCall, "LendingTerm: loan not called");
+            loan.caller = msg.sender;
+            loan.callTime = block.timestamp;
+        }
+
+        // close the loan
+        uint256 loanDebt = getLoanDebt(loanId);
+        loans[loanId].closeTime = block.timestamp;
+        issuanceDecrease = loan.borrowAmount;
+
+        // auction the loan collateral
+        IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
+        AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
+
+        // emit event
+        emit LoanClose(block.timestamp, loanId, 1, loanCalled);
     }
 
     /// @notice seize a single loan without attempt to skip the call period.
     function seize(bytes32 loanId) external {
-        bytes32[] memory loanIds = new bytes32[](1);
-        bool[] memory skipCall = new bool[](1);
-        loanIds[0] = loanId;
-        skipCall[0] = false;
-        seize(loanIds, skipCall);
+        address _auctionHouse = auctionHouse;
+        uint256 _issuance = issuance;
+        (
+            uint256 debtToForward,
+            uint256 issuanceDecrease
+        ) = _seize(loanId, _auctionHouse, _issuance);
+
+        // send CREDIT from the call fees to the auction house
+        if (debtToForward != 0) {
+            IERC20(creditToken).transfer(_auctionHouse, debtToForward);
+        }
+
+        // update issuance
+        issuance = _issuance - issuanceDecrease;
     }
 
-    /// @notice forgive all loans. This will allow all loans to be closed (through the `seize()`
-    /// function call) and marked as total losses in the system, without attempting to transfer
-    /// the collateral tokens to the auction house. This is meant for extreme events where collateral
-    /// assets are frozen and can't be transferred within or out of the system anymore.
-    function forgiveAllLoans() external {
-        require(canAutomaticallyForgive() || core().hasRole(CoreRoles.GOVERNOR, msg.sender), "LendingTerm: cannot forgive");
-        forgiveness = true;
+    /// @notice seize the collateral of a list of loans
+    function seizeMany(bytes32[] memory loanIds) public {
+        address _auctionHouse = auctionHouse;
+        uint256 newIssuance = issuance;
+        uint256 totalDebtToForward;
+        for (uint256 i = 0; i < loanIds.length; i++) {
+            (
+                uint256 debtToForward,
+                uint256 issuanceDecrease
+            ) = _seize(loanIds[i], _auctionHouse, newIssuance);
+
+            newIssuance -= issuanceDecrease;
+            totalDebtToForward += debtToForward;
+        }
+
+        // send CREDIT from the call fees to the auction house
+        if (totalDebtToForward != 0) {
+            IERC20(creditToken).transfer(_auctionHouse, totalDebtToForward);
+        }
+
+        // update issuance
+        issuance = newIssuance;
+    }
+
+    /// @notice forgive a loan, marking its debt as a total loss to the system.
+    /// The loan is closed (borrower keeps the CREDIT), and the collateral stays on the LendingTerm.
+    /// Governance can later unstuck the collateral through `emergencyAction`.
+    /// This function is made for emergencies where collateral is frozen or other reverting
+    /// conditions on collateral transfers that prevent it from being sent to the auctionHouse
+    /// for a regular repay() or seize() loan closing.
+    function forgive(bytes32 loanId) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        Loan storage loan = loans[loanId];
+
+        // check that the loan exists
+        require(loan.originationTime != 0, "LendingTerm: loan not found");
+
+        // check that the loan is not already closed
+        require(loan.closeTime == 0, "LendingTerm: loan closed");
+
+        // if loan has been called, reimburse the caller
+        bool loanCalled = loan.callTime != 0;
+        if (loanCalled) {
+            IERC20(creditToken).transfer(loan.caller, getLoanCallFee(loanId));
+        }
+
+        // close the loan
+        loans[loanId].closeTime = block.timestamp;
+        issuance -= loan.borrowAmount;
+
+        // mark loan as a total loss
+        int256 pnl = -int256(loan.borrowAmount);
+        GuildToken(guildToken).notifyPnL(address(this), pnl);
+
+        // set hardcap to 0 to prevent new borrows
+        hardCap = 0;
+
+        // emit event
+        emit LoanClose(block.timestamp, loanId, 2, loanCalled);
     }
 
     /// @notice set the address of the auction house.
@@ -482,10 +1028,5 @@ contract LendingTerm is CoreRef {
     /// allows to update a term's arbitrary hardcap without doing a gauge & loans migration.
     function setHardCap(uint256 _newValue) external onlyCoreRole(CoreRoles.TERM_HARDCAP) {
         hardCap = _newValue;
-    }
-
-    /// @notice automatic criteria for loan forgiveness, for use in inheriting contracts.
-    function canAutomaticallyForgive() public virtual view returns (bool) {
-        return false;
     }
 }

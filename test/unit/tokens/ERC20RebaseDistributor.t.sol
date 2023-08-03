@@ -162,11 +162,13 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.nonRebasingSupply(), 800);
         assertEq(token.rebasingSupply(), 0);
 
-        // should not allow distribution of profits if nobody is going to receive
+        // allow distribution of profits if nobody is going to receive, which
+        // is equivalent to just burning the tokens
         token.mint(address(this), 100);
-        token.approve(address(token), 100);
-        vm.expectRevert("ERC20RebaseDistributor: no rebase recipients");
         token.distribute(100);
+        assertEq(token.totalSupply(), 800);
+        assertEq(token.nonRebasingSupply(), 800);
+        assertEq(token.rebasingSupply(), 0);
     }
 
     function testMint() public {
@@ -446,10 +448,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // distribute
         token.mint(address(this), distributionAmount);
         token.approve(address(token), distributionAmount);
-        if (rebasingSupplyBefore == 0) {
-            vm.expectRevert("ERC20RebaseDistributor: no rebase recipients");
-        }
-        if (distributionAmount == 0 && rebasingSupplyBefore != 0) {
+        if (distributionAmount == 0) {
             vm.expectRevert("ERC20RebaseDistributor: cannot distribute zero");
         }
         token.distribute(distributionAmount);

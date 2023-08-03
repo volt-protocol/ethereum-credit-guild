@@ -2,14 +2,13 @@
 pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 
 contract MockERC20MultiVotes is ERC20MultiVotes, MockERC20 {
 
-    constructor() ERC20Permit("MockToken") {}
+    constructor() {}
 
     function setMaxDelegates(uint256 newMax) external {
         _setMaxDelegates(newMax);

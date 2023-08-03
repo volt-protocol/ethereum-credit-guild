@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Voting logic inspired by OpenZeppelin Contracts v4.4.1 (token/ERC20/extensions/ERC20Votes.sol)
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.13;
 
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";

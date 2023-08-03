@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity =0.8.13;
+pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -110,22 +110,25 @@ abstract contract ERC20RebaseDistributor is ERC20 {
     }
 
     /// @notice distribute tokens proportionately to all rebasing accounts.
+    /// @dev if no addresses are rebasing, calling this function will burn tokens
+    /// from `msg.sender` and emit an event, but won't rebase up any balances.
     function distribute(uint256 amount) external {
-        uint256 _totalRebasingShares = totalRebasingShares;
-        require(_totalRebasingShares != 0, "ERC20RebaseDistributor: no rebase recipients");
         require(amount != 0, "ERC20RebaseDistributor: cannot distribute zero");
 
         // burn the tokens received
         _burn(msg.sender, amount);
 
+        // emit event
+        uint256 _rebasingSharePrice = rebasingSharePrice;
+        uint256 _rebasingSupply = totalRebasingShares * _rebasingSharePrice / START_REBASING_SHARE_PRICE;
+        emit RebaseDistribution(msg.sender, block.timestamp, amount, _rebasingSupply);
+
         // adjust up the balance of all accounts that are rebasing by increasing
         // the share price of rebasing tokens
-        uint256 _rebasingSharePrice = rebasingSharePrice;
-        uint256 _rebasingSupply = _totalRebasingShares * _rebasingSharePrice / START_REBASING_SHARE_PRICE;
-        rebasingSharePrice = _rebasingSharePrice * (_rebasingSupply + amount) / _rebasingSupply;
-        pendingRebaseRewards += amount;
-
-        emit RebaseDistribution(msg.sender, block.timestamp, amount, _rebasingSupply);
+        if (_rebasingSupply != 0) {
+            rebasingSharePrice = _rebasingSharePrice * (_rebasingSupply + amount) / _rebasingSupply;
+            pendingRebaseRewards += amount;
+        }
     }
 
     /// @notice True if an address subscribed to rebasing.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity 0.8.13;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -178,16 +178,10 @@ contract AuctionHouse is CoreRef {
         // close the auction in state
         auctions[loanId].endTime = block.timestamp;
 
-        // pull CREDIT from the bidder and burn it
+        // pull CREDIT from the bidder
+        address _creditToken = creditToken;
         if (creditAsked != 0) {
-            IERC20(creditToken).transferFrom(msg.sender, address(this), creditAsked);
-        }
-        bool _loanCalled = auctions[loanId].loanCalled;
-        uint256 _callFeeAmount = auctions[loanId].callFeeAmount;
-        uint256 protocolInput = creditAsked + (_loanCalled ? _callFeeAmount : 0);
-        if (protocolInput != 0) {
-            RateLimitedCreditMinter(creditMinter).replenishBuffer(protocolInput);
-            CreditToken(creditToken).burn(protocolInput);
+            IERC20(_creditToken).transferFrom(msg.sender, address(this), creditAsked);
         }
 
         // transfer collateral to bidder
@@ -197,25 +191,42 @@ contract AuctionHouse is CoreRef {
         }
 
         // transfer what is left of collateral to borrower
-        uint256 _collateralAmount = auctions[loanId].collateralAmount;
-        uint256 collateralLeft = _collateralAmount - collateralReceived;
+        uint256 collateralLeft = auctions[loanId].collateralAmount - collateralReceived;
         if (collateralLeft != 0) {
             IERC20(_collateralToken).safeTransfer(auctions[loanId].borrower, collateralLeft);
         }
 
         // if loan was unsafe, or lending terms have been offboarded since auction start,
         // reimburse the call fee to caller.
+        bool _loanCalled = auctions[loanId].loanCalled;
+        uint256 _callFeeAmount = auctions[loanId].callFeeAmount;
+        uint256 protocolInput = creditAsked + (_loanCalled ? _callFeeAmount : 0);
         uint256 protocolOutput = auctions[loanId].borrowAmount;
-        uint256 minCollateralLeft = _collateralAmount * auctions[loanId].ltvBuffer / 1e18;
-        address _lendingTerm = auctions[loanId].lendingTerm;
-        if (_loanCalled && (collateralLeft < minCollateralLeft || GuildToken(guildToken).isGauge(_lendingTerm) == false)) {
-            RateLimitedCreditMinter(creditMinter).mint(auctions[loanId].caller, _callFeeAmount);
+        uint256 creditToBurn = protocolInput;
+        if (
+            _loanCalled &&
+            (
+                collateralLeft < (auctions[loanId].collateralAmount * auctions[loanId].ltvBuffer / 1e18)
+                || GuildToken(guildToken).isGauge(auctions[loanId].lendingTerm) == false
+            )
+        ) {
+            CreditToken(_creditToken).transfer(auctions[loanId].caller, _callFeeAmount);
             protocolOutput += _callFeeAmount;
+            creditToBurn -= _callFeeAmount;
         }
 
         // end of the lifecycle of a loan, notify of profit & losses created in the system.
+        // send profits to the GUILD token & burn the rest of CREDIT received in the liquidation
         int256 pnl = int256(protocolInput) - int256(protocolOutput);
-        GuildToken(guildToken).notifyPnL(_lendingTerm, pnl);
+        if (pnl > 0) {
+            CreditToken(_creditToken).transfer(guildToken, uint256(pnl));
+            creditToBurn -= uint256(pnl);
+        }
+        if (creditToBurn != 0) {
+            RateLimitedCreditMinter(creditMinter).replenishBuffer(creditToBurn);
+            CreditToken(_creditToken).burn(creditToBurn);
+        }
+        GuildToken(guildToken).notifyPnL(auctions[loanId].lendingTerm, pnl);
 
         // if losses were realized, set the harcap of the lending term to 0 to avoid new borrows.
         if (pnl < 0) {
@@ -240,9 +251,8 @@ contract AuctionHouse is CoreRef {
         auctions[loanId].endTime = block.timestamp;
 
         // if loan was called, reimburse the call fee to caller.
-        bool _loanCalled = auctions[loanId].loanCalled;
         uint256 _callFeeAmount = auctions[loanId].callFeeAmount;
-        if (_loanCalled && _callFeeAmount != 0) {
+        if (auctions[loanId].loanCalled && _callFeeAmount != 0) {
             CreditToken(creditToken).transfer(auctions[loanId].caller, _callFeeAmount);
         }
 
