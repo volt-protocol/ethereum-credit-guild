@@ -41,6 +41,8 @@ contract LendingTerm is EIP712, CoreRef {
     // signed messages for the lifecycle of loans
     bytes32 public constant _BORROW_TYPEHASH = keccak256("Borrow(address term,address borrower,uint256 borrowAmount,uint256 collateralAmount,uint256 nonce,uint256 deadline)");
     bytes32 public constant _REPAY_TYPEHASH = keccak256("Repay(address term,address repayer,bytes32 loanId,uint256 nonce,uint256 deadline)");
+    bytes32 public constant _PARTIAL_REPAY_TYPEHASH = keccak256("PartialRepay(address term,address repayer,bytes32 loanId,uint256 repayAmount,uint256 nonce,uint256 deadline)");
+    bytes32 public constant _ADD_COLLATERAL_TYPEHASH = keccak256("AddCollateral(address term,address borrower,bytes32 loanId,uint256 collateralToAdd,uint256 nonce,uint256 deadline)");
     bytes32 public constant _CALL_TYPEHASH = keccak256("Call(address term,address caller,bytes32[] loanIds,uint256 nonce,uint256 deadline)");
 
     struct Signature {
@@ -439,6 +441,77 @@ contract LendingTerm is EIP712, CoreRef {
         _addCollateral(msg.sender, loanId, collateralToAdd);
     }
 
+    /// @notice add collateral on an open loan by signature
+    function addCollateralBySig(
+        address borrower,
+        bytes32 loanId,
+        uint256 collateralToAdd,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_ADD_COLLATERAL_TYPEHASH, address(this), borrower, loanId, collateralToAdd, _useNonce(borrower), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
+        require(signer == borrower, "LendingTerm: invalid signature");
+        
+        _addCollateral(borrower, loanId, collateralToAdd);
+    }
+
+    /// @notice add collateral on an open loan with a permit on collateral token
+    function addCollateralWithPermit(
+        bytes32 loanId,
+        uint256 collateralToAdd,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        IERC20Permit(collateralToken).permit(
+            msg.sender,
+            address(this),
+            collateralToAdd,
+            deadline,
+            sig.v,
+            sig.r,
+            sig.s
+        );
+        
+        _addCollateral(msg.sender, loanId, collateralToAdd);
+    }
+
+    /// @notice add collateral on an open loan by signature with permit on collateral token
+    function addCollateralBySigWithPermit(
+        address borrower,
+        bytes32 loanId,
+        uint256 collateralToAdd,
+        uint256 deadline,
+        Signature calldata addCollateralSig,
+        Signature calldata permitSig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_ADD_COLLATERAL_TYPEHASH, address(this), borrower, loanId, collateralToAdd, _useNonce(borrower), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, addCollateralSig.v, addCollateralSig.r, addCollateralSig.s);
+        require(signer == borrower, "LendingTerm: invalid signature");
+
+        IERC20Permit(collateralToken).permit(
+            borrower,
+            address(this),
+            collateralToAdd,
+            deadline,
+            permitSig.v,
+            permitSig.r,
+            permitSig.s
+        );
+        
+        _addCollateral(borrower, loanId, collateralToAdd);
+    }
+
     /// @notice partially repay an open loan.
     /// a borrower might want to partially repay debt so that his position cannot be called for free.
     /// if the loan is called & goes into liquidation, and less than `ltvBuffer` percent of his
@@ -484,6 +557,77 @@ contract LendingTerm is EIP712, CoreRef {
     /// @notice partially repay an open loan.
     function partialRepay(bytes32 loanId, uint256 debtToRepay) external {
         _partialRepay(msg.sender, loanId, debtToRepay);
+    }
+
+    /// @notice partially repay an open loan by signature
+    function partialRepayBySig(
+        address repayer,
+        bytes32 loanId,
+        uint256 debtToRepay,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_PARTIAL_REPAY_TYPEHASH, address(this), repayer, loanId, debtToRepay, _useNonce(repayer), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
+        require(signer == repayer, "LendingTerm: invalid signature");
+        
+        _partialRepay(repayer, loanId, debtToRepay);
+    }
+
+    /// @notice partially repay an open loan with a permit on CREDIT token
+    function partialRepayWithPermit(
+        bytes32 loanId,
+        uint256 debtToRepay,
+        uint256 deadline,
+        Signature calldata sig
+    ) external {
+        IERC20Permit(creditToken).permit(
+            msg.sender,
+            address(this),
+            debtToRepay,
+            deadline,
+            sig.v,
+            sig.r,
+            sig.s
+        );
+        
+        _partialRepay(msg.sender, loanId, debtToRepay);
+    }
+
+    /// @notice partially repay an open loan by signature with permit on CREDIT token
+    function partialRepayBySigWithPermit(
+        address repayer,
+        bytes32 loanId,
+        uint256 debtToRepay,
+        uint256 deadline,
+        Signature calldata repaySig,
+        Signature calldata permitSig
+    ) external {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_PARTIAL_REPAY_TYPEHASH, address(this), repayer, loanId, debtToRepay, _useNonce(repayer), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, repaySig.v, repaySig.r, repaySig.s);
+        require(signer == repayer, "LendingTerm: invalid signature");
+
+        IERC20Permit(creditToken).permit(
+            repayer,
+            address(this),
+            debtToRepay,
+            deadline,
+            permitSig.v,
+            permitSig.r,
+            permitSig.s
+        );
+        
+        _partialRepay(repayer, loanId, debtToRepay);
     }
 
     /// @notice repay an open loan
@@ -557,7 +701,7 @@ contract LendingTerm is EIP712, CoreRef {
         _repay(repayer, loanId);
     }
 
-     /// @notice repay an open loan with a permit on CREDIT token
+    /// @notice repay an open loan with a permit on CREDIT token
     function repayWithPermit(
         bytes32 loanId,
         uint256 maxDebt,
