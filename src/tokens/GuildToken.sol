@@ -49,11 +49,22 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// @notice profit index of a given user in a given gauge
     mapping(address=>mapping(address=>uint256)) internal userGaugeProfitIndex;
 
-    /// @notice percentage of profits distributed to GUILD holders, expressed as a percentage
-    /// with 18 decimals, e.g. a value of 0.2e18 would direct 20% of system profits to GUILD
-    /// holders that vote in gauges. The rest (1e18 - `guildPerformanceFee`) is distributed to
-    /// lenders of the system, CREDIT holders, through the rebasing mechanism.
-    uint256 public guildPerformanceFee;
+    struct GuildProfitSharing {
+        uint48 guildSplit;
+        uint48 otherSplit;
+        address otherRecipient;
+    }
+
+    /// @notice configuration of profit sharing.
+    /// `guildSplit` and `otherSplit` are expressed as percentages with 14 decimals, so a value of 1e14
+    /// would direct 100% of profits. The sum should be <= 1e14.
+    /// The rest (if the sum of `guildSplit` + `otherSplit` is < 1e14) is distributed to lenders of the
+    /// system, CREDIT holders, through the rebasing mechanism.
+    /// If `otherRecipient` is set to address(0), `otherSplit` should equal 0.
+    /// The share of profit to `otherRecipient` is sent through a regular ERC20.transfer().
+    /// This structure is optimized for storage packing, all external interfaces reference
+    /// percentages encoded as uint256 with 18 decimals.
+    GuildProfitSharing internal profitSharingConfig;
 
     /// @notice multiplier for CREDIT value in the system.
     /// e.g. a value of 0.7e18 would mean that CREDIT has been discounted by 30% so far in the system,
@@ -144,8 +155,14 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// @notice emitted when CREDIT multiplier is updated.
     event CreditMultiplierUpdate(uint256 indexed when, uint256 newValue);
 
-    /// @notice emitted when GUILD performance fee is updated.
-    event GuildPerformanceFeeUpdate(uint256 indexed when, uint256 newValue);
+    /// @notice emitted when GUILD profit sharing is updated.
+    event ProfitSharingConfigUpdate(
+        uint256 indexed when,
+        uint256 creditSplit,
+        uint256 guildSplit,
+        uint256 otherSplit,
+        address otherRecipient
+    );
 
     /// @notice emitted when a GUILD member claims their CREDIT rewards.
     event ClaimRewards(uint256 indexed when, address indexed user, address indexed gauge, uint256 amount);
@@ -156,11 +173,46 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// @notice last block.timestamp when a user apply a loss that occurred in a given gauge
     mapping(address => mapping(address => uint256)) public lastGaugeLossApplied;
 
-    /// @notice set the performance fee (percentage of system profits that go to GUILD holders).
-    function setGuildPerformanceFee(uint256 _guildPerformanceFee) external onlyCoreRole(CoreRoles.GOVERNOR) {
-        require(_guildPerformanceFee <= 1e18, "GuildToken: invalid performance fee");
-        guildPerformanceFee = _guildPerformanceFee;
-        emit GuildPerformanceFeeUpdate(block.timestamp, _guildPerformanceFee);
+    /// @notice set the profit sharing config.
+    function setProfitSharingConfig(
+        uint256 creditSplit,
+        uint256 guildSplit,
+        uint256 otherSplit,
+        address otherRecipient
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        if (otherRecipient == address(0)) {
+            require(otherSplit == 0, "GuildToken: invalid config");
+        } else {
+            require(otherSplit != 0, "GuildToken: invalid config");
+        }
+        require(otherSplit + guildSplit + creditSplit == 1e18, "GuildToken: invalid config");
+        
+        profitSharingConfig = GuildProfitSharing({
+            guildSplit: uint48(guildSplit / 1e4),
+            otherSplit: uint48(otherSplit / 1e4),
+            otherRecipient: otherRecipient
+        });
+
+        emit ProfitSharingConfigUpdate(
+            block.timestamp,
+            creditSplit,
+            guildSplit,
+            otherSplit,
+            otherRecipient
+        );
+    }
+
+    /// @notice get the profit sharing config.
+    function getProfitSharingConfig() external view returns (
+        uint256 creditSplit,
+        uint256 guildSplit,
+        uint256 otherSplit,
+        address otherRecipient
+    ) {
+        guildSplit = uint256(profitSharingConfig.guildSplit) * 1e4;
+        otherSplit = uint256(profitSharingConfig.otherSplit) * 1e4;
+        creditSplit = 1e18 - guildSplit - otherSplit;
+        otherRecipient = profitSharingConfig.otherRecipient;
     }
 
     /// @notice notify profit and loss in a given gauge
@@ -183,10 +235,16 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         }
         // handling profit
         else if (amount > 0) {
-            uint256 amountForGuild = uint256(amount) * guildPerformanceFee / 1e18;
+            uint256 amountForGuild = uint256(amount) * uint256(profitSharingConfig.guildSplit) / 1e14;
+            uint256 amountForOther = uint256(amount) * uint256(profitSharingConfig.otherSplit) / 1e14;
+            uint256 amountForCredit = uint256(amount) - amountForGuild - amountForOther;
+
+            // distribute to other
+            if (amountForOther != 0) {
+                CreditToken(credit).transfer(profitSharingConfig.otherRecipient, amountForOther);
+            }
             
             // distribute to lenders
-            uint256 amountForCredit = uint256(amount) - amountForGuild;
             if (amountForCredit != 0) {
                 CreditToken(credit).distribute(amountForCredit);
             }

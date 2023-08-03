@@ -545,6 +545,78 @@ contract GuildTokenUnitTest is Test {
         assertEq(token.creditMultiplier(), 0.28e18); // half of previous value because half the supply defaulted
     }
 
+    function testSetProfitSharingConfig() public {
+        (
+            uint256 creditSplit,
+            uint256 guildSplit,
+            uint256 otherSplit,
+            address otherRecipient
+        ) = token.getProfitSharingConfig();
+        assertEq(creditSplit, 1e18);
+        assertEq(guildSplit, 0);
+        assertEq(otherSplit, 0);
+        assertEq(otherRecipient, address(0));
+
+        // revert if not governor
+        vm.expectRevert("UNAUTHORIZED");
+        token.setProfitSharingConfig(
+            0.8e18, // creditSplit
+            0.1e18, // guildSplit
+            0.1e18, // otherSplit
+            address(this) // otherRecipient
+        );
+
+        // provides no 'other' recipient, but non-zero 'other' split
+        vm.expectRevert("GuildToken: invalid config");
+        vm.prank(governor);
+        token.setProfitSharingConfig(
+            0.8e18, // creditSplit
+            0.1e18, // guildSplit
+            0.1e18, // otherSplit
+            address(0) // otherRecipient
+        );
+
+        // provides 'other' recipient, but zero 'other' split
+        vm.expectRevert("GuildToken: invalid config");
+        vm.prank(governor);
+        token.setProfitSharingConfig(
+            0.8e18, // creditSplit
+            0.2e18, // guildSplit
+            0, // otherSplit
+            address(this) // otherRecipient
+        );
+
+        // sum != 100%
+        vm.expectRevert("GuildToken: invalid config");
+        vm.prank(governor);
+        token.setProfitSharingConfig(
+            0.8e18, // creditSplit
+            0.2e18, // guildSplit
+            0.1e18, // otherSplit
+            address(this) // otherRecipient
+        );
+
+        // ok
+        vm.prank(governor);
+        token.setProfitSharingConfig(
+            0, // creditSplit
+            0.3e18, // guildSplit
+            0.7e18, // otherSplit
+            address(this) // otherRecipient
+        );
+
+        (
+            creditSplit,
+            guildSplit,
+            otherSplit,
+            otherRecipient
+        ) = token.getProfitSharingConfig();
+        assertEq(creditSplit, 0);
+        assertEq(guildSplit, 0.3e18);
+        assertEq(otherSplit, 0.7e18);
+        assertEq(otherRecipient, address(this));
+    }
+
     function testProfitDistribution() public {
         // grant roles to test contract
         vm.startPrank(governor);
@@ -564,7 +636,13 @@ contract GuildTokenUnitTest is Test {
         //   - 250 on gauge2 (50 alice, 200 bob)
         //   - 200 on gauge3 (200 bob)
         credit.mint(alice, 50e18);
-        token.setGuildPerformanceFee(0.5e18);
+        vm.prank(governor);
+        token.setProfitSharingConfig(
+            0.5e18, // creditSplit
+            0.5e18, // guildSplit
+            0, // otherSplit
+            address(0) // otherRecipient
+        );
         token.setMaxGauges(3);
         token.addGauge(gauge1);
         token.addGauge(gauge2);
@@ -640,6 +718,21 @@ contract GuildTokenUnitTest is Test {
         assertEq(credit.balanceOf(alice), 50e18 + 15e18 + 10e18 + 50e18);
         assertEq(credit.balanceOf(bob), 20e18 + 90e18 + 100e18);
         assertEq(credit.totalSupply(), 220e18 + 200e18 + 300e18);
+
+        // change all fees go to alice
+        vm.prank(governor);
+        token.setProfitSharingConfig(
+            0, // creditSplit
+            0, // guildSplit
+            1e18, // otherSplit
+            alice // otherRecipient
+        );
+
+        // simulate 100 profit on gauge3
+        credit.mint(address(token), 100e18);
+        token.notifyPnL(gauge3, 100e18);
+
+        assertEq(credit.balanceOf(alice), 50e18 + 15e18 + 10e18 + 50e18 + 100e18);
     }
 
     function testGetPendingRewards() public {
@@ -661,7 +754,13 @@ contract GuildTokenUnitTest is Test {
         //   - 250 on gauge2 (50 alice, 200 bob)
         //   - 200 on gauge3 (200 bob)
         credit.mint(alice, 50e18);
-        token.setGuildPerformanceFee(0.5e18);
+        vm.prank(governor);
+        token.setProfitSharingConfig(
+            0.5e18, // creditSplit
+            0.5e18, // guildSplit
+            0, // otherSplit
+            address(0) // otherRecipient
+        );
         token.setMaxGauges(3);
         token.addGauge(gauge1);
         token.addGauge(gauge2);
