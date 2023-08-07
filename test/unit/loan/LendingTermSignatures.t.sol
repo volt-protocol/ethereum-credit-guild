@@ -98,7 +98,6 @@ contract LendingTermSignaturesUnitTest is Test {
         guild.addGauge(address(term));
         guild.mint(address(this), _HARDCAP * 2);
         guild.incrementGauge(address(term), uint112(_HARDCAP));
-        vm.warp(block.timestamp + _CYCLE_LENGTH);
 
         // labels
         vm.label(address(core), "core");

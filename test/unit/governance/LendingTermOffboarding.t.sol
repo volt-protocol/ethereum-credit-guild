@@ -104,7 +104,6 @@ contract LendingTermOffboardingUnitTest is Test {
         guild.addGauge(address(term));
         guild.mint(address(this), _HARDCAP * 2);
         guild.incrementGauge(address(term), uint112(_HARDCAP));
-        vm.warp(block.timestamp + _CYCLE_LENGTH);
 
         // allow GUILD delegations
         guild.setMaxDelegates(10);

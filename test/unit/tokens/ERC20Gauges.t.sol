@@ -160,32 +160,50 @@ contract ERC20GaugesUnitTest is Test {
         token.setMaxGauges(2);
         token.addGauge(gauge1);
         token.addGauge(gauge2);
+    
+        require(token.calculateGaugeAllocation(gauge1, 100e18) == 0);
+        require(token.calculateGaugeAllocation(gauge2, 100e18) == 0);
 
         require(token.incrementGauge(gauge1, 1e18) == 1e18);
         require(token.incrementGauge(gauge2, 1e18) == 2e18);
 
+        require(token.calculateGaugeAllocation(gauge1, 100e18) == 50e18);
+        require(token.calculateGaugeAllocation(gauge2, 100e18) == 50e18);
+        require(token.calculateGaugeStoredAllocation(gauge1, 100e18) == 0);
+        require(token.calculateGaugeStoredAllocation(gauge2, 100e18) == 0);
+
         vm.warp(block.timestamp + _CYCLE_LENGTH); // warp 1 cycle to store changes
         require(token.calculateGaugeAllocation(gauge1, 100e18) == 50e18);
         require(token.calculateGaugeAllocation(gauge2, 100e18) == 50e18);
+        require(token.calculateGaugeStoredAllocation(gauge1, 100e18) == 50e18);
+        require(token.calculateGaugeStoredAllocation(gauge2, 100e18) == 50e18);
 
         require(token.incrementGauge(gauge2, 2e18) == 4e18);
 
         // ensure updates don't propagate until stored
-        require(token.calculateGaugeAllocation(gauge1, 100e18) == 50e18);
-        require(token.calculateGaugeAllocation(gauge2, 100e18) == 50e18);
+        require(token.calculateGaugeAllocation(gauge1, 100e18) == 25e18);
+        require(token.calculateGaugeAllocation(gauge2, 100e18) == 75e18);
+        require(token.calculateGaugeStoredAllocation(gauge1, 100e18) == 50e18);
+        require(token.calculateGaugeStoredAllocation(gauge2, 100e18) == 50e18);
 
         vm.warp(block.timestamp + _CYCLE_LENGTH); // warp another cycle to store changes again
         require(token.calculateGaugeAllocation(gauge1, 100e18) == 25e18);
         require(token.calculateGaugeAllocation(gauge2, 100e18) == 75e18);
+        require(token.calculateGaugeStoredAllocation(gauge1, 100e18) == 25e18);
+        require(token.calculateGaugeStoredAllocation(gauge2, 100e18) == 75e18);
 
         // deprecate gauge
         token.removeGauge(gauge1);
         require(token.calculateGaugeAllocation(gauge1, 100e18) == 0);
-        require(token.calculateGaugeAllocation(gauge2, 100e18) == 75e18);
+        require(token.calculateGaugeAllocation(gauge2, 100e18) == 100e18);
+        require(token.calculateGaugeStoredAllocation(gauge1, 100e18) == 0);
+        require(token.calculateGaugeStoredAllocation(gauge2, 100e18) == 75e18);
 
         vm.warp(block.timestamp + _CYCLE_LENGTH); // warp another cycle to store changes again
         require(token.calculateGaugeAllocation(gauge1, 100e18) == 0);
         require(token.calculateGaugeAllocation(gauge2, 100e18) == 100e18);
+        require(token.calculateGaugeStoredAllocation(gauge1, 100e18) == 0);
+        require(token.calculateGaugeStoredAllocation(gauge2, 100e18) == 100e18);
     }
 
     function testIncrement(

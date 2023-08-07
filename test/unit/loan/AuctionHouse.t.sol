@@ -98,7 +98,6 @@ contract AuctionHouseUnitTest is Test {
         guild.addGauge(address(term));
         guild.mint(address(this), 1e18);
         guild.incrementGauge(address(term), uint112(1e18));
-        vm.warp(block.timestamp + _CYCLE_LENGTH);
 
         // labels
         vm.label(address(core), "core");

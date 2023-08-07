@@ -94,7 +94,6 @@ contract LendingTermUnitTest is Test {
         guild.addGauge(address(term));
         guild.mint(address(this), _HARDCAP * 2);
         guild.incrementGauge(address(term), uint112(_HARDCAP));
-        vm.warp(block.timestamp + _CYCLE_LENGTH);
 
         // labels
         vm.label(address(core), "core");
@@ -256,7 +255,6 @@ contract LendingTermUnitTest is Test {
         guild.addGauge(address(this));
         guild.mint(address(this), guild.getGaugeWeight(address(term)));
         guild.incrementGauge(address(this), uint112(guild.getGaugeWeight(address(term))));
-        vm.warp(block.timestamp + _CYCLE_LENGTH);
 
         // prepare
         uint256 borrowAmount = 20_000e18;
