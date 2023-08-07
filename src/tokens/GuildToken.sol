@@ -8,6 +8,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ERC20Gauges} from "@src/tokens/ERC20Gauges.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
@@ -410,8 +411,10 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     }
 
     /// @dev prevent outbound token transfers (_decrementWeightUntilFree) and gauge weight decrease
-    /// (decrementGauge, decrementGauges) for users who have an unrealized loss in a gauge.
-    /// Also update the user profit index.
+    /// (decrementGauge, decrementGauges) for users who have an unrealized loss in a gauge, or if the
+    /// gauge is currently using its allocated debt ceiling. To decrement gauge weight, guild holders
+    /// might have to call loans if the debt ceiling is used.
+    /// Also update the user profit index and claim rewards.
     function _decrementGaugeWeight(
         address user,
         address gauge,
@@ -425,7 +428,31 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             "GuildToken: pending loss"
         );
 
+        // update the user profit index and claim rewards
         _claimUserGaugeRewards(user, gauge, true);
+
+        // check if gauge is currently using its allocated debt ceiling.
+        // To decrement gauge weight, guild holders might have to call loans if the debt ceiling is used.
+        // issuance() is read with a try/catch to prevent broken terms from breaking the guild token.
+        uint256 issuance;
+        {
+            (bool success, bytes memory result) = gauge.staticcall(abi.encodeWithSignature("issuance()"));
+            if (success) {
+                issuance = uint256(bytes32(result));
+            }
+        }
+        if (issuance != 0) {
+            uint256 creditTotalSupply = CreditToken(credit).totalSupply();
+            uint256 debtCeilingAfterDecrement = 0;
+            if (!_deprecatedGauges.contains(gauge)) {
+                uint112 currentTotalWeight = _totalWeight.currentWeight;
+                if (currentTotalWeight != 0 && currentTotalWeight != weight) {
+                    uint112 currentGaugeWeight = _getGaugeWeight[gauge].currentWeight;
+                    debtCeilingAfterDecrement = creditTotalSupply * (currentGaugeWeight - weight) / (currentTotalWeight - weight);
+                }
+            }
+            require(issuance <= debtCeilingAfterDecrement, "GuildToken: debt ceiling used");
+        }
 
         super._decrementGaugeWeight(user, gauge, weight, cycle);
     }
@@ -433,7 +460,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// @dev prevent weight increment for gauge if user has an unapplied loss.
     /// If the user has 0 weight (i.e. no loss to realize), allow incrementing
     /// gauge weight & update lastGaugeLossApplied to current time.
-    /// Also update the user profit index.
+    /// Also update the user profit index an claim rewards.
     function _incrementGaugeWeight(
         address user,
         address gauge,

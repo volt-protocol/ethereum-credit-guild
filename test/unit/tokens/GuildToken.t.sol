@@ -21,6 +21,8 @@ contract GuildTokenUnitTest is Test {
     uint32 constant _CYCLE_LENGTH = 1 hours;
     uint32 constant _FREEZE_PERIOD = 10 minutes;
 
+    uint256 public issuance; // for mocked behavior
+
     function setUp() public {
         vm.warp(1679067867);
         vm.roll(16848497);
@@ -792,5 +794,57 @@ contract GuildTokenUnitTest is Test {
         assertEq(aliceGaugeRewards[1], 0);
         assertEq(aliceTotalRewards, 10e18);
         assertEq(token.claimRewards(alice), 10e18);
+    }
+
+    function testDecrementGaugeDebtCeilingUsed() public {
+        // grant roles to test contract
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // setup
+        // 50 GUILD for alice, 50 GUILD for bob
+        token.mint(alice, 150e18);
+        token.mint(bob, 400e18);
+        // add gauges
+        token.setMaxGauges(3);
+        token.addGauge(gauge1);
+        token.addGauge(gauge2);
+        token.addGauge(address(this));
+        // 80 votes on gauge1, 40 votes on gauge2, 40 votes on this
+        vm.startPrank(alice);
+        token.incrementGauge(gauge1, 10e18);
+        token.incrementGauge(gauge2, 10e18);
+        vm.stopPrank();
+        vm.startPrank(bob);
+        token.incrementGauge(gauge1, 10e18);
+        token.incrementGauge(address(this), 10e18);
+        vm.stopPrank();
+
+        // simulate alice borrows 100 CREDIT on this (gauge 3)
+        credit.mint(alice, 100e18);
+        issuance = 100e18;
+        assertEq(credit.totalSupply(), 200e18);
+
+        // gauge 3 (this) has 25% of votes, but 50% of credit issuance,
+        // so nobody can decrease the votes for this gauge
+        vm.expectRevert("GuildToken: debt ceiling used");
+        vm.prank(bob);
+        token.decrementGauge(address(this), 10e18);
+
+        // alice now votes for gauge3 (this), so that it is still 50% of credit issuance,
+        // but has 67% of votes.
+        vm.prank(alice);
+        token.incrementGauge(address(this), 50e18);
+        // after alice increment :
+        // gauge1: 20 votes
+        // gauge2: 10 votes
+        // gauge3 (this): 60 votes
+        // now bob can decrement his gauge vote.
+        vm.prank(bob);
+        token.decrementGauge(address(this), 10e18);
     }
 }
