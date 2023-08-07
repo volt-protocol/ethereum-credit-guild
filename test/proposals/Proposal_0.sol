@@ -91,6 +91,7 @@ contract Proposal_0 is Proposal {
                     interestRate: 0.02e18, // 2%
                     maxDelayBetweenPartialRepay: 0,
                     minPartialRepayPercent: 0,
+                    openingFee: 0, // 0%
                     callFee: 0.02e18, // 2%
                     callPeriod: 600, // 10 minutes
                     hardCap: 2_000_000e18, // max 2M CREDIT issued

@@ -78,6 +78,7 @@ contract LendingTermOffboardingUnitTest is Test {
                 interestRate: _INTEREST_RATE,
                 maxDelayBetweenPartialRepay: 0,
                 minPartialRepayPercent: 0,
+                openingFee: 0,
                 callFee: _CALL_FEE,
                 callPeriod: _CALL_PERIOD,
                 hardCap: _HARDCAP,

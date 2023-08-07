@@ -69,6 +69,7 @@ contract LendingTermUnitTest is Test {
                 interestRate: _INTEREST_RATE,
                 maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
                 minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                openingFee: 0,
                 callFee: _CALL_FEE,
                 callPeriod: _CALL_PERIOD,
                 hardCap: _HARDCAP,
@@ -160,6 +161,56 @@ contract LendingTermUnitTest is Test {
         // check interest accrued over time
         vm.warp(block.timestamp + term.YEAR());
         assertEq(term.getLoanDebt(loanId), borrowAmount * 110 / 100); // 10% APR
+    }
+
+    // borrow with opening fee success
+    function testBorrowWithOpeningFeeSuccess() public {
+        // create a similar term but with 5% opening fee
+        LendingTerm term2 = new LendingTerm(
+            address(core), /*_core*/
+            address(guild), /*_guildToken*/
+            address(auctionHouse), /*_auctionHouse*/
+            address(rlcm), /*_creditMinter*/
+            address(credit), /*_creditToken*/
+            LendingTerm.LendingTermParams({
+                collateralToken: address(collateral),
+                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                interestRate: _INTEREST_RATE,
+                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                openingFee: 0.05e18,
+                callFee: _CALL_FEE,
+                callPeriod: _CALL_PERIOD,
+                hardCap: _HARDCAP,
+                ltvBuffer: _LTV_BUFFER
+            })
+        );
+        vm.label(address(term2), "term2");
+        guild.addGauge(address(term2));
+        guild.decrementGauge(address(term), uint112(_HARDCAP));
+        guild.incrementGauge(address(term2), uint112(_HARDCAP));
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term2));
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term2));
+        vm.stopPrank();
+
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 12e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term2), collateralAmount);
+        credit.mint(address(this), 1_000e18);
+        credit.approve(address(term2), 1_000e18);
+
+        // borrow
+        bytes32 loanId = term2.borrow(borrowAmount, collateralAmount);
+
+        // check borrow success
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term2)), collateralAmount);
+        assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(credit.balanceOf(address(term2)), 0);
+        assertEq(term2.getLoan(loanId).borrower, address(this));
     }
 
     // borrow fail because 0 collateral

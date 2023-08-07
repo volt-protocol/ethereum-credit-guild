@@ -109,6 +109,12 @@ contract LendingTerm is EIP712, CoreRef {
     /// maxDelayBetweenPartialRepay is != 0
     mapping(bytes32=>uint256) public lastPartialRepay;
 
+    /// @notice the opening fee is a small amount of CREDIT provided by the borrower
+    /// when the loan is opened.
+    /// The call fee is expressed as a percentage of the borrowAmount, with 18
+    /// decimals, e.g. 0.05e18 = 5% of the borrowed amount.
+    uint256 public immutable openingFee;
+
     /// @notice the call fee is a small amount of CREDIT provided by the caller
     /// when the loan is called.
     /// The call fee is expressed as a percentage of the borrowAmount, with 18
@@ -167,6 +173,7 @@ contract LendingTerm is EIP712, CoreRef {
         uint256 interestRate;
         uint256 maxDelayBetweenPartialRepay;
         uint256 minPartialRepayPercent;
+        uint256 openingFee;
         uint256 callFee;
         uint256 callPeriod;
         uint256 hardCap;
@@ -190,6 +197,7 @@ contract LendingTerm is EIP712, CoreRef {
         interestRate = params.interestRate;
         maxDelayBetweenPartialRepay = params.maxDelayBetweenPartialRepay;
         minPartialRepayPercent = params.minPartialRepayPercent;
+        openingFee = params.openingFee;
         callFee = params.callFee;
         callPeriod = params.callPeriod;
         hardCap = params.hardCap;
@@ -330,6 +338,14 @@ contract LendingTerm is EIP712, CoreRef {
 
         // pull the collateral from the borrower
         IERC20(collateralToken).safeTransferFrom(borrower, address(this), collateralAmount);
+
+        // pull opening fee from the borrower, if any
+        if (openingFee != 0) {
+            uint256 _openingFee = borrowAmount * openingFee / 1e18;
+            // transfer from borrower to GuildToken & report profit
+            IERC20(creditToken).safeTransferFrom(borrower, guildToken, _openingFee);
+            GuildToken(guildToken).notifyPnL(address(this), int256(_openingFee));
+        }
 
         // emit event
         emit LoanBorrow(block.timestamp, loanId, borrower, collateralAmount, borrowAmount);
