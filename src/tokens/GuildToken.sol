@@ -236,13 +236,14 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         }
         // handling profit
         else if (amount > 0) {
-            uint256 amountForGuild = uint256(amount) * uint256(profitSharingConfig.guildSplit) / 1e14;
-            uint256 amountForOther = uint256(amount) * uint256(profitSharingConfig.otherSplit) / 1e14;
+            GuildProfitSharing memory _profitSharingConfig = profitSharingConfig;
+            uint256 amountForGuild = uint256(amount) * uint256(_profitSharingConfig.guildSplit) / 1e14;
+            uint256 amountForOther = uint256(amount) * uint256(_profitSharingConfig.otherSplit) / 1e14;
             uint256 amountForCredit = uint256(amount) - amountForGuild - amountForOther;
 
             // distribute to other
             if (amountForOther != 0) {
-                CreditToken(credit).transfer(profitSharingConfig.otherRecipient, amountForOther);
+                CreditToken(credit).transfer(_profitSharingConfig.otherRecipient, amountForOther);
             }
             
             // distribute to lenders
@@ -256,7 +257,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
                 // if the gauge has 0 weight, does not update the profit index, this is unnecessary
                 // because the profit index is used to reattribute profit to users voting for the gauge,
                 // and if the weigth is 0, there are no users voting for the gauge.
-                uint256 _gaugeWeight = uint256(getGaugeWeight(gauge));
+                uint256 _gaugeWeight = uint256(_getGaugeWeight[gauge].currentWeight);
                 if (_gaugeWeight != 0) {
                     uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
                     if (_gaugeProfitIndex == 0) {
