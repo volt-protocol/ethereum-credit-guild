@@ -398,6 +398,56 @@ contract LendingTerm is EIP712, CoreRef {
         return _borrow(msg.sender, borrowAmount, collateralAmount);
     }
 
+    /// @notice borrow with a permit on credit token
+    function borrowWithCreditPermit(
+        uint256 borrowAmount,
+        uint256 collateralAmount,
+        uint256 deadline,
+        Signature calldata sig
+    ) external whenNotPaused returns (bytes32 loanId) {
+        IERC20Permit(creditToken).permit(
+            msg.sender,
+            address(this),
+            borrowAmount * openingFee / 1e18,
+            deadline,
+            sig.v,
+            sig.r,
+            sig.s
+        );
+        return _borrow(msg.sender, borrowAmount, collateralAmount);
+    }
+
+    /// @notice borrow with a permit on collateral token + credit token
+    function borrowWithPermits(
+        uint256 borrowAmount,
+        uint256 collateralAmount,
+        uint256 deadline,
+        Signature calldata collateralPermitSig,
+        Signature calldata creditPermitSig
+    ) external whenNotPaused returns (bytes32 loanId) {
+        IERC20Permit(collateralToken).permit(
+            msg.sender,
+            address(this),
+            collateralAmount,
+            deadline,
+            collateralPermitSig.v,
+            collateralPermitSig.r,
+            collateralPermitSig.s
+        );
+
+        IERC20Permit(creditToken).permit(
+            msg.sender,
+            address(this),
+            borrowAmount * openingFee / 1e18,
+            deadline,
+            creditPermitSig.v,
+            creditPermitSig.r,
+            creditPermitSig.s
+        );
+
+        return _borrow(msg.sender, borrowAmount, collateralAmount);
+    }
+
     /// @notice borrow with a signature to open the loan and a permit on collateral token
     function borrowBySigWithPermit(
         address borrower,
@@ -424,6 +474,79 @@ contract LendingTerm is EIP712, CoreRef {
             permitSig.v,
             permitSig.r,
             permitSig.s
+        );
+
+        return _borrow(borrower, borrowAmount, collateralAmount);
+    }
+
+    /// @notice borrow with a signature to open the loan and a permit on credit token
+    function borrowBySigWithCreditPermit(
+        address borrower,
+        uint256 borrowAmount,
+        uint256 collateralAmount,
+        uint256 deadline,
+        Signature calldata borrowSig,
+        Signature calldata permitCredit
+    ) external whenNotPaused returns (bytes32 loanId) {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_BORROW_TYPEHASH, address(this), borrower, borrowAmount, collateralAmount, _useNonce(borrower), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, borrowSig.v, borrowSig.r, borrowSig.s);
+        require(signer == borrower, "LendingTerm: invalid signature");
+
+        IERC20Permit(creditToken).permit(
+            borrower,
+            address(this),
+            borrowAmount * openingFee / 1e18,
+            deadline,
+            permitCredit.v,
+            permitCredit.r,
+            permitCredit.s
+        );
+
+        return _borrow(borrower, borrowAmount, collateralAmount);
+    }
+
+    /// @notice borrow with a signature to open the loan and a permit on collateral token + credit token
+    function borrowBySigWithPermits(
+        address borrower,
+        uint256 borrowAmount,
+        uint256 collateralAmount,
+        uint256 deadline,
+        Signature calldata borrowSig,
+        Signature calldata collateralPermitSig,
+        Signature calldata creditPermitSig
+    ) external whenNotPaused returns (bytes32 loanId) {
+        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
+
+        bytes32 structHash = keccak256(abi.encode(_BORROW_TYPEHASH, address(this), borrower, borrowAmount, collateralAmount, _useNonce(borrower), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, borrowSig.v, borrowSig.r, borrowSig.s);
+        require(signer == borrower, "LendingTerm: invalid signature");
+
+        IERC20Permit(collateralToken).permit(
+            borrower,
+            address(this),
+            collateralAmount,
+            deadline,
+            collateralPermitSig.v,
+            collateralPermitSig.r,
+            collateralPermitSig.s
+        );
+
+        IERC20Permit(creditToken).permit(
+            borrower,
+            address(this),
+            borrowAmount * openingFee / 1e18,
+            deadline,
+            creditPermitSig.v,
+            creditPermitSig.r,
+            creditPermitSig.s
         );
 
         return _borrow(borrower, borrowAmount, collateralAmount);
