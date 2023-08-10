@@ -9,17 +9,21 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 /// @notice Utils to offboard a LendingTerm.
 /// This contracts works somewhat similarly to a Veto governor: any GUILD holder can poll for the removal
 /// of a lending term, and if enough GUILD holders vote for a removal poll, the term can be offboarded.
+/// When a term is offboarded, no new loans can be issued
 contract LendingTermOffboarding is CoreRef {
 
     /// @notice emitted when a user supports the removal of a lending term
     event OffboardSupport(
-        address indexed user,
+        uint256 indexed timestamp, 
         address indexed term,
         uint256 indexed snapshotBlock,
+        address user,
         uint256 userWeight
     );
     /// @notice emitted when a lending term is offboarded
-    event Offboard(address indexed term);
+    event Offboard(uint256 indexed timestamp, address indexed term);
+    /// @notice emitted when a lending term is cleaned up
+    event Cleanup(uint256 indexed timestamp, address indexed term);
 
     /// @notice Emitted when quorum is updated.
     event QuorumUpdated(uint256 oldQuorum, uint256 newQuorum);
@@ -71,7 +75,7 @@ contract LendingTermOffboarding is CoreRef {
 
         polls[block.number][term] = 1; // voting power
         lastPollBlock[term] = block.number;
-        emit OffboardSupport(address(0), term, block.number, 1);
+        emit OffboardSupport(block.timestamp, term, block.number, address(0), 1);
     }
 
     /// @notice Support a poll to offboard a given LendingTerm.
@@ -86,31 +90,46 @@ contract LendingTermOffboarding is CoreRef {
         if (_weight + userWeight >= quorum) {
             canOffboard[term] = true;
         }
-        emit OffboardSupport(msg.sender, term, snapshotBlock, userWeight);
+        emit OffboardSupport(block.timestamp, term, snapshotBlock, msg.sender, userWeight);
     }
     
-    /// @notice Offboard a LendingTerm. This will seize the collateral of all loans.
+    /// @notice Offboard a LendingTerm.
+    /// This will prevent new loans from being open, and will prevent GUILD holders to vote for the term.
     /// @param term LendingTerm to offboard from the system.
-    /// @param loanIds List of loans to seize (skip loan calling).
-    function offboard(address term, bytes32[] memory loanIds) external whenNotPaused {
+    function offboard(address term) external whenNotPaused {
         require(canOffboard[term], "LendingTermOffboarding: quorum not met");
 
         // self-grant permissions
-        core().grantRole(CoreRoles.TERM_HARDCAP, address(this));
         core().grantRole(CoreRoles.GAUGE_REMOVE, address(this));
 
-        LendingTerm(term).setHardCap(0);
-        LendingTerm(term).seizeMany(loanIds);
-        require(LendingTerm(term).issuance() == 0, "LendingTermOffboarding: not all loans closed");
+        // update protocol config
         GuildToken(guildToken).removeGauge(term);
-
-        // cleanup roles
-        core().revokeRole(CoreRoles.TERM_HARDCAP, address(this));
-        core().revokeRole(CoreRoles.GAUGE_REMOVE, address(this));
         core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
+
+        // self-revoke permissions
+        core().revokeRole(CoreRoles.GAUGE_REMOVE, address(this));
+
+        emit Offboard(block.timestamp, term);
+    }
+
+    /// @notice Cleanup roles of a LendingTerm.
+    /// This is only callable after a term has been offboarded and all its loans have been closed.
+    /// @param term LendingTerm to cleanup.
+    function cleanup(address term) external whenNotPaused {
+        require(canOffboard[term], "LendingTermOffboarding: quorum not met");
+        require(LendingTerm(term).issuance() == 0, "LendingTermOffboarding: not all loans closed");
+
+        // self-grant permissions
+        core().grantRole(CoreRoles.TERM_HARDCAP, address(this));
+
+        // update protocol config
+        LendingTerm(term).setHardCap(0);
         core().revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, term);
 
+        // self-revoke permissions
+        core().revokeRole(CoreRoles.TERM_HARDCAP, address(this));
+
         canOffboard[term] = false;
-        emit Offboard(term);
+        emit Cleanup(block.timestamp, term);
     }
 }

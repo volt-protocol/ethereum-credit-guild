@@ -230,23 +230,61 @@ contract LendingTermOffboardingUnitTest is Test {
         vm.warp(block.timestamp + 13);
 
         // cannot offboard if quorum is not met
-        bytes32[] memory loanIds = new bytes32[](0);
         vm.expectRevert("LendingTermOffboarding: quorum not met");
-        offboarder.offboard(address(term), loanIds);
+        offboarder.offboard(address(term));
 
         // prepare (2)
         offboarder.supportOffboard(snapshotBlock, address(term));
         assertEq(offboarder.polls(snapshotBlock, address(term)), _QUORUM + 1);
         assertEq(offboarder.canOffboard(address(term)), true);
 
-        // cannot offboard if all loans are not closed
-        vm.expectRevert("LendingTermOffboarding: not all loans closed");
-        offboarder.offboard(address(term), loanIds);
-
         // properly offboard a term
-        loanIds = new bytes32[](1);
-        loanIds[0] = aliceLoanId;
-        offboarder.offboard(address(term), loanIds);
+        assertEq(guild.isGauge(address(term)), true);
+        offboarder.offboard(address(term));
+        assertEq(guild.isGauge(address(term)), false);
+        assertEq(core.hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term)), false);
+
+        
+        vm.startPrank(alice);
+        // can close loans
+        credit.approve(address(term), aliceLoanSize);
+        term.repay(aliceLoanId);
+        // cannot open new loans
+        collateral.approve(address(term), aliceLoanSize);
+        vm.expectRevert("LendingTerm: debt ceiling reached");
+        aliceLoanId = term.borrow(aliceLoanSize, aliceLoanSize);
+        vm.stopPrank();
+    }
+
+    function testCleanup() public {
+        // prepare (1)
+        guild.mint(bob, _QUORUM);
+        vm.startPrank(bob);
+        guild.delegate(bob);
+        uint256 snapshotBlock = block.number;
+        offboarder.proposeOffboard(address(term));
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        vm.expectRevert("LendingTermOffboarding: quorum not met");
+        offboarder.cleanup(address(term));
+        offboarder.supportOffboard(snapshotBlock, address(term));
+        offboarder.offboard(address(term));
+
+        // cannot cleanup because loans are active
+        vm.expectRevert("LendingTermOffboarding: not all loans closed");
+        offboarder.cleanup(address(term));
+
+        // close loans
+        vm.startPrank(alice);
+        credit.approve(address(term), aliceLoanSize);
+        term.repay(aliceLoanId);
+        vm.stopPrank();
+
+        // cleanup
+        offboarder.cleanup(address(term));
+
         assertEq(offboarder.canOffboard(address(term)), false);
+        assertEq(term.hardCap(), 0);
+        assertEq(core.hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term)), false);
     }
 }
