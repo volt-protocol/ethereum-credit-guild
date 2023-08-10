@@ -119,12 +119,14 @@ contract ERC20GaugesUnitTest is Test {
     }
 
     function testRemoveGauge() public {
+        require(token.isDeprecatedGauge(gauge1) == false);
         token.setMaxGauges(2);
         token.addGauge(gauge1);
         token.removeGauge(gauge1);
         require(token.numGauges() == 1);
         require(token.numDeprecatedGauges() == 1);
         require(token.deprecatedGauges()[0] == gauge1);
+        require(token.isDeprecatedGauge(gauge1) == true);
     }
 
     function testRemoveGaugeTwice() public {

@@ -47,6 +47,7 @@ import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
         ... Rename to remove "contract" from name because we don't check if target is a contract
     - Rename `calculateGaugeAllocation` to `calculateGaugeStoredAllocation` to make clear that it reads from stored weights.
     - Add `calculateGaugeAllocation` helper function that reads from current weight.
+    - Add `isDeprecatedGauge(address)->bool` view function that returns true if gauge is deprecated.
     - Consistency: make incrementGauges return a uint112 instead of uint256
     - Import OpenZeppelin ERC20 & EnumerableSet instead of Solmate's
     - Update error management style (use require + messages instead of Solidity errors)
@@ -177,6 +178,11 @@ abstract contract ERC20Gauges is ERC20 {
     /// @notice returns true if `gauge` is not in deprecated gauges
     function isGauge(address gauge) public view returns (bool) {
         return _gauges.contains(gauge) && !_deprecatedGauges.contains(gauge);
+    }
+
+    /// @notice returns true if `gauge` is in deprecated gauges
+    function isDeprecatedGauge(address gauge) public view returns (bool) {
+        return _deprecatedGauges.contains(gauge);
     }
 
     /// @notice returns the number of live gauges
