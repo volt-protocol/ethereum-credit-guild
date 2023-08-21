@@ -53,9 +53,9 @@ contract LendingTermUnitTest is Test {
         );
         auctionHouse = new AuctionHouse(
             address(core),
-            address(guild),
-            address(rlcm),
-            address(credit)
+            650,
+            1800,
+            0.1e18
         );
         term = new LendingTerm(
             address(core), /*_core*/
@@ -789,14 +789,16 @@ contract LendingTermUnitTest is Test {
         // loan is closed
         assertEq(term.getLoan(loanId).closeTime, block.timestamp);
         assertEq(term.getLoanDebt(loanId), 0);
-        assertEq(term.issuance(), 0);
+        assertEq(term.issuance(), borrowAmount);
         // borrower kept credit
         assertEq(credit.balanceOf(address(this)), borrowAmount - callFee);
-        assertEq(credit.balanceOf(address(term)), 0);
-        assertEq(credit.balanceOf(address(auctionHouse)), callFee);
-        // collateral went to auctionHouse
-        assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
-        assertEq(collateral.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(term)), callFee);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // cannot set auctionHouse because an auction is in progress
+        vm.prank(governor);
+        vm.expectRevert("LendingTerm: auctions in progress");
+        term.setAuctionHouse(address(this));
     }
 
     // seize success even without call, if loan missed a period partialRepay
@@ -819,14 +821,11 @@ contract LendingTermUnitTest is Test {
         // loan is closed
         assertEq(term.getLoan(loanId).closeTime, block.timestamp);
         assertEq(term.getLoanDebt(loanId), 0);
-        assertEq(term.issuance(), 0);
+        assertEq(term.issuance(), borrowAmount);
         // borrower kept credit
         assertEq(credit.balanceOf(address(this)), borrowAmount);
-        assertEq(credit.balanceOf(address(term)), 0);
-        assertEq(credit.balanceOf(address(auctionHouse)), 0); // no call fee collected & forwarded
-        // collateral went to auctionHouse
-        assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
-        assertEq(collateral.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(term)), 0); // no call fee collected
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
     }
 
     // seizeMany success
@@ -853,14 +852,11 @@ contract LendingTermUnitTest is Test {
         // loan is closed
         assertEq(term.getLoan(loanId).closeTime, block.timestamp);
         assertEq(term.getLoanDebt(loanId), 0);
-        assertEq(term.issuance(), 0);
+        assertEq(term.issuance(), borrowAmount);
         // borrower kept credit
         assertEq(credit.balanceOf(address(this)), borrowAmount - callFee);
-        assertEq(credit.balanceOf(address(term)), 0);
-        assertEq(credit.balanceOf(address(auctionHouse)), callFee);
-        // collateral went to auctionHouse
-        assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
-        assertEq(collateral.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(term)), callFee);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
     }
 
     // seize fail because loan doesnt exist
@@ -1071,8 +1067,8 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), 0);
     }
 
-    // full flow test (borrow, call, seize)
-    function testFlowBorrowCallSeize() public {
+    // full flow test (borrow, call, seize, onBid with good debt)
+    function testFlowBorrowCallSeizeOnBidGoodDebt() public {
         bytes32 loanId = keccak256(abi.encode(address(this), address(term), block.timestamp));
         assertEq(term.getLoanCallFee(loanId), 0);
 
@@ -1113,14 +1109,17 @@ contract LendingTermUnitTest is Test {
         term.seizeMany(loanIds);
 
         // call
+        address caller = address(1000);
         uint256 callFee = 1_000e18;
         assertEq(term.getLoanCallFee(loanId), callFee);
+        credit.mint(caller, callFee);
+        vm.startPrank(caller);
         credit.approve(address(term), callFee);
         term.call(loanId);
+        vm.stopPrank();
     
-        assertEq(credit.balanceOf(address(this)), 21_000e18);
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
         assertEq(credit.balanceOf(address(term)), callFee);
-        assertEq(collateral.balanceOf(address(this)), 0);
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
 
         // cannot seize because call period isn't elapsed
@@ -1128,18 +1127,247 @@ contract LendingTermUnitTest is Test {
         term.seizeMany(loanIds);
 
         // seize
+        address bidder = address(101);
         vm.warp(block.timestamp + term.callPeriod());
         vm.roll(block.number + 1);
         term.seize(loanId);
 
-        assertEq(credit.balanceOf(address(this)), 21_000e18);
-        assertEq(credit.balanceOf(address(term)), 0);
-        assertEq(credit.balanceOf(address(auctionHouse)), callFee);
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(address(term)), callFee);
+        assertEq(credit.balanceOf(bidder), 0);
         assertEq(collateral.balanceOf(address(this)), 0);
-        assertEq(collateral.balanceOf(address(term)), 0);
-        assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+        assertEq(collateral.balanceOf(bidder), 0);
 
         assertEq(term.getLoanCallFee(loanId), 0); // /!\ not callFee because loan is closed now
+
+        // auction bid
+        credit.mint(bidder, 21_000e18);
+        vm.prank(bidder);
+        credit.approve(address(term), 21_000e18);
+        vm.prank(address(auctionHouse));
+        term.onBid(loanId, bidder, AuctionHouse.AuctionResult({
+            collateralToBorrower: 3e18,
+            collateralToCaller: 0,
+            collateralToBidder: 12e18,
+            creditFromBidder: 21_000e18,
+            creditToCaller: 0,
+            creditToBurn: 20_000e18,
+            creditToProfit: 2_000e18,
+            pnl: 2_000e18
+        }));
+
+        // check token movements
+        assertEq(collateral.balanceOf(address(this)), 3e18);
+        assertEq(collateral.balanceOf(caller), 0);
+        assertEq(collateral.balanceOf(bidder), 12e18);
+        assertEq(collateral.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(caller), 0);
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(bidder), 0);
+    }
+    
+    // full flow test (borrow, call, seize, onBid with good debt but in danger zone)
+    function testFlowBorrowCallSeizeOnBidGoodDangerousDebt() public {
+        bytes32 loanId = keccak256(abi.encode(address(this), address(term), block.timestamp));
+        assertEq(term.getLoanCallFee(loanId), 0);
+
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), collateralAmount);
+        assertEq(collateral.balanceOf(address(term)), 0);
+
+        // borrow
+        bytes32 loanIdReturned = term.borrow(borrowAmount, collateralAmount);
+        assertEq(loanId, loanIdReturned);
+
+        assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        credit.mint(address(this), 2_000e18);
+
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // cannot seize because call isn't started
+        bytes32[] memory loanIds = new bytes32[](1);
+        loanIds[0] = loanId;
+        vm.expectRevert("LendingTerm: loan not called");
+        term.seizeMany(loanIds);
+
+        // call
+        address caller = address(1000);
+        uint256 callFee = 1_000e18;
+        assertEq(term.getLoanCallFee(loanId), callFee);
+        credit.mint(caller, callFee);
+        vm.startPrank(caller);
+        credit.approve(address(term), callFee);
+        term.call(loanId);
+        vm.stopPrank();
+    
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(address(term)), callFee);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // cannot seize because call period isn't elapsed
+        vm.expectRevert("LendingTerm: call period in progress");
+        term.seizeMany(loanIds);
+
+        // seize
+        address bidder = address(101);
+        vm.warp(block.timestamp + term.callPeriod());
+        vm.roll(block.number + 1);
+        term.seize(loanId);
+
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(address(term)), callFee);
+        assertEq(credit.balanceOf(bidder), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+        assertEq(collateral.balanceOf(bidder), 0);
+
+        assertEq(term.getLoanCallFee(loanId), 0); // /!\ not callFee because loan is closed now
+
+        // auction bid
+        credit.mint(bidder, 22_000e18);
+        vm.prank(bidder);
+        credit.approve(address(term), 22_000e18);
+        vm.prank(address(auctionHouse));
+        term.onBid(loanId, bidder, AuctionHouse.AuctionResult({
+            collateralToBorrower: 2e18,
+            collateralToCaller: 1e18,
+            collateralToBidder: 12e18,
+            creditFromBidder: 22_000e18,
+            creditToCaller: 1_000e18,
+            creditToBurn: 20_000e18,
+            creditToProfit: 2_000e18,
+            pnl: 2_000e18
+        }));
+
+        // check token movements
+        assertEq(collateral.balanceOf(address(this)), 2e18);
+        assertEq(collateral.balanceOf(caller), 1e18);
+        assertEq(collateral.balanceOf(bidder), 12e18);
+        assertEq(collateral.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(caller), 1_000e18);
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(bidder), 0);
+    }
+
+    // full flow test (borrow, call, seize, onBid with bad debt)
+    function testFlowBorrowCallSeizeOnBidBadDebt() public {
+        bytes32 loanId = keccak256(abi.encode(address(this), address(term), block.timestamp));
+        assertEq(term.getLoanCallFee(loanId), 0);
+
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), collateralAmount);
+        assertEq(collateral.balanceOf(address(term)), 0);
+
+        // borrow
+        bytes32 loanIdReturned = term.borrow(borrowAmount, collateralAmount);
+        assertEq(loanId, loanIdReturned);
+
+        assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        credit.mint(address(this), 2_000e18);
+
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // cannot seize because call isn't started
+        bytes32[] memory loanIds = new bytes32[](1);
+        loanIds[0] = loanId;
+        vm.expectRevert("LendingTerm: loan not called");
+        term.seizeMany(loanIds);
+
+        // call
+        address caller = address(1000);
+        uint256 callFee = 1_000e18;
+        assertEq(term.getLoanCallFee(loanId), callFee);
+        credit.mint(caller, callFee);
+        vm.startPrank(caller);
+        credit.approve(address(term), callFee);
+        term.call(loanId);
+        vm.stopPrank();
+    
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(address(term)), callFee);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // cannot seize because call period isn't elapsed
+        vm.expectRevert("LendingTerm: call period in progress");
+        term.seizeMany(loanIds);
+
+        // seize
+        address bidder = address(101);
+        vm.warp(block.timestamp + term.callPeriod());
+        vm.roll(block.number + 1);
+        term.seize(loanId);
+
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(address(term)), callFee);
+        assertEq(credit.balanceOf(bidder), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+        assertEq(collateral.balanceOf(bidder), 0);
+
+        assertEq(term.getLoanCallFee(loanId), 0); // /!\ not callFee because loan is closed now
+
+        // auction bid
+        credit.mint(bidder, 10_000e18);
+        vm.prank(bidder);
+        credit.approve(address(term), 10_000e18);
+        vm.prank(address(auctionHouse));
+        term.onBid(loanId, bidder, AuctionHouse.AuctionResult({
+            collateralToBorrower: 0,
+            collateralToCaller: 0,
+            collateralToBidder: 15e18,
+            creditFromBidder: 10_000e18,
+            creditToCaller: 1_000e18,
+            creditToBurn: 10_000e18,
+            creditToProfit: 0,
+            pnl: -10_000e18
+        }));
+
+        // check token movements
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(caller), 0);
+        assertEq(collateral.balanceOf(bidder), 15e18);
+        assertEq(collateral.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.balanceOf(caller), 1_000e18);
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(bidder), 0);
     }
 
     // full flow test (borrow, forgive)
@@ -1296,9 +1524,7 @@ contract LendingTermUnitTest is Test {
 
         assertEq(credit.balanceOf(address(this)), 20_000e18);
         assertEq(credit.balanceOf(address(term)), 0);
-        assertEq(credit.balanceOf(address(auctionHouse)), 0);
         assertEq(collateral.balanceOf(address(this)), 0);
-        assertEq(collateral.balanceOf(address(term)), 0);
-        assertEq(collateral.balanceOf(address(auctionHouse)), collateralAmount);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
     }
 }

@@ -75,9 +75,9 @@ contract Proposal_0 is Proposal {
         {
             AuctionHouse auctionHouse = new AuctionHouse(
                 addresses.mainnet("CORE"),
-                addresses.mainnet("ERC20_GUILD"),
-                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
-                addresses.mainnet("ERC20_CREDIT")
+                650, // midPoint = 10m50s
+                1800, // auctionDuration = 30m
+                0.1e18 // dangerPenalty = 10%
             );
             LendingTerm termUsdc1 = new LendingTerm(
                 addresses.mainnet("CORE"),

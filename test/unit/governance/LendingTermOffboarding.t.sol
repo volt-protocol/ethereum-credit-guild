@@ -62,9 +62,9 @@ contract LendingTermOffboardingUnitTest is Test {
         offboarder = new LendingTermOffboarding(address(core), address(guild), _QUORUM);
         auctionHouse = new AuctionHouse(
             address(core),
-            address(guild),
-            address(rlcm),
-            address(credit)
+            650,
+            1800,
+            0.1e18
         );
         term = new LendingTerm(
             address(core), /*_core*/

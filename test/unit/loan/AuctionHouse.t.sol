@@ -37,6 +37,11 @@ contract AuctionHouseUnitTest is Test {
     uint256 constant _HARDCAP = 20_000_000e18;
     uint256 constant _LTV_BUFFER = 0.20e18; // 20%
 
+    // AuctionHouse params
+    uint256 constant _MIDPOINT = 650; // 10m50s
+    uint256 constant _AUCTION_DURATION = 1800; // 30m
+    uint256 constant _DANGER_PENALTY = 0.1e18; // 10%
+
     function setUp() public {
         vm.warp(1679067867);
         vm.roll(16848497);
@@ -54,9 +59,9 @@ contract AuctionHouseUnitTest is Test {
         );
         auctionHouse = new AuctionHouse(
             address(core),
-            address(guild),
-            address(rlcm),
-            address(credit)
+            _MIDPOINT,
+            _AUCTION_DURATION,
+            _DANGER_PENALTY
         );
         term = new LendingTerm(
             address(core), /*_core*/
@@ -88,10 +93,8 @@ contract AuctionHouseUnitTest is Test {
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
         core.grantRole(CoreRoles.TERM_HARDCAP, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
-        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(auctionHouse));
-        core.grantRole(CoreRoles.TERM_HARDCAP, address(auctionHouse));
-        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(auctionHouse));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         // add gauge and vote for it
@@ -114,11 +117,9 @@ contract AuctionHouseUnitTest is Test {
     // constructor params & public state getters
     function testInitialState() public {
         assertEq(address(auctionHouse.core()), address(core));
-        assertEq(auctionHouse.MIDPOINT(), 650);
-        assertEq(auctionHouse.AUCTION_DURATION(), 1800);
-        assertEq(auctionHouse.guildToken(), address(guild));
-        assertEq(auctionHouse.creditMinter(), address(rlcm));
-        assertEq(auctionHouse.creditToken(), address(credit));
+        assertEq(auctionHouse.midPoint(), _MIDPOINT);
+        assertEq(auctionHouse.auctionDuration(), _AUCTION_DURATION);
+        assertEq(auctionHouse.dangerPenalty(), _DANGER_PENALTY);
 
         assertEq(collateral.totalSupply(), 0);
         assertEq(credit.totalSupply(), 0);
@@ -161,7 +162,7 @@ contract AuctionHouseUnitTest is Test {
         term.seize(loanId);
     }
 
-    function _setupLoanAndOffboard() private returns (bytes32 loanId) {
+    function _setupLoanAndForceClose() private returns (bytes32 loanId) {
         loanId = _setupLoan();
 
         // 1 year later, interest accrued
@@ -185,9 +186,6 @@ contract AuctionHouseUnitTest is Test {
         assertEq(auctionHouse.getAuction(loanId).startTime, block.timestamp);
         assertEq(auctionHouse.getAuction(loanId).endTime, 0);
         assertEq(auctionHouse.getAuction(loanId).lendingTerm, address(term));
-        assertEq(auctionHouse.getAuction(loanId).caller, caller);
-        assertEq(auctionHouse.getAuction(loanId).borrower, borrower);
-        assertEq(auctionHouse.getAuction(loanId).collateralToken, address(collateral));
         assertEq(auctionHouse.getAuction(loanId).collateralAmount, 15e18);
         assertEq(auctionHouse.getAuction(loanId).debtAmount, 22_000e18);
         assertEq(auctionHouse.getAuction(loanId).ltvBuffer, _LTV_BUFFER);
@@ -198,7 +196,7 @@ contract AuctionHouseUnitTest is Test {
     function testStartAuctionFailNotALendingTerm() public {
         bytes32 loanId = _setupLoanAndSeizeCollateral();
 
-        vm.expectRevert("AuctionHouse: invalid gauge");
+        vm.expectRevert("AuctionHouse: invalid caller");
         auctionHouse.startAuction(loanId, 22_000e18, true);
     }
 
@@ -237,29 +235,13 @@ contract AuctionHouseUnitTest is Test {
         auctionHouse.startAuction(loanId, 19_000e18, true);
     }
 
-    // startAuction fail if no collateral is available on LendingTerm
-    function testStartAuctionFailNoCollateralLeft() public {
-        bytes32 loanId = _setupAndCallLoan();
-
-        // the LendingTerm calls startAuction during seize() but the collateral
-        // is not available on the LendingTerm anymore.
-        // (this would only happen due to invalid logic in the LendingTerm)
-        vm.startPrank(address(term));
-        collateral.transfer(governor, collateral.balanceOf(address(term)));
-        vm.warp(block.timestamp + term.callPeriod());
-        vm.roll(block.number + 1);
-        vm.expectRevert("ERC20: transfer amount exceeds balance");
-        term.seize(loanId);
-        vm.stopPrank();
-    }
-
     // getBidDetail at various steps
     function testGetBidDetailWithDiscount() public {
         bytes32 loanId = _setupLoanAndSeizeCollateral();
         assertEq(auctionHouse.getAuction(loanId).collateralAmount, 15e18);
         assertEq(auctionHouse.getAuction(loanId).debtAmount, 22_000e18);
-        uint256 PHASE_1_DURATION = auctionHouse.MIDPOINT();
-        uint256 PHASE_2_DURATION = auctionHouse.AUCTION_DURATION() - auctionHouse.MIDPOINT();
+        uint256 PHASE_1_DURATION = auctionHouse.midPoint();
+        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() - auctionHouse.midPoint();
 
         // right at the start of auction
         {
@@ -354,11 +336,11 @@ contract AuctionHouseUnitTest is Test {
 
     // getBidDetail at various steps
     function testGetBidDetailWithoutDiscount() public {
-        bytes32 loanId = _setupLoanAndOffboard();
+        bytes32 loanId = _setupLoanAndForceClose();
         assertEq(auctionHouse.getAuction(loanId).collateralAmount, 15e18);
         assertEq(auctionHouse.getAuction(loanId).debtAmount, 22_000e18);
-        uint256 PHASE_1_DURATION = auctionHouse.MIDPOINT();
-        uint256 PHASE_2_DURATION = auctionHouse.AUCTION_DURATION() - auctionHouse.MIDPOINT();
+        uint256 PHASE_1_DURATION = auctionHouse.midPoint();
+        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() - auctionHouse.midPoint();
 
         // right at the start of auction
         {
@@ -462,7 +444,7 @@ contract AuctionHouseUnitTest is Test {
         bytes32 loanId = _setupLoanAndSeizeCollateral();
         ( , uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
         credit.mint(address(this), creditAsked);
-        credit.approve(address(auctionHouse), creditAsked);
+        credit.approve(address(term), creditAsked);
         auctionHouse.bid(loanId);
 
         vm.expectRevert("AuctionHouse: auction ended");
@@ -480,7 +462,7 @@ contract AuctionHouseUnitTest is Test {
         bytes32 loanId = _setupLoanAndSeizeCollateral();
         ( , uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
         credit.mint(address(this), creditAsked);
-        credit.approve(address(auctionHouse), creditAsked);
+        credit.approve(address(term), creditAsked);
         auctionHouse.bid(loanId);
 
         // bid should close the loan
@@ -493,8 +475,8 @@ contract AuctionHouseUnitTest is Test {
     // bid success, that creates bad debt
     function testBidSuccessBadDebt() public {
         bytes32 loanId = _setupLoanAndSeizeCollateral();
-        uint256 PHASE_1_DURATION = auctionHouse.MIDPOINT();
-        uint256 PHASE_2_DURATION = auctionHouse.AUCTION_DURATION() - auctionHouse.MIDPOINT();
+        uint256 PHASE_1_DURATION = auctionHouse.midPoint();
+        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() - auctionHouse.midPoint();
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION + PHASE_2_DURATION / 2);
 
@@ -506,12 +488,12 @@ contract AuctionHouseUnitTest is Test {
         // bid
         credit.mint(bidder, 11_000e18);
         vm.startPrank(bidder);
-        credit.approve(address(auctionHouse), 11_000e18);
+        credit.approve(address(term), 11_000e18);
         auctionHouse.bid(loanId);
         vm.stopPrank();
 
         // check token locations
-        assertEq(collateral.balanceOf(address(auctionHouse)), 0);
+        assertEq(collateral.balanceOf(address(term)), 0);
         assertEq(collateral.balanceOf(bidder), 15e18);
         assertEq(collateral.totalSupply(), 15e18);
         assertEq(credit.balanceOf(borrower), 20_000e18);
@@ -524,7 +506,7 @@ contract AuctionHouseUnitTest is Test {
 
     // bid at various times (fuzz)
     function testBidSuccessFuzz(uint256 time) public {
-        vm.assume(time < auctionHouse.AUCTION_DURATION() * 2);
+        vm.assume(time < auctionHouse.auctionDuration() * 2);
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + time);
 
@@ -535,9 +517,9 @@ contract AuctionHouseUnitTest is Test {
         uint256 minCollateralForASafeLoan = 3e18;
 
         // check token locations
-        assertEq(collateral.balanceOf(address(auctionHouse)), 15e18);
+        assertEq(collateral.balanceOf(address(term)), 15e18);
         assertEq(collateral.totalSupply(), 15e18);
-        assertEq(credit.balanceOf(address(auctionHouse)), 1_000e18); // call fee
+        assertEq(credit.balanceOf(address(term)), 1_000e18); // call fee
         assertEq(credit.balanceOf(borrower), 20_000e18);
         assertEq(credit.totalSupply(), 21_000e18);
 
@@ -545,20 +527,20 @@ contract AuctionHouseUnitTest is Test {
         if (creditAsked != 0) {
             credit.mint(bidder, creditAsked);
             vm.prank(bidder);
-            credit.approve(address(auctionHouse), creditAsked);
+            credit.approve(address(term), creditAsked);
         }
         vm.prank(bidder);
         auctionHouse.bid(loanId);
 
         // bid should close the loan
         assertEq(auctionHouse.getAuction(loanId).endTime, block.timestamp);
+        assertEq(term.getLoan(loanId).bidTime, block.timestamp);
 
         // check token locations
-        assertEq(credit.balanceOf(address(auctionHouse)), 0);
+        assertEq(credit.balanceOf(address(term)), 0);
         assertEq(credit.balanceOf(borrower), 20_000e18);
         assertEq(credit.totalSupply(), 20_000e18);
-        assertEq(collateral.balanceOf(address(auctionHouse)), 0);
-        assertEq(collateral.balanceOf(borrower), collateralReturnedToBorrower);
+        assertEq(collateral.balanceOf(address(term)), 0);
         assertEq(collateral.balanceOf(bidder), collateralReceived);
         assertEq(collateral.totalSupply(), 15e18);
         // loan was safe
@@ -569,8 +551,10 @@ contract AuctionHouseUnitTest is Test {
             // all CREDIT minted by bidder to get collateral has been burnt, as well as the call fee
             assertEq(credit.balanceOf(borrower), 20_000e18);
             assertEq(credit.totalSupply(), 20_000e18);
+            // all collateral returned to borrower
+            assertEq(collateral.balanceOf(borrower), collateralReturnedToBorrower);
         }
-        // loan was unsafe of insolvent
+        // loan was unsafe or insolvent
         else {
             assertEq(credit.balanceOf(borrower), 20_000e18);
             assertEq(credit.balanceOf(caller), 1_000e18);
@@ -582,14 +566,20 @@ contract AuctionHouseUnitTest is Test {
             } else {
                 assertEq(guild.lastGaugeLoss(address(term)), 0); // no loss
             }
+
+            // part of collateral is sent to caller
+            uint256 collateralSentToCaller = _DANGER_PENALTY * collateralReturnedToBorrower / 1e18;
+            collateralReturnedToBorrower -= collateralSentToCaller;
+            assertEq(collateral.balanceOf(borrower), collateralReturnedToBorrower);
+            assertEq(collateral.balanceOf(caller), collateralSentToCaller);
         }
     }
 
     // forgive a loan after the bid period is ended
     function testForgive() public {
         bytes32 loanId = _setupLoanAndSeizeCollateral();
-        uint256 PHASE_1_DURATION = auctionHouse.MIDPOINT();
-        uint256 PHASE_2_DURATION = auctionHouse.AUCTION_DURATION() - auctionHouse.MIDPOINT();
+        uint256 PHASE_1_DURATION = auctionHouse.midPoint();
+        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() - auctionHouse.midPoint();
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION + PHASE_2_DURATION / 2);
 
@@ -610,7 +600,7 @@ contract AuctionHouseUnitTest is Test {
         vm.stopPrank();
 
         // check token locations
-        assertEq(collateral.balanceOf(address(auctionHouse)), 15e18);
+        assertEq(collateral.balanceOf(address(term)), 15e18);
         assertEq(collateral.totalSupply(), 15e18);
         assertEq(credit.balanceOf(borrower), 20_000e18);
         assertEq(credit.balanceOf(caller), 1_000e18);

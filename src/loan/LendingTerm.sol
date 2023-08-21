@@ -29,10 +29,11 @@ contract LendingTerm is EIP712, CoreRef {
     /// @notice emitted when a loan is called (repayer has `callPeriod` seconds to repay at a discount).
     event LoanCall(uint256 indexed when, bytes32 indexed loanId);
     /// @notice emitted when a loan is closed (repay, seize, forgive).
-    /// the lifecycle of the loan might continue in the AuctionHouse, but when this event is emitted, the
-    /// responsibility of the LendingTerm is over.
     /// closeType enum : 0 = repay, 1 = seize, 2 = forgive.
+    /// if closeType == 1 (seize), there will be a subsequent LoanBid event.
     event LoanClose(uint256 indexed when, bytes32 indexed loanId, uint8 indexed closeType, bool loanCalled);
+    /// @notice emitted when there is a bid on a loan's collateral to liquidate the position.
+    event LoanBid(uint256 indexed when, bytes32 indexed loanId, uint256 collateralSold, uint256 debtRecovered);
     /// @notice emitted when someone adds collateral to a loan
     event LoanAddCollateral(uint256 indexed when, bytes32 indexed loanId, address indexed borrower, uint256 collateralAmount);
     /// @notice emitted when someone partially repays a loan
@@ -158,7 +159,9 @@ contract LendingTerm is EIP712, CoreRef {
         address caller; // a caller of 0 indicates that the loan has not been called
         uint256 callTime; // a call time of 0 indicates that the loan has not been called
         uint256 originationTime; // the time the loan was initiated
-        uint256 closeTime; // the time the loan was closed (repaid or liquidated)
+        uint256 closeTime; // the time the loan was closed (repaid or seized)
+        uint256 debtWhenSeized; // the debt when the loan collateral has been seized
+        uint256 bidTime; // the time of auction bid when collateral was liquidated
     }
 
     /// @notice the list of all loans that existed or are still active
@@ -326,7 +329,9 @@ contract LendingTerm is EIP712, CoreRef {
             caller: address(0),
             callTime: 0,
             originationTime: block.timestamp,
-            closeTime: 0
+            closeTime: 0,
+            debtWhenSeized: 0,
+            bidTime: 0
         });
         issuance = _postBorrowIssuance;
         if (maxDelayBetweenPartialRepay != 0) {
@@ -336,16 +341,17 @@ contract LendingTerm is EIP712, CoreRef {
         // mint debt to the borrower
         RateLimitedCreditMinter(creditMinter).mint(borrower, borrowAmount);
 
-        // pull the collateral from the borrower
-        IERC20(collateralToken).safeTransferFrom(borrower, address(this), collateralAmount);
-
         // pull opening fee from the borrower, if any
         if (openingFee != 0) {
             uint256 _openingFee = borrowAmount * openingFee / 1e18;
             // transfer from borrower to GuildToken & report profit
-            IERC20(creditToken).safeTransferFrom(borrower, guildToken, _openingFee);
-            GuildToken(guildToken).notifyPnL(address(this), int256(_openingFee));
+            address _guildToken = guildToken;
+            IERC20(creditToken).safeTransferFrom(borrower, _guildToken, _openingFee);
+            GuildToken(_guildToken).notifyPnL(address(this), int256(_openingFee));
         }
+
+        // pull the collateral from the borrower
+        IERC20(collateralToken).safeTransferFrom(borrower, address(this), collateralAmount);
 
         // emit event
         emit LoanBorrow(block.timestamp, loanId, borrower, collateralAmount, borrowAmount);
@@ -425,16 +431,6 @@ contract LendingTerm is EIP712, CoreRef {
         Signature calldata collateralPermitSig,
         Signature calldata creditPermitSig
     ) external whenNotPaused returns (bytes32 loanId) {
-        IERC20Permit(collateralToken).permit(
-            msg.sender,
-            address(this),
-            collateralAmount,
-            deadline,
-            collateralPermitSig.v,
-            collateralPermitSig.r,
-            collateralPermitSig.s
-        );
-
         IERC20Permit(creditToken).permit(
             msg.sender,
             address(this),
@@ -443,6 +439,16 @@ contract LendingTerm is EIP712, CoreRef {
             creditPermitSig.v,
             creditPermitSig.r,
             creditPermitSig.s
+        );
+
+        IERC20Permit(collateralToken).permit(
+            msg.sender,
+            address(this),
+            collateralAmount,
+            deadline,
+            collateralPermitSig.v,
+            collateralPermitSig.r,
+            collateralPermitSig.s
         );
 
         return _borrow(msg.sender, borrowAmount, collateralAmount);
@@ -529,16 +535,6 @@ contract LendingTerm is EIP712, CoreRef {
         address signer = ECDSA.recover(hash, borrowSig.v, borrowSig.r, borrowSig.s);
         require(signer == borrower, "LendingTerm: invalid signature");
 
-        IERC20Permit(collateralToken).permit(
-            borrower,
-            address(this),
-            collateralAmount,
-            deadline,
-            collateralPermitSig.v,
-            collateralPermitSig.r,
-            collateralPermitSig.s
-        );
-
         IERC20Permit(creditToken).permit(
             borrower,
             address(this),
@@ -547,6 +543,16 @@ contract LendingTerm is EIP712, CoreRef {
             creditPermitSig.v,
             creditPermitSig.r,
             creditPermitSig.s
+        );
+
+        IERC20Permit(collateralToken).permit(
+            borrower,
+            address(this),
+            collateralAmount,
+            deadline,
+            collateralPermitSig.v,
+            collateralPermitSig.r,
+            collateralPermitSig.s
         );
 
         return _borrow(borrower, borrowAmount, collateralAmount);
@@ -797,12 +803,13 @@ contract LendingTerm is EIP712, CoreRef {
         );
         if (interest != 0) {
             // forward profit portion to the GUILD token, burn the rest
-            IERC20(_creditToken).transfer(guildToken, interest);
+            address _guildToken = guildToken;
+            IERC20(_creditToken).transfer(_guildToken, interest);
             CreditToken(_creditToken).burn(borrowAmount); // == loan.borrowAmount
             RateLimitedCreditMinter(creditMinter).replenishBuffer(borrowAmount);
 
             // report profit
-            GuildToken(guildToken).notifyPnL(address(this), int256(interest));
+            GuildToken(_guildToken).notifyPnL(address(this), int256(interest));
         }
 
         // close the loan
@@ -1033,15 +1040,11 @@ contract LendingTerm is EIP712, CoreRef {
 
     /// @notice seize the collateral of a loan, to repay outstanding debt.
     /// Under normal conditions, the loans should be call()'d first, to give the borrower an opportunity to repay (the 'call period').
-    /// Calling of loans can be skipped if the `issuance` is above `hardCap` or if a loan missed a periodic partialRepay.
+    /// Calling of loans can be skipped if the `hardCap` is zero (bad debt created in the past) or if a loan missed a periodic partialRepay.
     function _seize(
         bytes32 loanId,
-        address _auctionHouse,
-        uint256 issuanceBefore
-    ) internal returns (
-        uint256 debtToForward,
-        uint256 issuanceDecrease
-    ) {
+        address _auctionHouse
+    ) internal {
         Loan storage loan = loans[loanId];
 
         // check that the loan exists
@@ -1053,80 +1056,48 @@ contract LendingTerm is EIP712, CoreRef {
         // set the call info, if not set
         uint256 _callTime = loan.callTime;
         bool loanCalled = _callTime != 0;
-        bool canSkipCall = issuanceBefore > hardCap || partialRepayDelayPassed(loanId);
+        bool canSkipCall = hardCap == 0 || partialRepayDelayPassed(loanId);
         if (loanCalled) {
             // check that the call period has elapsed
             if (!canSkipCall) {
                 require(block.timestamp >= loan.callTime + callPeriod, "LendingTerm: call period in progress");
             }
-            debtToForward = getLoanCallFee(loanId);
         } else {
             require(canSkipCall, "LendingTerm: loan not called");
-            loan.caller = msg.sender;
+            loan.caller = address(this);
             loan.callTime = block.timestamp;
         }
 
         // close the loan
         uint256 loanDebt = getLoanDebt(loanId);
         loans[loanId].closeTime = block.timestamp;
-        issuanceDecrease = loan.borrowAmount;
+        loans[loanId].debtWhenSeized = loanDebt;
 
         // auction the loan collateral
-        IERC20(collateralToken).safeApprove(_auctionHouse, loan.collateralAmount);
         AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
 
         // emit event
         emit LoanClose(block.timestamp, loanId, 1, loanCalled);
     }
 
-    /// @notice seize a single loan without attempt to skip the call period.
+    /// @notice seize the collateral of a single loan
     function seize(bytes32 loanId) external {
-        address _auctionHouse = auctionHouse;
-        uint256 _issuance = issuance;
-        (
-            uint256 debtToForward,
-            uint256 issuanceDecrease
-        ) = _seize(loanId, _auctionHouse, _issuance);
-
-        // send CREDIT from the call fees to the auction house
-        if (debtToForward != 0) {
-            IERC20(creditToken).transfer(_auctionHouse, debtToForward);
-        }
-
-        // update issuance
-        issuance = _issuance - issuanceDecrease;
+        _seize(loanId, auctionHouse);
     }
 
     /// @notice seize the collateral of a list of loans
     function seizeMany(bytes32[] memory loanIds) public {
         address _auctionHouse = auctionHouse;
-        uint256 newIssuance = issuance;
-        uint256 totalDebtToForward;
         for (uint256 i = 0; i < loanIds.length; i++) {
-            (
-                uint256 debtToForward,
-                uint256 issuanceDecrease
-            ) = _seize(loanIds[i], _auctionHouse, newIssuance);
-
-            newIssuance -= issuanceDecrease;
-            totalDebtToForward += debtToForward;
+            _seize(loanIds[i], _auctionHouse);
         }
-
-        // send CREDIT from the call fees to the auction house
-        if (totalDebtToForward != 0) {
-            IERC20(creditToken).transfer(_auctionHouse, totalDebtToForward);
-        }
-
-        // update issuance
-        issuance = newIssuance;
     }
 
     /// @notice forgive a loan, marking its debt as a total loss to the system.
     /// The loan is closed (borrower keeps the CREDIT), and the collateral stays on the LendingTerm.
     /// Governance can later unstuck the collateral through `emergencyAction`.
     /// This function is made for emergencies where collateral is frozen or other reverting
-    /// conditions on collateral transfers that prevent it from being sent to the auctionHouse
-    /// for a regular repay() or seize() loan closing.
+    /// conditions on collateral transfers that prevent regular repay() or seize() loan closing.
     function forgive(bytes32 loanId) external onlyCoreRole(CoreRoles.GOVERNOR) {
         Loan storage loan = loans[loanId];
 
@@ -1157,9 +1128,115 @@ contract LendingTerm is EIP712, CoreRef {
         emit LoanClose(block.timestamp, loanId, 2, loanCalled);
     }
 
+    /// @notice callback from the auctionHouse when au auction concludes
+    function onBid(bytes32 loanId, address bidder, AuctionHouse.AuctionResult memory result) external {
+        // preliminary checks
+        require(msg.sender == auctionHouse, "LendingTerm: invalid caller");
+        uint256 _debtWhenSeized = loans[loanId].debtWhenSeized;
+        require(_debtWhenSeized != 0, "LendingTerm: loan not seized");
+        require(loans[loanId].bidTime == 0, "LendingTerm: loan auction concluded");
+
+        // sanity checks
+        // these should never fail for a properly implemented AuctionHouse contract
+        // collateral movements (collateralOut == 0 if forgive())
+        uint256 collateralOut = result.collateralToBorrower + result.collateralToCaller + result.collateralToBidder;
+        require(collateralOut == loans[loanId].collateralAmount || collateralOut == 0, "LendingTerm: invalid collateral movements");
+        // credit movements
+        uint256 _borrowAmount = loans[loanId].borrowAmount;
+        address _caller = loans[loanId].caller;
+        uint256 _callFeeAmount =  _borrowAmount * callFee / 1e18;
+        require(
+            (_caller == address(this) && result.creditToCaller == 0) || // force closed
+            (_caller != address(this) && result.creditToCaller == 0) || // loan called not in danger zone
+            (_caller != address(this) && result.creditToCaller == _callFeeAmount), // loan called & in danger zone
+            "LendingTerm: invalid call fee"
+        );
+        uint256 creditFromCaller = _caller == address(this) ? 0 : _callFeeAmount;
+        uint256 creditIn = result.creditFromBidder + creditFromCaller;
+        uint256 creditOut = result.creditToCaller + result.creditToBurn + result.creditToProfit;
+        require(creditIn == creditOut, "LendingTerm: invalid bid credit movement");
+        if (result.pnl > 0) {
+            require(result.creditToProfit == uint256(result.pnl), "LendingTerm: invalid profit reported");
+            require(result.creditToBurn == _borrowAmount, "LendingTerm: invalid principal burn");
+        } else {
+            require(result.creditToProfit == 0, "LendingTerm: invalid negative profit");
+            require(result.creditToBurn == result.creditFromBidder, "LendingTerm: invalid negative principal burn");
+            require(uint256(-result.pnl) == _borrowAmount - result.creditFromBidder, "LendingTerm: invalid negative pnl");
+        }
+        require(result.pnl == int256(creditIn) - int256(_borrowAmount) - int256(result.creditToCaller), "LendingTerm: invalid pnl");
+
+        // save bid time
+        loans[loanId].bidTime = block.timestamp;
+
+        // pull credit from bidder
+        address _creditToken = creditToken;
+        if (result.creditFromBidder != 0) {
+            CreditToken(_creditToken).transferFrom(bidder, address(this), result.creditFromBidder);
+        }
+
+        // send credit to caller
+        if (result.creditToCaller != 0) {
+            CreditToken(_creditToken).transfer(loans[loanId].caller, result.creditToCaller);
+        }
+
+        // burn credit principal
+        if (result.creditToBurn != 0) {
+            RateLimitedCreditMinter(creditMinter).replenishBuffer(result.creditToBurn);
+            CreditToken(_creditToken).burn(result.creditToBurn);
+        }
+
+        // handle profit & losses
+        if (result.pnl != 0) {
+            address _guildToken = guildToken;
+            if (result.pnl > 0) {
+                // forward profit to GuildToken before notifying it of profits
+                // the GuildToken will handle profit distribution.
+                IERC20(_creditToken).transfer(_guildToken, result.creditToProfit);
+            }
+            else if (result.pnl < 0) {
+                // if auction resulted in bad debt, prevent new loans from being issued and allow
+                // force-closing of all loans (seize() without call() first).
+                hardCap = 0;
+            }
+            GuildToken(_guildToken).notifyPnL(address(this), result.pnl);
+        }
+
+        // decrease issuance
+        issuance -= loans[loanId].borrowAmount;
+
+        // send collateral to borrower
+        address _collateralToken = collateralToken;
+        if (result.collateralToBorrower != 0) {
+            IERC20(_collateralToken).safeTransfer(loans[loanId].borrower, result.collateralToBorrower);
+        }
+
+        // send collateral to caller
+        if (result.collateralToCaller != 0) {
+            IERC20(_collateralToken).safeTransfer(loans[loanId].caller, result.collateralToCaller);
+        }
+
+        // send collateral to bidder
+        if (result.collateralToBidder != 0) {
+            IERC20(_collateralToken).safeTransfer(bidder, result.collateralToBidder);
+        }
+
+        emit LoanBid(
+            block.timestamp,
+            loanId,
+            result.collateralToBidder,
+            result.creditFromBidder
+        );
+    }
+
     /// @notice set the address of the auction house.
     /// governor-only, to allow full governance to update the auction mechanisms.
     function setAuctionHouse(address _newValue) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        // allow configuration changes only when there are no auctions in progress.
+        // updating the auction house while auctions are in progress could break the loan
+        // lifecycle, as it would prevent the former auctionHouse (that have active auctions)
+        // from reporting the result to the lending term.
+        require(AuctionHouse(auctionHouse).nAuctionsInProgress() == 0, "LendingTerm: auctions in progress");
+
         auctionHouse = _newValue;
     }
 
