@@ -11,10 +11,9 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 /// of a lending term, and if enough GUILD holders vote for a removal poll, the term can be offboarded.
 /// When a term is offboarded, no new loans can be issued
 contract LendingTermOffboarding is CoreRef {
-
     /// @notice emitted when a user supports the removal of a lending term
     event OffboardSupport(
-        uint256 indexed timestamp, 
+        uint256 indexed timestamp,
         address indexed term,
         uint256 indexed snapshotBlock,
         address user,
@@ -41,14 +40,14 @@ contract LendingTermOffboarding is CoreRef {
 
     /// @notice list of removal polls created.
     /// keys = [snapshotBlock][termAddress] -> quorum supporting the removal.
-    mapping(uint256=>mapping(address=>uint256)) public polls;
+    mapping(uint256 => mapping(address => uint256)) public polls;
 
     /// @notice block number of last removal polls created for each term.
     /// key = [termAddress] -> block number.
-    mapping(address=>uint256) public lastPollBlock;
+    mapping(address => uint256) public lastPollBlock;
 
     /// @notice mapping of terms that can be offboarded.
-    mapping(address=>bool) public canOffboard;
+    mapping(address => bool) public canOffboard;
 
     constructor(
         address _core,
@@ -60,7 +59,9 @@ contract LendingTermOffboarding is CoreRef {
     }
 
     /// @notice set the quorum for offboard votes
-    function setQuorum(uint256 _quorum) external onlyCoreRole(CoreRoles.GOVERNOR) {
+    function setQuorum(
+        uint256 _quorum
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         emit QuorumUpdated(quorum, _quorum);
         quorum = _quorum;
     }
@@ -70,29 +71,56 @@ contract LendingTermOffboarding is CoreRef {
     /// that counts the number of user supports (a value of 0 is used as the existence
     /// check to know if a poll has been created).
     function proposeOffboard(address term) external whenNotPaused {
-        require(polls[block.number][term] == 0, "LendingTermOffboarding: poll exists");
-        require(block.number > lastPollBlock[term] + POLL_DURATION_BLOCKS, "LendingTermOffboarding: poll active");
+        require(
+            polls[block.number][term] == 0,
+            "LendingTermOffboarding: poll exists"
+        );
+        require(
+            block.number > lastPollBlock[term] + POLL_DURATION_BLOCKS,
+            "LendingTermOffboarding: poll active"
+        );
 
         polls[block.number][term] = 1; // voting power
         lastPollBlock[term] = block.number;
-        emit OffboardSupport(block.timestamp, term, block.number, address(0), 1);
+        emit OffboardSupport(
+            block.timestamp,
+            term,
+            block.number,
+            address(0),
+            1
+        );
     }
 
     /// @notice Support a poll to offboard a given LendingTerm.
-    function supportOffboard(uint256 snapshotBlock, address term) external whenNotPaused {
-        require(block.number <= snapshotBlock + POLL_DURATION_BLOCKS, "LendingTermOffboarding: poll expired");
+    function supportOffboard(
+        uint256 snapshotBlock,
+        address term
+    ) external whenNotPaused {
+        require(
+            block.number <= snapshotBlock + POLL_DURATION_BLOCKS,
+            "LendingTermOffboarding: poll expired"
+        );
         uint256 _weight = polls[snapshotBlock][term];
         require(_weight != 0, "LendingTermOffboarding: poll not found");
-        uint256 userWeight = GuildToken(guildToken).getPastVotes(msg.sender, snapshotBlock);
+        uint256 userWeight = GuildToken(guildToken).getPastVotes(
+            msg.sender,
+            snapshotBlock
+        );
         require(userWeight != 0, "LendingTermOffboarding: zero weight");
 
         polls[snapshotBlock][term] = _weight + userWeight;
         if (_weight + userWeight >= quorum) {
             canOffboard[term] = true;
         }
-        emit OffboardSupport(block.timestamp, term, snapshotBlock, msg.sender, userWeight);
+        emit OffboardSupport(
+            block.timestamp,
+            term,
+            snapshotBlock,
+            msg.sender,
+            userWeight
+        );
     }
-    
+
     /// @notice Offboard a LendingTerm.
     /// This will prevent new loans from being open, and will prevent GUILD holders to vote for the term.
     /// @param term LendingTerm to offboard from the system.
@@ -117,7 +145,10 @@ contract LendingTermOffboarding is CoreRef {
     /// @param term LendingTerm to cleanup.
     function cleanup(address term) external whenNotPaused {
         require(canOffboard[term], "LendingTermOffboarding: quorum not met");
-        require(LendingTerm(term).issuance() == 0, "LendingTermOffboarding: not all loans closed");
+        require(
+            LendingTerm(term).issuance() == 0,
+            "LendingTermOffboarding: not all loans closed"
+        );
 
         // self-grant permissions
         core().grantRole(CoreRoles.TERM_HARDCAP, address(this));

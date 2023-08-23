@@ -15,7 +15,12 @@ import {ERC20RebaseDistributor} from "@src/tokens/ERC20RebaseDistributor.sol";
 @author eswak
 @notice This is the debt token of the Ethereum Credit Guild.
 */
-contract CreditToken is CoreRef, ERC20Burnable, ERC20MultiVotes, ERC20RebaseDistributor {
+contract CreditToken is
+    CoreRef,
+    ERC20Burnable,
+    ERC20MultiVotes,
+    ERC20RebaseDistributor
+{
     constructor(
         address _core
     )
@@ -51,7 +56,10 @@ contract CreditToken is CoreRef, ERC20Burnable, ERC20MultiVotes, ERC20RebaseDist
     function forceEnterRebase(
         address account
     ) external onlyCoreRole(CoreRoles.CREDIT_REBASE_PARAMETERS) {
-        require(rebasingState[account].isRebasing == 0, "CreditToken: already rebasing");
+        require(
+            rebasingState[account].isRebasing == 0,
+            "CreditToken: already rebasing"
+        );
         _enterRebase(account);
     }
 
@@ -59,7 +67,10 @@ contract CreditToken is CoreRef, ERC20Burnable, ERC20MultiVotes, ERC20RebaseDist
     function forceExitRebase(
         address account
     ) external onlyCoreRole(CoreRoles.CREDIT_REBASE_PARAMETERS) {
-        require(rebasingState[account].isRebasing == 1, "CreditToken: not rebasing");
+        require(
+            rebasingState[account].isRebasing == 1,
+            "CreditToken: not rebasing"
+        );
         _exitRebase(account);
     }
 
@@ -88,14 +99,23 @@ contract CreditToken is CoreRef, ERC20Burnable, ERC20MultiVotes, ERC20RebaseDist
         return ERC20RebaseDistributor.balanceOf(account);
     }
 
-    function totalSupply() public view override(ERC20, ERC20RebaseDistributor) returns (uint256) {
+    function totalSupply()
+        public
+        view
+        override(ERC20, ERC20RebaseDistributor)
+        returns (uint256)
+    {
         return ERC20RebaseDistributor.totalSupply();
     }
 
     function transfer(
         address to,
         uint256 amount
-    ) public override(ERC20, ERC20MultiVotes, ERC20RebaseDistributor) returns (bool) {
+    )
+        public
+        override(ERC20, ERC20MultiVotes, ERC20RebaseDistributor)
+        returns (bool)
+    {
         _decrementVotesUntilFree(msg.sender, amount); // from ERC20MultiVotes
         return ERC20RebaseDistributor.transfer(to, amount);
     }
@@ -104,7 +124,11 @@ contract CreditToken is CoreRef, ERC20Burnable, ERC20MultiVotes, ERC20RebaseDist
         address from,
         address to,
         uint256 amount
-    ) public override(ERC20, ERC20MultiVotes, ERC20RebaseDistributor) returns (bool) {
+    )
+        public
+        override(ERC20, ERC20MultiVotes, ERC20RebaseDistributor)
+        returns (bool)
+    {
         _decrementVotesUntilFree(from, amount); // from ERC20MultiVotes
         return ERC20RebaseDistributor.transferFrom(from, to, amount);
     }

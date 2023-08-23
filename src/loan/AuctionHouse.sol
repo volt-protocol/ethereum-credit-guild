@@ -74,7 +74,7 @@ contract AuctionHouse is CoreRef {
 
     /// @notice the list of all auctions that existed or are still active.
     /// key is the loanId for which the auction has been created.
-    mapping(bytes32=>Auction) public auctions;
+    mapping(bytes32 => Auction) public auctions;
 
     /// @notice number of auctions currently in progress
     uint256 public nAuctionsInProgress;
@@ -101,19 +101,35 @@ contract AuctionHouse is CoreRef {
     /// @param loanId the ID of the loan which collateral is auctioned
     /// @param debtAmount the amount of CREDIT debt to recover from the collateral auction
     /// @param loanCalled true if the call fee has been collected
-    function startAuction(bytes32 loanId, uint256 debtAmount, bool loanCalled) external whenNotPaused {
+    function startAuction(
+        bytes32 loanId,
+        uint256 debtAmount,
+        bool loanCalled
+    ) external whenNotPaused {
         // check that caller is a lending term that hasn't been offboarded
-        require(core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, msg.sender), "AuctionHouse: invalid caller");
+        require(
+            core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, msg.sender),
+            "AuctionHouse: invalid caller"
+        );
 
         // check the loan exists in calling lending term and has been closed in the current block
         LendingTerm.Loan memory loan = LendingTerm(msg.sender).getLoan(loanId);
-        require(loan.closeTime == block.timestamp, "AuctionHouse: loan previously closed");
+        require(
+            loan.closeTime == block.timestamp,
+            "AuctionHouse: loan previously closed"
+        );
 
         // sanity check: debt is at least the borrowed amount
-        require(debtAmount >= loan.borrowAmount, "AuctionHouse: negative interest");
+        require(
+            debtAmount >= loan.borrowAmount,
+            "AuctionHouse: negative interest"
+        );
 
         // check auction for this loan has not already been created
-        require(auctions[loanId].startTime == 0, "AuctionHouse: auction exists");
+        require(
+            auctions[loanId].startTime == 0,
+            "AuctionHouse: auction exists"
+        );
 
         // save auction in state
         auctions[loanId] = Auction({
@@ -124,7 +140,8 @@ contract AuctionHouse is CoreRef {
             borrowAmount: loan.borrowAmount,
             debtAmount: debtAmount,
             ltvBuffer: LendingTerm(msg.sender).ltvBuffer(),
-            callFeeAmount: loan.borrowAmount * LendingTerm(msg.sender).callFee() / 1e18,
+            callFeeAmount: (loan.borrowAmount *
+                LendingTerm(msg.sender).callFee()) / 1e18,
             loanCalled: loanCalled
         });
         nAuctionsInProgress++;
@@ -142,10 +159,12 @@ contract AuctionHouse is CoreRef {
     /// @notice Get the bid details for an active auction.
     /// During the first half of the auction, an increasing amount of the collateral is offered, for the full CREDIT amount.
     /// During the second half of the action, all collateral is offered, for a decreasing CREDIT amount.
-    /// If less collateral than the LTV buffer is left after the bid (loan with bad debt or in danger zone), 
+    /// If less collateral than the LTV buffer is left after the bid (loan with bad debt or in danger zone),
     /// the CREDIT amount asked is increased by the call fee, to reimburse the call fee to the caller, instead of letting
     /// the borrower recover more of their collateral.
-    function getBidDetail(bytes32 loanId) public view returns (uint256 collateralReceived, uint256 creditAsked) {
+    function getBidDetail(
+        bytes32 loanId
+    ) public view returns (uint256 collateralReceived, uint256 creditAsked) {
         // check the auction for this loan exists
         uint256 _startTime = auctions[loanId].startTime;
         require(_startTime != 0, "AuctionHouse: invalid auction");
@@ -166,11 +185,15 @@ contract AuctionHouse is CoreRef {
             // compute amount of collateral received
             uint256 elapsed = block.timestamp - _startTime; // [0, midPoint[
             uint256 _collateralAmount = auctions[loanId].collateralAmount; // SLOAD
-            collateralReceived = _collateralAmount * elapsed / midPoint;
+            collateralReceived = (_collateralAmount * elapsed) / midPoint;
 
             // discount debt by the call fee if collateral left is above LTV buffer
-            uint256 minCollateralLeft = _collateralAmount * auctions[loanId].ltvBuffer / 1e18;
-            if (_collateralAmount - collateralReceived > minCollateralLeft && auctions[loanId].loanCalled) {
+            uint256 minCollateralLeft = (_collateralAmount *
+                auctions[loanId].ltvBuffer) / 1e18;
+            if (
+                _collateralAmount - collateralReceived > minCollateralLeft &&
+                auctions[loanId].loanCalled
+            ) {
                 creditAsked -= auctions[loanId].callFeeAmount;
             }
         }
@@ -183,7 +206,10 @@ contract AuctionHouse is CoreRef {
             uint256 PHASE_2_DURATION = auctionDuration - midPoint;
             uint256 elapsed = block.timestamp - _startTime - midPoint; // [0, PHASE_2_DURATION[
             uint256 _debtAmount = auctions[loanId].debtAmount;
-            creditAsked = _debtAmount - _debtAmount * elapsed / PHASE_2_DURATION;
+            creditAsked =
+                _debtAmount -
+                (_debtAmount * elapsed) /
+                PHASE_2_DURATION;
         }
         // second phase fully elapsed, anyone can receive the full collateral and give 0 CREDIT
         // in practice, somebody should have taken the arb before we reach this condition.
@@ -200,7 +226,9 @@ contract AuctionHouse is CoreRef {
     function bid(bytes32 loanId) external whenNotPaused {
         // this view function will revert if the auction is not started,
         // or if the auction is already ended.
-        (uint256 collateralReceived, uint256 creditAsked) = getBidDetail(loanId);
+        (uint256 collateralReceived, uint256 creditAsked) = getBidDetail(
+            loanId
+        );
 
         // close the auction in state
         auctions[loanId].endTime = block.timestamp;
@@ -210,23 +238,30 @@ contract AuctionHouse is CoreRef {
         bool _loanCalled = auctions[loanId].loanCalled;
         uint256 _callFeeAmount = auctions[loanId].callFeeAmount;
         AuctionResult memory result;
-        result.collateralToBorrower = auctions[loanId].collateralAmount - collateralReceived;
+        result.collateralToBorrower =
+            auctions[loanId].collateralAmount -
+            collateralReceived;
         //result.collateralToCaller = 0; // implicit
         result.collateralToBidder = collateralReceived;
         result.creditFromBidder = creditAsked;
         //result.creditToCaller = 0; // implicit
         result.creditToBurn = creditAsked + (_loanCalled ? _callFeeAmount : 0);
         //result.creditToProfit = 0; // implicit
-        result.pnl = int256(result.creditToBurn) - int256(auctions[loanId].borrowAmount);
+        result.pnl =
+            int256(result.creditToBurn) -
+            int256(auctions[loanId].borrowAmount);
 
         // if loan was unsafe, reimburse the call fee to caller and allocate them
         // part of the collateral that is left.
-        uint256 minCollateralLeft = (result.collateralToBorrower + collateralReceived) * auctions[loanId].ltvBuffer / 1e18;
+        uint256 minCollateralLeft = ((result.collateralToBorrower +
+            collateralReceived) * auctions[loanId].ltvBuffer) / 1e18;
         if (_loanCalled && result.collateralToBorrower < minCollateralLeft) {
             result.creditToCaller += _callFeeAmount;
             result.creditToBurn -= _callFeeAmount;
             result.pnl -= int256(_callFeeAmount);
-            result.collateralToCaller += result.collateralToBorrower * dangerPenalty / 1e18;
+            result.collateralToCaller +=
+                (result.collateralToBorrower * dangerPenalty) /
+                1e18;
             result.collateralToBorrower -= result.collateralToCaller;
         }
 
@@ -236,9 +271,13 @@ contract AuctionHouse is CoreRef {
             result.creditToBurn -= uint256(result.pnl);
             result.creditToProfit = uint256(result.pnl);
         }
-        
+
         // notify LendingTerm of auction result
-        LendingTerm(auctions[loanId].lendingTerm).onBid(loanId, msg.sender, result);
+        LendingTerm(auctions[loanId].lendingTerm).onBid(
+            loanId,
+            msg.sender,
+            result
+        );
 
         // emit event
         emit AuctionEnd(
@@ -257,7 +296,7 @@ contract AuctionHouse is CoreRef {
     function forgive(bytes32 loanId) external whenNotPaused {
         // this view function will revert if the auction is not started,
         // or if the auction is already ended.
-        ( , uint256 creditAsked) = getBidDetail(loanId);
+        (, uint256 creditAsked) = getBidDetail(loanId);
         require(creditAsked == 0, "AuctionHouse: ongoing auction");
 
         // close the auction in state
@@ -272,13 +311,19 @@ contract AuctionHouse is CoreRef {
         //result.collateralToCaller = 0; // implicit
         //result.collateralToBidder = 0; // implicit
         //result.creditFromBidder = 0; // implicit
-        result.creditToCaller = _loanCalled ? auctions[loanId].callFeeAmount : 0;
+        result.creditToCaller = _loanCalled
+            ? auctions[loanId].callFeeAmount
+            : 0;
         //result.creditToBurn = 0; // implicit
         //result.creditToProfit = 0; // implicit
         result.pnl = -int256(auctions[loanId].borrowAmount);
 
         // notify LendingTerm of auction result
-        LendingTerm(auctions[loanId].lendingTerm).onBid(loanId, msg.sender, result);
+        LendingTerm(auctions[loanId].lendingTerm).onBid(
+            loanId,
+            msg.sender,
+            result
+        );
 
         // emit event
         emit AuctionEnd(

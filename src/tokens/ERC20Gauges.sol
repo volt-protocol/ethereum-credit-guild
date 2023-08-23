@@ -114,7 +114,8 @@ abstract contract ERC20Gauges is ERC20 {
 
     /// @notice see `getGaugeCycleEnd()`
     function _getGaugeCycleEnd() internal view returns (uint32) {
-        uint32 nowPlusOneCycle = block.timestamp.safeCastTo32() + gaugeCycleLength;
+        uint32 nowPlusOneCycle = block.timestamp.safeCastTo32() +
+            gaugeCycleLength;
         unchecked {
             return (nowPlusOneCycle / gaugeCycleLength) * gaugeCycleLength; // cannot divide by zero and always <= nowPlusOneCycle so no overflow
         }
@@ -258,7 +259,7 @@ abstract contract ERC20Gauges is ERC20 {
         uint112 total = _totalWeight.currentWeight;
         if (total == 0) return 0;
         uint112 weight = _getGaugeWeight[gauge].currentWeight;
-        
+
         return (quantity * weight) / total;
     }
 

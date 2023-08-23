@@ -45,10 +45,11 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     address public credit;
 
     /// @notice profit index of a given gauge
-    mapping(address=>uint256) internal gaugeProfitIndex;
+    mapping(address => uint256) internal gaugeProfitIndex;
 
     /// @notice profit index of a given user in a given gauge
-    mapping(address=>mapping(address=>uint256)) internal userGaugeProfitIndex;
+    mapping(address => mapping(address => uint256))
+        internal userGaugeProfitIndex;
 
     /// @dev internal structure used to optimize storage read, public functions use
     /// uint256 numbers with 18 decimals.
@@ -179,7 +180,12 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     );
 
     /// @notice emitted when a GUILD member claims their CREDIT rewards.
-    event ClaimRewards(uint256 indexed when, address indexed user, address indexed gauge, uint256 amount);
+    event ClaimRewards(
+        uint256 indexed when,
+        address indexed user,
+        address indexed gauge,
+        uint256 amount
+    );
 
     /// @notice last block.timestamp when a loss occurred in a given gauge
     mapping(address => uint256) public lastGaugeLoss;
@@ -200,8 +206,11 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         } else {
             require(otherSplit != 0, "GuildToken: invalid config");
         }
-        require(surplusBufferSplit + otherSplit + guildSplit + creditSplit == 1e18, "GuildToken: invalid config");
-        
+        require(
+            surplusBufferSplit + otherSplit + guildSplit + creditSplit == 1e18,
+            "GuildToken: invalid config"
+        );
+
         profitSharingConfig = GuildProfitSharing({
             surplusBufferSplit: uint32(surplusBufferSplit / 1e9),
             guildSplit: uint32(guildSplit / 1e9),
@@ -219,14 +228,20 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     }
 
     /// @notice get the profit sharing config.
-    function getProfitSharingConfig() external view returns (
-        uint256 surplusBufferSplit,
-        uint256 creditSplit,
-        uint256 guildSplit,
-        uint256 otherSplit,
-        address otherRecipient
-    ) {
-        surplusBufferSplit = uint256(profitSharingConfig.surplusBufferSplit) * 1e9;
+    function getProfitSharingConfig()
+        external
+        view
+        returns (
+            uint256 surplusBufferSplit,
+            uint256 creditSplit,
+            uint256 guildSplit,
+            uint256 otherSplit,
+            address otherRecipient
+        )
+    {
+        surplusBufferSplit =
+            uint256(profitSharingConfig.surplusBufferSplit) *
+            1e9;
         guildSplit = uint256(profitSharingConfig.guildSplit) * 1e9;
         otherSplit = uint256(profitSharingConfig.otherSplit) * 1e9;
         creditSplit = 1e18 - surplusBufferSplit - guildSplit - otherSplit;
@@ -242,7 +257,9 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     }
 
     /// @notice withdraw from surplus buffer
-    function withdrawFromSurplusBuffer(uint256 amount) external onlyCoreRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW) {
+    function withdrawFromSurplusBuffer(
+        uint256 amount
+    ) external onlyCoreRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW) {
         uint256 newSurplusBuffer = surplusBuffer - amount; // this would revert due to underflow if withdrawing > surplusBuffer
         surplusBuffer = newSurplusBuffer;
         CreditToken(credit).transfer(msg.sender, amount);
@@ -269,7 +286,10 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             if (loss < _surplusBuffer) {
                 // deplete the surplus buffer
                 surplusBuffer = _surplusBuffer - loss;
-                emit SurplusBufferUpdate(block.timestamp, _surplusBuffer - loss);
+                emit SurplusBufferUpdate(
+                    block.timestamp,
+                    _surplusBuffer - loss
+                );
                 CreditToken(credit).burn(loss);
             } else {
                 // empty the surplus buffer
@@ -280,30 +300,47 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
 
                 // update the CREDIT multiplier
                 uint256 creditTotalSupply = ERC20(credit).totalSupply();
-                uint256 newCreditMultiplier = creditMultiplier * (creditTotalSupply - loss) / creditTotalSupply;
+                uint256 newCreditMultiplier = (creditMultiplier *
+                    (creditTotalSupply - loss)) / creditTotalSupply;
                 creditMultiplier = newCreditMultiplier;
-                emit CreditMultiplierUpdate(block.timestamp, newCreditMultiplier);
+                emit CreditMultiplierUpdate(
+                    block.timestamp,
+                    newCreditMultiplier
+                );
             }
         }
         // handling profit
         else if (amount > 0) {
-            GuildProfitSharing memory _profitSharingConfig = profitSharingConfig;
-            uint256 amountForSurplusBuffer = uint256(amount) * uint256(_profitSharingConfig.surplusBufferSplit) / 1e9;
-            uint256 amountForGuild = uint256(amount) * uint256(_profitSharingConfig.guildSplit) / 1e9;
-            uint256 amountForOther = uint256(amount) * uint256(_profitSharingConfig.otherSplit) / 1e9;
-            uint256 amountForCredit = uint256(amount) - amountForSurplusBuffer - amountForGuild - amountForOther;
+            GuildProfitSharing
+                memory _profitSharingConfig = profitSharingConfig;
+            uint256 amountForSurplusBuffer = (uint256(amount) *
+                uint256(_profitSharingConfig.surplusBufferSplit)) / 1e9;
+            uint256 amountForGuild = (uint256(amount) *
+                uint256(_profitSharingConfig.guildSplit)) / 1e9;
+            uint256 amountForOther = (uint256(amount) *
+                uint256(_profitSharingConfig.otherSplit)) / 1e9;
+            uint256 amountForCredit = uint256(amount) -
+                amountForSurplusBuffer -
+                amountForGuild -
+                amountForOther;
 
             // distribute to surplus buffer
             if (amountForSurplusBuffer != 0) {
                 surplusBuffer = _surplusBuffer + amountForSurplusBuffer;
-                emit SurplusBufferUpdate(block.timestamp, _surplusBuffer + amountForSurplusBuffer);
+                emit SurplusBufferUpdate(
+                    block.timestamp,
+                    _surplusBuffer + amountForSurplusBuffer
+                );
             }
 
             // distribute to other
             if (amountForOther != 0) {
-                CreditToken(credit).transfer(_profitSharingConfig.otherRecipient, amountForOther);
+                CreditToken(credit).transfer(
+                    _profitSharingConfig.otherRecipient,
+                    amountForOther
+                );
             }
-            
+
             // distribute to lenders
             if (amountForCredit != 0) {
                 CreditToken(credit).distribute(amountForCredit);
@@ -315,13 +352,18 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
                 // if the gauge has 0 weight, does not update the profit index, this is unnecessary
                 // because the profit index is used to reattribute profit to users voting for the gauge,
                 // and if the weigth is 0, there are no users voting for the gauge.
-                uint256 _gaugeWeight = uint256(_getGaugeWeight[gauge].currentWeight);
+                uint256 _gaugeWeight = uint256(
+                    _getGaugeWeight[gauge].currentWeight
+                );
                 if (_gaugeWeight != 0) {
                     uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
                     if (_gaugeProfitIndex == 0) {
                         _gaugeProfitIndex = 1e18;
                     }
-                    gaugeProfitIndex[gauge] = _gaugeProfitIndex + amountForGuild * 1e18 / _gaugeWeight;
+                    gaugeProfitIndex[gauge] =
+                        _gaugeProfitIndex +
+                        (amountForGuild * 1e18) /
+                        _gaugeWeight;
                 }
             }
         }
@@ -334,7 +376,11 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// (increment gauge vote, decrement gauge vote).
     /// if `send` is true, sends the CREDIT tokens to the user.
     /// in any case, returns the new amount of credit earned.
-    function _claimUserGaugeRewards(address user, address gauge, bool send) internal returns (uint256 creditEarned) {
+    function _claimUserGaugeRewards(
+        address user,
+        address gauge,
+        bool send
+    ) internal returns (uint256 creditEarned) {
         uint256 _userGaugeWeight = uint256(getUserGaugeWeight[user][gauge]);
         if (_userGaugeWeight == 0) {
             return 0;
@@ -349,7 +395,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         }
         uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
         if (deltaIndex != 0) {
-            creditEarned = _userGaugeWeight * deltaIndex / 1e18;
+            creditEarned = (_userGaugeWeight * deltaIndex) / 1e18;
             userGaugeProfitIndex[user][gauge] = _gaugeProfitIndex;
         }
         if (creditEarned != 0) {
@@ -362,11 +408,17 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     }
 
     /// @notice read & return pending undistributed rewards for a given user
-    function getPendingRewards(address user) external view returns (
-        address[] memory gauges,
-        uint256[] memory creditEarned,
-        uint256 totalCreditEarned
-    ) {
+    function getPendingRewards(
+        address user
+    )
+        external
+        view
+        returns (
+            address[] memory gauges,
+            uint256[] memory creditEarned,
+            uint256 totalCreditEarned
+        )
+    {
         gauges = _userGauges[user].values();
         creditEarned = new uint256[](gauges.length);
 
@@ -383,8 +435,10 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             }
             uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
             if (deltaIndex != 0) {
-                uint256 _userGaugeWeight = uint256(getUserGaugeWeight[user][gauge]);
-                creditEarned[i] = _userGaugeWeight * deltaIndex / 1e18;
+                uint256 _userGaugeWeight = uint256(
+                    getUserGaugeWeight[user][gauge]
+                );
+                creditEarned[i] = (_userGaugeWeight * deltaIndex) / 1e18;
                 totalCreditEarned += creditEarned[i];
             }
 
@@ -395,7 +449,9 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     }
 
     /// @notice claim rewards for a given user
-    function claimRewards(address user) external returns (uint256 creditEarned) {
+    function claimRewards(
+        address user
+    ) external returns (uint256 creditEarned) {
         address[] memory gauges = _userGauges[user].values();
         for (uint256 i = 0; i < gauges.length; ) {
             creditEarned += _claimUserGaugeRewards(user, gauges[i], false);
@@ -495,7 +551,9 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         // issuance() is read with a try/catch to prevent broken terms from breaking the guild token.
         uint256 issuance;
         {
-            (bool success, bytes memory result) = gauge.staticcall(abi.encodeWithSignature("issuance()"));
+            (bool success, bytes memory result) = gauge.staticcall(
+                abi.encodeWithSignature("issuance()")
+            );
             if (success) {
                 issuance = uint256(bytes32(result));
             }
@@ -506,11 +564,17 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             if (!_deprecatedGauges.contains(gauge)) {
                 uint112 currentTotalWeight = _totalWeight.currentWeight;
                 if (currentTotalWeight != 0 && currentTotalWeight != weight) {
-                    uint112 currentGaugeWeight = _getGaugeWeight[gauge].currentWeight;
-                    debtCeilingAfterDecrement = creditTotalSupply * (currentGaugeWeight - weight) / (currentTotalWeight - weight);
+                    uint112 currentGaugeWeight = _getGaugeWeight[gauge]
+                        .currentWeight;
+                    debtCeilingAfterDecrement =
+                        (creditTotalSupply * (currentGaugeWeight - weight)) /
+                        (currentTotalWeight - weight);
                 }
             }
-            require(issuance <= debtCeilingAfterDecrement, "GuildToken: debt ceiling used");
+            require(
+                issuance <= debtCeilingAfterDecrement,
+                "GuildToken: debt ceiling used"
+            );
         }
 
         super._decrementGaugeWeight(user, gauge, weight, cycle);
@@ -558,17 +622,19 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
                         Inheritance reconciliation
     //////////////////////////////////////////////////////////////*/
 
-    function _burn(address from, uint256 amount)
-        internal
-        virtual
-        override(ERC20, ERC20Gauges, ERC20MultiVotes)
-    {
+    function _burn(
+        address from,
+        uint256 amount
+    ) internal virtual override(ERC20, ERC20Gauges, ERC20MultiVotes) {
         _decrementWeightUntilFree(from, amount);
         _decrementVotesUntilFree(from, amount);
         ERC20._burn(from, amount);
     }
 
-    function transfer(address to, uint256 amount)
+    function transfer(
+        address to,
+        uint256 amount
+    )
         public
         virtual
         override(ERC20, ERC20Gauges, ERC20MultiVotes)
