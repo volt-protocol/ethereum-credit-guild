@@ -549,11 +549,13 @@ contract GuildTokenUnitTest is Test {
 
     function testSetProfitSharingConfig() public {
         (
+            uint256 surplusBufferSplit,
             uint256 creditSplit,
             uint256 guildSplit,
             uint256 otherSplit,
             address otherRecipient
         ) = token.getProfitSharingConfig();
+        assertEq(surplusBufferSplit, 0);
         assertEq(creditSplit, 1e18);
         assertEq(guildSplit, 0);
         assertEq(otherSplit, 0);
@@ -562,8 +564,9 @@ contract GuildTokenUnitTest is Test {
         // revert if not governor
         vm.expectRevert("UNAUTHORIZED");
         token.setProfitSharingConfig(
+            0.05e18, // surplusBufferSplit
             0.8e18, // creditSplit
-            0.1e18, // guildSplit
+            0.05e18, // guildSplit
             0.1e18, // otherSplit
             address(this) // otherRecipient
         );
@@ -572,8 +575,9 @@ contract GuildTokenUnitTest is Test {
         vm.expectRevert("GuildToken: invalid config");
         vm.prank(governor);
         token.setProfitSharingConfig(
+            0.05e18, // surplusBufferSplit
             0.8e18, // creditSplit
-            0.1e18, // guildSplit
+            0.05e18, // guildSplit
             0.1e18, // otherSplit
             address(0) // otherRecipient
         );
@@ -582,8 +586,9 @@ contract GuildTokenUnitTest is Test {
         vm.expectRevert("GuildToken: invalid config");
         vm.prank(governor);
         token.setProfitSharingConfig(
+            0.15e18, // surplusBufferSplit
             0.8e18, // creditSplit
-            0.2e18, // guildSplit
+            0.05e18, // guildSplit
             0, // otherSplit
             address(this) // otherRecipient
         );
@@ -592,8 +597,9 @@ contract GuildTokenUnitTest is Test {
         vm.expectRevert("GuildToken: invalid config");
         vm.prank(governor);
         token.setProfitSharingConfig(
+            0.1e18, // surplusBufferSplit
             0.8e18, // creditSplit
-            0.2e18, // guildSplit
+            0.1e18, // guildSplit
             0.1e18, // otherSplit
             address(this) // otherRecipient
         );
@@ -601,21 +607,24 @@ contract GuildTokenUnitTest is Test {
         // ok
         vm.prank(governor);
         token.setProfitSharingConfig(
-            0, // creditSplit
-            0.3e18, // guildSplit
-            0.7e18, // otherSplit
+            0.05e18, // surplusBufferSplit
+            0.8e18, // creditSplit
+            0.05e18, // guildSplit
+            0.1e18, // otherSplit
             address(this) // otherRecipient
         );
 
         (
+            surplusBufferSplit,
             creditSplit,
             guildSplit,
             otherSplit,
             otherRecipient
         ) = token.getProfitSharingConfig();
-        assertEq(creditSplit, 0);
-        assertEq(guildSplit, 0.3e18);
-        assertEq(otherSplit, 0.7e18);
+        assertEq(surplusBufferSplit, 0.05e18);
+        assertEq(creditSplit, 0.8e18);
+        assertEq(guildSplit, 0.05e18);
+        assertEq(otherSplit, 0.1e18);
         assertEq(otherRecipient, address(this));
     }
 
@@ -640,6 +649,7 @@ contract GuildTokenUnitTest is Test {
         credit.mint(alice, 50e18);
         vm.prank(governor);
         token.setProfitSharingConfig(
+            0, // surplusBufferSplit
             0.5e18, // creditSplit
             0.5e18, // guildSplit
             0, // otherSplit
@@ -724,6 +734,7 @@ contract GuildTokenUnitTest is Test {
         // change all fees go to alice
         vm.prank(governor);
         token.setProfitSharingConfig(
+            0, // surplusBufferSplit
             0, // creditSplit
             0, // guildSplit
             1e18, // otherSplit
@@ -758,6 +769,7 @@ contract GuildTokenUnitTest is Test {
         credit.mint(alice, 50e18);
         vm.prank(governor);
         token.setProfitSharingConfig(
+            0, // surplusBufferSplit
             0.5e18, // creditSplit
             0.5e18, // guildSplit
             0, // otherSplit
