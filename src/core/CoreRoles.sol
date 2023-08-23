@@ -19,12 +19,16 @@ library CoreRoles {
     /// @notice can mint CREDIT arbitrarily
     bytes32 internal constant CREDIT_MINTER = keccak256("CREDIT_MINTER_ROLE");
 
-    /// @notice can mint CREDIT within rate limits
+    /// @notice can mint CREDIT within rate limits & cap
     bytes32 internal constant RATE_LIMITED_CREDIT_MINTER =
         keccak256("RATE_LIMITED_CREDIT_MINTER_ROLE");
 
     /// @notice can mint GUILD arbitrarily
     bytes32 internal constant GUILD_MINTER = keccak256("GUILD_MINTER_ROLE");
+
+    /// @notice can mint GUILD within rate limits & cap
+    bytes32 internal constant RATE_LIMITED_GUILD_MINTER =
+        keccak256("RATE_LIMITED_GUILD_MINTER_ROLE");
 
     /// ----------- GUILD Token Management ---------------
 
@@ -41,7 +45,7 @@ library CoreRoles {
     /// @notice can notify of profits & losses in a given gauge
     bytes32 internal constant GAUGE_PNL_NOTIFIER =
         keccak256("GAUGE_PNL_NOTIFIER_ROLE");
-    
+
     /// @notice can update governance parameters for GUILD delegations
     bytes32 internal constant GUILD_GOVERNANCE_PARAMETERS =
         keccak256("GUILD_GOVERNANCE_PARAMETERS_ROLE");
@@ -51,7 +55,7 @@ library CoreRoles {
         keccak256("GUILD_SURPLUS_BUFFER_WITHDRAW_ROLE");
 
     /// ----------- CREDIT Token Management ---------------
-    
+
     /// @notice can update governance parameters for CREDIT delegations
     bytes32 internal constant CREDIT_GOVERNANCE_PARAMETERS =
         keccak256("CREDIT_GOVERNANCE_PARAMETERS_ROLE");
