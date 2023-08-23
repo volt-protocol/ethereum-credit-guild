@@ -859,4 +859,104 @@ contract GuildTokenUnitTest is Test {
         vm.prank(bob);
         token.decrementGauge(address(this), 10e18);
     }
+
+    function testDonateToSurplusBuffer() public {
+        // initial state
+        assertEq(token.surplusBuffer(), 0);
+        credit.mint(address(this), 100e18);
+        credit.approve(address(token), 100e18);
+        assertEq(credit.balanceOf(address(this)), 200e18);
+        assertEq(credit.balanceOf(address(token)), 0);
+
+        // cannot donate more than current balance/approval
+        vm.expectRevert("ERC20: insufficient allowance");
+        token.donateToSurplusBuffer(999e18);
+
+        // donate to surplus buffer
+        token.donateToSurplusBuffer(100e18);
+
+        // checks
+        assertEq(token.surplusBuffer(), 100e18);
+        assertEq(credit.balanceOf(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(token)), 100e18);
+    }
+
+    function testWithdrawFromSurplusBuffer() public {
+        // initial state
+        credit.mint(address(this), 100e18);
+        credit.approve(address(token), 100e18);
+        token.donateToSurplusBuffer(100e18);
+        assertEq(token.surplusBuffer(), 100e18);
+        assertEq(credit.balanceOf(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(token)), 100e18);
+
+        // without role, cannot withdraw
+        vm.expectRevert("UNAUTHORIZED");
+        token.withdrawFromSurplusBuffer(10e18);
+
+        // grant role to test contract
+        vm.prank(governor);
+        core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
+
+        // withdraw
+        token.withdrawFromSurplusBuffer(10e18);
+        assertEq(token.surplusBuffer(), 90e18);
+        assertEq(credit.balanceOf(address(this)), 110e18);
+        assertEq(credit.balanceOf(address(token)), 90e18);
+
+        // cannot withdraw more than current buffer
+        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // underflow
+        token.withdrawFromSurplusBuffer(999e18);
+    }
+
+    function testDepleteSurplusBuffer() public {
+        // grant roles to test contract
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
+        core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
+        vm.stopPrank();
+
+        // initial state
+        // 100 CREDIT circulating (assuming backed by >= 100 USD)
+        assertEq(token.creditMultiplier(), 1e18);
+        assertEq(credit.totalSupply(), 100e18);
+
+        // donate 100 to surplus buffer
+        credit.mint(address(this), 100e18);
+        credit.approve(address(token), 100e18);
+        token.donateToSurplusBuffer(100e18);
+        assertEq(token.surplusBuffer(), 100e18);
+        assertEq(credit.balanceOf(address(token)), 100e18);
+        assertEq(credit.totalSupply(), 200e18);
+
+        // apply a loss (1)
+        // 30 CREDIT of loans completely default (~30 USD loss)
+        // partially deplete surplus buffer
+        token.notifyPnL(address(this), -30e18);
+        assertEq(token.creditMultiplier(), 1e18); // 0% discounted
+        assertEq(token.surplusBuffer(), 70e18);
+        assertEq(credit.balanceOf(address(token)), 70e18);
+
+        // apply a gain on an existing loan
+        vm.prank(governor);
+        token.setProfitSharingConfig(
+            1e18, // surplusBufferSplit
+            0, // creditSplit
+            0, // guildSplit
+            0, // otherSplit
+            address(0) // otherRecipient
+        );
+        credit.mint(address(token), 10e18);
+        token.notifyPnL(address(this), 10e18);
+        assertEq(token.surplusBuffer(), 80e18);
+        assertEq(credit.balanceOf(address(token)), 80e18);
+
+        // apply a loss (2)
+        // 110 CREDIT of loans completely default (~14 USD loss because CREDIT now worth 0.7 USD)
+        // overdraft on surplus buffer, adjust down creditMultiplier
+        token.notifyPnL(address(this), -110e18);
+        assertEq(token.creditMultiplier(), 0.7e18); // 30% discounted (30 credit net loss)
+        assertEq(token.surplusBuffer(), 0);
+        assertEq(credit.balanceOf(address(token)), 0);
+    }
 }

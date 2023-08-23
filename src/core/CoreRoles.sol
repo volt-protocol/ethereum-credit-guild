@@ -46,6 +46,10 @@ library CoreRoles {
     bytes32 internal constant GUILD_GOVERNANCE_PARAMETERS =
         keccak256("GUILD_GOVERNANCE_PARAMETERS_ROLE");
 
+    /// @notice can withdraw from GUILD surplus buffer
+    bytes32 internal constant GUILD_SURPLUS_BUFFER_WITHDRAW =
+        keccak256("GUILD_SURPLUS_BUFFER_WITHDRAW_ROLE");
+
     /// ----------- CREDIT Token Management ---------------
     
     /// @notice can update governance parameters for CREDIT delegations

@@ -28,6 +28,7 @@ contract Core is AccessControlEnumerable {
         _setRoleAdmin(CoreRoles.GAUGE_PARAMETERS, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GAUGE_PNL_NOTIFIER, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, CoreRoles.GOVERNOR);
+        _setRoleAdmin(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.CREDIT_REBASE_PARAMETERS, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.TERM_HARDCAP, CoreRoles.GOVERNOR);

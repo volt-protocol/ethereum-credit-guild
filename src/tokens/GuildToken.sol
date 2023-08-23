@@ -233,6 +233,22 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         otherRecipient = profitSharingConfig.otherRecipient;
     }
 
+    /// @notice donate to surplus buffer
+    function donateToSurplusBuffer(uint256 amount) external {
+        CreditToken(credit).transferFrom(msg.sender, address(this), amount);
+        uint256 newSurplusBuffer = surplusBuffer + amount;
+        surplusBuffer = newSurplusBuffer;
+        emit SurplusBufferUpdate(block.timestamp, newSurplusBuffer);
+    }
+
+    /// @notice withdraw from surplus buffer
+    function withdrawFromSurplusBuffer(uint256 amount) external onlyCoreRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW) {
+        uint256 newSurplusBuffer = surplusBuffer - amount; // this would revert due to underflow if withdrawing > surplusBuffer
+        surplusBuffer = newSurplusBuffer;
+        CreditToken(credit).transfer(msg.sender, amount);
+        emit SurplusBufferUpdate(block.timestamp, newSurplusBuffer);
+    }
+
     /// @notice notify profit and loss in a given gauge
     /// if `amount` is > 0, the same number of CREDIT tokens are expected to be transferred to this contract
     /// before `notifyPnL` is called.
@@ -245,18 +261,22 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         // handling loss
         if (amount < 0) {
             uint256 loss = uint256(-amount);
+
+            // save gauge loss
+            lastGaugeLoss[gauge] = block.timestamp;
+            emit GaugeLoss(gauge, block.timestamp);
+
             if (loss < _surplusBuffer) {
+                // deplete the surplus buffer
                 surplusBuffer = _surplusBuffer - loss;
                 emit SurplusBufferUpdate(block.timestamp, _surplusBuffer - loss);
+                CreditToken(credit).burn(loss);
             } else {
-                // deplete surplus buffer
+                // empty the surplus buffer
                 loss -= _surplusBuffer;
                 surplusBuffer = 0;
+                CreditToken(credit).burn(_surplusBuffer);
                 emit SurplusBufferUpdate(block.timestamp, 0);
-
-                // save gauge loss
-                lastGaugeLoss[gauge] = block.timestamp;
-                emit GaugeLoss(gauge, block.timestamp);
 
                 // update the CREDIT multiplier
                 uint256 creditTotalSupply = ERC20(credit).totalSupply();
