@@ -173,6 +173,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// @notice emitted when GUILD profit sharing is updated.
     event ProfitSharingConfigUpdate(
         uint256 indexed when,
+        uint256 surplusBufferSplit,
         uint256 creditSplit,
         uint256 guildSplit,
         uint256 otherSplit,
@@ -220,6 +221,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
 
         emit ProfitSharingConfigUpdate(
             block.timestamp,
+            surplusBufferSplit,
             creditSplit,
             guildSplit,
             otherSplit,
