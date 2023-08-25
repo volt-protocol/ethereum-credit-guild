@@ -45,11 +45,11 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     address public credit;
 
     /// @notice profit index of a given gauge
-    mapping(address => uint256) internal gaugeProfitIndex;
+    mapping(address => uint256) public gaugeProfitIndex;
 
     /// @notice profit index of a given user in a given gauge
     mapping(address => mapping(address => uint256))
-        internal userGaugeProfitIndex;
+        public userGaugeProfitIndex;
 
     /// @dev internal structure used to optimize storage read, public functions use
     /// uint256 numbers with 18 decimals.
