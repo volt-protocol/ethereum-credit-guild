@@ -9,6 +9,7 @@
     "setup": "curl -L https://foundry.paradigm.xyz | bash && foundryup",
     "compile": "forge build",
     "clean": "forge clean",
+    "slither": "slither .",
     "test": "npm run test:unit",
     "test:unit": "forge test --match-path './test/unit/**' -vvv",
     "test:proposals": "forge test --match-path './test/proposals/**' --fork-url $ETH_RPC_URL -vvv",

@@ -5,6 +5,6 @@
     "exclude_high": false,
     "json": "",
     "disable_color": false,
-    "filter_paths": "(test/|external/)",
+    "filter_paths": "(test/|scripts/|src\\/external/|node_modules/)",
     "legacy_ast": false
 }
