@@ -9,12 +9,14 @@ import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
 contract LendingTermUnitTest is Test {
     address private governor = address(1);
     address private guardian = address(2);
     Core private core;
+    ProfitManager private profitManager;
     CreditToken credit;
     GuildToken guild;
     MockERC20 collateral;
@@ -41,9 +43,10 @@ contract LendingTermUnitTest is Test {
         vm.roll(16848497);
         core = new Core();
 
+        profitManager = new ProfitManager(address(core));
         collateral = new MockERC20();
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
         rlcm = new RateLimitedCreditMinter(
             address(core), /*_core*/
             address(credit), /*_token*/
@@ -59,6 +62,7 @@ contract LendingTermUnitTest is Test {
         );
         term = new LendingTerm(
             address(core), /*_core*/
+            address(profitManager), /*_profitManager*/
             address(guild), /*_guildToken*/
             address(auctionHouse), /*_auctionHouse*/
             address(rlcm), /*_creditMinter*/
@@ -76,6 +80,7 @@ contract LendingTermUnitTest is Test {
                 ltvBuffer: _LTV_BUFFER
             })
         );
+        profitManager.initializeReferences(address(credit), address(guild));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -98,6 +103,7 @@ contract LendingTermUnitTest is Test {
 
         // labels
         vm.label(address(core), "core");
+        vm.label(address(profitManager), "profitManager");
         vm.label(address(collateral), "collateral");
         vm.label(address(credit), "credit");
         vm.label(address(guild), "guild");
@@ -168,6 +174,7 @@ contract LendingTermUnitTest is Test {
         // create a similar term but with 5% opening fee
         LendingTerm term2 = new LendingTerm(
             address(core), /*_core*/
+            address(profitManager), /*profitManager*/
             address(guild), /*_guildToken*/
             address(auctionHouse), /*_auctionHouse*/
             address(rlcm), /*_creditMinter*/

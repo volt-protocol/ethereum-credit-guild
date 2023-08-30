@@ -9,6 +9,7 @@ import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
 contract AuctionHouseUnitTest is Test {
@@ -18,6 +19,7 @@ contract AuctionHouseUnitTest is Test {
     address private caller = address(4);
     address private bidder = address(5);
     Core private core;
+    ProfitManager private profitManager;
     CreditToken credit;
     GuildToken guild;
     MockERC20 collateral;
@@ -47,9 +49,10 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(16848497);
         core = new Core();
 
+        profitManager = new ProfitManager(address(core));
         collateral = new MockERC20();
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
         rlcm = new RateLimitedCreditMinter(
             address(core), /*_core*/
             address(credit), /*_token*/
@@ -65,6 +68,7 @@ contract AuctionHouseUnitTest is Test {
         );
         term = new LendingTerm(
             address(core), /*_core*/
+            address(profitManager), /*_profitManager*/
             address(guild), /*_guildToken*/
             address(auctionHouse), /*_auctionHouse*/
             address(rlcm), /*_creditMinter*/
@@ -82,6 +86,7 @@ contract AuctionHouseUnitTest is Test {
                 ltvBuffer: _LTV_BUFFER
             })
         );
+        profitManager.initializeReferences(address(credit), address(guild));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -105,6 +110,7 @@ contract AuctionHouseUnitTest is Test {
 
         // labels
         vm.label(address(core), "core");
+        vm.label(address(profitManager), "profitManager");
         vm.label(address(collateral), "collateral");
         vm.label(address(credit), "credit");
         vm.label(address(guild), "guild");

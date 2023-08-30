@@ -9,12 +9,14 @@ import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
 contract LendingTermOffboardingUnitTest is Test {
     address private governor = address(1);
     Core private core;
+    ProfitManager private profitManager;
     GuildToken private guild;
     CreditToken private credit;
     MockERC20 private collateral;
@@ -49,8 +51,10 @@ contract LendingTermOffboardingUnitTest is Test {
 
         // deploy
         core = new Core();
+        profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        profitManager.initializeReferences(address(credit), address(guild));
         collateral = new MockERC20();
         rlcm = new RateLimitedCreditMinter(
             address(core), /*_core*/
@@ -68,6 +72,7 @@ contract LendingTermOffboardingUnitTest is Test {
         );
         term = new LendingTerm(
             address(core), /*_core*/
+            address(profitManager), /*_profitManager*/
             address(guild), /*_guildToken*/
             address(auctionHouse), /*_auctionHouse*/
             address(rlcm), /*_creditMinter*/
@@ -119,6 +124,7 @@ contract LendingTermOffboardingUnitTest is Test {
         // labels
         vm.label(address(this), "test");
         vm.label(address(core), "core");
+        vm.label(address(profitManager), "profitManager");
         vm.label(address(guild), "guild");
         vm.label(address(credit), "credit");
         vm.label(address(rlcm), "rlcm");

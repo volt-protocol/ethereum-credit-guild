@@ -5,6 +5,7 @@ import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedGuildMinter} from "@src/rate-limits/RateLimitedGuildMinter.sol";
 
 /// @notice SurplusGuildMinter allows GUILD to be minted from CREDIT collateral.
@@ -40,6 +41,9 @@ contract SurplusGuildMinter is CoreRef {
         address indexed user,
         uint256 amount
     );
+
+    /// @notice reference to the ProfitManager
+    address public immutable profitManager;
 
     /// @notice reference to the CREDIT token
     address public immutable credit;
@@ -81,12 +85,14 @@ contract SurplusGuildMinter is CoreRef {
 
     constructor(
         address _core,
+        address _profitManager,
         address _credit,
         address _guild,
         address _rlgm,
         uint256 _ratio,
         uint256 _interestRate
     ) CoreRef(_core) {
+        profitManager = _profitManager;
         credit = _credit;
         guild = _guild;
         rlgm = _rlgm;
@@ -101,8 +107,8 @@ contract SurplusGuildMinter is CoreRef {
     ) external whenNotPaused {
         // pull CREDIT from user & transfer it to surplus buffer
         CreditToken(credit).transferFrom(msg.sender, address(this), amount);
-        CreditToken(credit).approve(address(guild), amount);
-        GuildToken(guild).donateToSurplusBuffer(amount);
+        CreditToken(credit).approve(address(profitManager), amount);
+        ProfitManager(profitManager).donateToSurplusBuffer(amount);
 
         // self-mint GUILD tokens
         uint256 _ratio = ratio;
@@ -114,7 +120,7 @@ contract SurplusGuildMinter is CoreRef {
         require(stakes[msg.sender][term] == 0, "SurplusGuildMinter: already staking");
         stakes[msg.sender][term] = amount;
         lastGaugeLoss[msg.sender][term] = GuildToken(guild).lastGaugeLoss(term);
-        profitIndex[msg.sender][term] = GuildToken(guild).userGaugeProfitIndex(address(this), term);
+        profitIndex[msg.sender][term] = ProfitManager(profitManager).userGaugeProfitIndex(address(this), term);
         stakeRatio[msg.sender][term] = _ratio;
         stakeInterestRate[msg.sender][term] = interestRate;
         stakeTimestamp[msg.sender][term] = block.timestamp;
@@ -137,8 +143,8 @@ contract SurplusGuildMinter is CoreRef {
         uint256 _userLastGaugeLoss = lastGaugeLoss[msg.sender][term];
 
         // compute CREDIT rewards
-        GuildToken(guild).claimRewards(address(this)); // this will update profit indexes
-        uint256 _profitIndex = GuildToken(guild).userGaugeProfitIndex(address(this), term);
+        ProfitManager(profitManager).claimRewards(address(this)); // this will update profit indexes
+        uint256 _profitIndex = ProfitManager(profitManager).userGaugeProfitIndex(address(this), term);
         uint256 _userProfitIndex = profitIndex[msg.sender][term];
         if (_profitIndex == 0) _profitIndex = 1e18;
         if (_userProfitIndex == 0) _userProfitIndex = 1e18;
@@ -159,7 +165,7 @@ contract SurplusGuildMinter is CoreRef {
             GuildToken(guild).decrementGauge(term, uint112(guildAmount));
 
             // pull CREDIT from surplus buffer
-            GuildToken(guild).withdrawFromSurplusBuffer(creditStaked);
+            ProfitManager(profitManager).withdrawFromSurplusBuffer(creditStaked);
             creditToUser += creditStaked;
 
             // replenish GUILD minter buffer

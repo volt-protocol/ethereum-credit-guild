@@ -6,10 +6,12 @@ import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 
 contract GuildTokenUnitTest is Test {
     address private governor = address(1);
     Core private core;
+    ProfitManager private profitManager;
     CreditToken credit;
     GuildToken token;
     address constant alice = address(0x616c696365);
@@ -27,15 +29,18 @@ contract GuildTokenUnitTest is Test {
         vm.warp(1679067867);
         vm.roll(16848497);
         core = new Core();
+        profitManager = new ProfitManager(address(core));
+        credit = new CreditToken(address(core));
+        token = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        profitManager.initializeReferences(address(credit), address(token));
+
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
-        credit = new CreditToken(address(core));
-        token = new GuildToken(address(core), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
-
         // labels
         vm.label(address(core), "core");
+        vm.label(address(profitManager), "profitManager");
         vm.label(address(token), "token");
         vm.label(alice, "alice");
         vm.label(bob, "bob");
@@ -269,7 +274,7 @@ contract GuildTokenUnitTest is Test {
 
         // revert because user doesn't have role
         vm.expectRevert("UNAUTHORIZED");
-        token.notifyPnL(gauge1, 0);
+        profitManager.notifyPnL(gauge1, 0);
 
         // grant roles to test contract
         vm.startPrank(governor);
@@ -278,14 +283,14 @@ contract GuildTokenUnitTest is Test {
         vm.stopPrank();
 
         // successful call & check
-        token.notifyPnL(gauge1, -100);
+        profitManager.notifyPnL(gauge1, -100);
         assertEq(token.lastGaugeLoss(gauge1), block.timestamp);
 
         // successful call & check
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 13);
-        credit.mint(address(token), 200);
-        token.notifyPnL(gauge1, 200);
+        credit.mint(address(profitManager), 200);
+        profitManager.notifyPnL(gauge1, 200);
         assertEq(token.lastGaugeLoss(gauge1), block.timestamp - 13);
     }
 
@@ -320,7 +325,7 @@ contract GuildTokenUnitTest is Test {
         vm.roll(block.number + 1);
 
         // loss in gauge 1
-        token.notifyPnL(gauge1, -100);
+        profitManager.notifyPnL(gauge1, -100);
     }
 
     function testApplyGaugeLoss() public {
@@ -444,7 +449,7 @@ contract GuildTokenUnitTest is Test {
         _setupAliceLossInGauge1();
 
         // loss in gauge 3
-        token.notifyPnL(gauge3, -100);
+        profitManager.notifyPnL(gauge3, -100);
 
         // roll to next block
         vm.warp(block.timestamp + 13);
@@ -509,305 +514,6 @@ contract GuildTokenUnitTest is Test {
         assertEq(token.balanceOf(alice), 60e18);
     }
 
-    function testCreditMultiplier() public {
-        // grant roles to test contract
-        vm.startPrank(governor);
-        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
-        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
-        vm.stopPrank();
-
-        // initial state
-        // 100 CREDIT circulating (assuming backed by >= 100 USD)
-        assertEq(token.creditMultiplier(), 1e18);
-        assertEq(credit.totalSupply(), 100e18);
-
-        // apply a loss (1)
-        // 30 CREDIT of loans completely default (~30 USD loss)
-        token.notifyPnL(address(this), -30e18);
-        assertEq(token.creditMultiplier(), 0.7e18); // 30% discounted
-
-        // apply a loss (2)
-        // 20 CREDIT of loans completely default (~14 USD loss because CREDIT now worth 0.7 USD)
-        token.notifyPnL(address(this), -20e18);
-        assertEq(token.creditMultiplier(), 0.56e18); // 56% discounted
-
-        // apply a gain on an existing loan
-        credit.mint(address(token), 70e18);
-        token.notifyPnL(address(this), 70e18);
-        assertEq(token.creditMultiplier(), 0.56e18); // unchanged, does not go back up
-
-        // new CREDIT is minted
-        // new loans worth 830 CREDIT are opened
-        credit.mint(address(this), 830e18);
-        assertEq(credit.totalSupply(), 1000e18);
-
-        // apply a loss (3)
-        // 500 CREDIT of loans completely default
-        token.notifyPnL(address(this), -500e18);
-        assertEq(token.creditMultiplier(), 0.28e18); // half of previous value because half the supply defaulted
-    }
-
-    function testSetProfitSharingConfig() public {
-        (
-            uint256 surplusBufferSplit,
-            uint256 creditSplit,
-            uint256 guildSplit,
-            uint256 otherSplit,
-            address otherRecipient
-        ) = token.getProfitSharingConfig();
-        assertEq(surplusBufferSplit, 0);
-        assertEq(creditSplit, 1e18);
-        assertEq(guildSplit, 0);
-        assertEq(otherSplit, 0);
-        assertEq(otherRecipient, address(0));
-
-        // revert if not governor
-        vm.expectRevert("UNAUTHORIZED");
-        token.setProfitSharingConfig(
-            0.05e18, // surplusBufferSplit
-            0.8e18, // creditSplit
-            0.05e18, // guildSplit
-            0.1e18, // otherSplit
-            address(this) // otherRecipient
-        );
-
-        // provides no 'other' recipient, but non-zero 'other' split
-        vm.expectRevert("GuildToken: invalid config");
-        vm.prank(governor);
-        token.setProfitSharingConfig(
-            0.05e18, // surplusBufferSplit
-            0.8e18, // creditSplit
-            0.05e18, // guildSplit
-            0.1e18, // otherSplit
-            address(0) // otherRecipient
-        );
-
-        // provides 'other' recipient, but zero 'other' split
-        vm.expectRevert("GuildToken: invalid config");
-        vm.prank(governor);
-        token.setProfitSharingConfig(
-            0.15e18, // surplusBufferSplit
-            0.8e18, // creditSplit
-            0.05e18, // guildSplit
-            0, // otherSplit
-            address(this) // otherRecipient
-        );
-
-        // sum != 100%
-        vm.expectRevert("GuildToken: invalid config");
-        vm.prank(governor);
-        token.setProfitSharingConfig(
-            0.1e18, // surplusBufferSplit
-            0.8e18, // creditSplit
-            0.1e18, // guildSplit
-            0.1e18, // otherSplit
-            address(this) // otherRecipient
-        );
-
-        // ok
-        vm.prank(governor);
-        token.setProfitSharingConfig(
-            0.05e18, // surplusBufferSplit
-            0.8e18, // creditSplit
-            0.05e18, // guildSplit
-            0.1e18, // otherSplit
-            address(this) // otherRecipient
-        );
-
-        (
-            surplusBufferSplit,
-            creditSplit,
-            guildSplit,
-            otherSplit,
-            otherRecipient
-        ) = token.getProfitSharingConfig();
-        assertEq(surplusBufferSplit, 0.05e18);
-        assertEq(creditSplit, 0.8e18);
-        assertEq(guildSplit, 0.05e18);
-        assertEq(otherSplit, 0.1e18);
-        assertEq(otherRecipient, address(this));
-    }
-
-    function testProfitDistribution() public {
-        // grant roles to test contract
-        vm.startPrank(governor);
-        core.grantRole(CoreRoles.GOVERNOR, address(this));
-        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
-        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
-        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
-        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
-        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
-        vm.stopPrank();
-
-        // setup
-        // 50-50 profit split between GUILD & CREDIT
-        // 150 CREDIT circulating (100 rebasing on test contract, 50 non rebasing on alice)
-        // 550 GUILD, 500 voting in gauges :
-        //   - 50 on gauge1 (alice)
-        //   - 250 on gauge2 (50 alice, 200 bob)
-        //   - 200 on gauge3 (200 bob)
-        credit.mint(alice, 50e18);
-        vm.prank(governor);
-        token.setProfitSharingConfig(
-            0, // surplusBufferSplit
-            0.5e18, // creditSplit
-            0.5e18, // guildSplit
-            0, // otherSplit
-            address(0) // otherRecipient
-        );
-        token.setMaxGauges(3);
-        token.addGauge(gauge1);
-        token.addGauge(gauge2);
-        token.addGauge(gauge3);
-        token.mint(alice, 150e18);
-        token.mint(bob, 400e18);
-        vm.startPrank(alice);
-        token.incrementGauge(gauge1, 50e18);
-        token.incrementGauge(gauge2, 50e18);
-        vm.stopPrank();
-        vm.startPrank(bob);
-        token.incrementGauge(gauge2, 200e18);
-        token.incrementGauge(gauge3, 200e18);
-        vm.stopPrank();
-
-        // simulate 20 profit on gauge1
-        // 10 goes to alice (guild voting)
-        // 10 goes to test (rebasing credit)
-        credit.mint(address(token), 20e18);
-        token.notifyPnL(gauge1, 20e18);
-        assertEq(token.claimRewards(alice), 10e18);
-        assertEq(token.claimRewards(bob), 0);
-        assertEq(credit.balanceOf(address(this)), 110e18);
-    
-        // simulate 50 profit on gauge2
-        // 5 goes to alice (guild voting)
-        // 20 goes to bob (guild voting)
-        // 25 goes to test (rebasing credit)
-        credit.mint(address(token), 50e18);
-        token.notifyPnL(gauge2, 50e18);
-        assertEq(token.claimRewards(alice), 5e18);
-        assertEq(token.claimRewards(bob), 20e18);
-        assertEq(credit.balanceOf(address(this)), 135e18);
-
-        // check the balances are as expected
-        assertEq(credit.balanceOf(alice), 50e18 + 15e18);
-        assertEq(credit.balanceOf(bob), 20e18);
-        assertEq(credit.totalSupply(), 220e18);
-
-        // simulate 100 profit on gauge2 + 100 profit on gauge3
-        // 10 goes to alice (10 guild voting on gauge2)
-        // 90 goes to bob (40 guild voting on gauge2 + 50 guild voting on gauge3)
-        // 100 goes to test (50+50 for rebasing credit)
-        credit.mint(address(token), 100e18);
-        token.notifyPnL(gauge2, 100e18);
-        credit.mint(address(token), 100e18);
-        token.notifyPnL(gauge3, 100e18);
-        //assertEq(token.claimRewards(alice), 10e18);
-        vm.prank(alice);
-        token.incrementGauge(gauge2, 50e18); // should claim her 10 pending rewards in gauge2
-        assertEq(token.claimRewards(bob), 90e18);
-        assertEq(credit.balanceOf(address(this)), 235e18);
-
-        // check the balances are as expected
-        assertEq(credit.balanceOf(alice), 50e18 + 15e18 + 10e18);
-        assertEq(credit.balanceOf(bob), 20e18 + 90e18);
-        assertEq(credit.totalSupply(), 220e18 + 200e18);
-
-        // gauge2 votes are now 100 alice, 200 bob
-        // simulate 300 profit on gauge2
-        // 50 goes to alice (guild voting)
-        // 100 goes to bob (guild voting)
-        // 150 goes to test (rebasing credit)
-        credit.mint(address(token), 300e18);
-        token.notifyPnL(gauge2, 300e18);
-        //assertEq(token.claimRewards(alice), 50e18);
-        vm.prank(alice);
-        token.decrementGauge(gauge2, 100e18); // should claim her 50 pending rewards in gauge2
-        assertEq(token.claimRewards(bob), 100e18);
-        assertEq(credit.balanceOf(address(this)), 235e18 + 150e18);
-
-        // check the balances are as expected
-        assertEq(credit.balanceOf(alice), 50e18 + 15e18 + 10e18 + 50e18);
-        assertEq(credit.balanceOf(bob), 20e18 + 90e18 + 100e18);
-        assertEq(credit.totalSupply(), 220e18 + 200e18 + 300e18);
-
-        // change all fees go to alice
-        vm.prank(governor);
-        token.setProfitSharingConfig(
-            0, // surplusBufferSplit
-            0, // creditSplit
-            0, // guildSplit
-            1e18, // otherSplit
-            alice // otherRecipient
-        );
-
-        // simulate 100 profit on gauge3
-        credit.mint(address(token), 100e18);
-        token.notifyPnL(gauge3, 100e18);
-
-        assertEq(credit.balanceOf(alice), 50e18 + 15e18 + 10e18 + 50e18 + 100e18);
-    }
-
-    function testGetPendingRewards() public {
-        // grant roles to test contract
-        vm.startPrank(governor);
-        core.grantRole(CoreRoles.GOVERNOR, address(this));
-        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
-        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
-        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
-        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
-        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
-        vm.stopPrank();
-
-        // setup
-        // 50-50 profit split between GUILD & CREDIT
-        // 150 CREDIT circulating (100 rebasing on test contract, 50 non rebasing on alice)
-        // 550 GUILD, 500 voting in gauges :
-        //   - 50 on gauge1 (alice)
-        //   - 250 on gauge2 (50 alice, 200 bob)
-        //   - 200 on gauge3 (200 bob)
-        credit.mint(alice, 50e18);
-        vm.prank(governor);
-        token.setProfitSharingConfig(
-            0, // surplusBufferSplit
-            0.5e18, // creditSplit
-            0.5e18, // guildSplit
-            0, // otherSplit
-            address(0) // otherRecipient
-        );
-        token.setMaxGauges(3);
-        token.addGauge(gauge1);
-        token.addGauge(gauge2);
-        token.addGauge(gauge3);
-        token.mint(alice, 150e18);
-        token.mint(bob, 400e18);
-        vm.startPrank(alice);
-        token.incrementGauge(gauge1, 50e18);
-        token.incrementGauge(gauge2, 50e18);
-        vm.stopPrank();
-        vm.startPrank(bob);
-        token.incrementGauge(gauge2, 200e18);
-        token.incrementGauge(gauge3, 200e18);
-        vm.stopPrank();
-
-        // simulate 20 profit on gauge1
-        // 10 goes to alice (guild voting)
-        // 10 goes to test (rebasing credit)
-        credit.mint(address(token), 20e18);
-        token.notifyPnL(gauge1, 20e18);
-
-        // check alice pending rewards
-        (address[] memory aliceGauges, uint256[] memory aliceGaugeRewards, uint256 aliceTotalRewards) = token.getPendingRewards(alice);
-        assertEq(aliceGauges.length, 2);
-        assertEq(aliceGauges[0], gauge1);
-        assertEq(aliceGauges[1], gauge2);
-        assertEq(aliceGaugeRewards.length, 2);
-        assertEq(aliceGaugeRewards[0], 10e18);
-        assertEq(aliceGaugeRewards[1], 0);
-        assertEq(aliceTotalRewards, 10e18);
-        assertEq(token.claimRewards(alice), 10e18);
-    }
-
     function testDecrementGaugeDebtCeilingUsed() public {
         // grant roles to test contract
         vm.startPrank(governor);
@@ -858,105 +564,5 @@ contract GuildTokenUnitTest is Test {
         // now bob can decrement his gauge vote.
         vm.prank(bob);
         token.decrementGauge(address(this), 10e18);
-    }
-
-    function testDonateToSurplusBuffer() public {
-        // initial state
-        assertEq(token.surplusBuffer(), 0);
-        credit.mint(address(this), 100e18);
-        credit.approve(address(token), 100e18);
-        assertEq(credit.balanceOf(address(this)), 200e18);
-        assertEq(credit.balanceOf(address(token)), 0);
-
-        // cannot donate more than current balance/approval
-        vm.expectRevert("ERC20: insufficient allowance");
-        token.donateToSurplusBuffer(999e18);
-
-        // donate to surplus buffer
-        token.donateToSurplusBuffer(100e18);
-
-        // checks
-        assertEq(token.surplusBuffer(), 100e18);
-        assertEq(credit.balanceOf(address(this)), 100e18);
-        assertEq(credit.balanceOf(address(token)), 100e18);
-    }
-
-    function testWithdrawFromSurplusBuffer() public {
-        // initial state
-        credit.mint(address(this), 100e18);
-        credit.approve(address(token), 100e18);
-        token.donateToSurplusBuffer(100e18);
-        assertEq(token.surplusBuffer(), 100e18);
-        assertEq(credit.balanceOf(address(this)), 100e18);
-        assertEq(credit.balanceOf(address(token)), 100e18);
-
-        // without role, cannot withdraw
-        vm.expectRevert("UNAUTHORIZED");
-        token.withdrawFromSurplusBuffer(10e18);
-
-        // grant role to test contract
-        vm.prank(governor);
-        core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
-
-        // withdraw
-        token.withdrawFromSurplusBuffer(10e18);
-        assertEq(token.surplusBuffer(), 90e18);
-        assertEq(credit.balanceOf(address(this)), 110e18);
-        assertEq(credit.balanceOf(address(token)), 90e18);
-
-        // cannot withdraw more than current buffer
-        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // underflow
-        token.withdrawFromSurplusBuffer(999e18);
-    }
-
-    function testDepleteSurplusBuffer() public {
-        // grant roles to test contract
-        vm.startPrank(governor);
-        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
-        core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
-        vm.stopPrank();
-
-        // initial state
-        // 100 CREDIT circulating (assuming backed by >= 100 USD)
-        assertEq(token.creditMultiplier(), 1e18);
-        assertEq(credit.totalSupply(), 100e18);
-
-        // donate 100 to surplus buffer
-        credit.mint(address(this), 100e18);
-        credit.approve(address(token), 100e18);
-        token.donateToSurplusBuffer(100e18);
-        assertEq(token.surplusBuffer(), 100e18);
-        assertEq(credit.balanceOf(address(token)), 100e18);
-        assertEq(credit.totalSupply(), 200e18);
-
-        // apply a loss (1)
-        // 30 CREDIT of loans completely default (~30 USD loss)
-        // partially deplete surplus buffer
-        token.notifyPnL(address(this), -30e18);
-        assertEq(token.creditMultiplier(), 1e18); // 0% discounted
-        assertEq(token.surplusBuffer(), 70e18);
-        assertEq(credit.balanceOf(address(token)), 70e18);
-
-        // apply a gain on an existing loan
-        vm.prank(governor);
-        token.setProfitSharingConfig(
-            1e18, // surplusBufferSplit
-            0, // creditSplit
-            0, // guildSplit
-            0, // otherSplit
-            address(0) // otherRecipient
-        );
-        credit.mint(address(token), 10e18);
-        token.notifyPnL(address(this), 10e18);
-        assertEq(token.surplusBuffer(), 80e18);
-        assertEq(credit.balanceOf(address(token)), 80e18);
-
-        // apply a loss (2)
-        // 110 CREDIT of loans completely default (~14 USD loss because CREDIT now worth 0.7 USD)
-        // overdraft on surplus buffer, adjust down creditMultiplier
-        token.notifyPnL(address(this), -110e18);
-        assertEq(token.creditMultiplier(), 0.7e18); // 30% discounted (30 credit net loss)
-        assertEq(token.surplusBuffer(), 0);
-        assertEq(credit.balanceOf(address(token)), 0);
     }
 }

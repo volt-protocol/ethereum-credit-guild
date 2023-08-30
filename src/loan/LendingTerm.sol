@@ -13,6 +13,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
 /// @notice Lending Term contract of the Ethereum Credit Guild, a base implementation of
@@ -103,6 +104,9 @@ contract LendingTerm is EIP712, CoreRef {
     /// Expressed as a percentage, with 18 decimals, e.g. 1.2e18 = 120% tolerance, meaning if GUILD holders' gauge weights
     /// would set a debt ceiling to 100 CREDIT, the issuance could go as high as 120 CREDIT.
     uint256 public constant GAUGE_CAP_TOLERANCE = 1.2e18;
+
+    /// @notice reference to the ProfitManager
+    address public immutable profitManager;
 
     /// @notice reference to the GUILD token
     address public immutable guildToken;
@@ -226,12 +230,14 @@ contract LendingTerm is EIP712, CoreRef {
 
     constructor(
         address _core,
+        address _profitManager,
         address _guildToken,
         address _auctionHouse,
         address _creditMinter,
         address _creditToken,
         LendingTermParams memory params
     ) EIP712("Ethereum Credit Guild", "1") CoreRef(_core) {
+        profitManager = _profitManager;
         guildToken = _guildToken;
         auctionHouse = _auctionHouse;
         creditMinter = _creditMinter;
@@ -371,7 +377,7 @@ contract LendingTerm is EIP712, CoreRef {
         require(_postBorrowIssuance <= hardCap, "LendingTerm: hardcap reached");
 
         // check the debt ceiling
-        uint256 _totalSupply = IERC20(creditToken).totalSupply();
+        uint256 _totalSupply = CreditToken(creditToken).totalSupply();
         uint256 debtCeiling = (GuildToken(guildToken).calculateGaugeAllocation(
             address(this),
             _totalSupply + borrowAmount
@@ -411,14 +417,13 @@ contract LendingTerm is EIP712, CoreRef {
         // pull opening fee from the borrower, if any
         if (openingFee != 0) {
             uint256 _openingFee = (borrowAmount * openingFee) / 1e18;
-            // transfer from borrower to GuildToken & report profit
-            address _guildToken = guildToken;
-            IERC20(creditToken).safeTransferFrom(
+            // transfer from borrower to ProfitManager & report profit
+            CreditToken(creditToken).transferFrom(
                 borrower,
-                _guildToken,
+                profitManager,
                 _openingFee
             );
-            GuildToken(_guildToken).notifyPnL(
+            ProfitManager(profitManager).notifyPnL(
                 address(this),
                 int256(_openingFee)
             );
@@ -875,21 +880,19 @@ contract LendingTerm is EIP712, CoreRef {
         lastPartialRepay[loanId] = block.timestamp;
 
         // pull the debt from the borrower
-        address _creditToken = creditToken;
-        address _guildToken = guildToken;
-        IERC20(_creditToken).safeTransferFrom(
+        CreditToken(creditToken).transferFrom(
             repayer,
             address(this),
             debtToRepay
         );
 
-        // forward profit portion to the GUILD token, burn the rest
-        IERC20(_creditToken).transfer(_guildToken, interestRepaid);
-        GuildToken(_guildToken).notifyPnL(
+        // forward profit portion to the ProfitManager, burn the rest
+        CreditToken(creditToken).transfer(profitManager, interestRepaid);
+        ProfitManager(profitManager).notifyPnL(
             address(this),
             int256(interestRepaid)
         );
-        CreditToken(_creditToken).burn(principalRepaid);
+        CreditToken(creditToken).burn(principalRepaid);
         RateLimitedCreditMinter(creditMinter).replenishBuffer(principalRepaid);
 
         // emit event
@@ -1019,9 +1022,8 @@ contract LendingTerm is EIP712, CoreRef {
         /// @dev `debtToPullForRepay` could be smaller than `loanDebt` if the loan has been called, in this
         /// case the caller already transferred some debt tokens to the lending term, and a reduced
         /// amount has to be pulled from the borrower.
-        address _creditToken = creditToken;
         uint256 callTime = loan.callTime;
-        IERC20(_creditToken).transferFrom(
+        CreditToken(creditToken).transferFrom(
             repayer,
             address(this),
             (callTime != 0 && block.timestamp <= callTime + callPeriod)
@@ -1029,14 +1031,13 @@ contract LendingTerm is EIP712, CoreRef {
                 : loanDebt
         );
         if (interest != 0) {
-            // forward profit portion to the GUILD token, burn the rest
-            address _guildToken = guildToken;
-            IERC20(_creditToken).transfer(_guildToken, interest);
-            CreditToken(_creditToken).burn(borrowAmount); // == loan.borrowAmount
+            // forward profit portion to the ProfitManager, burn the rest
+            CreditToken(creditToken).transfer(profitManager, interest);
+            CreditToken(creditToken).burn(borrowAmount); // == loan.borrowAmount
             RateLimitedCreditMinter(creditMinter).replenishBuffer(borrowAmount);
 
             // report profit
-            GuildToken(_guildToken).notifyPnL(address(this), int256(interest));
+            ProfitManager(profitManager).notifyPnL(address(this), int256(interest));
         }
 
         // close the loan
@@ -1190,7 +1191,7 @@ contract LendingTerm is EIP712, CoreRef {
     function call(bytes32 loanId) external {
         uint256 callFeeAmount = _call(loanId, msg.sender);
         if (callFeeAmount != 0) {
-            IERC20(creditToken).transferFrom(
+            CreditToken(creditToken).transferFrom(
                 msg.sender,
                 address(this),
                 callFeeAmount
@@ -1207,7 +1208,7 @@ contract LendingTerm is EIP712, CoreRef {
 
         // pull the call fees from caller
         if (debtToPullForCallFees != 0) {
-            IERC20(creditToken).transferFrom(
+            CreditToken(creditToken).transferFrom(
                 msg.sender,
                 address(this),
                 debtToPullForCallFees
@@ -1247,7 +1248,7 @@ contract LendingTerm is EIP712, CoreRef {
 
         // pull the call fees from caller
         if (debtToPullForCallFees != 0) {
-            IERC20(creditToken).transferFrom(
+            CreditToken(creditToken).transferFrom(
                 caller,
                 address(this),
                 debtToPullForCallFees
@@ -1277,7 +1278,7 @@ contract LendingTerm is EIP712, CoreRef {
                 sig.r,
                 sig.s
             );
-            IERC20(creditToken).transferFrom(
+            CreditToken(creditToken).transferFrom(
                 msg.sender,
                 address(this),
                 debtToPullForCallFees
@@ -1327,7 +1328,7 @@ contract LendingTerm is EIP712, CoreRef {
                 permitSig.r,
                 permitSig.s
             );
-            IERC20(creditToken).transferFrom(
+            CreditToken(creditToken).transferFrom(
                 caller,
                 address(this),
                 debtToPullForCallFees
@@ -1407,7 +1408,7 @@ contract LendingTerm is EIP712, CoreRef {
         // if loan has been called, reimburse the caller
         bool loanCalled = loan.callTime != 0;
         if (loanCalled) {
-            IERC20(creditToken).transfer(loan.caller, getLoanCallFee(loanId));
+            CreditToken(creditToken).transfer(loan.caller, getLoanCallFee(loanId));
         }
 
         // close the loan
@@ -1416,7 +1417,7 @@ contract LendingTerm is EIP712, CoreRef {
 
         // mark loan as a total loss
         int256 pnl = -int256(loan.borrowAmount);
-        GuildToken(guildToken).notifyPnL(address(this), pnl);
+        ProfitManager(profitManager).notifyPnL(address(this), pnl);
 
         // set hardcap to 0 to prevent new borrows
         hardCap = 0;
@@ -1508,9 +1509,8 @@ contract LendingTerm is EIP712, CoreRef {
         loans[loanId].bidTime = block.timestamp;
 
         // pull credit from bidder
-        address _creditToken = creditToken;
         if (result.creditFromBidder != 0) {
-            CreditToken(_creditToken).transferFrom(
+            CreditToken(creditToken).transferFrom(
                 bidder,
                 address(this),
                 result.creditFromBidder
@@ -1519,7 +1519,7 @@ contract LendingTerm is EIP712, CoreRef {
 
         // send credit to caller
         if (result.creditToCaller != 0) {
-            CreditToken(_creditToken).transfer(
+            CreditToken(creditToken).transfer(
                 loans[loanId].caller,
                 result.creditToCaller
             );
@@ -1530,17 +1530,16 @@ contract LendingTerm is EIP712, CoreRef {
             RateLimitedCreditMinter(creditMinter).replenishBuffer(
                 result.creditToBurn
             );
-            CreditToken(_creditToken).burn(result.creditToBurn);
+            CreditToken(creditToken).burn(result.creditToBurn);
         }
 
         // handle profit & losses
         if (result.pnl != 0) {
-            address _guildToken = guildToken;
             if (result.pnl > 0) {
-                // forward profit to GuildToken before notifying it of profits
-                // the GuildToken will handle profit distribution.
-                IERC20(_creditToken).transfer(
-                    _guildToken,
+                // forward profit to ProfitManager before notifying it of profits
+                // the ProfitManager will handle profit distribution.
+                CreditToken(creditToken).transfer(
+                    profitManager,
                     result.creditToProfit
                 );
             } else if (result.pnl < 0) {
@@ -1548,16 +1547,15 @@ contract LendingTerm is EIP712, CoreRef {
                 // force-closing of all loans (seize() without call() first).
                 hardCap = 0;
             }
-            GuildToken(_guildToken).notifyPnL(address(this), result.pnl);
+            ProfitManager(profitManager).notifyPnL(address(this), result.pnl);
         }
 
         // decrease issuance
         issuance -= loans[loanId].borrowAmount;
 
         // send collateral to borrower
-        address _collateralToken = collateralToken;
         if (result.collateralToBorrower != 0) {
-            IERC20(_collateralToken).safeTransfer(
+            IERC20(collateralToken).safeTransfer(
                 loans[loanId].borrower,
                 result.collateralToBorrower
             );
@@ -1565,7 +1563,7 @@ contract LendingTerm is EIP712, CoreRef {
 
         // send collateral to caller
         if (result.collateralToCaller != 0) {
-            IERC20(_collateralToken).safeTransfer(
+            IERC20(collateralToken).safeTransfer(
                 loans[loanId].caller,
                 result.collateralToCaller
             );
@@ -1573,7 +1571,7 @@ contract LendingTerm is EIP712, CoreRef {
 
         // send collateral to bidder
         if (result.collateralToBidder != 0) {
-            IERC20(_collateralToken).safeTransfer(
+            IERC20(collateralToken).safeTransfer(
                 bidder,
                 result.collateralToBidder
             );

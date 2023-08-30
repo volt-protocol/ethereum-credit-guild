@@ -11,6 +11,7 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
@@ -28,11 +29,18 @@ contract Proposal_0 is Proposal {
             addresses.addMainnet("CORE", address(core));
         }
 
+        // ProfitManager
+        {
+            ProfitManager profitManager = new ProfitManager(addresses.mainnet("CORE"));
+            addresses.addMainnet("PROFIT_MANAGER", address(profitManager));
+        }
+
         // Tokens & minting
         {
             CreditToken credit = new CreditToken(addresses.mainnet("CORE"));
             GuildToken guild = new GuildToken(
                 addresses.mainnet("CORE"),
+                addresses.mainnet("PROFIT_MANAGER"),
                 address(credit),
                 7 days, // gaugeCycleLength,
                 1 days // incrementFreezeWindow
@@ -53,6 +61,7 @@ contract Proposal_0 is Proposal {
             );
             SurplusGuildMinter guildMinter = new SurplusGuildMinter(
                 addresses.mainnet("CORE"),
+                addresses.mainnet("PROFIT_MANAGER"),
                 address(credit),
                 address(guild),
                 address(rateLimitedGuildMinter),
@@ -110,6 +119,7 @@ contract Proposal_0 is Proposal {
             );
             LendingTerm termUSDC1 = new LendingTerm(
                 addresses.mainnet("CORE"),
+                addresses.mainnet("PROFIT_MANAGER"),
                 addresses.mainnet("ERC20_GUILD"),
                 address(auctionHouse),
                 addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
@@ -129,6 +139,7 @@ contract Proposal_0 is Proposal {
             );
             LendingTerm termSDAI1 = new LendingTerm(
                 addresses.mainnet("CORE"),
+                addresses.mainnet("PROFIT_MANAGER"),
                 addresses.mainnet("ERC20_GUILD"),
                 address(auctionHouse),
                 addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
@@ -220,7 +231,11 @@ contract Proposal_0 is Proposal {
         core.grantRole(CoreRoles.TIMELOCK_CANCELLER, addresses.mainnet("TEAM_MULTISIG"));
 
         // Configuration
-        GuildToken(addresses.mainnet("ERC20_GUILD")).setProfitSharingConfig(
+        ProfitManager(addresses.mainnet("PROFIT_MANAGER")).initializeReferences(
+            addresses.mainnet("ERC20_CREDIT"),
+            addresses.mainnet("ERC20_GUILD")
+        );
+        ProfitManager(addresses.mainnet("PROFIT_MANAGER")).setProfitSharingConfig(
             0.1e18, // 10% surplusBufferSplit
             0.9e18, // 90% creditSplit
             0, // guildSplit

@@ -6,6 +6,7 @@ import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {RateLimitedGuildMinter} from "@src/rate-limits/RateLimitedGuildMinter.sol";
 
@@ -14,6 +15,7 @@ contract SurplusGuildMinterUnitTest is Test {
     address private guardian = address(2);
     address private term = address(1182791270913933);
     Core private core;
+    ProfitManager private profitManager;
     CreditToken credit;
     GuildToken guild;
     RateLimitedGuildMinter rlgm;
@@ -32,8 +34,9 @@ contract SurplusGuildMinterUnitTest is Test {
         vm.roll(16848497);
         core = new Core();
 
+        profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
         rlgm = new RateLimitedGuildMinter(
             address(core), /*_core*/
             address(guild), /*_token*/
@@ -43,12 +46,14 @@ contract SurplusGuildMinterUnitTest is Test {
         );
         sgm = new SurplusGuildMinter(
             address(core),
+            address(profitManager),
             address(credit),
             address(guild),
             address(rlgm),
             RATIO,
             INTEREST_RATE
         );
+        profitManager.initializeReferences(address(credit), address(guild));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -72,6 +77,7 @@ contract SurplusGuildMinterUnitTest is Test {
 
         // labels
         vm.label(address(core), "core");
+        vm.label(address(profitManager), "profitManager");
         vm.label(address(credit), "credit");
         vm.label(address(guild), "guild");
         vm.label(address(rlgm), "rlcgm");
@@ -92,7 +98,7 @@ contract SurplusGuildMinterUnitTest is Test {
     // test stake function
     function testStake() public {
         // initial state
-        assertEq(guild.surplusBuffer(), 0);
+        assertEq(profitManager.surplusBuffer(), 0);
         assertEq(guild.balanceOf(address(sgm)), 0);
         assertEq(guild.getGaugeWeight(term), 50e18);
 
@@ -103,7 +109,7 @@ contract SurplusGuildMinterUnitTest is Test {
         
         // check after-stake state
         assertEq(credit.balanceOf(address(this)), 0);
-        assertEq(guild.surplusBuffer(), 100e18);
+        assertEq(profitManager.surplusBuffer(), 100e18);
         assertEq(guild.balanceOf(address(sgm)), 200e18);
         assertEq(guild.getGaugeWeight(term), 250e18);
         assertEq(sgm.stakes(address(this), term), 100e18);
@@ -122,25 +128,25 @@ contract SurplusGuildMinterUnitTest is Test {
         credit.approve(address(sgm), 150e18);
         sgm.stake(term, 150e18);
         assertEq(credit.balanceOf(address(this)), 0);
-        assertEq(guild.surplusBuffer(), 150e18);
+        assertEq(profitManager.surplusBuffer(), 150e18);
         assertEq(guild.balanceOf(address(sgm)), 300e18);
         assertEq(guild.getGaugeWeight(term), 350e18);
         assertEq(sgm.stakes(address(this), term), 150e18);
 
         // the guild token earn interests
         vm.prank(governor);
-        guild.setProfitSharingConfig(
+        profitManager.setProfitSharingConfig(
             0.5e18, // surplusBufferSplit
             0, // creditSplit
             0.5e18, // guildSplit
             0, // otherSplit
             address(0) // otherRecipient
         );
-        credit.mint(address(guild), 35e18);
-        guild.notifyPnL(term, 35e18);
-        assertEq(guild.surplusBuffer(), 150e18 + 17.5e18);
-        (,, uint256 rewardsThis) = guild.getPendingRewards(address(this));
-        (,, uint256 rewardsSgm) = guild.getPendingRewards(address(sgm));
+        credit.mint(address(profitManager), 35e18);
+        profitManager.notifyPnL(term, 35e18);
+        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18);
+        (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
+        (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
         assertEq(rewardsThis, 2.5e18);
         assertEq(rewardsSgm, 15e18);
 
@@ -154,7 +160,7 @@ contract SurplusGuildMinterUnitTest is Test {
         assertEq(guild.balanceOf(address(this)), 300e18 * INTEREST_RATE / 1e18 + 50e18);
         assertEq(credit.balanceOf(address(sgm)), 0);
         assertEq(guild.balanceOf(address(sgm)), 0);
-        assertEq(guild.surplusBuffer(), 17.5e18);
+        assertEq(profitManager.surplusBuffer(), 17.5e18);
         assertEq(guild.getGaugeWeight(term), 50e18);
         assertEq(sgm.stakes(address(this), term), 0);
 
@@ -170,25 +176,25 @@ contract SurplusGuildMinterUnitTest is Test {
         credit.approve(address(sgm), 150e18);
         sgm.stake(term, 150e18);
         assertEq(credit.balanceOf(address(this)), 0);
-        assertEq(guild.surplusBuffer(), 150e18);
+        assertEq(profitManager.surplusBuffer(), 150e18);
         assertEq(guild.balanceOf(address(sgm)), 300e18);
         assertEq(guild.getGaugeWeight(term), 350e18);
         assertEq(sgm.stakes(address(this), term), 150e18);
 
         // the guild token earn interests
         vm.prank(governor);
-        guild.setProfitSharingConfig(
+        profitManager.setProfitSharingConfig(
             0.5e18, // surplusBufferSplit
             0, // creditSplit
             0.5e18, // guildSplit
             0, // otherSplit
             address(0) // otherRecipient
         );
-        credit.mint(address(guild), 35e18);
-        guild.notifyPnL(term, 35e18);
-        assertEq(guild.surplusBuffer(), 150e18 + 17.5e18);
-        (,, uint256 rewardsThis) = guild.getPendingRewards(address(this));
-        (,, uint256 rewardsSgm) = guild.getPendingRewards(address(sgm));
+        credit.mint(address(profitManager), 35e18);
+        profitManager.notifyPnL(term, 35e18);
+        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18);
+        (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
+        (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
         assertEq(rewardsThis, 2.5e18);
         assertEq(rewardsSgm, 15e18);
 
@@ -197,8 +203,8 @@ contract SurplusGuildMinterUnitTest is Test {
         vm.roll(block.number + 1);
 
         // loss in gauge
-        guild.notifyPnL(term, -27.5e18);
-        assertEq(guild.surplusBuffer(), 150e18 - 10e18);
+        profitManager.notifyPnL(term, -27.5e18);
+        assertEq(profitManager.surplusBuffer(), 150e18 - 10e18);
 
         // unstake (sgm)
         sgm.unstake(term);
@@ -206,7 +212,7 @@ contract SurplusGuildMinterUnitTest is Test {
         assertEq(guild.balanceOf(address(this)), 50e18 + 0); // no guild reward from interest rate
         assertEq(credit.balanceOf(address(sgm)), 0); // did not withdraw from surplus buffer
         assertEq(guild.balanceOf(address(sgm)), 300e18); // still not slashed
-        assertEq(guild.surplusBuffer(), 150e18 - 10e18); // did not withdraw from surplus buffer
+        assertEq(profitManager.surplusBuffer(), 150e18 - 10e18); // did not withdraw from surplus buffer
         assertEq(guild.getGaugeWeight(term), 350e18); // did no decrementWeight
         assertEq(sgm.stakes(address(this), term), 0);
 
@@ -283,27 +289,27 @@ contract SurplusGuildMinterUnitTest is Test {
 
         // both gauges earn interests
         vm.prank(governor);
-        guild.setProfitSharingConfig(
+        profitManager.setProfitSharingConfig(
             0.5e18, // surplusBufferSplit
             0, // creditSplit
             0.5e18, // guildSplit
             0, // otherSplit
             address(0) // otherRecipient
         );
-        credit.mint(address(guild), 420e18);
-        guild.notifyPnL(term1, 140e18);
-        guild.notifyPnL(term2, 280e18);
+        credit.mint(address(profitManager), 420e18);
+        profitManager.notifyPnL(term1, 140e18);
+        profitManager.notifyPnL(term2, 280e18);
 
         // fast-forward 1 year
         vm.warp(block.timestamp + sgm.YEAR());
         vm.roll(block.number + 1);
 
         // loss in term1 + slash sgm
-        guild.notifyPnL(term1, -20e18);
+        profitManager.notifyPnL(term1, -20e18);
         assertEq(guild.balanceOf(address(sgm)), 600e18);
         guild.applyGaugeLoss(term1, address(sgm));
         assertEq(guild.balanceOf(address(sgm)), 300e18);
-        assertEq(guild.surplusBuffer(), 300e18 + (140e18 + 280e18) / 2 - 20e18);
+        assertEq(profitManager.surplusBuffer(), 300e18 + (140e18 + 280e18) / 2 - 20e18);
 
         // gauge1 has 50 (this) + 50*2 (sgm user1) + 100*2 (sgm user2) = 350 weight
         // gauge2 has 50 (this) + 50*2 (sgm user1) + 100*2 (sgm user2) = 350 weight
