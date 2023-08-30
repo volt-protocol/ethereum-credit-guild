@@ -16,7 +16,6 @@ import {RateLimitedGuildMinter} from "@src/rate-limits/RateLimitedGuildMinter.so
 /// participate in the gauge system to increase debt ceiling and earn fees
 /// from selected lending terms.
 contract SurplusGuildMinter is CoreRef {
-
     /// @notice reference number of seconds in 1 year
     uint256 public constant YEAR = 31557600;
 
@@ -101,10 +100,7 @@ contract SurplusGuildMinter is CoreRef {
     }
 
     /// @notice stake CREDIT tokens to start voting in a gauge.
-    function stake(
-        address term,
-        uint256 amount
-    ) external whenNotPaused {
+    function stake(address term, uint256 amount) external whenNotPaused {
         // pull CREDIT from user & transfer it to surplus buffer
         CreditToken(credit).transferFrom(msg.sender, address(this), amount);
         CreditToken(credit).approve(address(profitManager), amount);
@@ -112,15 +108,19 @@ contract SurplusGuildMinter is CoreRef {
 
         // self-mint GUILD tokens
         uint256 _ratio = ratio;
-        uint256 guildAmount = _ratio * amount / 1e18;
+        uint256 guildAmount = (_ratio * amount) / 1e18;
         RateLimitedGuildMinter(rlgm).mint(address(this), guildAmount);
         GuildToken(guild).incrementGauge(term, uint112(guildAmount));
 
         // update state
-        require(stakes[msg.sender][term] == 0, "SurplusGuildMinter: already staking");
+        require(
+            stakes[msg.sender][term] == 0,
+            "SurplusGuildMinter: already staking"
+        );
         stakes[msg.sender][term] = amount;
         lastGaugeLoss[msg.sender][term] = GuildToken(guild).lastGaugeLoss(term);
-        profitIndex[msg.sender][term] = ProfitManager(profitManager).userGaugeProfitIndex(address(this), term);
+        profitIndex[msg.sender][term] = ProfitManager(profitManager)
+            .userGaugeProfitIndex(address(this), term);
         stakeRatio[msg.sender][term] = _ratio;
         stakeInterestRate[msg.sender][term] = interestRate;
         stakeTimestamp[msg.sender][term] = block.timestamp;
@@ -131,9 +131,7 @@ contract SurplusGuildMinter is CoreRef {
 
     /// @notice unstake CREDIT tokens and stop voting in a gauge.
     /// user must have been staking for at least one block.
-    function unstake(
-        address term
-    ) external whenNotPaused {
+    function unstake(address term) external whenNotPaused {
         // check that the user is staking
         uint256 creditStaked = stakes[msg.sender][term];
         require(creditStaked != 0, "SurplusGuildMinter: not staking");
@@ -144,12 +142,14 @@ contract SurplusGuildMinter is CoreRef {
 
         // compute CREDIT rewards
         ProfitManager(profitManager).claimRewards(address(this)); // this will update profit indexes
-        uint256 _profitIndex = ProfitManager(profitManager).userGaugeProfitIndex(address(this), term);
+        uint256 _profitIndex = ProfitManager(profitManager)
+            .userGaugeProfitIndex(address(this), term);
         uint256 _userProfitIndex = profitIndex[msg.sender][term];
         if (_profitIndex == 0) _profitIndex = 1e18;
         if (_userProfitIndex == 0) _userProfitIndex = 1e18;
         uint256 deltaIndex = _profitIndex - _userProfitIndex;
-        uint256 guildAmount = stakeRatio[msg.sender][term] * creditStaked / 1e18;
+        uint256 guildAmount = (stakeRatio[msg.sender][term] * creditStaked) /
+            1e18;
         uint256 guildReward;
         uint256 creditToUser;
         if (deltaIndex != 0) {
@@ -160,12 +160,18 @@ contract SurplusGuildMinter is CoreRef {
         // can be called by anyone to slash address(this) and decrement gauge weight etc. The contribution
         // to the surplus buffer is also forfeited.
         // if no loss occurred while the user was staking :
-        if (_lastGaugeLoss == 0 || (_lastGaugeLoss == _userLastGaugeLoss && _lastGaugeLoss != block.timestamp)) {
+        if (
+            _lastGaugeLoss == 0 ||
+            (_lastGaugeLoss == _userLastGaugeLoss &&
+                _lastGaugeLoss != block.timestamp)
+        ) {
             // decrement GUILD voting weight
             GuildToken(guild).decrementGauge(term, uint112(guildAmount));
 
             // pull CREDIT from surplus buffer
-            ProfitManager(profitManager).withdrawFromSurplusBuffer(creditStaked);
+            ProfitManager(profitManager).withdrawFromSurplusBuffer(
+                creditStaked
+            );
             creditToUser += creditStaked;
 
             // replenish GUILD minter buffer
@@ -173,7 +179,10 @@ contract SurplusGuildMinter is CoreRef {
             RateLimitedGuildMinter(rlgm).replenishBuffer(guildAmount);
 
             // mint interest rates to users
-            guildReward = (guildAmount * stakeInterestRate[msg.sender][term] / 1e18) * (block.timestamp - stakeTimestamp[msg.sender][term]) / YEAR;
+            guildReward =
+                (((guildAmount * stakeInterestRate[msg.sender][term]) / 1e18) *
+                    (block.timestamp - stakeTimestamp[msg.sender][term])) /
+                YEAR;
             if (guildReward != 0) {
                 RateLimitedGuildMinter(rlgm).mint(msg.sender, guildReward);
                 emit GuildReward(block.timestamp, msg.sender, guildReward);
@@ -189,18 +198,28 @@ contract SurplusGuildMinter is CoreRef {
         stakes[msg.sender][term] = 0;
 
         // emit event
-        emit Unstake(block.timestamp, term, creditStaked, guildReward, int256(creditToUser) - int256(creditStaked));
+        emit Unstake(
+            block.timestamp,
+            term,
+            creditStaked,
+            guildReward,
+            int256(creditToUser) - int256(creditStaked)
+        );
     }
 
     /// @notice governor-only function to set the ratio of GUILD tokens minted
     /// per CREDIT tokens contributed to the surplus buffer.
-    function setRatio(uint256 _ratio) external onlyCoreRole(CoreRoles.GOVERNOR) {
+    function setRatio(
+        uint256 _ratio
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         ratio = _ratio;
     }
 
     /// @notice governor-only function to set the interest rate of GUILD tokens
     /// borrowed through the SurplusGuildMinter.
-    function setInterestRate(uint256 _interestRate) external onlyCoreRole(CoreRoles.GOVERNOR) {
+    function setInterestRate(
+        uint256 _interestRate
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         interestRate = _interestRate;
     }
 }

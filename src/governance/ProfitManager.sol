@@ -22,7 +22,6 @@ import {CreditToken} from "@src/tokens/CreditToken.sol";
     GUILD holders that vote for the most productive gauges.
 */
 contract ProfitManager is CoreRef {
-
     /// @notice reference to GUILD token.
     address public guild;
 
@@ -33,8 +32,7 @@ contract ProfitManager is CoreRef {
     mapping(address => uint256) public gaugeProfitIndex;
 
     /// @notice profit index of a given user in a given gauge
-    mapping(address => mapping(address => uint256))
-        public userGaugeProfitIndex;
+    mapping(address => mapping(address => uint256)) public userGaugeProfitIndex;
 
     /// @dev internal structure used to optimize storage read, public functions use
     /// uint256 numbers with 18 decimals.
@@ -102,7 +100,10 @@ contract ProfitManager is CoreRef {
     );
 
     /// @notice initialize references to GUILD & CREDIT tokens.
-    function initializeReferences(address _credit, address _guild) external onlyCoreRole(CoreRoles.GOVERNOR) {
+    function initializeReferences(
+        address _credit,
+        address _guild
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         assert(credit == address(0) && guild == address(0));
         credit = _credit;
         guild = _guild;
@@ -268,7 +269,9 @@ contract ProfitManager is CoreRef {
                 // if the gauge has 0 weight, does not update the profit index, this is unnecessary
                 // because the profit index is used to reattribute profit to users voting for the gauge,
                 // and if the weigth is 0, there are no users voting for the gauge.
-                uint256 _gaugeWeight = uint256(GuildToken(guild).getGaugeWeight(gauge));
+                uint256 _gaugeWeight = uint256(
+                    GuildToken(guild).getGaugeWeight(gauge)
+                );
                 if (_gaugeWeight != 0) {
                     uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
                     if (_gaugeProfitIndex == 0) {
@@ -291,7 +294,9 @@ contract ProfitManager is CoreRef {
         address user,
         address gauge
     ) public returns (uint256 creditEarned) {
-        uint256 _userGaugeWeight = uint256(GuildToken(guild).getUserGaugeWeight(user, gauge));
+        uint256 _userGaugeWeight = uint256(
+            GuildToken(guild).getUserGaugeWeight(user, gauge)
+        );
         if (_userGaugeWeight == 0) {
             return 0;
         }
@@ -348,7 +353,6 @@ contract ProfitManager is CoreRef {
             uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
             uint256 _userGaugeProfitIndex = userGaugeProfitIndex[user][gauge];
 
-
             if (_gaugeProfitIndex == 0) {
                 _gaugeProfitIndex = 1e18;
             }
@@ -357,7 +361,9 @@ contract ProfitManager is CoreRef {
             }
             uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
             if (deltaIndex != 0) {
-                uint256 _userGaugeWeight = uint256(GuildToken(_guild).getUserGaugeWeight(user, gauge));
+                uint256 _userGaugeWeight = uint256(
+                    GuildToken(_guild).getUserGaugeWeight(user, gauge)
+                );
                 creditEarned[i] = (_userGaugeWeight * deltaIndex) / 1e18;
                 totalCreditEarned += creditEarned[i];
             }

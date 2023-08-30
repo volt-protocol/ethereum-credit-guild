@@ -1037,7 +1037,10 @@ contract LendingTerm is EIP712, CoreRef {
             RateLimitedCreditMinter(creditMinter).replenishBuffer(borrowAmount);
 
             // report profit
-            ProfitManager(profitManager).notifyPnL(address(this), int256(interest));
+            ProfitManager(profitManager).notifyPnL(
+                address(this),
+                int256(interest)
+            );
         }
 
         // close the loan
@@ -1408,7 +1411,10 @@ contract LendingTerm is EIP712, CoreRef {
         // if loan has been called, reimburse the caller
         bool loanCalled = loan.callTime != 0;
         if (loanCalled) {
-            CreditToken(creditToken).transfer(loan.caller, getLoanCallFee(loanId));
+            CreditToken(creditToken).transfer(
+                loan.caller,
+                getLoanCallFee(loanId)
+            );
         }
 
         // close the loan
