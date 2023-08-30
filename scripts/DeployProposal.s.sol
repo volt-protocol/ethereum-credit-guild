@@ -6,22 +6,13 @@ import {Proposal_0 as proposal} from "@test/proposals/Proposal_0.sol";
 import {Script} from "@forge-std/Script.sol";
 import {Addresses} from "@test/proposals/Addresses.sol";
 
-/*
-How to use:
-forge script contracts/test/proposals/DeployProposal.s.sol:DeployProposal \
-    -vvvv \
-    --rpc-url $ETH_RPC_URL \
-    --broadcast
-Remove --broadcast if you want to try locally first, without paying any gas.
-*/
-
 contract DeployProposal is Script, proposal {
     uint256 public PRIVATE_KEY;
     bool public DO_DEPLOY;
     bool public DO_AFTERDEPLOY;
     bool public DO_TEARDOWN;
 
-    function setUp() public {
+    function _parseEnv() internal {
         // Default behavior: do debug prints
         DEBUG = vm.envOr("DEBUG", true);
         // Default behavior: use Anvil 0 private key
@@ -32,12 +23,13 @@ contract DeployProposal is Script, proposal {
         // Default behavior: do deploy
         DO_DEPLOY = vm.envOr("DO_DEPLOY", true);
         // Default behavior: do after-deploy
-        DO_DEPLOY = vm.envOr("DO_AFTERDEPLOY", true);
+        DO_AFTERDEPLOY = vm.envOr("DO_AFTERDEPLOY", true);
         // Default behavior: don't do teardown
-        DO_DEPLOY = vm.envOr("DO_TEARDOWN", false);
+        DO_TEARDOWN = vm.envOr("DO_TEARDOWN", true);
     }
 
     function run() public {
+        _parseEnv();
         Addresses addresses = new Addresses();
         addresses.resetRecordingAddresses();
         address deployerAddress = vm.addr(PRIVATE_KEY);
