@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
@@ -18,11 +15,8 @@ import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.
 
 /// @notice Lending Term contract of the Ethereum Credit Guild, a base implementation of
 /// smart contract issuing CREDIT debt and escrowing collateral assets.
-contract LendingTerm is EIP712, CoreRef {
+contract LendingTerm is CoreRef {
     using SafeERC20 for IERC20;
-    using Counters for Counters.Counter;
-
-    mapping(address => Counters.Counter) private _nonces;
 
     // events for the lifecycle of loans that happen in the lending term
     /// @notice emitted when new loans are opened (mint debt to borrower, pull collateral from borrower).
@@ -65,28 +59,6 @@ contract LendingTerm is EIP712, CoreRef {
         address indexed repayer,
         uint256 repayAmount
     );
-
-    // signed messages for the lifecycle of loans
-    bytes32 public constant _BORROW_TYPEHASH =
-        keccak256(
-            "Borrow(address term,address borrower,uint256 borrowAmount,uint256 collateralAmount,uint256 nonce,uint256 deadline)"
-        );
-    bytes32 public constant _REPAY_TYPEHASH =
-        keccak256(
-            "Repay(address term,address repayer,bytes32 loanId,uint256 nonce,uint256 deadline)"
-        );
-    bytes32 public constant _PARTIAL_REPAY_TYPEHASH =
-        keccak256(
-            "PartialRepay(address term,address repayer,bytes32 loanId,uint256 repayAmount,uint256 nonce,uint256 deadline)"
-        );
-    bytes32 public constant _ADD_COLLATERAL_TYPEHASH =
-        keccak256(
-            "AddCollateral(address term,address borrower,bytes32 loanId,uint256 collateralToAdd,uint256 nonce,uint256 deadline)"
-        );
-    bytes32 public constant _CALL_TYPEHASH =
-        keccak256(
-            "Call(address term,address caller,bytes32[] loanIds,uint256 nonce,uint256 deadline)"
-        );
 
     struct Signature {
         uint8 v;
@@ -236,7 +208,7 @@ contract LendingTerm is EIP712, CoreRef {
         address _creditMinter,
         address _creditToken,
         LendingTermParams memory params
-    ) EIP712("Ethereum Credit Guild", "1") CoreRef(_core) {
+    ) CoreRef(_core) {
         profitManager = _profitManager;
         guildToken = _guildToken;
         auctionHouse = _auctionHouse;
@@ -252,20 +224,6 @@ contract LendingTerm is EIP712, CoreRef {
         callPeriod = params.callPeriod;
         hardCap = params.hardCap;
         ltvBuffer = params.ltvBuffer;
-    }
-
-    function nonces(address user) external view returns (uint256) {
-        return _nonces[user].current();
-    }
-
-    function DOMAIN_SEPARATOR() external view returns (bytes32) {
-        return _domainSeparatorV4();
-    }
-
-    function _useNonce(address user) internal returns (uint256 current) {
-        Counters.Counter storage nonce = _nonces[user];
-        current = nonce.current();
-        nonce.increment();
     }
 
     /// @notice get a loan
@@ -454,36 +412,6 @@ contract LendingTerm is EIP712, CoreRef {
         loanId = _borrow(msg.sender, borrowAmount, collateralAmount);
     }
 
-    /// @notice borrow with a signature to open the loan
-    function borrowBySig(
-        address borrower,
-        uint256 borrowAmount,
-        uint256 collateralAmount,
-        uint256 deadline,
-        Signature calldata sig
-    ) external whenNotPaused returns (bytes32 loanId) {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _BORROW_TYPEHASH,
-                address(this),
-                borrower,
-                borrowAmount,
-                collateralAmount,
-                _useNonce(borrower),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
-        require(signer == borrower, "LendingTerm: invalid signature");
-
-        return _borrow(borrower, borrowAmount, collateralAmount);
-    }
-
     /// @notice borrow with a permit on collateral token
     function borrowWithPermit(
         uint256 borrowAmount,
@@ -553,155 +481,6 @@ contract LendingTerm is EIP712, CoreRef {
         return _borrow(msg.sender, borrowAmount, collateralAmount);
     }
 
-    /// @notice borrow with a signature to open the loan and a permit on collateral token
-    function borrowBySigWithPermit(
-        address borrower,
-        uint256 borrowAmount,
-        uint256 collateralAmount,
-        uint256 deadline,
-        Signature calldata borrowSig,
-        Signature calldata permitSig
-    ) external whenNotPaused returns (bytes32 loanId) {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _BORROW_TYPEHASH,
-                address(this),
-                borrower,
-                borrowAmount,
-                collateralAmount,
-                _useNonce(borrower),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(
-            hash,
-            borrowSig.v,
-            borrowSig.r,
-            borrowSig.s
-        );
-        require(signer == borrower, "LendingTerm: invalid signature");
-
-        IERC20Permit(collateralToken).permit(
-            borrower,
-            address(this),
-            collateralAmount,
-            deadline,
-            permitSig.v,
-            permitSig.r,
-            permitSig.s
-        );
-
-        return _borrow(borrower, borrowAmount, collateralAmount);
-    }
-
-    /// @notice borrow with a signature to open the loan and a permit on credit token
-    function borrowBySigWithCreditPermit(
-        address borrower,
-        uint256 borrowAmount,
-        uint256 collateralAmount,
-        uint256 deadline,
-        Signature calldata borrowSig,
-        Signature calldata permitCredit
-    ) external whenNotPaused returns (bytes32 loanId) {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _BORROW_TYPEHASH,
-                address(this),
-                borrower,
-                borrowAmount,
-                collateralAmount,
-                _useNonce(borrower),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(
-            hash,
-            borrowSig.v,
-            borrowSig.r,
-            borrowSig.s
-        );
-        require(signer == borrower, "LendingTerm: invalid signature");
-
-        IERC20Permit(creditToken).permit(
-            borrower,
-            address(this),
-            (borrowAmount * openingFee) / 1e18,
-            deadline,
-            permitCredit.v,
-            permitCredit.r,
-            permitCredit.s
-        );
-
-        return _borrow(borrower, borrowAmount, collateralAmount);
-    }
-
-    /// @notice borrow with a signature to open the loan and a permit on collateral token + credit token
-    function borrowBySigWithPermits(
-        address borrower,
-        uint256 borrowAmount,
-        uint256 collateralAmount,
-        uint256 deadline,
-        Signature calldata borrowSig,
-        Signature calldata collateralPermitSig,
-        Signature calldata creditPermitSig
-    ) external whenNotPaused returns (bytes32 loanId) {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _BORROW_TYPEHASH,
-                address(this),
-                borrower,
-                borrowAmount,
-                collateralAmount,
-                _useNonce(borrower),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(
-            hash,
-            borrowSig.v,
-            borrowSig.r,
-            borrowSig.s
-        );
-        require(signer == borrower, "LendingTerm: invalid signature");
-
-        IERC20Permit(creditToken).permit(
-            borrower,
-            address(this),
-            (borrowAmount * openingFee) / 1e18,
-            deadline,
-            creditPermitSig.v,
-            creditPermitSig.r,
-            creditPermitSig.s
-        );
-
-        IERC20Permit(collateralToken).permit(
-            borrower,
-            address(this),
-            collateralAmount,
-            deadline,
-            collateralPermitSig.v,
-            collateralPermitSig.r,
-            collateralPermitSig.s
-        );
-
-        return _borrow(borrower, borrowAmount, collateralAmount);
-    }
-
     /// @notice add collateral on an open loan.
     /// a borrower might want to add collateral so that his position cannot be called for free.
     /// if the loan is called & goes into liquidation, and less than `ltvBuffer` percent of his
@@ -743,36 +522,6 @@ contract LendingTerm is EIP712, CoreRef {
         _addCollateral(msg.sender, loanId, collateralToAdd);
     }
 
-    /// @notice add collateral on an open loan by signature
-    function addCollateralBySig(
-        address borrower,
-        bytes32 loanId,
-        uint256 collateralToAdd,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _ADD_COLLATERAL_TYPEHASH,
-                address(this),
-                borrower,
-                loanId,
-                collateralToAdd,
-                _useNonce(borrower),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
-        require(signer == borrower, "LendingTerm: invalid signature");
-
-        _addCollateral(borrower, loanId, collateralToAdd);
-    }
-
     /// @notice add collateral on an open loan with a permit on collateral token
     function addCollateralWithPermit(
         bytes32 loanId,
@@ -791,52 +540,6 @@ contract LendingTerm is EIP712, CoreRef {
         );
 
         _addCollateral(msg.sender, loanId, collateralToAdd);
-    }
-
-    /// @notice add collateral on an open loan by signature with permit on collateral token
-    function addCollateralBySigWithPermit(
-        address borrower,
-        bytes32 loanId,
-        uint256 collateralToAdd,
-        uint256 deadline,
-        Signature calldata addCollateralSig,
-        Signature calldata permitSig
-    ) external {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _ADD_COLLATERAL_TYPEHASH,
-                address(this),
-                borrower,
-                loanId,
-                collateralToAdd,
-                _useNonce(borrower),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(
-            hash,
-            addCollateralSig.v,
-            addCollateralSig.r,
-            addCollateralSig.s
-        );
-        require(signer == borrower, "LendingTerm: invalid signature");
-
-        IERC20Permit(collateralToken).permit(
-            borrower,
-            address(this),
-            collateralToAdd,
-            deadline,
-            permitSig.v,
-            permitSig.r,
-            permitSig.s
-        );
-
-        _addCollateral(borrower, loanId, collateralToAdd);
     }
 
     /// @notice partially repay an open loan.
@@ -904,36 +607,6 @@ contract LendingTerm is EIP712, CoreRef {
         _partialRepay(msg.sender, loanId, debtToRepay);
     }
 
-    /// @notice partially repay an open loan by signature
-    function partialRepayBySig(
-        address repayer,
-        bytes32 loanId,
-        uint256 debtToRepay,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _PARTIAL_REPAY_TYPEHASH,
-                address(this),
-                repayer,
-                loanId,
-                debtToRepay,
-                _useNonce(repayer),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
-        require(signer == repayer, "LendingTerm: invalid signature");
-
-        _partialRepay(repayer, loanId, debtToRepay);
-    }
-
     /// @notice partially repay an open loan with a permit on CREDIT token
     function partialRepayWithPermit(
         bytes32 loanId,
@@ -952,52 +625,6 @@ contract LendingTerm is EIP712, CoreRef {
         );
 
         _partialRepay(msg.sender, loanId, debtToRepay);
-    }
-
-    /// @notice partially repay an open loan by signature with permit on CREDIT token
-    function partialRepayBySigWithPermit(
-        address repayer,
-        bytes32 loanId,
-        uint256 debtToRepay,
-        uint256 deadline,
-        Signature calldata repaySig,
-        Signature calldata permitSig
-    ) external {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _PARTIAL_REPAY_TYPEHASH,
-                address(this),
-                repayer,
-                loanId,
-                debtToRepay,
-                _useNonce(repayer),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(
-            hash,
-            repaySig.v,
-            repaySig.r,
-            repaySig.s
-        );
-        require(signer == repayer, "LendingTerm: invalid signature");
-
-        IERC20Permit(creditToken).permit(
-            repayer,
-            address(this),
-            debtToRepay,
-            deadline,
-            permitSig.v,
-            permitSig.r,
-            permitSig.s
-        );
-
-        _partialRepay(repayer, loanId, debtToRepay);
     }
 
     /// @notice repay an open loan
@@ -1062,34 +689,6 @@ contract LendingTerm is EIP712, CoreRef {
         _repay(msg.sender, loanId);
     }
 
-    /// @notice repay an open loan by signature
-    function repayBySig(
-        address repayer,
-        bytes32 loanId,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _REPAY_TYPEHASH,
-                address(this),
-                repayer,
-                loanId,
-                _useNonce(repayer),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
-        require(signer == repayer, "LendingTerm: invalid signature");
-
-        _repay(repayer, loanId);
-    }
-
     /// @notice repay an open loan with a permit on CREDIT token
     function repayWithPermit(
         bytes32 loanId,
@@ -1108,51 +707,6 @@ contract LendingTerm is EIP712, CoreRef {
         );
 
         _repay(msg.sender, loanId);
-    }
-
-    /// @notice repay an open loan by signature and with a permit on CREDIT token
-    function repayBySigWithPermit(
-        address repayer,
-        bytes32 loanId,
-        uint256 maxDebt,
-        uint256 deadline,
-        Signature calldata repaySig,
-        Signature calldata permitSig
-    ) external {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _REPAY_TYPEHASH,
-                address(this),
-                repayer,
-                loanId,
-                _useNonce(repayer),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(
-            hash,
-            repaySig.v,
-            repaySig.r,
-            repaySig.s
-        );
-        require(signer == repayer, "LendingTerm: invalid signature");
-
-        IERC20Permit(creditToken).permit(
-            repayer,
-            address(this),
-            maxDebt,
-            deadline,
-            permitSig.v,
-            permitSig.r,
-            permitSig.s
-        );
-
-        _repay(repayer, loanId);
     }
 
     /// @notice call a loan in state, and return the amount of debt tokens to pull for call fee.
@@ -1219,46 +773,6 @@ contract LendingTerm is EIP712, CoreRef {
         }
     }
 
-    /// @notice call a list of loans using a signed Call message
-    function callManyBySig(
-        address caller,
-        bytes32[] memory loanIds,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _CALL_TYPEHASH,
-                address(this),
-                caller,
-                keccak256(abi.encodePacked(loanIds)),
-                _useNonce(caller),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(hash, sig.v, sig.r, sig.s);
-        require(signer == caller, "LendingTerm: invalid signature");
-
-        uint256 debtToPullForCallFees = 0;
-        for (uint256 i = 0; i < loanIds.length; i++) {
-            debtToPullForCallFees += _call(loanIds[i], caller);
-        }
-
-        // pull the call fees from caller
-        if (debtToPullForCallFees != 0) {
-            CreditToken(creditToken).transferFrom(
-                caller,
-                address(this),
-                debtToPullForCallFees
-            );
-        }
-    }
-
     /// @notice call with a permit on CREDIT token to pull call fees
     function callManyWithPermit(
         bytes32[] memory loanIds,
@@ -1283,56 +797,6 @@ contract LendingTerm is EIP712, CoreRef {
             );
             CreditToken(creditToken).transferFrom(
                 msg.sender,
-                address(this),
-                debtToPullForCallFees
-            );
-        }
-    }
-
-    /// @notice call by signature with a permit on CREDIT token to pull call fees
-    function callManyBySigWithPermit(
-        address caller,
-        bytes32[] memory loanIds,
-        uint256 deadline,
-        Signature calldata callSig,
-        Signature calldata permitSig
-    ) external {
-        require(block.timestamp <= deadline, "LendingTerm: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _CALL_TYPEHASH,
-                address(this),
-                caller,
-                keccak256(abi.encodePacked(loanIds)),
-                _useNonce(caller),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSA.recover(hash, callSig.v, callSig.r, callSig.s);
-        require(signer == caller, "LendingTerm: invalid signature");
-
-        uint256 debtToPullForCallFees = 0;
-        for (uint256 i = 0; i < loanIds.length; i++) {
-            debtToPullForCallFees += _call(loanIds[i], caller);
-        }
-
-        // pull the call fees from caller
-        if (debtToPullForCallFees != 0) {
-            IERC20Permit(creditToken).permit(
-                caller,
-                address(this),
-                debtToPullForCallFees,
-                deadline,
-                permitSig.v,
-                permitSig.r,
-                permitSig.s
-            );
-            CreditToken(creditToken).transferFrom(
-                caller,
                 address(this),
                 debtToPullForCallFees
             );
