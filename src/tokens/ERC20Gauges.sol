@@ -45,6 +45,9 @@ import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
         ... Add internal _setCanExceedMaxGauges(address, bool) method
         ... Remove check of "target address has nonzero code size"
         ... Rename to remove "contract" from name because we don't check if target is a contract
+    - Rename `calculateGaugeAllocation` to `calculateGaugeStoredAllocation` to make clear that it reads from stored weights.
+    - Add `calculateGaugeAllocation` helper function that reads from current weight.
+    - Add `isDeprecatedGauge(address)->bool` view function that returns true if gauge is deprecated.
     - Consistency: make incrementGauges return a uint112 instead of uint256
     - Import OpenZeppelin ERC20 & EnumerableSet instead of Solmate's
     - Update error management style (use require + messages instead of Solidity errors)
@@ -111,7 +114,8 @@ abstract contract ERC20Gauges is ERC20 {
 
     /// @notice see `getGaugeCycleEnd()`
     function _getGaugeCycleEnd() internal view returns (uint32) {
-        uint32 nowPlusOneCycle = block.timestamp.safeCastTo32() + gaugeCycleLength;
+        uint32 nowPlusOneCycle = block.timestamp.safeCastTo32() +
+            gaugeCycleLength;
         unchecked {
             return (nowPlusOneCycle / gaugeCycleLength) * gaugeCycleLength; // cannot divide by zero and always <= nowPlusOneCycle so no overflow
         }
@@ -175,6 +179,11 @@ abstract contract ERC20Gauges is ERC20 {
     /// @notice returns true if `gauge` is not in deprecated gauges
     function isGauge(address gauge) public view returns (bool) {
         return _gauges.contains(gauge) && !_deprecatedGauges.contains(gauge);
+    }
+
+    /// @notice returns true if `gauge` is in deprecated gauges
+    function isDeprecatedGauge(address gauge) public view returns (bool) {
+        return _deprecatedGauges.contains(gauge);
     }
 
     /// @notice returns the number of live gauges
@@ -246,9 +255,29 @@ abstract contract ERC20Gauges is ERC20 {
         uint256 quantity
     ) external view returns (uint256) {
         if (_deprecatedGauges.contains(gauge)) return 0;
+
+        uint112 total = _totalWeight.currentWeight;
+        if (total == 0) return 0;
+        uint112 weight = _getGaugeWeight[gauge].currentWeight;
+
+        return (quantity * weight) / total;
+    }
+
+    /** 
+     @notice helper function for calculating the proportion of a `quantity` allocated to a gauge
+     @param gauge the gauge to calculate allocation of
+     @param quantity a representation of a resource to be shared among all gauges
+     @return the proportion of `quantity` allocated to `gauge`. Returns 0 if gauge is not live, even if it has weight.
+    */
+    function calculateGaugeStoredAllocation(
+        address gauge,
+        uint256 quantity
+    ) external view returns (uint256) {
+        if (_deprecatedGauges.contains(gauge)) return 0;
         uint32 currentCycle = _getGaugeCycleEnd();
 
         uint112 total = _getStoredWeight(_totalWeight, currentCycle);
+        if (total == 0) return 0;
         uint112 weight = _getStoredWeight(_getGaugeWeight[gauge], currentCycle);
         return (quantity * weight) / total;
     }

@@ -49,12 +49,17 @@ abstract contract ERC20MultiVotes is ERC20Permit {
     mapping(address => Checkpoint[]) private _checkpoints;
 
     /// @notice Get the `pos`-th checkpoint for `account`.
-    function checkpoints(address account, uint32 pos) public view virtual returns (Checkpoint memory) {
+    function checkpoints(
+        address account,
+        uint32 pos
+    ) public view virtual returns (Checkpoint memory) {
         return _checkpoints[account][pos];
     }
 
     /// @notice Get number of checkpoints for `account`.
-    function numCheckpoints(address account) public view virtual returns (uint32) {
+    function numCheckpoints(
+        address account
+    ) public view virtual returns (uint32) {
         return _checkpoints[account].length.safeCastTo32();
     }
 
@@ -83,13 +88,22 @@ abstract contract ERC20MultiVotes is ERC20Permit {
      * @param blockNumber the block to calculate votes for.
      * @return the amount of votes.
      */
-    function getPastVotes(address account, uint256 blockNumber) public view virtual returns (uint256) {
-        require(blockNumber < block.number, "ERC20MultiVotes: not a past block");
+    function getPastVotes(
+        address account,
+        uint256 blockNumber
+    ) public view virtual returns (uint256) {
+        require(
+            blockNumber < block.number,
+            "ERC20MultiVotes: not a past block"
+        );
         return _checkpointsLookup(_checkpoints[account], blockNumber);
     }
 
     /// @dev Lookup a value in a list of (sorted) checkpoints.
-    function _checkpointsLookup(Checkpoint[] storage ckpts, uint256 blockNumber) private view returns (uint256) {
+    function _checkpointsLookup(
+        Checkpoint[] storage ckpts,
+        uint256 blockNumber
+    ) private view returns (uint256) {
         // We run a binary search to look for the earliest checkpoint taken after `blockNumber`.
         uint256 high = ckpts.length;
         uint256 low = 0;
@@ -118,7 +132,10 @@ abstract contract ERC20MultiVotes is ERC20Permit {
     event MaxDelegatesUpdate(uint256 oldMaxDelegates, uint256 newMaxDelegates);
 
     /// @notice emitted when updating the canContractExceedMaxDelegates flag for an account
-    event CanContractExceedMaxDelegatesUpdate(address indexed account, bool canContractExceedMaxDelegates);
+    event CanContractExceedMaxDelegatesUpdate(
+        address indexed account,
+        bool canContractExceedMaxDelegates
+    );
 
     /// @notice the maximum amount of delegates for a user at a given time
     uint256 public maxDelegates;
@@ -135,8 +152,14 @@ abstract contract ERC20MultiVotes is ERC20Permit {
     }
 
     /// @notice set the canContractExceedMaxDelegates flag for an account.
-    function _setContractExceedMaxDelegates(address account, bool canExceedMax) internal {
-        require(!canExceedMax || account.code.length != 0, "ERC20MultiVotes: not a smart contract"); // can only approve contracts
+    function _setContractExceedMaxDelegates(
+        address account,
+        bool canExceedMax
+    ) internal {
+        require(
+            !canExceedMax || account.code.length != 0,
+            "ERC20MultiVotes: not a smart contract"
+        ); // can only approve contracts
 
         canContractExceedMaxDelegates[account] = canExceedMax;
 
@@ -148,20 +171,37 @@ abstract contract ERC20MultiVotes is ERC20Permit {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Emitted when a `delegator` delegates `amount` votes to `delegate`.
-    event Delegation(address indexed delegator, address indexed delegate, uint256 amount);
+    event Delegation(
+        address indexed delegator,
+        address indexed delegate,
+        uint256 amount
+    );
 
     /// @dev Emitted when a `delegator` undelegates `amount` votes from `delegate`.
-    event Undelegation(address indexed delegator, address indexed delegate, uint256 amount);
+    event Undelegation(
+        address indexed delegator,
+        address indexed delegate,
+        uint256 amount
+    );
 
     /// @dev Emitted when a token transfer or delegate change results in changes to an account's voting power.
-    event DelegateVotesChanged(address indexed delegate, uint256 previousBalance, uint256 newBalance);
+    event DelegateVotesChanged(
+        address indexed delegate,
+        uint256 previousBalance,
+        uint256 newBalance
+    );
 
     /// @notice An event that is emitted when an account changes its delegate
     /// @dev this is used for backward compatibility with OZ interfaces for ERC20Votes and ERC20VotesComp.
-    event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
+    event DelegateChanged(
+        address indexed delegator,
+        address indexed fromDelegate,
+        address indexed toDelegate
+    );
 
     /// @notice mapping from a delegator and delegatee to the delegated amount.
-    mapping(address => mapping(address => uint256)) private _delegatesVotesCount;
+    mapping(address => mapping(address => uint256))
+        private _delegatesVotesCount;
 
     /// @notice mapping from a delegator to the total number of delegated votes.
     mapping(address => uint256) public userDelegatedVotes;
@@ -175,7 +215,10 @@ abstract contract ERC20MultiVotes is ERC20Permit {
      * @param delegatee the account receiving votes from `delegator`.
      * @return the total amount of votes delegated to `delegatee` by `delegator`
      */
-    function delegatesVotesCount(address delegator, address delegatee) public view virtual returns (uint256) {
+    function delegatesVotesCount(
+        address delegator,
+        address delegatee
+    ) public view virtual returns (uint256) {
         return _delegatesVotesCount[delegator][delegatee];
     }
 
@@ -184,7 +227,9 @@ abstract contract ERC20MultiVotes is ERC20Permit {
      * @param delegator the account which is delegating votes to delegates.
      * @return the list of delegated accounts.
      */
-    function delegates(address delegator) public view returns (address[] memory) {
+    function delegates(
+        address delegator
+    ) public view returns (address[] memory) {
         return _delegates[delegator].values();
     }
 
@@ -203,7 +248,10 @@ abstract contract ERC20MultiVotes is ERC20Permit {
      * @param amount the amount of votes received.
      * @dev requires "freeVotes(msg.sender) > amount" and will not exceed max delegates
      */
-    function incrementDelegation(address delegatee, uint256 amount) public virtual {
+    function incrementDelegation(
+        address delegatee,
+        uint256 amount
+    ) public virtual {
         _incrementDelegation(msg.sender, delegatee, amount);
     }
 
@@ -226,7 +274,10 @@ abstract contract ERC20MultiVotes is ERC20Permit {
         _delegate(msg.sender, newDelegatee);
     }
 
-    function _delegate(address delegator, address newDelegatee) internal virtual {
+    function _delegate(
+        address delegator,
+        address newDelegatee
+    ) internal virtual {
         uint256 count = delegateCount(delegator);
 
         // undefined behavior for delegateCount > 1
@@ -236,7 +287,11 @@ abstract contract ERC20MultiVotes is ERC20Permit {
         // if already delegated, undelegate first
         if (count == 1) {
             oldDelegatee = _delegates[delegator].at(0);
-            _undelegate(delegator, oldDelegatee, _delegatesVotesCount[delegator][oldDelegatee]);
+            _undelegate(
+                delegator,
+                oldDelegatee,
+                _delegatesVotesCount[delegator][oldDelegatee]
+            );
         }
 
         // redelegate only if newDelegatee is not empty
@@ -253,10 +308,18 @@ abstract contract ERC20MultiVotes is ERC20Permit {
     ) internal virtual {
         // Require freeVotes exceed the delegation size
         uint256 free = freeVotes(delegator);
-        require(delegatee != address(0) && free >= amount, "ERC20MultiVotes: delegation error");
+        require(
+            delegatee != address(0) && free >= amount,
+            "ERC20MultiVotes: delegation error"
+        );
 
         bool newDelegate = _delegates[delegator].add(delegatee); // idempotent add
-        require(!newDelegate || delegateCount(delegator) <= maxDelegates || canContractExceedMaxDelegates[delegator], "ERC20MultiVotes: delegation error");
+        require(
+            !newDelegate ||
+                delegateCount(delegator) <= maxDelegates ||
+                canContractExceedMaxDelegates[delegator],
+            "ERC20MultiVotes: delegation error"
+        );
 
         _delegatesVotesCount[delegator][delegatee] += amount;
         userDelegatedVotes[delegator] += amount;
@@ -270,7 +333,8 @@ abstract contract ERC20MultiVotes is ERC20Permit {
         address delegatee,
         uint256 amount
     ) internal virtual {
-        uint256 newDelegates = _delegatesVotesCount[delegator][delegatee] - amount;
+        uint256 newDelegates = _delegatesVotesCount[delegator][delegatee] -
+            amount;
 
         if (newDelegates == 0) {
             require(_delegates[delegator].remove(delegatee));
@@ -297,7 +361,12 @@ abstract contract ERC20MultiVotes is ERC20Permit {
         if (pos > 0 && ckpts[pos - 1].fromBlock == block.number) {
             ckpts[pos - 1].votes = newWeight.safeCastTo224();
         } else {
-            ckpts.push(Checkpoint({fromBlock: block.number.safeCastTo32(), votes: newWeight.safeCastTo224()}));
+            ckpts.push(
+                Checkpoint({
+                    fromBlock: block.number.safeCastTo32(),
+                    votes: newWeight.safeCastTo224()
+                })
+            );
         }
         emit DelegateVotesChanged(delegatee, oldWeight, newWeight);
     }
@@ -323,7 +392,10 @@ abstract contract ERC20MultiVotes is ERC20Permit {
         super._burn(from, amount);
     }
 
-    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+    function transfer(
+        address to,
+        uint256 amount
+    ) public virtual override returns (bool) {
         _decrementVotesUntilFree(msg.sender, amount);
         return super.transfer(to, amount);
     }
@@ -353,7 +425,11 @@ abstract contract ERC20MultiVotes is ERC20Permit {
 
         // Free delegates until through entire list or under votes amount
         uint256 size = delegateList.length;
-        for (uint256 i = 0; i < size && (userFreeVotes + totalFreed) < votes; i++) {
+        for (
+            uint256 i = 0;
+            i < size && (userFreeVotes + totalFreed) < votes;
+            i++
+        ) {
             address delegatee = delegateList[i];
             uint256 delegateVotes = _delegatesVotesCount[user][delegatee];
             if (delegateVotes != 0) {
@@ -387,13 +463,23 @@ abstract contract ERC20MultiVotes is ERC20Permit {
         bytes32 r,
         bytes32 s
     ) public {
-        require(block.timestamp <= expiry, "ERC20MultiVotes: signature expired");
+        require(
+            block.timestamp <= expiry,
+            "ERC20MultiVotes: signature expired"
+        );
         address signer = ecrecover(
             keccak256(
                 abi.encodePacked(
                     "\x19\x01",
                     _domainSeparatorV4(),
-                    keccak256(abi.encode(DELEGATION_TYPEHASH, delegatee, nonce, expiry))
+                    keccak256(
+                        abi.encode(
+                            DELEGATION_TYPEHASH,
+                            delegatee,
+                            nonce,
+                            expiry
+                        )
+                    )
                 )
             ),
             v,

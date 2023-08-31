@@ -23,12 +23,23 @@ contract Core is AccessControlEnumerable {
         _setRoleAdmin(CoreRoles.CREDIT_MINTER, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.RATE_LIMITED_CREDIT_MINTER, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GUILD_MINTER, CoreRoles.GOVERNOR);
+        _setRoleAdmin(CoreRoles.RATE_LIMITED_GUILD_MINTER, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GAUGE_ADD, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GAUGE_REMOVE, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GAUGE_PARAMETERS, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GAUGE_PNL_NOTIFIER, CoreRoles.GOVERNOR);
-        _setRoleAdmin(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, CoreRoles.GOVERNOR);
-        _setRoleAdmin(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, CoreRoles.GOVERNOR);
+        _setRoleAdmin(
+            CoreRoles.GUILD_GOVERNANCE_PARAMETERS,
+            CoreRoles.GOVERNOR
+        );
+        _setRoleAdmin(
+            CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW,
+            CoreRoles.GOVERNOR
+        );
+        _setRoleAdmin(
+            CoreRoles.CREDIT_GOVERNANCE_PARAMETERS,
+            CoreRoles.GOVERNOR
+        );
         _setRoleAdmin(CoreRoles.CREDIT_REBASE_PARAMETERS, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.TERM_HARDCAP, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.TIMELOCK_PROPOSER, CoreRoles.GOVERNOR);

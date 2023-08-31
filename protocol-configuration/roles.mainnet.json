@@ -1,10 +1,14 @@
 [
   {
-    "name": "TIMELOCK",
+    "name": "LENDING_TERM_OFFBOARDING",
     "role": "GOVERNOR_ROLE"
   },
   {
     "name": "CORE",
+    "role": "GOVERNOR_ROLE"
+  },
+  {
+    "name": "TIMELOCK",
     "role": "GOVERNOR_ROLE"
   },
 
@@ -15,7 +19,26 @@
 
   {
     "name": "RATE_LIMITED_CREDIT_MINTER",
+    "role": "CREDIT_MINTER_ROLE"
+  },
+
+  {
+    "name": "TERM_USDC_1",
     "role": "RATE_LIMITED_CREDIT_MINTER_ROLE"
+  },
+  {
+    "name": "TERM_SDAI_1",
+    "role": "RATE_LIMITED_CREDIT_MINTER_ROLE"
+  },
+
+  {
+    "name": "RATE_LIMITED_GUILD_MINTER",
+    "role": "GUILD_MINTER_ROLE"
+  },
+
+  {
+    "name": "SURPLUS_GUILD_MINTER",
+    "role": "RATE_LIMITED_GUILD_MINTER_ROLE"
   },
 
   {
@@ -31,6 +54,40 @@
   {
     "name": "TIMELOCK",
     "role": "GAUGE_PARAMETERS_ROLE"
+  },
+
+  {
+    "name": "TERM_USDC_1",
+    "role": "GAUGE_PNL_NOTIFIER_ROLE"
+  },
+  {
+    "name": "TERM_SDAI_1",
+    "role": "GAUGE_PNL_NOTIFIER_ROLE"
+  },
+
+  {
+    "name": "TIMELOCK",
+    "role": "GUILD_GOVERNANCE_PARAMETERS_ROLE"
+  },
+
+  {
+    "name": "SURPLUS_GUILD_MINTER",
+    "role": "GUILD_SURPLUS_BUFFER_WITHDRAW_ROLE"
+  },
+
+  {
+    "name": "TIMELOCK",
+    "role": "CREDIT_GOVERNANCE_PARAMETERS_ROLE"
+  },
+
+  {
+    "name": "TIMELOCK",
+    "role": "CREDIT_REBASE_PARAMETERS_ROLE"
+  },
+
+  {
+    "name": "TIMELOCK",
+    "role": "TERM_HARDCAP_ROLE"
   },
 
   {

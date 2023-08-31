@@ -17,7 +17,12 @@ contract VoltTimelockController is TimelockController, CoreRef {
         uint256 _minDelay
     )
         CoreRef(_core)
-        TimelockController(_minDelay, new address[](0), new address[](0), address(0))
+        TimelockController(
+            _minDelay,
+            new address[](0),
+            new address[](0),
+            address(0)
+        )
     {}
 
     /// @dev override of OZ access/AccessControl.sol inherited by governance/TimelockController.sol

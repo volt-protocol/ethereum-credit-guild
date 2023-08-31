@@ -9,12 +9,14 @@ import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
 contract LendingTermOffboardingUnitTest is Test {
     address private governor = address(1);
     Core private core;
+    ProfitManager private profitManager;
     GuildToken private guild;
     CreditToken private credit;
     MockERC20 private collateral;
@@ -49,8 +51,10 @@ contract LendingTermOffboardingUnitTest is Test {
 
         // deploy
         core = new Core();
+        profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        profitManager.initializeReferences(address(credit), address(guild));
         collateral = new MockERC20();
         rlcm = new RateLimitedCreditMinter(
             address(core), /*_core*/
@@ -62,12 +66,13 @@ contract LendingTermOffboardingUnitTest is Test {
         offboarder = new LendingTermOffboarding(address(core), address(guild), _QUORUM);
         auctionHouse = new AuctionHouse(
             address(core),
-            address(guild),
-            address(rlcm),
-            address(credit)
+            650,
+            1800,
+            0.1e18
         );
         term = new LendingTerm(
             address(core), /*_core*/
+            address(profitManager), /*_profitManager*/
             address(guild), /*_guildToken*/
             address(auctionHouse), /*_auctionHouse*/
             address(rlcm), /*_creditMinter*/
@@ -78,6 +83,7 @@ contract LendingTermOffboardingUnitTest is Test {
                 interestRate: _INTEREST_RATE,
                 maxDelayBetweenPartialRepay: 0,
                 minPartialRepayPercent: 0,
+                openingFee: 0,
                 callFee: _CALL_FEE,
                 callPeriod: _CALL_PERIOD,
                 hardCap: _HARDCAP,
@@ -104,7 +110,6 @@ contract LendingTermOffboardingUnitTest is Test {
         guild.addGauge(address(term));
         guild.mint(address(this), _HARDCAP * 2);
         guild.incrementGauge(address(term), uint112(_HARDCAP));
-        vm.warp(block.timestamp + _CYCLE_LENGTH);
 
         // allow GUILD delegations
         guild.setMaxDelegates(10);
@@ -119,6 +124,7 @@ contract LendingTermOffboardingUnitTest is Test {
         // labels
         vm.label(address(this), "test");
         vm.label(address(core), "core");
+        vm.label(address(profitManager), "profitManager");
         vm.label(address(guild), "guild");
         vm.label(address(credit), "credit");
         vm.label(address(rlcm), "rlcm");
@@ -230,23 +236,61 @@ contract LendingTermOffboardingUnitTest is Test {
         vm.warp(block.timestamp + 13);
 
         // cannot offboard if quorum is not met
-        bytes32[] memory loanIds = new bytes32[](0);
         vm.expectRevert("LendingTermOffboarding: quorum not met");
-        offboarder.offboard(address(term), loanIds);
+        offboarder.offboard(address(term));
 
         // prepare (2)
         offboarder.supportOffboard(snapshotBlock, address(term));
         assertEq(offboarder.polls(snapshotBlock, address(term)), _QUORUM + 1);
         assertEq(offboarder.canOffboard(address(term)), true);
 
-        // cannot offboard if all loans are not closed
-        vm.expectRevert("LendingTermOffboarding: not all loans closed");
-        offboarder.offboard(address(term), loanIds);
-
         // properly offboard a term
-        loanIds = new bytes32[](1);
-        loanIds[0] = aliceLoanId;
-        offboarder.offboard(address(term), loanIds);
+        assertEq(guild.isGauge(address(term)), true);
+        offboarder.offboard(address(term));
+        assertEq(guild.isGauge(address(term)), false);
+        assertEq(core.hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term)), false);
+
+        
+        vm.startPrank(alice);
+        // can close loans
+        credit.approve(address(term), aliceLoanSize);
+        term.repay(aliceLoanId);
+        // cannot open new loans
+        collateral.approve(address(term), aliceLoanSize);
+        vm.expectRevert("LendingTerm: debt ceiling reached");
+        aliceLoanId = term.borrow(aliceLoanSize, aliceLoanSize);
+        vm.stopPrank();
+    }
+
+    function testCleanup() public {
+        // prepare (1)
+        guild.mint(bob, _QUORUM);
+        vm.startPrank(bob);
+        guild.delegate(bob);
+        uint256 snapshotBlock = block.number;
+        offboarder.proposeOffboard(address(term));
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        vm.expectRevert("LendingTermOffboarding: quorum not met");
+        offboarder.cleanup(address(term));
+        offboarder.supportOffboard(snapshotBlock, address(term));
+        offboarder.offboard(address(term));
+
+        // cannot cleanup because loans are active
+        vm.expectRevert("LendingTermOffboarding: not all loans closed");
+        offboarder.cleanup(address(term));
+
+        // close loans
+        vm.startPrank(alice);
+        credit.approve(address(term), aliceLoanSize);
+        term.repay(aliceLoanId);
+        vm.stopPrank();
+
+        // cleanup
+        offboarder.cleanup(address(term));
+
         assertEq(offboarder.canOffboard(address(term)), false);
+        assertEq(term.hardCap(), 0);
+        assertEq(core.hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term)), false);
     }
 }
