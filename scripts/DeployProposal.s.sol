@@ -20,11 +20,10 @@ contract DeployProposal is Script, proposal {
             "ETH_PRIVATE_KEY",
             77814517325470205911140941194401928579557062014761831930645393041380819009408
         );
-        // Default behavior: do deploy
+        // Default behavior: do all steps
+        // Environment variables can skip some of them.
         DO_DEPLOY = vm.envOr("DO_DEPLOY", true);
-        // Default behavior: do after-deploy
         DO_AFTERDEPLOY = vm.envOr("DO_AFTERDEPLOY", true);
-        // Default behavior: don't do teardown
         DO_TEARDOWN = vm.envOr("DO_TEARDOWN", true);
     }
 
