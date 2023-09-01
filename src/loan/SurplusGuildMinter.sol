@@ -17,7 +17,7 @@ import {RateLimitedGuildMinter} from "@src/rate-limits/RateLimitedGuildMinter.so
 /// from selected lending terms.
 contract SurplusGuildMinter is CoreRef {
     /// @notice minimum number of CREDIT to stake
-    uint256 public constant MIN_STAKE = 100e18;
+    uint256 public constant MIN_STAKE = 1e18;
 
     /// @notice reference number of seconds in 1 year
     uint256 public constant YEAR = 31557600;
@@ -136,7 +136,7 @@ contract SurplusGuildMinter is CoreRef {
 
     /// @notice unstake CREDIT tokens and stop voting in a gauge.
     /// user must have been staking for at least one block.
-    function unstake(address term) external whenNotPaused {
+    function unstake(address term) external {
         // check that the user is staking
         uint256 creditStaked = stakes[msg.sender][term];
         require(creditStaked != 0, "SurplusGuildMinter: not staking");

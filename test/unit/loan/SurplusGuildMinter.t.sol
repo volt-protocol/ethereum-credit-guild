@@ -103,8 +103,9 @@ contract SurplusGuildMinterUnitTest is Test {
         assertEq(guild.getGaugeWeight(term), 50e18);
 
         // cannot stake dust amounts
+        uint256 minStake = sgm.MIN_STAKE();
         vm.expectRevert("SurplusGuildMinter: min stake");
-        sgm.stake(term, 123);
+        sgm.stake(term, minStake - 1);
 
         // stake 100 CREDIT
         credit.mint(address(this), 100e18);
