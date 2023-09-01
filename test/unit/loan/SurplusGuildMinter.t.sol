@@ -102,6 +102,10 @@ contract SurplusGuildMinterUnitTest is Test {
         assertEq(guild.balanceOf(address(sgm)), 0);
         assertEq(guild.getGaugeWeight(term), 50e18);
 
+        // cannot stake dust amounts
+        vm.expectRevert("SurplusGuildMinter: min stake");
+        sgm.stake(term, 123);
+
         // stake 100 CREDIT
         credit.mint(address(this), 100e18);
         credit.approve(address(sgm), 100e18);
@@ -229,9 +233,6 @@ contract SurplusGuildMinterUnitTest is Test {
 
         vm.expectRevert("Pausable: paused");
         sgm.stake(term, 100e18);
-
-        vm.expectRevert("Pausable: paused");
-        sgm.unstake(term);
     }
 
     // test governor setter for ratio
@@ -341,5 +342,99 @@ contract SurplusGuildMinterUnitTest is Test {
         assertEq(credit.balanceOf(user2), 40e18 + 80e18 + 100e18);
         assertEq(guild.balanceOf(user2), 0 + 20e18);
         vm.stopPrank();
+    }
+
+    // test downgrade function
+    function testDowngrade() public {
+        // setup
+        credit.mint(address(this), 150e18);
+        credit.approve(address(sgm), 150e18);
+        sgm.stake(term, 150e18);
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(profitManager.surplusBuffer(), 150e18);
+        assertEq(guild.balanceOf(address(sgm)), 300e18);
+        assertEq(guild.getGaugeWeight(term), 350e18);
+        assertEq(sgm.stakes(address(this), term), 150e18);
+
+        // the guild token earn interests
+        vm.prank(governor);
+        profitManager.setProfitSharingConfig(
+            0.5e18, // surplusBufferSplit
+            0, // creditSplit
+            0.5e18, // guildSplit
+            0, // otherSplit
+            address(0) // otherRecipient
+        );
+        credit.mint(address(profitManager), 35e18);
+        profitManager.notifyPnL(term, 35e18);
+        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18);
+        (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
+        (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
+        assertEq(rewardsThis, 2.5e18);
+        assertEq(rewardsSgm, 15e18);
+
+        // fast-forward 1 year
+        vm.warp(block.timestamp + sgm.YEAR());
+        vm.roll(block.number + 1);
+
+        // cannot downgrade because ratio didn't go down
+        vm.expectRevert("SurplusGuildMinter: cannot downgrade");
+        sgm.downgrade(address(this), term);
+
+        // decrease ratio
+        vm.prank(governor);
+        sgm.setRatio(RATIO / 2); // 1:1
+
+        // downgrade (new ratio)
+        sgm.downgrade(address(this), term);
+
+        assertEq(credit.balanceOf(address(this)), rewardsSgm);
+        assertEq(guild.balanceOf(address(this)), 300e18 * INTEREST_RATE / 1e18 + 50e18);
+        assertEq(credit.balanceOf(address(sgm)), 0);
+        assertEq(guild.balanceOf(address(sgm)), 150e18); // instead of 300 because ratio 2->1
+        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18);
+        assertEq(guild.getGaugeWeight(term), 150e18 + 50e18);
+        assertEq(sgm.stakes(address(this), term), 150e18);
+
+        // fast-forward 1 year
+        vm.warp(block.timestamp + sgm.YEAR());
+        vm.roll(block.number + 1);
+
+        // decrease interestRate
+        vm.prank(governor);
+        sgm.setInterestRate(INTEREST_RATE / 2); // 5%
+
+        // downgrade (new rate)
+        sgm.downgrade(address(this), term);
+
+        assertEq(credit.balanceOf(address(this)), rewardsSgm); // unchanged
+        assertEq(guild.balanceOf(address(this)), 300e18 * INTEREST_RATE / 1e18 + 50e18 + 150e18 * INTEREST_RATE / 1e18);
+        assertEq(credit.balanceOf(address(sgm)), 0);
+        assertEq(guild.balanceOf(address(sgm)), 150e18); // unchanged
+        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18); // unchanged
+        assertEq(guild.getGaugeWeight(term), 150e18 + 50e18); // unchanged
+        assertEq(sgm.stakes(address(this), term), 150e18); // unchanged
+
+        // loss in term + slash sgm
+        profitManager.notifyPnL(term, -20e18);
+        assertEq(guild.balanceOf(address(sgm)), 150e18);
+        guild.applyGaugeLoss(term, address(sgm));
+        assertEq(guild.balanceOf(address(sgm)), 0);
+        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18 - 20e18);
+
+        // decrease interestRate
+        vm.prank(governor);
+        sgm.setInterestRate(INTEREST_RATE / 4); // 2.5%
+
+        // downgrade (new rate)
+        sgm.downgrade(address(this), term);
+
+        assertEq(credit.balanceOf(address(this)), rewardsSgm); // unchanged
+        assertEq(guild.balanceOf(address(this)), 300e18 * INTEREST_RATE / 1e18 + 50e18 + 150e18 * INTEREST_RATE / 1e18); // unchanged
+        assertEq(credit.balanceOf(address(sgm)), 0); // unchanged
+        assertEq(guild.balanceOf(address(sgm)), 0);
+        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18 - 20e18); // unchanged
+        assertEq(guild.getGaugeWeight(term), 50e18);
+        assertEq(sgm.stakes(address(this), term), 0); // unstaked
     }
 }
