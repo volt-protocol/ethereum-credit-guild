@@ -64,11 +64,6 @@ library CoreRoles {
     bytes32 internal constant CREDIT_REBASE_PARAMETERS =
         keccak256("CREDIT_REBASE_PARAMETERS_ROLE");
 
-    /// ----------- Lending Term Management --------------------
-
-    /// @notice can set the hardcap of a lending term
-    bytes32 internal constant TERM_HARDCAP = keccak256("TERM_HARDCAP_ROLE");
-
     /// ----------- Timelock management ------------------------
     /// The hashes are the same as OpenZeppelins's roles in TimelockController
 

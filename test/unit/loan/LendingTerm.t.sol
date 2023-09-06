@@ -392,7 +392,6 @@ contract LendingTermUnitTest is Test {
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
         vm.prank(governor);
-        core.grantRole(CoreRoles.TERM_HARDCAP, address(this));
         term.setHardCap(type(uint256).max);
 
         // borrow
@@ -970,13 +969,9 @@ contract LendingTermUnitTest is Test {
         assertEq(term.hardCap(), _HARDCAP);
         
         vm.prank(governor);
-        core.grantRole(CoreRoles.TERM_HARDCAP, address(this));
         term.setHardCap(type(uint256).max);
 
         assertEq(term.hardCap(), type(uint256).max);
-
-        vm.prank(governor);
-        core.revokeRole(CoreRoles.TERM_HARDCAP, address(this));
 
         vm.expectRevert("UNAUTHORIZED");
         term.setHardCap(12345);
@@ -1521,7 +1516,6 @@ contract LendingTermUnitTest is Test {
 
         // set hardcap to 0
         vm.prank(governor);
-        core.grantRole(CoreRoles.TERM_HARDCAP, address(this));
         term.setHardCap(0);
 
         // seize without call

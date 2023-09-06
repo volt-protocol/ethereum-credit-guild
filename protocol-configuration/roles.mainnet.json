@@ -50,6 +50,10 @@
     "name": "TIMELOCK",
     "role": "GAUGE_REMOVE_ROLE"
   },
+  {
+    "name": "LENDING_TERM_OFFBOARDING",
+    "role": "GAUGE_REMOVE_ROLE"
+  },
 
   {
     "name": "TIMELOCK",
@@ -83,11 +87,6 @@
   {
     "name": "TIMELOCK",
     "role": "CREDIT_REBASE_PARAMETERS_ROLE"
-  },
-
-  {
-    "name": "TIMELOCK",
-    "role": "TERM_HARDCAP_ROLE"
   },
 
   {

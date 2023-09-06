@@ -96,7 +96,6 @@ contract AuctionHouseUnitTest is Test {
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         core.grantRole(CoreRoles.GAUGE_REMOVE, address(this));
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
-        core.grantRole(CoreRoles.TERM_HARDCAP, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
@@ -177,6 +176,7 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         bytes32[] memory loanIds = new bytes32[](1);
         loanIds[0] = loanId;
+        vm.prank(governor);
         term.setHardCap(0);
         term.seizeMany(loanIds);
     }

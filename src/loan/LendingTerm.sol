@@ -1076,7 +1076,7 @@ contract LendingTerm is CoreRef {
     /// allows to update a term's arbitrary hardcap without doing a gauge & loans migration.
     function setHardCap(
         uint256 _newValue
-    ) external onlyCoreRole(CoreRoles.TERM_HARDCAP) {
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         hardCap = _newValue;
     }
 }

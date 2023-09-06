@@ -97,6 +97,7 @@ contract LendingTermOffboardingUnitTest is Test {
         core.grantRole(CoreRoles.GUILD_MINTER, address(this));
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         core.grantRole(CoreRoles.GAUGE_REMOVE, address(this));
+        core.grantRole(CoreRoles.GAUGE_REMOVE, address(offboarder));
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
         core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));

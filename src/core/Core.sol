@@ -41,7 +41,6 @@ contract Core is AccessControlEnumerable {
             CoreRoles.GOVERNOR
         );
         _setRoleAdmin(CoreRoles.CREDIT_REBASE_PARAMETERS, CoreRoles.GOVERNOR);
-        _setRoleAdmin(CoreRoles.TERM_HARDCAP, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.TIMELOCK_PROPOSER, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.TIMELOCK_EXECUTOR, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.TIMELOCK_CANCELLER, CoreRoles.GOVERNOR);

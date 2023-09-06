@@ -127,15 +127,9 @@ contract LendingTermOffboarding is CoreRef {
     function offboard(address term) external whenNotPaused {
         require(canOffboard[term], "LendingTermOffboarding: quorum not met");
 
-        // self-grant permissions
-        core().grantRole(CoreRoles.GAUGE_REMOVE, address(this));
-
         // update protocol config
         GuildToken(guildToken).removeGauge(term);
         core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
-
-        // self-revoke permissions
-        core().revokeRole(CoreRoles.GAUGE_REMOVE, address(this));
 
         emit Offboard(block.timestamp, term);
     }
@@ -150,15 +144,9 @@ contract LendingTermOffboarding is CoreRef {
             "LendingTermOffboarding: not all loans closed"
         );
 
-        // self-grant permissions
-        core().grantRole(CoreRoles.TERM_HARDCAP, address(this));
-
         // update protocol config
         LendingTerm(term).setHardCap(0);
         core().revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, term);
-
-        // self-revoke permissions
-        core().revokeRole(CoreRoles.TERM_HARDCAP, address(this));
 
         canOffboard[term] = false;
         emit Cleanup(block.timestamp, term);

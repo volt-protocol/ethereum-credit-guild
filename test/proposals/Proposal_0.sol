@@ -193,6 +193,7 @@ contract Proposal_0 is Proposal {
 
         // GAUGE_REMOVE
         core.grantRole(CoreRoles.GAUGE_REMOVE, addresses.mainnet("TIMELOCK"));
+        core.grantRole(CoreRoles.GAUGE_REMOVE, addresses.mainnet("LENDING_TERM_OFFBOARDING"));
 
         // GAUGE_PARAMETERS
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, addresses.mainnet("TIMELOCK"));
@@ -215,9 +216,6 @@ contract Proposal_0 is Proposal {
 
         // CREDIT_REBASE_PARAMETERS
         core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, addresses.mainnet("TIMELOCK"));
-
-        // TERM_HARDCAP
-        core.grantRole(CoreRoles.TERM_HARDCAP, addresses.mainnet("TIMELOCK"));
 
         // TIMELOCK_PROPOSER
         core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("GOVERNOR"));
