@@ -647,8 +647,8 @@ contract LendingTermUnitTest is Test {
         bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
 
         // revoke role so buffer of CREDIT cannot replenish
-        vm.prank(guardian);
-        core.guardianRevokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
+        vm.prank(governor);
+        core.revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
 
         // repay
         vm.warp(block.timestamp + 13);

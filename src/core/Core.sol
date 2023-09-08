@@ -14,9 +14,6 @@ contract Core is AccessControlEnumerable {
         // renounceRole(bytes32 role, address account)
         _setupRole(CoreRoles.GOVERNOR, msg.sender);
 
-        // Core itself is governor so guardian can have indirect access to revoke other roles
-        _setupRole(CoreRoles.GOVERNOR, address(this));
-
         // Initial roles setup: direct hierarchy, everything under governor
         _setRoleAdmin(CoreRoles.GOVERNOR, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GUARDIAN, CoreRoles.GOVERNOR);
@@ -63,20 +60,4 @@ contract Core is AccessControlEnumerable {
     // grantRole(bytes32 role, address account)
     // revokeRole(bytes32 role, address account)
     // renounceRole(bytes32 role, address account)
-
-    /// @notice revokes a role from address
-    /// @param role the role to revoke
-    /// @param account the address to revoke the role from
-    function guardianRevokeRole(
-        bytes32 role,
-        address account
-    ) external onlyRole(CoreRoles.GUARDIAN) {
-        require(
-            role != CoreRoles.GOVERNOR,
-            "Core: guardian cannot revoke governor"
-        );
-
-        // External call because this contract is appointed as a governor and has access to revoke
-        this.revokeRole(role, account);
-    }
 }

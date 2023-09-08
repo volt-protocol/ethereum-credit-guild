@@ -4,10 +4,6 @@
     "role": "GOVERNOR_ROLE"
   },
   {
-    "name": "CORE",
-    "role": "GOVERNOR_ROLE"
-  },
-  {
     "name": "TIMELOCK",
     "role": "GOVERNOR_ROLE"
   },
