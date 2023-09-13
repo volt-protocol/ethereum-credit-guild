@@ -612,4 +612,7 @@ interface Vm is VmSafe {
 
     // Fetches the given transaction from the given fork and executes it on the current state
     function transact(uint256 forkId, bytes32 txHash) external;
+
+    // Get list of keys present in a JSON string
+    function parseJsonKeys(string calldata json, string calldata key) external pure returns (string[] memory keys);
 }

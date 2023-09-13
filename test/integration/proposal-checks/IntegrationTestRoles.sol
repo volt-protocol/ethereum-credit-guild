@@ -24,42 +24,35 @@ contract IntegrationTestRoles is PostProposalCheck {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/protocol-configuration/roles.mainnet.json");
         string memory json = vm.readFile(path);
-        bytes memory parsedJson = vm.parseJson(json);
-        CoreRole[] memory roles = abi.decode(parsedJson, (CoreRole[]));
+
+        string[] memory roles = vm.parseJsonKeys(json, "$");
+
+        assertEq(roles.length, 17);
 
         Core core = Core(addresses.mainnet("CORE"));
         for (uint256 i = 0; i < roles.length; i++) {
-            address addr = addresses.mainnet(roles[i].name);
-            bytes32 role = keccak256(bytes(roles[i].role));
+            bytes32 role = keccak256(bytes(string.concat(roles[i], "_ROLE")));
             
             assertEq(
                 core.getRoleAdmin(role),
                 CoreRoles.GOVERNOR,
-                string.concat("Wrong admin for role ", roles[i].role, ", expected GOVERNOR")
-            );
-            assertEq(
-                core.hasRole(role, addr),
-                true,
-                string.concat("Expected ", roles[i].name, " to have role ", roles[i].role)
+                string.concat("Wrong admin for role ", roles[i], ", expected GOVERNOR")
             );
 
-            roleHashes.push(role);
-            roleMember[role][roleMemberCount[role]++] = addr;
-            roleHashToLabel[role] = roles[i].role;
-        }
+            bytes memory parsedJson = vm.parseJson(json, string.concat(".", roles[i]));
+            string[] memory addressNames = abi.decode(parsedJson, (string[]));
 
-        for (uint256 i = 0; i < roleHashes.length; i++) {
-            bytes32 roleHash = roleHashes[i];
             assertEq(
-                core.getRoleMemberCount(roleHash),
-                roleMemberCount[roleHash],
-                string.concat("Expected role ", roleHashToLabel[roleHash], " to have ", Strings.toString(roleMemberCount[roleHash]), " members")
+                core.getRoleMemberCount(role),
+                addressNames.length,
+                string.concat("Expected role ", roles[i], " to have ", Strings.toString(addressNames.length), " members")
             );
-            for (uint256 j = 0; j < roleMemberCount[roleHash]; j++) {
+
+            for (uint256 j = 0; j < addressNames.length; j++) {
                 assertEq(
-                    core.getRoleMember(roleHash, j),
-                    roleMember[roleHash][j],
-                    string.concat("Expected role ", roleHashToLabel[roleHash], " member ", Strings.toString(j), " to be ", addresses.mainnetLabel(roleMember[roleHash][j]))
+                    core.hasRole(role, addresses.mainnet(addressNames[j])),
+                    true,
+                    string.concat("Expected ", addressNames[j], " to have role ", roles[i])
                 );
             }
         }

@@ -1,110 +1,59 @@
-[
-  {
-    "name": "LENDING_TERM_OFFBOARDING",
-    "role": "GOVERNOR_ROLE"
-  },
-  {
-    "name": "TIMELOCK",
-    "role": "GOVERNOR_ROLE"
-  },
-
-  {
-    "name": "TEAM_MULTISIG",
-    "role": "GUARDIAN_ROLE"
-  },
-
-  {
-    "name": "RATE_LIMITED_CREDIT_MINTER",
-    "role": "CREDIT_MINTER_ROLE"
-  },
-
-  {
-    "name": "TERM_USDC_1",
-    "role": "RATE_LIMITED_CREDIT_MINTER_ROLE"
-  },
-  {
-    "name": "TERM_SDAI_1",
-    "role": "RATE_LIMITED_CREDIT_MINTER_ROLE"
-  },
-
-  {
-    "name": "RATE_LIMITED_GUILD_MINTER",
-    "role": "GUILD_MINTER_ROLE"
-  },
-
-  {
-    "name": "SURPLUS_GUILD_MINTER",
-    "role": "RATE_LIMITED_GUILD_MINTER_ROLE"
-  },
-
-  {
-    "name": "TIMELOCK",
-    "role": "GAUGE_ADD_ROLE"
-  },
-
-  {
-    "name": "TIMELOCK",
-    "role": "GAUGE_REMOVE_ROLE"
-  },
-  {
-    "name": "LENDING_TERM_OFFBOARDING",
-    "role": "GAUGE_REMOVE_ROLE"
-  },
-
-  {
-    "name": "TIMELOCK",
-    "role": "GAUGE_PARAMETERS_ROLE"
-  },
-
-  {
-    "name": "TERM_USDC_1",
-    "role": "GAUGE_PNL_NOTIFIER_ROLE"
-  },
-  {
-    "name": "TERM_SDAI_1",
-    "role": "GAUGE_PNL_NOTIFIER_ROLE"
-  },
-
-  {
-    "name": "TIMELOCK",
-    "role": "GUILD_GOVERNANCE_PARAMETERS_ROLE"
-  },
-
-  {
-    "name": "SURPLUS_GUILD_MINTER",
-    "role": "GUILD_SURPLUS_BUFFER_WITHDRAW_ROLE"
-  },
-
-  {
-    "name": "TIMELOCK",
-    "role": "CREDIT_GOVERNANCE_PARAMETERS_ROLE"
-  },
-
-  {
-    "name": "TIMELOCK",
-    "role": "CREDIT_REBASE_PARAMETERS_ROLE"
-  },
-
-  {
-    "name": "GOVERNOR",
-    "role": "PROPOSER_ROLE"
-  },
-  {
-    "name": "TEAM_MULTISIG",
-    "role": "PROPOSER_ROLE"
-  },
-
-  {
-    "name": "ZERO_ADDRESS",
-    "role": "EXECUTOR_ROLE"
-  },
-
-  {
-    "name": "VETO_GOVERNOR",
-    "role": "CANCELLER_ROLE"
-  },
-  {
-    "name": "TEAM_MULTISIG",
-    "role": "CANCELLER_ROLE"
-  }
-]
+{
+  "GOVERNOR": [
+    "LENDING_TERM_OFFBOARDING",
+    "TIMELOCK"
+  ],
+  "GUARDIAN": [
+    "TEAM_MULTISIG"
+  ],
+  "CREDIT_MINTER": [
+    "RATE_LIMITED_CREDIT_MINTER"
+  ],
+  "RATE_LIMITED_CREDIT_MINTER": [
+    "TERM_USDC_1",
+    "TERM_SDAI_1"
+  ],
+  "GUILD_MINTER": [
+    "RATE_LIMITED_GUILD_MINTER"
+  ],
+  "RATE_LIMITED_GUILD_MINTER": [
+    "SURPLUS_GUILD_MINTER"
+  ],
+  "GAUGE_ADD": [
+    "TIMELOCK"
+  ],
+  "GAUGE_REMOVE": [
+    "TIMELOCK",
+    "LENDING_TERM_OFFBOARDING"
+  ],
+  "GAUGE_PARAMETERS": [
+    "TIMELOCK"
+  ],
+  "GAUGE_PNL_NOTIFIER": [
+    "TERM_USDC_1",
+    "TERM_SDAI_1"
+  ],
+  "GUILD_GOVERNANCE_PARAMETERS": [
+    "TIMELOCK"
+  ],
+  "GUILD_SURPLUS_BUFFER_WITHDRAW": [
+    "SURPLUS_GUILD_MINTER"
+  ],
+  "CREDIT_GOVERNANCE_PARAMETERS": [
+    "TIMELOCK"
+  ],
+  "CREDIT_REBASE_PARAMETERS": [
+    "TIMELOCK"
+  ],
+  "PROPOSER": [
+    "GOVERNOR",
+    "TEAM_MULTISIG"
+  ],
+  "EXECUTOR": [
+    "ZERO_ADDRESS"
+  ],
+  "CANCELLER": [
+    "VETO_GOVERNOR",
+    "TEAM_MULTISIG"
+  ]
+}
