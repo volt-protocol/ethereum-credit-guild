@@ -18,6 +18,20 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
         totalSupply() == nonRebasingSupply() + rebasingSupply()
         sum of balanceOf(x) == totalSupply() [+= rounding down errors of 1 wei for each balanceOf]
         ```
+
+        Internally, when a user subscribes to the rebase, their balance is converted to a number of
+        shares, and the total number of shares is updated. When a user unsubscribes, their shares are
+        converted back to a balance, and the total number of shares is updated.
+
+        On each distribution, the share price of rebasing tokens is updated to reflect the new value
+        of rebasing shares. The formula is as follow :
+
+        ```
+        newSharePrice = oldSharePrice * (rebasingSupply + amount) / rebasingSupply
+        ```
+
+        If the rebasingSupply is 0 (nobody subscribed to rebasing), the tokens distributed are burnt
+        but nobody benefits for the share price increase, since the share price cannot be updated.
 */
 abstract contract ERC20RebaseDistributor is ERC20 {
     /*///////////////////////////////////////////////////////////////
