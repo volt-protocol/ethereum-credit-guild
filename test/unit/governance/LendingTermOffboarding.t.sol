@@ -294,4 +294,30 @@ contract LendingTermOffboardingUnitTest is Test {
         assertEq(term.hardCap(), 0);
         assertEq(core.hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term)), false);
     }
+
+    function testCannotVoteTwice() public {
+        // prepare (1)
+        guild.mint(bob, _QUORUM / 2);
+        vm.startPrank(bob);
+        guild.delegate(bob);
+        uint256 snapshotBlock = block.number;
+        offboarder.proposeOffboard(address(term));
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+
+        // cannot offboard if quorum is not met
+        vm.expectRevert("LendingTermOffboarding: quorum not met");
+        offboarder.offboard(address(term));
+
+        // vote once
+        offboarder.supportOffboard(snapshotBlock, address(term));
+        assertEq(offboarder.polls(snapshotBlock, address(term)), _QUORUM / 2 + 1);
+        assertEq(offboarder.canOffboard(address(term)), false);
+    
+        // cannot vote twice
+        vm.expectRevert("LendingTermOffboarding: already voted");
+        offboarder.supportOffboard(snapshotBlock, address(term));
+        assertEq(offboarder.polls(snapshotBlock, address(term)), _QUORUM / 2 + 1);
+        assertEq(offboarder.canOffboard(address(term)), false);
+    }
 }

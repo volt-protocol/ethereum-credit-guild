@@ -8,8 +8,10 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 
 /// @notice Utils to offboard a LendingTerm.
 /// This contracts works somewhat similarly to a Veto governor: any GUILD holder can poll for the removal
-/// of a lending term, and if enough GUILD holders vote for a removal poll, the term can be offboarded.
-/// When a term is offboarded, no new loans can be issued
+/// of a lending term, and if enough GUILD holders vote for a removal poll, the term can be offboarded
+/// without delay.
+/// When a term is offboarded, no new loans can be issued, and GUILD holders cannot vote for the term anymore.
+/// After a term is offboarded, all the loans have to be called, and the term can be cleaned up (roles).
 contract LendingTermOffboarding is CoreRef {
     /// @notice emitted when a user supports the removal of a lending term
     event OffboardSupport(
@@ -41,6 +43,10 @@ contract LendingTermOffboarding is CoreRef {
     /// @notice list of removal polls created.
     /// keys = [snapshotBlock][termAddress] -> quorum supporting the removal.
     mapping(uint256 => mapping(address => uint256)) public polls;
+
+    /// @notice list of user votes in removal polls
+    /// keys = [userAddress][snapshotBlock][termAddress] -> user vote weight.
+    mapping(address => mapping(uint256 => mapping(address => uint256))) public userPollVotes;
 
     /// @notice block number of last removal polls created for each term.
     /// key = [termAddress] -> block number.
@@ -107,7 +113,9 @@ contract LendingTermOffboarding is CoreRef {
             snapshotBlock
         );
         require(userWeight != 0, "LendingTermOffboarding: zero weight");
+        require(userPollVotes[msg.sender][snapshotBlock][term] == 0, "LendingTermOffboarding: already voted");
 
+        userPollVotes[msg.sender][snapshotBlock][term] = userWeight;
         polls[snapshotBlock][term] = _weight + userWeight;
         if (_weight + userWeight >= quorum) {
             canOffboard[term] = true;
