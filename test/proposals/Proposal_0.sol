@@ -43,7 +43,7 @@ contract Proposal_0 is Proposal {
                 addresses.mainnet("PROFIT_MANAGER"),
                 address(credit),
                 7 days, // gaugeCycleLength,
-                1 days // incrementFreezeWindow
+                0 // incrementFreezeWindow
             );
             RateLimitedCreditMinter rateLimitedCreditMinter = new RateLimitedCreditMinter(
                 addresses.mainnet("CORE"),
