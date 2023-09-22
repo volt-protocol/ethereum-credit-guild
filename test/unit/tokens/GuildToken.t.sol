@@ -20,9 +20,6 @@ contract GuildTokenUnitTest is Test {
     address constant gauge2 = address(0xBEEF);
     address constant gauge3 = address(0x3333);
 
-    uint32 constant _CYCLE_LENGTH = 1 hours;
-    uint32 constant _FREEZE_PERIOD = 10 minutes;
-
     uint256 public issuance; // for mocked behavior
 
     function setUp() public {
@@ -31,7 +28,7 @@ contract GuildTokenUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
-        token = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        token = new GuildToken(address(core), address(profitManager), address(credit));
         profitManager.initializeReferences(address(credit), address(token));
 
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -195,7 +192,7 @@ contract GuildTokenUnitTest is Test {
     function testAddGauge() public {
         // revert because user doesn't have role
         vm.expectRevert("UNAUTHORIZED");
-        token.addGauge(gauge1);
+        token.addGauge(1, gauge1);
 
         // grant role to test contract
         vm.startPrank(governor);
@@ -204,7 +201,7 @@ contract GuildTokenUnitTest is Test {
         vm.stopPrank();
 
         // successful call & check
-        token.addGauge(gauge1);
+        token.addGauge(1, gauge1);
         assertEq(token.isGauge(gauge1), true);
     }
 
@@ -214,7 +211,7 @@ contract GuildTokenUnitTest is Test {
         core.createRole(CoreRoles.GAUGE_ADD, CoreRoles.GOVERNOR);
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         vm.stopPrank();
-        token.addGauge(gauge1);
+        token.addGauge(1, gauge1);
         assertEq(token.isGauge(gauge1), true);
 
         // revert because user doesn't have role
@@ -309,9 +306,9 @@ contract GuildTokenUnitTest is Test {
 
         // setup
         token.setMaxGauges(3);
-        token.addGauge(gauge1);
-        token.addGauge(gauge2);
-        token.addGauge(gauge3);
+        token.addGauge(1, gauge1);
+        token.addGauge(1, gauge2);
+        token.addGauge(1, gauge3);
         token.mint(alice, 100e18);
         vm.startPrank(alice);
         token.incrementGauge(gauge1, 40e18);
@@ -426,14 +423,14 @@ contract GuildTokenUnitTest is Test {
         vm.prank(alice);
         address[] memory gaugesToIncrement1 = new address[](1);
         gaugesToIncrement1[0] = gauge2;
-        uint112[] memory amountsToIncrement1 = new uint112[](1);
+        uint256[] memory amountsToIncrement1 = new uint256[](1);
         amountsToIncrement1[0] = 20e18;
         token.incrementGauges(gaugesToIncrement1, amountsToIncrement1);
 
         // cannot increment gauges that have been affected by the loss
         address[] memory gaugesToIncrement2 = new address[](1);
         gaugesToIncrement2[0] = gauge1;
-        uint112[] memory amountsToIncrement2 = new uint112[](1);
+        uint256[] memory amountsToIncrement2 = new uint256[](1);
         amountsToIncrement2[0] = 20e18;
         vm.prank(alice);
         vm.expectRevert("GuildToken: pending loss");
@@ -495,14 +492,14 @@ contract GuildTokenUnitTest is Test {
         vm.prank(alice);
         address[] memory gaugesToDecrement1 = new address[](1);
         gaugesToDecrement1[0] = gauge2;
-        uint112[] memory amountsToDecrement1 = new uint112[](1);
+        uint256[] memory amountsToDecrement1 = new uint256[](1);
         amountsToDecrement1[0] = 40e18;
         token.decrementGauges(gaugesToDecrement1, amountsToDecrement1);
 
         // cannot decrement gauges that have been affected by the loss
         address[] memory gaugesToDecrement2 = new address[](1);
         gaugesToDecrement2[0] = gauge1;
-        uint112[] memory amountsToDecrement2 = new uint112[](1);
+        uint256[] memory amountsToDecrement2 = new uint256[](1);
         amountsToDecrement2[0] = 40e18;
         vm.prank(alice);
         vm.expectRevert("GuildToken: pending loss");
@@ -529,9 +526,9 @@ contract GuildTokenUnitTest is Test {
         token.mint(bob, 400e18);
         // add gauges
         token.setMaxGauges(3);
-        token.addGauge(gauge1);
-        token.addGauge(gauge2);
-        token.addGauge(address(this));
+        token.addGauge(1, gauge1);
+        token.addGauge(1, gauge2);
+        token.addGauge(1, address(this));
         // 80 votes on gauge1, 40 votes on gauge2, 40 votes on this
         vm.startPrank(alice);
         token.incrementGauge(gauge1, 10e18);

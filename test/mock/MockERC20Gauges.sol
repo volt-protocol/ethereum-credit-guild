@@ -6,17 +6,13 @@ import {MockERC20} from "@test/mock/MockERC20.sol";
 import {ERC20Gauges} from "@src/tokens/ERC20Gauges.sol";
 
 contract MockERC20Gauges is ERC20Gauges, MockERC20 {
-    constructor(
-        uint32 _cycleLength,
-        uint32 _freezeWindow
-    ) ERC20Gauges(_cycleLength, _freezeWindow) {}
 
     /// ------------------------------------------------------------------------
     /// Open access to internal functions.
     /// ------------------------------------------------------------------------
 
-    function addGauge(address gauge) external returns (uint112) {
-        return _addGauge(gauge);
+    function addGauge(uint256 gaugeType, address gauge) external returns (uint256) {
+        return _addGauge(gaugeType, gauge);
     }
 
     function removeGauge(address gauge) external {

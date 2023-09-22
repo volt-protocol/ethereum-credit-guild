@@ -51,6 +51,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
     - Update error management style (use require + messages instead of Solidity errors)
     - Implement C4 audit fixes for [M-03], [M-04], [M-07], [G-02], and [G-04].
     - Remove cycle-based logic
+    - Add gauge types
 */
 abstract contract ERC20Gauges is ERC20 {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -72,6 +73,13 @@ abstract contract ERC20Gauges is ERC20 {
 
     /// @notice the total global allocated weight ONLY of live gauges
     uint256 public totalWeight;
+
+    /// @notice the total allocated weight to gauges of a given type, ONLY of live gauges.
+    /// keys : totalTypeWeight[type] = total.
+    mapping(uint256 => uint256) public totalTypeWeight;
+
+    /// @notice the type of gauges.
+    mapping(address => uint256) public gaugeType;
 
     mapping(address => EnumerableSet.AddressSet) internal _userGauges;
 
@@ -149,7 +157,7 @@ abstract contract ERC20Gauges is ERC20 {
     ) external view returns (uint256) {
         if (_deprecatedGauges.contains(gauge)) return 0;
 
-        uint256 total = totalWeight;
+        uint256 total = totalTypeWeight[gaugeType[gauge]];
         if (total == 0) return 0;
         uint256 weight = getGaugeWeight[gauge];
 
@@ -205,6 +213,8 @@ abstract contract ERC20Gauges is ERC20 {
 
         getGaugeWeight[gauge] += weight;
 
+        totalTypeWeight[gaugeType[gauge]] += weight;
+
         emit IncrementGaugeWeight(user, gauge, weight);
     }
 
@@ -223,10 +233,10 @@ abstract contract ERC20Gauges is ERC20 {
     }
 
     /** 
-     @notice increment a list of gauges with some weights for the caller
-     @param gaugeList the gauges to increment
-     @param weights the weights to increment by
-     @return newUserWeight the new user weight
+    @notice increment a list of gauges with some weights for the caller
+    @param gaugeList the gauges to increment
+    @param weights the weights to increment by
+    @return newUserWeight the new user weight
     */
     function incrementGauges(
         address[] calldata gaugeList,
@@ -270,6 +280,7 @@ abstract contract ERC20Gauges is ERC20 {
     ) public virtual returns (uint256 newUserWeight) {
         // All operations will revert on underflow, protecting against bad inputs
         _decrementGaugeWeight(msg.sender, gauge, weight);
+        totalTypeWeight[gaugeType[gauge]] -= weight;
         return _decrementUserAndGlobalWeights(msg.sender, weight);
     }
 
@@ -325,6 +336,7 @@ abstract contract ERC20Gauges is ERC20 {
             weightsSum += weight;
 
             _decrementGaugeWeight(msg.sender, gauge, weight);
+            totalTypeWeight[gaugeType[gauge]] -= weight;
             unchecked {
                 ++i;
             }
@@ -341,7 +353,7 @@ abstract contract ERC20Gauges is ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice emitted when adding a new gauge to the live set.
-    event AddGauge(address indexed gauge);
+    event AddGauge(address indexed gauge, uint256 indexed gaugeType);
 
     /// @notice emitted when removing a gauge from the live set.
     event RemoveGauge(address indexed gauge);
@@ -362,7 +374,7 @@ abstract contract ERC20Gauges is ERC20 {
     /// @notice an approve list for contracts to go above the max gauge limit.
     mapping(address => bool) public canExceedMaxGauges;
 
-    function _addGauge(address gauge) internal returns (uint256 weight) {
+    function _addGauge(uint256 _type, address gauge) internal returns (uint256 weight) {
         bool newAdd = _gauges.add(gauge);
         bool previouslyDeprecated = _deprecatedGauges.remove(gauge);
         // add and fail loud if zero address or already present and not deprecated
@@ -370,14 +382,23 @@ abstract contract ERC20Gauges is ERC20 {
             gauge != address(0) && (newAdd || previouslyDeprecated),
             "ERC20Gauges: invalid gauge"
         );
+        uint256 currentType = gaugeType[gauge];
+        if (newAdd) {
+            require(currentType == 0, "ERC20Gauges: invalid type");
+            gaugeType[gauge] = _type;
+        } else {
+            // cannot change gauge type on re-add
+            require(currentType == _type, "ERC20Gauges: invalid type");
+        }
 
         // Check if some previous weight exists and re-add to total. Gauge and user weights are preserved.
         weight = getGaugeWeight[gauge];
         if (weight != 0) {
             totalWeight += weight;
+            totalTypeWeight[_type] += weight;
         }
 
-        emit AddGauge(gauge);
+        emit AddGauge(gauge, _type);
     }
 
     function _removeGauge(address gauge) internal {
@@ -388,6 +409,7 @@ abstract contract ERC20Gauges is ERC20 {
         uint256 weight = getGaugeWeight[gauge];
         if (weight != 0) {
             totalWeight -= weight;
+            totalTypeWeight[gaugeType[gauge]] -= weight;
         }
 
         emit RemoveGauge(gauge);
@@ -477,6 +499,7 @@ abstract contract ERC20Gauges is ERC20 {
                 // If the gauge is live (not deprecated), include its weight in the total to remove
                 if (!_deprecatedGauges.contains(gauge)) {
                     totalFreed += userGaugeWeight;
+                    totalTypeWeight[gaugeType[gauge]] -= userGaugeWeight;
                 }
                 userFreed += userGaugeWeight;
                 _decrementGaugeWeight(

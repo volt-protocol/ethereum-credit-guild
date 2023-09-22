@@ -27,10 +27,6 @@ contract AuctionHouseUnitTest is Test {
     AuctionHouse auctionHouse;
     LendingTerm term;
 
-    // GUILD params
-    uint32 constant _CYCLE_LENGTH = 1 hours;
-    uint32 constant _FREEZE_PERIOD = 10 minutes;
-
     // LendingTerm params
     uint256 constant _CREDIT_PER_COLLATERAL_TOKEN = 2000e18; // 2000, same decimals
     uint256 constant _INTEREST_RATE = 0.10e18; // 10% APR
@@ -52,7 +48,7 @@ contract AuctionHouseUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         collateral = new MockERC20();
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit));
         rlcm = new RateLimitedCreditMinter(
             address(core), /*_core*/
             address(credit), /*_token*/
@@ -103,7 +99,7 @@ contract AuctionHouseUnitTest is Test {
 
         // add gauge and vote for it
         guild.setMaxGauges(10);
-        guild.addGauge(address(term));
+        guild.addGauge(1, address(term));
         guild.mint(address(this), 1e18);
         guild.incrementGauge(address(term), uint112(1e18));
 

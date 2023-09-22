@@ -115,7 +115,7 @@ contract SurplusGuildMinter is CoreRef {
         uint256 _ratio = ratio;
         uint256 guildAmount = (_ratio * amount) / 1e18;
         RateLimitedGuildMinter(rlgm).mint(address(this), guildAmount);
-        GuildToken(guild).incrementGauge(term, uint112(guildAmount));
+        GuildToken(guild).incrementGauge(term, guildAmount);
 
         // update state
         require(
@@ -171,7 +171,7 @@ contract SurplusGuildMinter is CoreRef {
                 _lastGaugeLoss != block.timestamp)
         ) {
             // decrement GUILD voting weight
-            GuildToken(guild).decrementGauge(term, uint112(guildAmount));
+            GuildToken(guild).decrementGauge(term, guildAmount);
 
             // pull CREDIT from surplus buffer
             ProfitManager(profitManager).withdrawFromSurplusBuffer(
@@ -258,7 +258,7 @@ contract SurplusGuildMinter is CoreRef {
                 uint256 guildDecrement = guildAmount - (_ratio * creditStaked / 1e18);
                 if (guildDecrement != 0) {
                     // decrement GUILD voting weight
-                    GuildToken(guild).decrementGauge(term, uint112(guildDecrement));
+                    GuildToken(guild).decrementGauge(term, guildDecrement);
 
                     // replenish GUILD minter buffer
                     GuildToken(guild).burn(guildDecrement);

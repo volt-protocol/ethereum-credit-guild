@@ -41,9 +41,7 @@ contract Proposal_0 is Proposal {
             GuildToken guild = new GuildToken(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("PROFIT_MANAGER"),
-                address(credit),
-                7 days, // gaugeCycleLength,
-                0 // incrementFreezeWindow
+                address(credit)
             );
             RateLimitedCreditMinter rateLimitedCreditMinter = new RateLimitedCreditMinter(
                 addresses.mainnet("CORE"),
@@ -246,9 +244,11 @@ contract Proposal_0 is Proposal {
         );
         GuildToken(addresses.mainnet("ERC20_GUILD")).setMaxGauges(10);
         GuildToken(addresses.mainnet("ERC20_GUILD")).addGauge(
+            1,
             addresses.mainnet("TERM_USDC_1")
         );
         GuildToken(addresses.mainnet("ERC20_GUILD")).addGauge(
+            1,
             addresses.mainnet("TERM_SDAI_1")
         );
         CreditToken(addresses.mainnet("ERC20_GUILD")).setMaxDelegates(10);
