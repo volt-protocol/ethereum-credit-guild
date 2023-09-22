@@ -47,14 +47,11 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     constructor(
         address _core,
         address _profitManager,
-        address _credit,
-        uint32 _gaugeCycleLength,
-        uint32 _incrementFreezeWindow
+        address _credit
     )
         CoreRef(_core)
         ERC20("Ethereum Credit Guild - GUILD", "GUILD")
         ERC20Permit("Ethereum Credit Guild - GUILD")
-        ERC20Gauges(_gaugeCycleLength, _incrementFreezeWindow)
     {
         profitManager = _profitManager;
         credit = _credit;
@@ -83,9 +80,10 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
                         GAUGE MANAGEMENT
     //////////////////////////////////////////////////////////////*/
     function addGauge(
+        uint256 _type,
         address gauge
-    ) external onlyCoreRole(CoreRoles.GAUGE_ADD) returns (uint112) {
-        return _addGauge(gauge);
+    ) external onlyCoreRole(CoreRoles.GAUGE_ADD) returns (uint256) {
+        return _addGauge(_type, gauge);
     }
 
     function removeGauge(
@@ -148,13 +146,13 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         );
 
         // read user weight allocated to the lossy gauge
-        uint112 _userGaugeWeight = getUserGaugeWeight[who][gauge];
+        uint256 _userGaugeWeight = getUserGaugeWeight[who][gauge];
 
         // remove gauge weight allocation
         lastGaugeLossApplied[gauge][who] = block.timestamp;
-        uint32 currentCycle = _getGaugeCycleEnd();
-        _decrementGaugeWeight(who, gauge, _userGaugeWeight, currentCycle);
-        _decrementUserAndGlobalWeights(who, _userGaugeWeight, currentCycle);
+        _decrementGaugeWeight(who, gauge, _userGaugeWeight);
+        totalTypeWeight[gaugeType[gauge]] -= _userGaugeWeight;
+        _decrementUserAndGlobalWeights(who, _userGaugeWeight);
 
         // apply loss
         _burn(who, uint256(_userGaugeWeight));
@@ -204,8 +202,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     function _decrementGaugeWeight(
         address user,
         address gauge,
-        uint112 weight,
-        uint32 cycle
+        uint256 weight
     ) internal override {
         uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
         uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][user];
@@ -233,10 +230,9 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             uint256 creditTotalSupply = CreditToken(credit).totalSupply();
             uint256 debtCeilingAfterDecrement = 0;
             if (!_deprecatedGauges.contains(gauge)) {
-                uint112 currentTotalWeight = _totalWeight.currentWeight;
+                uint256 currentTotalWeight = totalWeight;
                 if (currentTotalWeight != 0 && currentTotalWeight != weight) {
-                    uint112 currentGaugeWeight = _getGaugeWeight[gauge]
-                        .currentWeight;
+                    uint256 currentGaugeWeight = getGaugeWeight[gauge];
                     debtCeilingAfterDecrement =
                         (creditTotalSupply * (currentGaugeWeight - weight)) /
                         (currentTotalWeight - weight);
@@ -248,7 +244,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             );
         }
 
-        super._decrementGaugeWeight(user, gauge, weight, cycle);
+        super._decrementGaugeWeight(user, gauge, weight);
     }
 
     /// @dev prevent weight increment for gauge if user has an unapplied loss.
@@ -258,8 +254,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     function _incrementGaugeWeight(
         address user,
         address gauge,
-        uint112 weight,
-        uint32 cycle
+        uint256 weight
     ) internal override {
         uint256 _lastGaugeLoss = lastGaugeLoss[gauge];
         uint256 _lastGaugeLossApplied = lastGaugeLossApplied[gauge][user];
@@ -274,7 +269,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
 
         ProfitManager(profitManager).claimGaugeRewards(user, gauge);
 
-        super._incrementGaugeWeight(user, gauge, weight, cycle);
+        super._incrementGaugeWeight(user, gauge, weight);
     }
 
     /*///////////////////////////////////////////////////////////////

@@ -24,10 +24,6 @@ contract LendingTermUnitTest is Test {
     AuctionHouse auctionHouse;
     LendingTerm term;
 
-    // GUILD params
-    uint32 constant _CYCLE_LENGTH = 1 hours;
-    uint32 constant _FREEZE_PERIOD = 10 minutes;
-
     // LendingTerm params
     uint256 constant _CREDIT_PER_COLLATERAL_TOKEN = 2000e18; // 2000, same decimals
     uint256 constant _INTEREST_RATE = 0.10e18; // 10% APR
@@ -46,7 +42,7 @@ contract LendingTermUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         collateral = new MockERC20();
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit));
         rlcm = new RateLimitedMinter(
             address(core), /*_core*/
             address(credit), /*_token*/
@@ -98,9 +94,9 @@ contract LendingTermUnitTest is Test {
 
         // add gauge and vote for it
         guild.setMaxGauges(10);
-        guild.addGauge(address(term));
+        guild.addGauge(1, address(term));
         guild.mint(address(this), _HARDCAP * 2);
-        guild.incrementGauge(address(term), uint112(_HARDCAP));
+        guild.incrementGauge(address(term), _HARDCAP);
 
         // labels
         vm.label(address(core), "core");
@@ -194,9 +190,9 @@ contract LendingTermUnitTest is Test {
             })
         );
         vm.label(address(term2), "term2");
-        guild.addGauge(address(term2));
-        guild.decrementGauge(address(term), uint112(_HARDCAP));
-        guild.incrementGauge(address(term2), uint112(_HARDCAP));
+        guild.addGauge(1, address(term2));
+        guild.decrementGauge(address(term), _HARDCAP);
+        guild.incrementGauge(address(term2), _HARDCAP);
         vm.startPrank(governor);
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term2));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term2));
@@ -311,9 +307,9 @@ contract LendingTermUnitTest is Test {
     // borrow fail because debt ceiling is reached
     function testBorrowFailDebtCeilingReached() public {
         // add another gauge, equal voting weight for the 2nd gauge
-        guild.addGauge(address(this));
+        guild.addGauge(1, address(this));
         guild.mint(address(this), guild.getGaugeWeight(address(term)));
-        guild.incrementGauge(address(this), uint112(guild.getGaugeWeight(address(term))));
+        guild.incrementGauge(address(this), uint256(guild.getGaugeWeight(address(term))));
 
         // prepare
         uint256 borrowAmount = 20_000e18;
