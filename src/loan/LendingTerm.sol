@@ -574,7 +574,8 @@ contract LendingTerm is CoreRef {
         uint256 loanDebt = getLoanDebt(loanId);
         require(debtToRepay < loanDebt, "LendingTerm: full repayment");
         uint256 percentRepaid = (debtToRepay * 1e18) / loanDebt; // [0, 1e18[
-        uint256 principalRepaid = (loan.borrowAmount * percentRepaid) / 1e18;
+        uint256 _borrowAmount = loan.borrowAmount;
+        uint256 principalRepaid = (_borrowAmount * percentRepaid) / 1e18;
         uint256 interestRepaid = debtToRepay - principalRepaid;
         require(
             principalRepaid != 0 && interestRepaid != 0,
@@ -583,6 +584,10 @@ contract LendingTerm is CoreRef {
         require(
             debtToRepay >= (loanDebt * minPartialRepayPercent) / 1e18,
             "LendingTerm: repay below min"
+        );
+        require(
+            _borrowAmount - principalRepaid > MIN_BORROW,
+            "LendingTerm: below min borrow"
         );
 
         // update loan in state
