@@ -12,7 +12,7 @@ contract Core is AccessControlEnumerable {
     constructor() {
         // For initial setup before going live, deployer can then call
         // renounceRole(bytes32 role, address account)
-        _setupRole(CoreRoles.GOVERNOR, msg.sender);
+        _grantRole(CoreRoles.GOVERNOR, msg.sender);
 
         // Initial roles setup: direct hierarchy, everything under governor
         _setRoleAdmin(CoreRoles.GOVERNOR, CoreRoles.GOVERNOR);
