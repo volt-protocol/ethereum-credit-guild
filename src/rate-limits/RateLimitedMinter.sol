@@ -16,7 +16,7 @@ interface IERC20Mintable {
 /// minting capabilities.
 contract RateLimitedMinter is RateLimitedV2 {
     /// @notice the reference to token
-    address public token;
+    address public immutable token;
 
     /// @notice role used to access control on mint/replenishBuffer
     bytes32 public immutable role;
