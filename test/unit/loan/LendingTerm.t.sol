@@ -507,6 +507,9 @@ contract LendingTermUnitTest is Test {
         term.partialRepay(loanId, 1);
         vm.expectRevert("LendingTerm: repay below min");
         term.partialRepay(loanId, 2_100e18); // min would be 20% = 2_200e18
+        uint256 MIN_BORROW = term.MIN_BORROW();
+        vm.expectRevert("LendingTerm: below min borrow");
+        term.partialRepay(loanId, 11_000e18 - MIN_BORROW + 1);
         term.repay(loanId);
         vm.expectRevert("LendingTerm: loan closed");
         term.partialRepay(loanId, 123);
