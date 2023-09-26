@@ -56,7 +56,8 @@ abstract contract ERC20RebaseDistributor is ERC20 {
 
     struct RebasingState {
         uint8 isRebasing;
-        uint248 nShares;
+        uint136 nShares;
+        uint112 minBalance;
     }
 
     /// @notice For internal accounting. Number of rebasing shares for each rebasing accounts. 0 if account is not rebasing.
@@ -98,8 +99,11 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         uint256 balance = ERC20.balanceOf(account);
         uint256 shares = (balance * START_REBASING_SHARE_PRICE) /
             rebasingSharePrice;
-        rebasingState[account].nShares = uint248(shares);
-        rebasingState[account].isRebasing = 1;
+        rebasingState[account] = RebasingState({
+            isRebasing: 1,
+            nShares: uint136(shares),
+            minBalance: uint112(balance)
+        });
         totalRebasingShares += shares;
         emit RebaseEnter(account, block.timestamp);
     }
@@ -116,17 +120,24 @@ abstract contract ERC20RebaseDistributor is ERC20 {
 
     function _exitRebase(address account) internal {
         uint256 rawBalance = ERC20.balanceOf(account);
-        uint256 shares = uint256(rebasingState[account].nShares);
+        RebasingState memory _rebasingState = rebasingState[account];
+        uint256 shares = uint256(_rebasingState.nShares);
         uint256 rebasedBalance = (shares * rebasingSharePrice) /
             START_REBASING_SHARE_PRICE;
+        if (rebasedBalance < _rebasingState.minBalance) {
+            rebasedBalance = _rebasingState.minBalance;
+        }
         uint256 mintAmount = rebasedBalance - rawBalance;
         if (mintAmount != 0) {
             ERC20._mint(account, mintAmount);
             pendingRebaseRewards -= mintAmount;
         }
 
-        rebasingState[account].nShares = 0;
-        rebasingState[account].isRebasing = 0;
+        rebasingState[account] = RebasingState({
+            isRebasing: 0,
+            nShares: 0,
+            minBalance: 0
+        });
         totalRebasingShares -= shares;
 
         emit RebaseExit(account, block.timestamp);
@@ -197,13 +208,15 @@ abstract contract ERC20RebaseDistributor is ERC20 {
     function balanceOf(
         address account
     ) public view virtual override returns (uint256) {
-        uint256 _rebasingShares = rebasingState[account].nShares;
-        if (_rebasingShares == 0) {
+        RebasingState memory _rebasingState = rebasingState[account];
+        if (_rebasingState.isRebasing == 0) {
             return ERC20.balanceOf(account);
         } else {
-            return
-                (_rebasingShares * rebasingSharePrice) /
+            uint256 underlying = (_rebasingState.nShares * rebasingSharePrice) /
                 START_REBASING_SHARE_PRICE;
+            return underlying > _rebasingState.minBalance
+                ? underlying
+                : _rebasingState.minBalance;
         }
     }
 
@@ -229,6 +242,9 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             _rebasingSharePrice = rebasingSharePrice;
             uint256 rebasedBalance = (_rebasingState.nShares *
                 _rebasingSharePrice) / START_REBASING_SHARE_PRICE;
+            if (rebasedBalance < _rebasingState.minBalance) {
+                rebasedBalance = _rebasingState.minBalance;
+            }
             uint256 mintAmount = rebasedBalance - balanceBefore;
             if (mintAmount != 0) {
                 ERC20._mint(account, mintAmount);
@@ -246,7 +262,11 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             uint256 sharesAfter = (balanceAfter * START_REBASING_SHARE_PRICE) /
                 _rebasingSharePrice;
             uint256 sharesBurnt = _rebasingState.nShares - sharesAfter;
-            rebasingState[account].nShares = uint248(sharesAfter);
+            rebasingState[account] = RebasingState({
+                isRebasing: 1,
+                nShares: uint136(sharesAfter),
+                minBalance: uint112(balanceAfter)
+            });
             totalRebasingShares = totalRebasingShares - sharesBurnt;
         }
     }
@@ -265,10 +285,17 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 _rebasingSharePrice) /
                 START_REBASING_SHARE_PRICE +
                 amount;
+            if (balanceAfter < _rebasingState.minBalance + amount) {
+                balanceAfter = _rebasingState.minBalance + amount;
+            }
             uint256 sharesAfter = (balanceAfter * START_REBASING_SHARE_PRICE) /
                 _rebasingSharePrice;
             uint256 sharesReceived = sharesAfter - _rebasingState.nShares;
-            rebasingState[account].nShares = uint248(sharesAfter);
+            rebasingState[account] = RebasingState({
+                isRebasing: 1,
+                nShares: uint136(sharesAfter),
+                minBalance: uint112(balanceAfter)
+            });
             totalRebasingShares = totalRebasingShares + sharesReceived;
         }
     }
@@ -292,6 +319,9 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             uint256 shares = uint256(rebasingStateFrom.nShares);
             uint256 rebasedBalance = (shares * _rebasingSharePrice) /
                 START_REBASING_SHARE_PRICE;
+            if (rebasedBalance < rebasingStateFrom.minBalance) {
+                rebasedBalance = rebasingStateFrom.minBalance;
+            }
             uint256 mintAmount = rebasedBalance - fromBalanceBefore;
             if (mintAmount != 0) {
                 ERC20._mint(msg.sender, mintAmount);
@@ -314,7 +344,11 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 START_REBASING_SHARE_PRICE) / _rebasingSharePrice;
             uint256 sharesSpent = rebasingStateFrom.nShares - fromSharesAfter;
             _totalRebasingShares -= sharesSpent;
-            rebasingState[msg.sender].nShares = uint248(fromSharesAfter);
+            rebasingState[msg.sender] = RebasingState({
+                isRebasing: 1,
+                nShares: uint136(fromSharesAfter),
+                minBalance: uint112(fromBalanceAfter)
+            });
         }
 
         // if `to` is rebasing, update its number of shares
@@ -323,11 +357,18 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 _rebasingSharePrice) /
                 START_REBASING_SHARE_PRICE +
                 amount;
+            if (toBalanceAfter < rebasingStateTo.minBalance + amount) {
+                toBalanceAfter = rebasingStateTo.minBalance + amount;
+            }
             uint256 toSharesAfter = (toBalanceAfter *
                 START_REBASING_SHARE_PRICE) / _rebasingSharePrice;
             uint256 sharesReceived = toSharesAfter - rebasingStateTo.nShares;
             _totalRebasingShares += sharesReceived;
-            rebasingState[to].nShares = uint248(toSharesAfter);
+            rebasingState[to] = RebasingState({
+                isRebasing: 1,
+                nShares: uint136(toSharesAfter),
+                minBalance: uint112(toBalanceAfter)
+            });
         }
 
         // if `from` or `to` was rebasing, update the total number of shares
@@ -360,6 +401,9 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             uint256 shares = uint256(rebasingStateFrom.nShares);
             uint256 rebasedBalance = (shares * _rebasingSharePrice) /
                 START_REBASING_SHARE_PRICE;
+            if (rebasedBalance < rebasingStateFrom.minBalance) {
+                rebasedBalance = rebasingStateFrom.minBalance;
+            }
             uint256 mintAmount = rebasedBalance - fromBalanceBefore;
             if (mintAmount != 0) {
                 ERC20._mint(from, mintAmount);
@@ -382,7 +426,11 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 START_REBASING_SHARE_PRICE) / _rebasingSharePrice;
             uint256 sharesSpent = rebasingStateFrom.nShares - fromSharesAfter;
             _totalRebasingShares -= sharesSpent;
-            rebasingState[from].nShares = uint248(fromSharesAfter);
+            rebasingState[from] = RebasingState({
+                isRebasing: 1,
+                nShares: uint136(fromSharesAfter),
+                minBalance: uint112(fromBalanceAfter)
+            });
         }
 
         // if `to` is rebasing, update its number of shares
@@ -391,11 +439,18 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 _rebasingSharePrice) /
                 START_REBASING_SHARE_PRICE +
                 amount;
+            if (toBalanceAfter < rebasingStateTo.minBalance + amount) {
+                toBalanceAfter = rebasingStateTo.minBalance + amount;
+            }
             uint256 toSharesAfter = (toBalanceAfter *
                 START_REBASING_SHARE_PRICE) / _rebasingSharePrice;
             uint256 sharesReceived = toSharesAfter - rebasingStateTo.nShares;
             _totalRebasingShares += sharesReceived;
-            rebasingState[to].nShares = uint248(toSharesAfter);
+            rebasingState[to] = RebasingState({
+                isRebasing: 1,
+                nShares: uint136(toSharesAfter),
+                minBalance: uint112(toBalanceAfter)
+            });
         }
 
         // if `from` or `to` was rebasing, update the total number of shares
