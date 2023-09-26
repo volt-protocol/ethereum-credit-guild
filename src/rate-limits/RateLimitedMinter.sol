@@ -66,7 +66,6 @@ contract RateLimitedMinter is RateLimitedV2 {
     )
         external
         onlyCoreRole(role)
-        whenNotPaused
     {
         _replenishBuffer(amount); /// effects
     }
