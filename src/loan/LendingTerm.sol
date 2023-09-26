@@ -173,6 +173,7 @@ contract LendingTerm is CoreRef {
         address borrower;
         uint256 borrowAmount;
         uint256 collateralAmount;
+        uint256 creditMultiplierOpen; // creditMultiplier when loan was opened
         address caller; // a caller of 0 indicates that the loan has not been called
         uint256 callTime; // a call time of 0 indicates that the loan has not been called
         uint256 originationTime; // the time the loan was initiated
@@ -268,6 +269,9 @@ contract LendingTerm is CoreRef {
             YEAR /
             1e18;
         uint256 loanDebt = borrowAmount + interest;
+        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 _creditMultiplierOpen = loan.creditMultiplierOpen;
+        loanDebt = loanDebt * _creditMultiplierOpen / creditMultiplier;
 
         return loanDebt;
     }
@@ -317,6 +321,8 @@ contract LendingTerm is CoreRef {
         // check that enough collateral is provided
         uint256 maxBorrow = (collateralAmount * maxDebtPerCollateralToken) /
             1e18;
+        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        maxBorrow = maxBorrow * 1e18 / creditMultiplier;
         require(
             borrowAmount <= maxBorrow,
             "LendingTerm: not enough collateral"
@@ -357,6 +363,7 @@ contract LendingTerm is CoreRef {
             borrower: borrower,
             borrowAmount: borrowAmount,
             collateralAmount: collateralAmount,
+            creditMultiplierOpen: creditMultiplier,
             caller: address(0),
             callTime: 0,
             originationTime: block.timestamp,
