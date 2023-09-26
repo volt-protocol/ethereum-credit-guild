@@ -3,24 +3,34 @@ pragma solidity 0.8.13;
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {RateLimitedV2} from "@src/utils/RateLimitedV2.sol";
 
-/// @notice contract to mint GUILD on a rate limit.
+import {CreditToken} from "@src/tokens/CreditToken.sol";
+
+interface IERC20Mintable {
+    function mint(address to, uint256 amount) external;
+}
+
+/// @notice contract to mint tokens on a rate limit.
 /// All minting should flow through this smart contract, as it should be the only one with
 /// minting capabilities.
-contract RateLimitedGuildMinter is RateLimitedV2 {
-    /// @notice the reference to GUILD token
+contract RateLimitedMinter is RateLimitedV2 {
+    /// @notice the reference to token
     address public token;
+
+    /// @notice role used to access control on mint/replenishBuffer
+    bytes32 public immutable role;
 
     /// @param _core reference to the core smart contract
     /// @param _token reference to the token to mint
+    /// @param _role role used to check access control
     /// @param _maxRateLimitPerSecond maximum rate limit per second that governance can set
     /// @param _rateLimitPerSecond starting rate limit per second for Volt minting
     /// @param _bufferCap cap on buffer size for this rate limited instance
     constructor(
         address _core,
         address _token,
+        bytes32 _role,
         uint256 _maxRateLimitPerSecond,
         uint128 _rateLimitPerSecond,
         uint128 _bufferCap
@@ -29,6 +39,7 @@ contract RateLimitedGuildMinter is RateLimitedV2 {
         RateLimitedV2(_maxRateLimitPerSecond, _rateLimitPerSecond, _bufferCap)
     {
         token = _token;
+        role = _role;
     }
 
     /// @notice Mint new tokens.
@@ -38,9 +49,13 @@ contract RateLimitedGuildMinter is RateLimitedV2 {
     function mint(
         address to,
         uint256 amount
-    ) external onlyCoreRole(CoreRoles.RATE_LIMITED_GUILD_MINTER) whenNotPaused {
+    )
+        external
+        onlyCoreRole(role)
+        whenNotPaused
+    {
         _depleteBuffer(amount); /// check and effects
-        GuildToken(token).mint(to, amount); /// interactions
+        IERC20Mintable(token).mint(to, amount); /// interactions
     }
 
     /// @notice replenish the buffer.
@@ -48,7 +63,11 @@ contract RateLimitedGuildMinter is RateLimitedV2 {
     /// @param amount of tokens to replenish buffer by
     function replenishBuffer(
         uint256 amount
-    ) external onlyCoreRole(CoreRoles.RATE_LIMITED_GUILD_MINTER) whenNotPaused {
+    )
+        external
+        onlyCoreRole(role)
+        whenNotPaused
+    {
         _replenishBuffer(amount); /// effects
     }
 }

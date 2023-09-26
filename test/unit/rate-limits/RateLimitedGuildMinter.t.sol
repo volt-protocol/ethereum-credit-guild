@@ -5,10 +5,10 @@ import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {RateLimitedGuildMinter} from "@src/rate-limits/RateLimitedGuildMinter.sol";
+import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 contract RateLimitedGuildMinterUnitTest is Test {
-    RateLimitedGuildMinter public rlgm;
+    RateLimitedMinter public rlgm;
     MockERC20 private token;
     address private governor = address(1);
     address private guardian = address(2);
@@ -28,9 +28,10 @@ contract RateLimitedGuildMinterUnitTest is Test {
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         token = new MockERC20();
-        rlgm = new RateLimitedGuildMinter(
+        rlgm = new RateLimitedMinter(
             address(core),
             address(token),
+            CoreRoles.RATE_LIMITED_GUILD_MINTER,
             MAX_RATE_LIMIT_PER_SECOND,
             RATE_LIMIT_PER_SECOND,
             BUFFER_CAP
