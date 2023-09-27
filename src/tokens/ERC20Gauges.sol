@@ -52,6 +52,8 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
     - Implement C4 audit fixes for [M-03], [M-04], [M-07], [G-02], and [G-04].
     - Remove cycle-based logic
     - Add gauge types
+    - Prevent removal of gauges if they were not previously added
+    - Add liveGauges() and numLiveGauges() getters
 */
 abstract contract ERC20Gauges is ERC20 {
     using EnumerableSet for EnumerableSet.AddressSet;
