@@ -122,6 +122,30 @@ abstract contract ERC20Gauges is ERC20 {
         return _deprecatedGauges.length();
     }
 
+    /// @notice returns the set of currently live gauges
+    function liveGauges() external view returns (address[] memory _liveGauges) {
+        _liveGauges = new address[](_gauges.length() - _deprecatedGauges.length());
+        address[] memory allGauges = _gauges.values();
+        uint256 j;
+        for (uint256 i; i < allGauges.length && j < _liveGauges.length; ) {
+            if (!_deprecatedGauges.contains(allGauges[i])) {
+                _liveGauges[j] = allGauges[i];
+                unchecked {
+                    ++j;
+                }
+            }
+            unchecked {
+                ++i;
+            }
+        }
+        return _liveGauges;
+    }
+
+    /// @notice returns the number of currently live gauges
+    function numLiveGauges() external view returns (uint256) {
+        return _gauges.length() - _deprecatedGauges.length();
+    }
+
     /// @notice returns the set of gauges the user has allocated to, may be live or deprecated.
     function userGauges(address user) external view returns (address[] memory) {
         return _userGauges[user].values();
