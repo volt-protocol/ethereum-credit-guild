@@ -87,7 +87,75 @@ contract ERC20GaugesUnitTest is Test {
         require(token.totalWeight() == amount);
         require(token.getGaugeWeight(gauge1) == amount);
         require(token.getUserGaugeWeight(address(this), gauge1) == amount);
+    }
+
+    function testLiveAndDeprecatedGaugeGetters() public {
+        require(token.numLiveGauges() == 0);
+        require(token.liveGauges().length == 0);
+        require(token.numDeprecatedGauges() == 0);
         require(token.deprecatedGauges().length == 0);
+
+        token.setMaxGauges(2);
+        token.addGauge(1, gauge1);
+        token.addGauge(1, gauge2);
+
+        require(token.numGauges() == 2);
+        require(token.gauges()[0] == gauge1);
+        require(token.gauges()[1] == gauge2);
+        require(token.numLiveGauges() == 2);
+        require(token.liveGauges().length == 2);
+        require(token.liveGauges()[0] == gauge1);
+        require(token.liveGauges()[1] == gauge2);
+        require(token.numDeprecatedGauges() == 0);
+        require(token.deprecatedGauges().length == 0);
+
+        token.removeGauge(gauge1);
+
+        require(token.numGauges() == 2);
+        require(token.gauges()[0] == gauge1);
+        require(token.gauges()[1] == gauge2);
+        require(token.numLiveGauges() == 1);
+        require(token.liveGauges().length == 1);
+        require(token.liveGauges()[0] == gauge2);
+        require(token.numDeprecatedGauges() == 1);
+        require(token.deprecatedGauges().length == 1);
+        require(token.deprecatedGauges()[0] == gauge1);
+
+        token.addGauge(1, gauge1); // re-add previously deprecated
+
+        require(token.numGauges() == 2);
+        require(token.gauges()[0] == gauge1);
+        require(token.gauges()[1] == gauge2);
+        require(token.numLiveGauges() == 2);
+        require(token.liveGauges().length == 2);
+        require(token.liveGauges()[0] == gauge1);
+        require(token.liveGauges()[1] == gauge2);
+        require(token.numDeprecatedGauges() == 0);
+        require(token.deprecatedGauges().length == 0);
+
+        token.removeGauge(gauge2);
+
+        require(token.numGauges() == 2);
+        require(token.gauges()[0] == gauge1);
+        require(token.gauges()[1] == gauge2);
+        require(token.numLiveGauges() == 1);
+        require(token.liveGauges().length == 1);
+        require(token.liveGauges()[0] == gauge1);
+        require(token.numDeprecatedGauges() == 1);
+        require(token.deprecatedGauges().length == 1);
+        require(token.deprecatedGauges()[0] == gauge2);
+
+        token.removeGauge(gauge1);
+
+        require(token.numGauges() == 2);
+        require(token.gauges()[0] == gauge1);
+        require(token.gauges()[1] == gauge2);
+        require(token.numLiveGauges() == 0);
+        require(token.liveGauges().length == 0);
+        require(token.numDeprecatedGauges() == 2);
+        require(token.deprecatedGauges().length == 2);
+        require(token.deprecatedGauges()[0] == gauge2);
+        require(token.deprecatedGauges()[1] == gauge1);
     }
 
     function testAddGaugeTwice() public {
