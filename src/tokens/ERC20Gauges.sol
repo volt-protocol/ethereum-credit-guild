@@ -14,7 +14,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         Alternatively, gauges can be used to direct another quantity such as relative access to a line of credit.
         This contract is abstract, and a parent shall implement public setter with adequate access control to manage
         the gauge set and caps.
-        "Live" gauges are in the set `_gauges`.  
+        All gauges are in the set `_gauges` (live + deprecated).  
         Users can only add weight to live gauges but can remove weight from live or deprecated gauges.
         Gauges can be deprecated and reinstated, and will maintain any non-removed weight from before.
 @dev    SECURITY NOTES: `maxGauges` is a critical variable to protect against gas DOS attacks upon token transfer. 
@@ -92,7 +92,7 @@ abstract contract ERC20Gauges is ERC20 {
                             VIEW HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice returns the set of live gauges
+    /// @notice returns the set of live + deprecated gauges
     function gauges() external view returns (address[] memory) {
         return _gauges.values();
     }
@@ -107,7 +107,7 @@ abstract contract ERC20Gauges is ERC20 {
         return _deprecatedGauges.contains(gauge);
     }
 
-    /// @notice returns the number of live gauges
+    /// @notice returns the number of live + deprecated gauges
     function numGauges() external view returns (uint256) {
         return _gauges.length();
     }
@@ -117,7 +117,7 @@ abstract contract ERC20Gauges is ERC20 {
         return _deprecatedGauges.values();
     }
 
-    /// @notice returns the number of live gauges
+    /// @notice returns the number of deprecated gauges
     function numDeprecatedGauges() external view returns (uint256) {
         return _deprecatedGauges.length();
     }
@@ -382,13 +382,13 @@ abstract contract ERC20Gauges is ERC20 {
             gauge != address(0) && (newAdd || previouslyDeprecated),
             "ERC20Gauges: invalid gauge"
         );
-        uint256 currentType = gaugeType[gauge];
+
         if (newAdd) {
-            require(currentType == 0, "ERC20Gauges: invalid type");
+            // save gauge type on first add
             gaugeType[gauge] = _type;
         } else {
-            // cannot change gauge type on re-add
-            require(currentType == _type, "ERC20Gauges: invalid type");
+            // cannot change gauge type on re-add of a previously deprecated gauge
+            require(gaugeType[gauge] == _type, "ERC20Gauges: invalid type");
         }
 
         // Check if some previous weight exists and re-add to total. Gauge and user weights are preserved.
