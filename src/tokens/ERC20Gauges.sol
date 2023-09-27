@@ -403,7 +403,7 @@ abstract contract ERC20Gauges is ERC20 {
 
     function _removeGauge(address gauge) internal {
         // add to deprecated and fail loud if not present
-        require(_deprecatedGauges.add(gauge), "ERC20Gauges: invalid gauge");
+        require(_gauges.contains(gauge) && _deprecatedGauges.add(gauge), "ERC20Gauges: invalid gauge");
 
         // Remove weight from total but keep the gauge and user weights in storage in case gauge is re-added.
         uint256 weight = getGaugeWeight[gauge];

@@ -116,6 +116,11 @@ contract ERC20GaugesUnitTest is Test {
         token.removeGauge(gauge1);
     }
 
+    function testRemoveUnexistingGauge() public {
+        vm.expectRevert("ERC20Gauges: invalid gauge");
+        token.removeGauge(address(12345));
+    }
+
     function testRemoveGaugeWithWeight(uint256 amount) public {
         token.mint(address(this), amount);
 
