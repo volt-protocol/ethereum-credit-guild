@@ -6,7 +6,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
-import {RateLimitedGuildMinter} from "@src/rate-limits/RateLimitedGuildMinter.sol";
+import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 /// @notice SurplusGuildMinter allows GUILD to be minted from CREDIT collateral.
 /// In this contract, CREDIT tokens can be provided as first-loss capital to
@@ -114,7 +114,7 @@ contract SurplusGuildMinter is CoreRef {
         // self-mint GUILD tokens
         uint256 _ratio = ratio;
         uint256 guildAmount = (_ratio * amount) / 1e18;
-        RateLimitedGuildMinter(rlgm).mint(address(this), guildAmount);
+        RateLimitedMinter(rlgm).mint(address(this), guildAmount);
         GuildToken(guild).incrementGauge(term, uint112(guildAmount));
 
         // update state
@@ -181,7 +181,7 @@ contract SurplusGuildMinter is CoreRef {
 
             // replenish GUILD minter buffer
             GuildToken(guild).burn(guildAmount);
-            RateLimitedGuildMinter(rlgm).replenishBuffer(guildAmount);
+            RateLimitedMinter(rlgm).replenishBuffer(guildAmount);
 
             // mint interest rates to users
             guildReward =
@@ -189,7 +189,7 @@ contract SurplusGuildMinter is CoreRef {
                     (block.timestamp - stakeTimestamp[msg.sender][term])) /
                 YEAR;
             if (guildReward != 0) {
-                RateLimitedGuildMinter(rlgm).mint(msg.sender, guildReward);
+                RateLimitedMinter(rlgm).mint(msg.sender, guildReward);
                 emit GuildReward(block.timestamp, msg.sender, guildReward);
             }
         }
@@ -262,7 +262,7 @@ contract SurplusGuildMinter is CoreRef {
 
                     // replenish GUILD minter buffer
                     GuildToken(guild).burn(guildDecrement);
-                    RateLimitedGuildMinter(rlgm).replenishBuffer(guildDecrement);
+                    RateLimitedMinter(rlgm).replenishBuffer(guildDecrement);
                 }
             }
 
@@ -272,7 +272,7 @@ contract SurplusGuildMinter is CoreRef {
                     (block.timestamp - stakeTimestamp[user][term])) /
                 YEAR;
             if (guildReward != 0) {
-                RateLimitedGuildMinter(rlgm).mint(user, guildReward);
+                RateLimitedMinter(rlgm).mint(user, guildReward);
                 emit GuildReward(block.timestamp, user, guildReward);
             }
 

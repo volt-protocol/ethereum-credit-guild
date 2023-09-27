@@ -105,7 +105,7 @@ contract AuctionHouse is CoreRef {
         bytes32 loanId,
         uint256 debtAmount,
         bool loanCalled
-    ) external whenNotPaused {
+    ) external {
         // check that caller is a lending term that hasn't been offboarded
         require(
             core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, msg.sender),
@@ -223,7 +223,7 @@ contract AuctionHouse is CoreRef {
     /// @notice bid for an active auction
     /// @dev as a bidder, you must approve CREDIT tokens on the LendingTerm contract
     /// associated with the loan, not on the AuctionHouse itself.
-    function bid(bytes32 loanId) external whenNotPaused {
+    function bid(bytes32 loanId) external {
         // this view function will revert if the auction is not started,
         // or if the auction is already ended.
         (uint256 collateralReceived, uint256 creditAsked) = getBidDetail(
@@ -293,7 +293,7 @@ contract AuctionHouse is CoreRef {
     /// @dev this is meant to be used when an auction concludes without anyone bidding,
     /// even if 0 CREDIT is asked in return. This situation could arise
     /// if collateral assets are frozen within the lending term contract.
-    function forgive(bytes32 loanId) external whenNotPaused {
+    function forgive(bytes32 loanId) external {
         // this view function will revert if the auction is not started,
         // or if the auction is already ended.
         (, uint256 creditAsked) = getBidDetail(loanId);
