@@ -569,6 +569,7 @@ contract LendingTerm is CoreRef {
             "LendingTerm: loan opened in same block"
         );
         require(loan.closeTime == 0, "LendingTerm: loan closed");
+        require(loan.callTime == 0, "LendingTerm: loan called");
 
         // compute partial repayment
         uint256 loanDebt = getLoanDebt(loanId);
