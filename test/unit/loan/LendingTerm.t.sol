@@ -1605,4 +1605,50 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.totalSupply(), 0);
         assertEq(credit.balanceOf(address(this)), 0);
     }
+
+    function testCannotPartialRepayAfterCall() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), collateralAmount);
+        assertEq(collateral.balanceOf(address(term)), 0);
+
+        // borrow
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        credit.mint(address(this), 2_000e18);
+
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // call
+        uint256 callFee = 1_000e18;
+        credit.approve(address(term), callFee);
+        term.call(loanId);
+
+        assertEq(credit.balanceOf(address(this)), 21_000e18);
+        assertEq(credit.balanceOf(address(term)), callFee);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // partialRepay
+        credit.approve(address(term), 5_000e18);
+        vm.expectRevert("LendingTerm: loan called");
+        term.partialRepay(loanId, 5_000e18);
+    }
 }
