@@ -5,10 +5,10 @@ import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
+import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 contract RateLimitedCreditMinterUnitTest is Test {
-    RateLimitedCreditMinter public rlcm;
+    RateLimitedMinter public rlcm;
     MockERC20 private token;
     address private governor = address(1);
     address private guardian = address(2);
@@ -28,9 +28,10 @@ contract RateLimitedCreditMinterUnitTest is Test {
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         token = new MockERC20();
-        rlcm = new RateLimitedCreditMinter(
+        rlcm = new RateLimitedMinter(
             address(core),
             address(token),
+            CoreRoles.RATE_LIMITED_CREDIT_MINTER,
             MAX_RATE_LIMIT_PER_SECOND,
             RATE_LIMIT_PER_SECOND,
             BUFFER_CAP
@@ -112,22 +113,5 @@ contract RateLimitedCreditMinterUnitTest is Test {
         // minting reverts because the contract is paused
         vm.expectRevert("Pausable: paused");
         rlcm.mint(alice, 100);
-    }
-
-    function testReplenishBufferPausable() public {
-        // create/grant role
-        vm.startPrank(governor);
-        core.createRole(
-            CoreRoles.RATE_LIMITED_CREDIT_MINTER,
-            CoreRoles.GOVERNOR
-        );
-        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(this));
-        vm.stopPrank();
-        vm.prank(guardian);
-        rlcm.pause();
-
-        // replenishBuffer reverts because the contract is paused
-        vm.expectRevert("Pausable: paused");
-        rlcm.replenishBuffer(100);
     }
 }
