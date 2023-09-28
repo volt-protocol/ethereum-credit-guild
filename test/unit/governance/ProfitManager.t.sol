@@ -20,9 +20,6 @@ contract ProfitManagerUnitTest is Test {
     address constant gauge2 = address(0xBEEF);
     address constant gauge3 = address(0x3333);
 
-    uint32 constant _CYCLE_LENGTH = 1 hours;
-    uint32 constant _FREEZE_PERIOD = 10 minutes;
-
     uint256 public issuance; // for mocked behavior
 
     function setUp() public {
@@ -31,7 +28,7 @@ contract ProfitManagerUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit));
 
         // labels
         vm.label(address(core), "core");
@@ -232,9 +229,9 @@ contract ProfitManagerUnitTest is Test {
             address(0) // otherRecipient
         );
         guild.setMaxGauges(3);
-        guild.addGauge(gauge1);
-        guild.addGauge(gauge2);
-        guild.addGauge(gauge3);
+        guild.addGauge(1, gauge1);
+        guild.addGauge(1, gauge2);
+        guild.addGauge(1, gauge3);
         guild.mint(alice, 150e18);
         guild.mint(bob, 400e18);
         vm.startPrank(alice);
@@ -352,9 +349,9 @@ contract ProfitManagerUnitTest is Test {
             address(0) // otherRecipient
         );
         guild.setMaxGauges(3);
-        guild.addGauge(gauge1);
-        guild.addGauge(gauge2);
-        guild.addGauge(gauge3);
+        guild.addGauge(1, gauge1);
+        guild.addGauge(1, gauge2);
+        guild.addGauge(1, gauge3);
         guild.mint(alice, 150e18);
         guild.mint(bob, 400e18);
         vm.startPrank(alice);
@@ -399,9 +396,9 @@ contract ProfitManagerUnitTest is Test {
         guild.mint(bob, 400e18);
         // add gauges
         guild.setMaxGauges(3);
-        guild.addGauge(gauge1);
-        guild.addGauge(gauge2);
-        guild.addGauge(address(this));
+        guild.addGauge(1, gauge1);
+        guild.addGauge(1, gauge2);
+        guild.addGauge(1, address(this));
         // 80 votes on gauge1, 40 votes on gauge2, 40 votes on this
         vm.startPrank(alice);
         guild.incrementGauge(gauge1, 10e18);

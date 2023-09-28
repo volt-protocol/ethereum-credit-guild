@@ -30,10 +30,6 @@ contract LendingTermOffboardingUnitTest is Test {
     bytes32 private aliceLoanId;
     uint256 private aliceLoanSize = 500_000e18;
 
-    // GUILD params
-    uint32 private constant _CYCLE_LENGTH = 1 hours;
-    uint32 private constant _FREEZE_PERIOD = 10 minutes;
-
     // LendingTerm params
     uint256 private constant _CREDIT_PER_COLLATERAL_TOKEN = 1e18; // 1:1, same decimals
     uint256 private constant _INTEREST_RATE = 0; // 0% APR
@@ -53,7 +49,7 @@ contract LendingTermOffboardingUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit));
         profitManager.initializeReferences(address(credit), address(guild));
         collateral = new MockERC20();
         rlcm = new RateLimitedMinter(
@@ -109,9 +105,9 @@ contract LendingTermOffboardingUnitTest is Test {
 
         // add gauge and vote for it
         guild.setMaxGauges(10);
-        guild.addGauge(address(term));
+        guild.addGauge(1, address(term));
         guild.mint(address(this), _HARDCAP * 2);
-        guild.incrementGauge(address(term), uint112(_HARDCAP));
+        guild.incrementGauge(address(term), _HARDCAP);
 
         // allow GUILD delegations
         guild.setMaxDelegates(10);
