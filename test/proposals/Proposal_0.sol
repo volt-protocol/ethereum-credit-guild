@@ -13,11 +13,10 @@ import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
+import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
-import {RateLimitedGuildMinter} from "@src/rate-limits/RateLimitedGuildMinter.sol";
-import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
 
 contract Proposal_0 is Proposal {
     string public name = "Proposal_0";
@@ -45,16 +44,18 @@ contract Proposal_0 is Proposal {
                 7 days, // gaugeCycleLength,
                 0 // incrementFreezeWindow
             );
-            RateLimitedCreditMinter rateLimitedCreditMinter = new RateLimitedCreditMinter(
+            RateLimitedMinter rateLimitedCreditMinter = new RateLimitedMinter(
                 addresses.mainnet("CORE"),
                 address(credit),
+                CoreRoles.RATE_LIMITED_CREDIT_MINTER,
                 0, // maxRateLimitPerSecond
                 0, // rateLimitPerSecond
                 2_000_000e18 // bufferCap
             );
-            RateLimitedGuildMinter rateLimitedGuildMinter = new RateLimitedGuildMinter(
+            RateLimitedMinter rateLimitedGuildMinter = new RateLimitedMinter(
                 addresses.mainnet("CORE"),
                 address(credit),
+                CoreRoles.RATE_LIMITED_GUILD_MINTER,
                 0, // maxRateLimitPerSecond
                 0, // rateLimitPerSecond
                 700_000_000e18 // bufferCap
