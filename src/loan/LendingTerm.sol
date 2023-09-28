@@ -577,6 +577,7 @@ contract LendingTerm is CoreRef {
         uint256 percentRepaid = (debtToRepay * 1e18) / loanDebt; // [0, 1e18[
         uint256 _borrowAmount = loan.borrowAmount;
         uint256 principalRepaid = (_borrowAmount * percentRepaid) / 1e18;
+        uint256 issuanceDecrease = (_borrowAmount * percentRepaid) / 1e18;
         uint256 interestRepaid = debtToRepay - principalRepaid;
         require(
             principalRepaid != 0 && interestRepaid != 0,
@@ -587,13 +588,14 @@ contract LendingTerm is CoreRef {
             "LendingTerm: repay below min"
         );
         require(
-            _borrowAmount - principalRepaid > MIN_BORROW,
+            _borrowAmount - issuanceDecrease > MIN_BORROW,
             "LendingTerm: below min borrow"
         );
 
         // update loan in state
-        loans[loanId].borrowAmount -= principalRepaid;
+        loans[loanId].borrowAmount -= issuanceDecrease;
         lastPartialRepay[loanId] = block.timestamp;
+        issuance -= issuanceDecrease;
 
         // pull the debt from the borrower
         CreditToken(creditToken).transferFrom(
@@ -609,7 +611,7 @@ contract LendingTerm is CoreRef {
             int256(interestRepaid)
         );
         CreditToken(creditToken).burn(principalRepaid);
-        RateLimitedMinter(creditMinter).replenishBuffer(principalRepaid);
+        RateLimitedMinter(creditMinter).replenishBuffer(issuanceDecrease);
 
         // emit event
         emit LoanPartialRepay(block.timestamp, loanId, repayer, debtToRepay);
