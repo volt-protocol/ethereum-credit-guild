@@ -68,6 +68,21 @@ contract ERC20RebaseDistributorUnitTest is Test {
         vm.expectRevert("ERC20RebaseDistributor: not rebasing");
         vm.prank(alice);
         token.exitRebase();
+
+        // test exitRebase with pending rebase rewards
+        vm.prank(alice);
+        token.enterRebase();
+
+        // distribute
+        token.mint(address(this), 100);
+        token.distribute(100);
+
+        assertEq(token.balanceOf(alice), 200);
+
+        vm.prank(alice);
+        token.exitRebase();
+
+        assertEq(token.balanceOf(alice), 200);
     }
 
     function testDistribute() public {
@@ -189,6 +204,18 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // check balances
         assertEq(token.balanceOf(alice), 100);
         assertEq(token.balanceOf(bobby), 100);
+
+        // distribute
+        token.mint(address(this), 100);
+        token.distribute(100);
+
+        assertEq(token.balanceOf(alice), 200);
+        assertEq(token.balanceOf(bobby), 100);
+
+        token.mint(alice, 100);
+        token.mint(bobby, 100);
+
+        assertEq(token.balanceOf(alice), 300);
     }
 
     function testBurn() public {
@@ -213,6 +240,21 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // check balances
         assertEq(token.balanceOf(alice), 0);
         assertEq(token.balanceOf(bobby), 0);
+        
+        // test burn with pending rebase rewards
+        token.mint(alice, 100);
+        assertEq(token.balanceOf(alice), 100);
+
+        // distribute
+        token.mint(address(this), 100);
+        token.distribute(100);
+
+        assertEq(token.balanceOf(alice), 200);
+
+        vm.prank(alice);
+        token.burn(50);
+
+        assertEq(token.balanceOf(alice), 150);
     }
 
     function testTransfer() public {
@@ -251,6 +293,34 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.totalSupply(), 200);
         assertEq(token.rebasingSupply(), 150);
         assertEq(token.nonRebasingSupply(), 50);
+
+        // test transfer with pending rebase rewards on `from`
+        // distribute
+        token.mint(address(this), 150);
+        token.distribute(150);
+
+        assertEq(token.balanceOf(alice), 300);
+        assertEq(token.balanceOf(bobby), 50);
+
+        vm.prank(alice);
+        token.transfer(bobby, 150);
+
+        assertEq(token.balanceOf(alice), 150);
+        assertEq(token.balanceOf(bobby), 200);
+
+        // test transfer with pending rebase rewards on `to`
+        // distribute
+        token.mint(address(this), 150);
+        token.distribute(150);
+
+        assertEq(token.balanceOf(alice), 300);
+        assertEq(token.balanceOf(bobby), 200);
+
+        vm.prank(bobby);
+        token.transfer(alice, 100);
+
+        assertEq(token.balanceOf(alice), 400);
+        assertEq(token.balanceOf(bobby), 100);
     }
 
     function testTransferFrom() public {
@@ -286,6 +356,36 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.isRebasing(bobby), false);
         assertEq(token.balanceOf(alice), 50);
         assertEq(token.balanceOf(bobby), 150);
+
+        // test transferFrom with pending rebase rewards on `from`
+        // distribute
+        token.mint(address(this), 50);
+        token.distribute(50);
+
+        assertEq(token.balanceOf(alice), 100);
+        assertEq(token.balanceOf(bobby), 150);
+
+        vm.prank(alice);
+        token.approve(address(this), 50);
+        token.transferFrom(alice, bobby, 50);
+
+        assertEq(token.balanceOf(alice), 50);
+        assertEq(token.balanceOf(bobby), 200);
+
+        // test transferFrom with pending rebase rewards on `to`
+        // distribute
+        token.mint(address(this), 50);
+        token.distribute(50);
+
+        assertEq(token.balanceOf(alice), 100);
+        assertEq(token.balanceOf(bobby), 200);
+
+        vm.prank(bobby);
+        token.approve(address(this), 100);
+        token.transferFrom(bobby, alice, 100);
+
+        assertEq(token.balanceOf(alice), 200);
+        assertEq(token.balanceOf(bobby), 100);
     }
 
     function testMovementsAfterDistribute() public {

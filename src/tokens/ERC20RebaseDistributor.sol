@@ -49,6 +49,20 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         uint256 amountDistributed,
         uint256 amountRebasing
     );
+    /// @notice Emitted when an `amount` of tokens is realized as rebase rewards for `account`.
+    /// @dev `totalSupply()`, `rebasingSupply()`, and `balanceOf()` reflect the rebase rewards
+    /// in real time, but the internal storage only realizes rebase rewards if the user has an
+    /// interaction with the token contract in one of the following functions:
+    /// - exitRebase()
+    /// - burn()
+    /// - mint()
+    /// - transfer() received or sent
+    /// - transferFrom() received or sent
+    event RebaseReward(
+        address indexed account,
+        uint256 indexed timestamp,
+        uint256 amount
+    );
 
     /*///////////////////////////////////////////////////////////////
                             INTERNAL STATE
@@ -129,6 +143,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         if (mintAmount != 0) {
             ERC20._mint(account, mintAmount);
             pendingRebaseRewards -= mintAmount;
+            emit RebaseReward(account, block.timestamp, mintAmount);
         }
 
         rebasingState[account] = RebasingState({
@@ -246,6 +261,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 ERC20._mint(account, mintAmount);
                 balanceBefore += mintAmount;
                 pendingRebaseRewards -= mintAmount;
+                emit RebaseReward(account, block.timestamp, mintAmount);
             }
         }
 
@@ -301,6 +317,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             if (mintAmount != 0) {
                 ERC20._mint(account, mintAmount);
                 pendingRebaseRewards -= mintAmount;
+                emit RebaseReward(account, block.timestamp, mintAmount);
             }
         }
     }
@@ -332,6 +349,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 ERC20._mint(msg.sender, mintAmount);
                 fromBalanceBefore += mintAmount;
                 pendingRebaseRewards -= mintAmount;
+                emit RebaseReward(msg.sender, block.timestamp, mintAmount);
             }
         }
 
@@ -382,6 +400,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             if (mintAmount != 0) {
                 ERC20._mint(to, mintAmount);
                 pendingRebaseRewards -= mintAmount;
+                emit RebaseReward(to, block.timestamp, mintAmount);
             }
         }
 
@@ -423,6 +442,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 ERC20._mint(from, mintAmount);
                 fromBalanceBefore += mintAmount;
                 pendingRebaseRewards -= mintAmount;
+                emit RebaseReward(from, block.timestamp, mintAmount);
             }
         }
 
@@ -473,6 +493,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             if (mintAmount != 0) {
                 ERC20._mint(to, mintAmount);
                 pendingRebaseRewards -= mintAmount;
+                emit RebaseReward(to, block.timestamp, mintAmount);
             }
         }
 
