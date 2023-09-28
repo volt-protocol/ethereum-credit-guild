@@ -10,6 +10,7 @@
     "RATE_LIMITED_CREDIT_MINTER"
   ],
   "RATE_LIMITED_CREDIT_MINTER": [
+    "PSM_USDC",
     "TERM_USDC_1",
     "TERM_SDAI_1"
   ],

@@ -10,6 +10,10 @@ contract MockERC20MultiVotes is ERC20MultiVotes, MockERC20 {
 
     constructor() {}
 
+    function decimals() public view override(ERC20, MockERC20) returns (uint8) {
+        return MockERC20.decimals();
+    }
+
     function setMaxDelegates(uint256 newMax) external {
         _setMaxDelegates(newMax);
     }
