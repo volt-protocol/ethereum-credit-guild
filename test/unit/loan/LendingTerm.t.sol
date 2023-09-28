@@ -474,6 +474,8 @@ contract LendingTermUnitTest is Test {
         term.partialRepay(loanId, 11_000e18);
 
         // checks
+        assertEq(term.issuance(), 10_000e18);
+        assertEq(term.getLoan(loanId).borrowAmount, 10_000e18);
         assertEq(term.getLoanDebt(loanId), 11_000e18);
         assertEq(term.getLoan(loanId).borrowAmount, 10_000e18);
     }
