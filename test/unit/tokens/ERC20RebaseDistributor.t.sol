@@ -515,10 +515,10 @@ contract ERC20RebaseDistributorUnitTest is Test {
 
     function testDistributeFuzz(uint256 distributionAmount, uint256[3] memory userBalances) public {
         // fuzz values in the plausibility range
-        distributionAmount = distributionAmount % 10_000e18 + 1; // [1, 10k (18 decimals)]
-        userBalances[0] = userBalances[0] % 1_000_000e18; // [0, 1M (18 decimals)]
-        userBalances[1] = userBalances[1] % 1_000_000e18; // [0, 1M (18 decimals)]
-        userBalances[2] = userBalances[2] % 1_000_000e18; // [0, 1M (18 decimals)]
+        distributionAmount = bound(distributionAmount, 0, 10_000e18);
+        userBalances[0] = bound(userBalances[0], 0, 1_000_000e18);
+        userBalances[1] = bound(userBalances[1], 0, 1_000_000e18);
+        userBalances[2] = bound(userBalances[2], 0, 1_000_000e18);
 
         // initial state: alice & bobby rebasing, carol not rebasing
         token.mint(alice, userBalances[0]);
@@ -585,8 +585,63 @@ contract ERC20RebaseDistributorUnitTest is Test {
         }
     }
 
+    function testMintAfterSharePriceUpdate(uint256 input) public {
+        uint256 distributionAmount = bound(input, 1, 1e27);
+        token.mint(alice, 100e18);
+        token.mint(bobby, 55e18);
+        vm.prank(bobby);
+        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        assertEq(token.totalSupply(), 155e18);
+        assertEq(token.nonRebasingSupply(), 100e18);
+        assertEq(token.rebasingSupply(), 55e18);
+
+        // some distribution amounts will make the division of share price
+        // round down some balance, and force to enter into the 'minBalance' confition
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        token.distribute(distributionAmount);
+
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 100e18); // unchanged
+        assertGt(token.balanceOf(bobby), 55e18 + distributionAmount - 2); // at most 1 wei of round down
+        assertLt(token.balanceOf(bobby), 55e18 + distributionAmount + 1); // at most balance + distributed
+
+        token.mint(alice, 100e18);
+        assertEq(token.balanceOf(alice), 200e18);
+    }
+
+    function testReceiveTransferAfterSharePriceUpdate(uint256 input) public {
+        uint256 distributionAmount = bound(input, 1, 1e27);
+        token.mint(alice, 100e18);
+        token.mint(bobby, 55e18);
+        vm.prank(bobby);
+        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        assertEq(token.totalSupply(), 155e18);
+        assertEq(token.nonRebasingSupply(), 100e18);
+        assertEq(token.rebasingSupply(), 55e18);
+
+        // some distribution amounts will make the division of share price
+        // round down some balance, and force to enter into the 'minBalance' confition
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        token.distribute(distributionAmount);
+
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 100e18); // unchanged
+        assertGt(token.balanceOf(bobby), 55e18 + distributionAmount - 2); // at most 1 wei of round down
+        assertLt(token.balanceOf(bobby), 55e18 + distributionAmount + 1); // at most balance + distributed
+
+        vm.prank(bobby);
+        token.transfer(alice, 10e18);
+        assertEq(token.balanceOf(alice), 110e18);
+    }
+
     function testCanExitRebaseAfterEnteringRebase(uint256 input) public {
-        uint256 distributionAmount = input % 1e27 + 1; // [1, 1_000_000_000e18]
+        uint256 distributionAmount = bound(input, 1, 1e27);
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
@@ -615,7 +670,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
     }
 
     function testCanTransferAfterEnteringRebase(uint256 input) public {
-        uint256 distributionAmount = input % 1e27 + 1; // [1, 1_000_000_000e18]
+        uint256 distributionAmount = bound(input, 1, 1e27);
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
@@ -645,7 +700,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
     }
 
     function testCanTransferFromAfterEnteringRebase1(uint256 input) public {
-        uint256 distributionAmount = input % 1e27 + 1; // [1, 1_000_000_000e18]
+        uint256 distributionAmount = bound(input, 1, 1e27);
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
@@ -677,7 +732,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
     }
 
     function testCanTransferFromAfterEnteringRebase2(uint256 input) public {
-        uint256 distributionAmount = input % 1e27 + 1; // [1, 1_000_000_000e18]
+        uint256 distributionAmount = bound(input, 1, 1e27);
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
@@ -709,7 +764,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
     }
 
     function testCanBurnAfterEnteringRebase(uint256 input) public {
-        uint256 distributionAmount = input % 1e27 + 1; // [1, 1_000_000_000e18]
+        uint256 distributionAmount = bound(input, 1, 1e27);
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
