@@ -540,6 +540,37 @@ contract ERC20GaugesUnitTest is Test {
         token.decrementGauge(gauge1, amount + 1);
     }
 
+    function testDecrementDeprecatedGauge() public {
+        token.mint(address(this), 100e18);
+
+        token.setMaxGauges(2);
+        token.addGauge(1, gauge1);
+
+        require(token.incrementGauge(gauge1, 5e18) == 5e18);
+
+        require(token.totalWeight() == 5e18);
+        require(token.totalTypeWeight(1) == 5e18);
+        require(token.getGaugeWeight(gauge1) == 5e18);
+        require(token.getUserGaugeWeight(address(this), gauge1) == 5e18);
+        require(token.getUserWeight(address(this)) == 5e18);
+
+        token.removeGauge(gauge1);
+
+        require(token.totalWeight() == 0);
+        require(token.totalTypeWeight(1) == 0);
+        require(token.getGaugeWeight(gauge1) == 5e18);
+        require(token.getUserGaugeWeight(address(this), gauge1) == 5e18);
+        require(token.getUserWeight(address(this)) == 5e18);
+
+        require(token.decrementGauge(gauge1, 5e18) == 0);
+
+        require(token.totalWeight() == 0);
+        require(token.totalTypeWeight(1) == 0);
+        require(token.getGaugeWeight(gauge1) == 0);
+        require(token.getUserGaugeWeight(address(this), gauge1) == 0);
+        require(token.getUserWeight(address(this)) == 0);
+    }
+
     function testDecrementGauges() public {
         token.mint(address(this), 100e18);
 
