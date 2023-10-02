@@ -11,7 +11,7 @@ import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
-import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
+import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 /// @notice Lending Term contract of the Ethereum Credit Guild, a base implementation of
 /// smart contract issuing CREDIT debt and escrowing collateral assets.
@@ -370,7 +370,7 @@ contract LendingTerm is CoreRef {
         }
 
         // mint debt to the borrower
-        RateLimitedCreditMinter(creditMinter).mint(borrower, borrowAmount);
+        RateLimitedMinter(creditMinter).mint(borrower, borrowAmount);
 
         // pull opening fee from the borrower, if any
         if (openingFee != 0) {
@@ -596,7 +596,7 @@ contract LendingTerm is CoreRef {
             int256(interestRepaid)
         );
         CreditToken(creditToken).burn(principalRepaid);
-        RateLimitedCreditMinter(creditMinter).replenishBuffer(principalRepaid);
+        RateLimitedMinter(creditMinter).replenishBuffer(principalRepaid);
 
         // emit event
         emit LoanPartialRepay(block.timestamp, loanId, repayer, debtToRepay);
@@ -661,7 +661,7 @@ contract LendingTerm is CoreRef {
             // forward profit portion to the ProfitManager, burn the rest
             CreditToken(creditToken).transfer(profitManager, interest);
             CreditToken(creditToken).burn(borrowAmount); // == loan.borrowAmount
-            RateLimitedCreditMinter(creditMinter).replenishBuffer(borrowAmount);
+            RateLimitedMinter(creditMinter).replenishBuffer(borrowAmount);
 
             // report profit
             ProfitManager(profitManager).notifyPnL(
@@ -997,7 +997,7 @@ contract LendingTerm is CoreRef {
 
         // burn credit principal
         if (result.creditToBurn != 0) {
-            RateLimitedCreditMinter(creditMinter).replenishBuffer(
+            RateLimitedMinter(creditMinter).replenishBuffer(
                 result.creditToBurn
             );
             CreditToken(creditToken).burn(result.creditToBurn);

@@ -7,8 +7,8 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
+import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
-import {RateLimitedGuildMinter} from "@src/rate-limits/RateLimitedGuildMinter.sol";
 
 contract SurplusGuildMinterUnitTest is Test {
     address private governor = address(1);
@@ -18,7 +18,7 @@ contract SurplusGuildMinterUnitTest is Test {
     ProfitManager private profitManager;
     CreditToken credit;
     GuildToken guild;
-    RateLimitedGuildMinter rlgm;
+    RateLimitedMinter rlgm;
     SurplusGuildMinter sgm;
 
     // GuildMinter params
@@ -33,9 +33,10 @@ contract SurplusGuildMinterUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
         guild = new GuildToken(address(core), address(profitManager), address(credit));
-        rlgm = new RateLimitedGuildMinter(
+        rlgm = new RateLimitedMinter(
             address(core), /*_core*/
             address(guild), /*_token*/
+            CoreRoles.RATE_LIMITED_GUILD_MINTER, /*_role*/
             type(uint256).max, /*_maxRateLimitPerSecond*/
             type(uint128).max, /*_rateLimitPerSecond*/
             type(uint128).max /*_bufferCap*/

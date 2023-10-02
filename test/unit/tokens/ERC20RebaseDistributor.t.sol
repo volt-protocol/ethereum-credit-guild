@@ -68,6 +68,21 @@ contract ERC20RebaseDistributorUnitTest is Test {
         vm.expectRevert("ERC20RebaseDistributor: not rebasing");
         vm.prank(alice);
         token.exitRebase();
+
+        // test exitRebase with pending rebase rewards
+        vm.prank(alice);
+        token.enterRebase();
+
+        // distribute
+        token.mint(address(this), 100);
+        token.distribute(100);
+
+        assertEq(token.balanceOf(alice), 200);
+
+        vm.prank(alice);
+        token.exitRebase();
+
+        assertEq(token.balanceOf(alice), 200);
     }
 
     function testDistribute() public {
@@ -189,6 +204,18 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // check balances
         assertEq(token.balanceOf(alice), 100);
         assertEq(token.balanceOf(bobby), 100);
+
+        // distribute
+        token.mint(address(this), 100);
+        token.distribute(100);
+
+        assertEq(token.balanceOf(alice), 200);
+        assertEq(token.balanceOf(bobby), 100);
+
+        token.mint(alice, 100);
+        token.mint(bobby, 100);
+
+        assertEq(token.balanceOf(alice), 300);
     }
 
     function testBurn() public {
@@ -213,6 +240,21 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // check balances
         assertEq(token.balanceOf(alice), 0);
         assertEq(token.balanceOf(bobby), 0);
+        
+        // test burn with pending rebase rewards
+        token.mint(alice, 100);
+        assertEq(token.balanceOf(alice), 100);
+
+        // distribute
+        token.mint(address(this), 100);
+        token.distribute(100);
+
+        assertEq(token.balanceOf(alice), 200);
+
+        vm.prank(alice);
+        token.burn(50);
+
+        assertEq(token.balanceOf(alice), 150);
     }
 
     function testTransfer() public {
@@ -251,6 +293,34 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.totalSupply(), 200);
         assertEq(token.rebasingSupply(), 150);
         assertEq(token.nonRebasingSupply(), 50);
+
+        // test transfer with pending rebase rewards on `from`
+        // distribute
+        token.mint(address(this), 150);
+        token.distribute(150);
+
+        assertEq(token.balanceOf(alice), 300);
+        assertEq(token.balanceOf(bobby), 50);
+
+        vm.prank(alice);
+        token.transfer(bobby, 150);
+
+        assertEq(token.balanceOf(alice), 150);
+        assertEq(token.balanceOf(bobby), 200);
+
+        // test transfer with pending rebase rewards on `to`
+        // distribute
+        token.mint(address(this), 150);
+        token.distribute(150);
+
+        assertEq(token.balanceOf(alice), 300);
+        assertEq(token.balanceOf(bobby), 200);
+
+        vm.prank(bobby);
+        token.transfer(alice, 100);
+
+        assertEq(token.balanceOf(alice), 400);
+        assertEq(token.balanceOf(bobby), 100);
     }
 
     function testTransferFrom() public {
@@ -286,6 +356,36 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.isRebasing(bobby), false);
         assertEq(token.balanceOf(alice), 50);
         assertEq(token.balanceOf(bobby), 150);
+
+        // test transferFrom with pending rebase rewards on `from`
+        // distribute
+        token.mint(address(this), 50);
+        token.distribute(50);
+
+        assertEq(token.balanceOf(alice), 100);
+        assertEq(token.balanceOf(bobby), 150);
+
+        vm.prank(alice);
+        token.approve(address(this), 50);
+        token.transferFrom(alice, bobby, 50);
+
+        assertEq(token.balanceOf(alice), 50);
+        assertEq(token.balanceOf(bobby), 200);
+
+        // test transferFrom with pending rebase rewards on `to`
+        // distribute
+        token.mint(address(this), 50);
+        token.distribute(50);
+
+        assertEq(token.balanceOf(alice), 100);
+        assertEq(token.balanceOf(bobby), 200);
+
+        vm.prank(bobby);
+        token.approve(address(this), 100);
+        token.transferFrom(bobby, alice, 100);
+
+        assertEq(token.balanceOf(alice), 200);
+        assertEq(token.balanceOf(bobby), 100);
     }
 
     function testMovementsAfterDistribute() public {
@@ -415,10 +515,10 @@ contract ERC20RebaseDistributorUnitTest is Test {
 
     function testDistributeFuzz(uint256 distributionAmount, uint256[3] memory userBalances) public {
         // fuzz values in the plausibility range
-        vm.assume(distributionAmount < 10_000e18);
-        vm.assume(userBalances[0] < 1_000_000e18);
-        vm.assume(userBalances[1] < 1_000_000e18);
-        vm.assume(userBalances[2] < 1_000_000e18);
+        distributionAmount = bound(distributionAmount, 0, 10_000e18);
+        userBalances[0] = bound(userBalances[0], 0, 1_000_000e18);
+        userBalances[1] = bound(userBalances[1], 0, 1_000_000e18);
+        userBalances[2] = bound(userBalances[2], 0, 1_000_000e18);
 
         // initial state: alice & bobby rebasing, carol not rebasing
         token.mint(alice, userBalances[0]);
@@ -458,7 +558,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
 
         // check balances
         // max error is due to rounding down on number of shares & share price
-        uint256 maxError = 2;
+        uint256 maxError = 1;
         assertApproxEqAbs(token.balanceOf(alice), userBalances[0] + distributionAmount * userBalances[0] / rebasingSupplyBefore, maxError);
         assertApproxEqAbs(token.balanceOf(bobby), userBalances[1] + distributionAmount * userBalances[1] / rebasingSupplyBefore, maxError);
         assertEq(token.balanceOf(carol), userBalances[2]);
@@ -483,5 +583,213 @@ contract ERC20RebaseDistributorUnitTest is Test {
             assertApproxEqAbs(token.rebasingSupply(), rebasingSupplyBefore + distributionAmount * i, maxError);
             assertApproxEqAbs(token.nonRebasingSupply(), nonRebasingSupplyBefore, maxError);
         }
+    }
+
+    function testMintAfterSharePriceUpdate(uint256 input) public {
+        uint256 distributionAmount = bound(input, 1, 1e27);
+        token.mint(alice, 100e18);
+        token.mint(bobby, 55e18);
+        vm.prank(bobby);
+        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        assertEq(token.totalSupply(), 155e18);
+        assertEq(token.nonRebasingSupply(), 100e18);
+        assertEq(token.rebasingSupply(), 55e18);
+
+        // some distribution amounts will make the division of share price
+        // round down some balance, and force to enter into the 'minBalance' confition
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        token.distribute(distributionAmount);
+
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 100e18); // unchanged
+        assertGt(token.balanceOf(bobby), 55e18 + distributionAmount - 2); // at most 1 wei of round down
+        assertLt(token.balanceOf(bobby), 55e18 + distributionAmount + 1); // at most balance + distributed
+
+        token.mint(alice, 100e18);
+        assertEq(token.balanceOf(alice), 200e18);
+    }
+
+    function testReceiveTransferAfterSharePriceUpdate(uint256 input) public {
+        uint256 distributionAmount = bound(input, 1, 1e27);
+        token.mint(alice, 100e18);
+        token.mint(bobby, 55e18);
+        vm.prank(bobby);
+        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        assertEq(token.totalSupply(), 155e18);
+        assertEq(token.nonRebasingSupply(), 100e18);
+        assertEq(token.rebasingSupply(), 55e18);
+
+        // some distribution amounts will make the division of share price
+        // round down some balance, and force to enter into the 'minBalance' confition
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        token.distribute(distributionAmount);
+
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 100e18); // unchanged
+        assertGt(token.balanceOf(bobby), 55e18 + distributionAmount - 2); // at most 1 wei of round down
+        assertLt(token.balanceOf(bobby), 55e18 + distributionAmount + 1); // at most balance + distributed
+
+        vm.prank(bobby);
+        token.transfer(alice, 10e18);
+        assertEq(token.balanceOf(alice), 110e18);
+    }
+
+    function testCanExitRebaseAfterEnteringRebase(uint256 input) public {
+        uint256 distributionAmount = bound(input, 1, 1e27);
+        token.mint(alice, 100e18);
+        token.mint(bobby, 55e18);
+        vm.prank(bobby);
+        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        assertEq(token.totalSupply(), 155e18);
+        assertEq(token.nonRebasingSupply(), 100e18);
+        assertEq(token.rebasingSupply(), 55e18);
+
+        // some distribution amounts will make the division of share price
+        // round down some balance, and force to enter into the 'minBalance' confition
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        token.distribute(distributionAmount);
+
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 100e18); // unchanged
+        assertGt(token.balanceOf(bobby), 55e18 + distributionAmount - 2); // at most 1 wei of round down
+        assertLt(token.balanceOf(bobby), 55e18 + distributionAmount + 1); // at most balance + distributed
+
+        vm.prank(alice);
+        token.exitRebase();
+
+        assertEq(token.balanceOf(alice), 100e18);
+    }
+
+    function testCanTransferAfterEnteringRebase(uint256 input) public {
+        uint256 distributionAmount = bound(input, 1, 1e27);
+        token.mint(alice, 100e18);
+        token.mint(bobby, 55e18);
+        vm.prank(bobby);
+        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        assertEq(token.totalSupply(), 155e18);
+        assertEq(token.nonRebasingSupply(), 100e18);
+        assertEq(token.rebasingSupply(), 55e18);
+
+        // some distribution amounts will make the division of share price
+        // round down some balance, and force to enter into the 'minBalance' confition
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        token.distribute(distributionAmount);
+
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 100e18); // unchanged
+        assertGt(token.balanceOf(bobby), 55e18 + distributionAmount - 2); // at most 1 wei of round down
+        assertLt(token.balanceOf(bobby), 55e18 + distributionAmount + 1); // at most balance + distributed
+
+        vm.prank(alice);
+        token.transfer(address(this), 100e18);
+
+        assertEq(token.balanceOf(address(this)), 100e18);
+        assertEq(token.balanceOf(alice), 0);
+    }
+
+    function testCanTransferFromAfterEnteringRebase1(uint256 input) public {
+        uint256 distributionAmount = bound(input, 1, 1e27);
+        token.mint(alice, 100e18);
+        token.mint(bobby, 55e18);
+        vm.prank(bobby);
+        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        assertEq(token.totalSupply(), 155e18);
+        assertEq(token.nonRebasingSupply(), 100e18);
+        assertEq(token.rebasingSupply(), 55e18);
+
+        // some distribution amounts will make the division of share price
+        // round down some balance, and force to enter into the 'minBalance' confition
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        token.distribute(distributionAmount);
+
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 100e18); // unchanged
+        assertGt(token.balanceOf(bobby), 55e18 + distributionAmount - 2); // at most 1 wei of round down
+        assertLt(token.balanceOf(bobby), 55e18 + distributionAmount + 1); // at most balance + distributed
+
+        vm.prank(alice);
+        token.approve(bobby, 100e18);
+        vm.prank(bobby);
+        token.transferFrom(alice, bobby, 100e18);
+
+        assertApproxEqAbs(token.balanceOf(bobby), 55e18 + distributionAmount + 100e18, 1);
+        assertEq(token.balanceOf(alice), 0);
+    }
+
+    function testCanTransferFromAfterEnteringRebase2(uint256 input) public {
+        uint256 distributionAmount = bound(input, 1, 1e27);
+        token.mint(alice, 100e18);
+        token.mint(bobby, 55e18);
+        vm.prank(bobby);
+        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        assertEq(token.totalSupply(), 155e18);
+        assertEq(token.nonRebasingSupply(), 100e18);
+        assertEq(token.rebasingSupply(), 55e18);
+
+        // some distribution amounts will make the division of share price
+        // round down some balance, and force to enter into the 'minBalance' confition
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        token.distribute(distributionAmount);
+
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 100e18); // unchanged
+        assertGt(token.balanceOf(bobby), 55e18 + distributionAmount - 2); // at most 1 wei of round down
+        assertLt(token.balanceOf(bobby), 55e18 + distributionAmount + 1); // at most balance + distributed
+
+        token.mint(address(this), 100e18);
+        token.approve(alice, 100e18);
+        vm.prank(alice);
+        token.transferFrom(address(this), alice, 100e18);
+
+        assertEq(token.balanceOf(address(this)), 0);
+        assertEq(token.balanceOf(alice), 200e18);
+    }
+
+    function testCanBurnAfterEnteringRebase(uint256 input) public {
+        uint256 distributionAmount = bound(input, 1, 1e27);
+        token.mint(alice, 100e18);
+        token.mint(bobby, 55e18);
+        vm.prank(bobby);
+        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        assertEq(token.totalSupply(), 155e18);
+        assertEq(token.nonRebasingSupply(), 100e18);
+        assertEq(token.rebasingSupply(), 55e18);
+
+        // some distribution amounts will make the division of share price
+        // round down some balance, and force to enter into the 'minBalance' confition
+        token.mint(address(this), distributionAmount);
+        token.approve(address(token), distributionAmount);
+        token.distribute(distributionAmount);
+
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 100e18); // unchanged
+        assertGt(token.balanceOf(bobby), 55e18 + distributionAmount - 2); // at most 1 wei of round down
+        assertLt(token.balanceOf(bobby), 55e18 + distributionAmount + 1); // at most balance + distributed
+
+        vm.prank(alice);
+        token.burn(100e18);
+
+        assertEq(token.balanceOf(address(this)), 0);
+        assertEq(token.balanceOf(alice), 0);
     }
 }

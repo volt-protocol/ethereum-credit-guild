@@ -10,7 +10,7 @@ import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
-import {RateLimitedCreditMinter} from "@src/rate-limits/RateLimitedCreditMinter.sol";
+import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 contract AuctionHouseUnitTest is Test {
     address private governor = address(1);
@@ -23,7 +23,7 @@ contract AuctionHouseUnitTest is Test {
     CreditToken credit;
     GuildToken guild;
     MockERC20 collateral;
-    RateLimitedCreditMinter rlcm;
+    RateLimitedMinter rlcm;
     AuctionHouse auctionHouse;
     LendingTerm term;
 
@@ -49,9 +49,10 @@ contract AuctionHouseUnitTest is Test {
         collateral = new MockERC20();
         credit = new CreditToken(address(core));
         guild = new GuildToken(address(core), address(profitManager), address(credit));
-        rlcm = new RateLimitedCreditMinter(
+        rlcm = new RateLimitedMinter(
             address(core), /*_core*/
             address(credit), /*_token*/
+            CoreRoles.RATE_LIMITED_CREDIT_MINTER, /*_role*/
             type(uint256).max, /*_maxRateLimitPerSecond*/
             type(uint128).max, /*_rateLimitPerSecond*/
             type(uint128).max /*_bufferCap*/
