@@ -306,8 +306,11 @@ abstract contract ERC20Gauges is ERC20 {
     ) public virtual returns (uint256 newUserWeight) {
         // All operations will revert on underflow, protecting against bad inputs
         _decrementGaugeWeight(msg.sender, gauge, weight);
-        totalTypeWeight[gaugeType[gauge]] -= weight;
-        return _decrementUserAndGlobalWeights(msg.sender, weight);
+        if (!_deprecatedGauges.contains(gauge)) {
+            totalTypeWeight[gaugeType[gauge]] -= weight;
+            totalWeight -= weight;
+        }
+        return getUserWeight[msg.sender];
     }
 
     function _decrementGaugeWeight(
@@ -325,17 +328,9 @@ abstract contract ERC20Gauges is ERC20 {
 
         getGaugeWeight[gauge] -= weight;
 
+        getUserWeight[user] -= weight;
+
         emit DecrementGaugeWeight(user, gauge, weight);
-    }
-
-    function _decrementUserAndGlobalWeights(
-        address user,
-        uint256 weight
-    ) internal returns (uint256 newUserWeight) {
-        newUserWeight = getUserWeight[user] - weight;
-
-        getUserWeight[user] = newUserWeight;
-        totalWeight -= weight;
     }
 
     /** 
@@ -359,19 +354,18 @@ abstract contract ERC20Gauges is ERC20 {
         for (uint256 i = 0; i < size; ) {
             address gauge = gaugeList[i];
             uint256 weight = weights[i];
-            weightsSum += weight;
 
             _decrementGaugeWeight(msg.sender, gauge, weight);
-            totalTypeWeight[gaugeType[gauge]] -= weight;
+            if (!_deprecatedGauges.contains(gauge)) {
+                totalTypeWeight[gaugeType[gauge]] -= weight;
+                weightsSum += weight;
+            }
             unchecked {
                 ++i;
             }
         }
-        return
-            _decrementUserAndGlobalWeights(
-                msg.sender,
-                weightsSum
-            );
+        totalWeight -= weightsSum;
+        return getUserWeight[msg.sender];
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -420,8 +414,8 @@ abstract contract ERC20Gauges is ERC20 {
         // Check if some previous weight exists and re-add to total. Gauge and user weights are preserved.
         weight = getGaugeWeight[gauge];
         if (weight != 0) {
-            totalWeight += weight;
             totalTypeWeight[_type] += weight;
+            totalWeight += weight;
         }
 
         emit AddGauge(gauge, _type);
@@ -434,8 +428,8 @@ abstract contract ERC20Gauges is ERC20 {
         // Remove weight from total but keep the gauge and user weights in storage in case gauge is re-added.
         uint256 weight = getGaugeWeight[gauge];
         if (weight != 0) {
-            totalWeight -= weight;
             totalTypeWeight[gaugeType[gauge]] -= weight;
+            totalWeight -= weight;
         }
 
         emit RemoveGauge(gauge);
@@ -522,11 +516,6 @@ abstract contract ERC20Gauges is ERC20 {
             address gauge = gaugeList[i];
             uint256 userGaugeWeight = getUserGaugeWeight[user][gauge];
             if (userGaugeWeight != 0) {
-                // If the gauge is live (not deprecated), include its weight in the total to remove
-                if (!_deprecatedGauges.contains(gauge)) {
-                    totalFreed += userGaugeWeight;
-                    totalTypeWeight[gaugeType[gauge]] -= userGaugeWeight;
-                }
                 userFreed += userGaugeWeight;
                 _decrementGaugeWeight(
                     user,
@@ -534,13 +523,18 @@ abstract contract ERC20Gauges is ERC20 {
                     userGaugeWeight
                 );
 
+                // If the gauge is live (not deprecated), include its weight in the total to remove
+                if (!_deprecatedGauges.contains(gauge)) {
+                    totalTypeWeight[gaugeType[gauge]] -= userGaugeWeight;
+                    totalFreed += userGaugeWeight;
+                }
+
                 unchecked {
                     ++i;
                 }
             }
         }
 
-        getUserWeight[user] -= userFreed;
         totalWeight -= totalFreed;
     }
 }

@@ -55,11 +55,11 @@ contract Proposal_0 is Proposal {
             );
             RateLimitedMinter rateLimitedGuildMinter = new RateLimitedMinter(
                 addresses.mainnet("CORE"),
-                address(credit),
+                address(guild),
                 CoreRoles.RATE_LIMITED_GUILD_MINTER,
                 0, // maxRateLimitPerSecond
                 0, // rateLimitPerSecond
-                700_000_000e18 // bufferCap
+                1_000_000_000e18 // bufferCap
             );
             SurplusGuildMinter guildMinter = new SurplusGuildMinter(
                 addresses.mainnet("CORE"),
