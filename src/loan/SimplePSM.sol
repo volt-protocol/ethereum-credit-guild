@@ -35,9 +35,9 @@ contract SimplePSM is CoreRef {
     address public immutable credit;
 
     /// @notice reference to the peg token contract
-    address public immutable token;
+    address public immutable pegToken;
 
-    /// @notice multiplier for decimals correction, e.g. 1e12 for a token
+    /// @notice multiplier for decimals correction, e.g. 1e12 for a pegToken
     /// with 6 decimals (because CREDIT has 18 decimals)
     uint256 public immutable decimalCorrection;
 
@@ -51,14 +51,14 @@ contract SimplePSM is CoreRef {
         address _profitManager,
         address _rlcm,
         address _credit,
-        address _token
+        address _pegToken
     ) CoreRef(_core) {
         profitManager = _profitManager;
         rlcm = _rlcm;
         credit = _credit;
-        token = _token;
+        pegToken = _pegToken;
 
-        uint256 decimals = uint256(ERC20(_token).decimals());
+        uint256 decimals = uint256(ERC20(_pegToken).decimals());
         decimalCorrection = 10**(18 - decimals);
     }
 
@@ -81,7 +81,7 @@ contract SimplePSM is CoreRef {
         uint256 amountIn
     ) external whenNotPaused returns (uint256 amountOut) {
         amountOut = getMintAmountOut(amountIn);
-        ERC20(token).safeTransferFrom(msg.sender, address(this), amountIn);
+        ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
         RateLimitedMinter(rlcm).mint(to, amountOut);
         emit Mint(to, amountIn, amountOut);
     }
@@ -93,10 +93,9 @@ contract SimplePSM is CoreRef {
         uint256 amountIn
     ) external returns (uint256 amountOut) {
         amountOut = getRedeemAmountOut(amountIn);
-        CreditToken(credit).transferFrom(msg.sender, address(this), amountIn);
-        CreditToken(credit).burn(amountIn);
+        CreditToken(credit).burnFrom(msg.sender, amountIn);
         RateLimitedMinter(rlcm).replenishBuffer(amountIn);
-        ERC20(token).safeTransfer(to, amountOut);
+        ERC20(pegToken).safeTransfer(to, amountOut);
         emit Redeem(to, amountIn, amountOut);
     }
 }

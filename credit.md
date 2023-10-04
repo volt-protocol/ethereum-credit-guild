@@ -1,116 +1,186 @@
 # Ethereum Credit Guild
+> version 1
 
-Existing lending protocols like MakerDAO, Aave, and Compound rely on trusted oracles, and have "closed" governance processes where changes to parameters are forced through a central decision-making process and thus occur at a very limited rate.
+Dominant lending protocols like MakerDAO, Aave, and Compound rely on trusted oracles and have "closed" governance processes where changes to parameters are forced through a central decision-making process. They make honest majority assumptions, lack bad debt markdown mechanisms, and cannot scale to support a truly large diversity of lending terms.
 
-The Ethereum Credit Guild seeks to change that, building an incentive aligned system with checks and balances allowing saving and credit operations without relying on trusted third parties, and responding on demand to changes in the market through an open parameter control process.
+Recent attempts to address these problems involve isolated markets, helping to silo risk but fragmenting liquidity, as well as peer to peer markets, which remove trust assumptions but impose complexity upon users.
+
+The Ethereum Credit Guild seeks to strike a new middle ground between honest-majority systems and pure peer to peer lending. Incentive alignment and appropriate checks and balances allow saving and credit operations without relying on trusted third parties, and responding on demand to changes in the market through an open parameter control process. The system makes an **honest minority assumption**, and if you possess sufficient tokens to constitute that minority, requires no trust assumptions at all. Its failure mode is to safely end lending operations (with borrowers compensated for the inconvenience), and one or several new iterations can be started with their own ownership distributions.
+
+We hope to see a diversity of markets applying the same core principles as this the v1 market described in this document, as well as continued development of the core technology, especially in regards to scaling.
 
 - [Ethereum Credit Guild](#ethereum-credit-guild)
   - [Overview](#overview)
+    - [Quorum Actions](#quorum-actions)
+    - [Gauge Voting](#gauge-voting)
+    - [Borrowing and Liquidation](#borrowing-and-liquidation)
+    - [Saving](#saving)
+    - [GUILD Minting](#guild-minting)
   - [Mechanism Detail](#mechanism-detail)
     - [Lending Terms](#lending-terms)
-    - [Borrowing and Repayment](#borrowing-and-repayment)
-    - [Calling and Liquidating Loans](#calling-and-liquidating-loans)
+    - [GUILD Minting](#guild-minting-1)
     - [Handling Bad Debt](#handling-bad-debt)
-    - [Swaps](#swaps)
   - [Pricing Credit](#pricing-credit)
   - [Bootstrapping Credit](#bootstrapping-credit)
-    - [On Competitive Advantages in Lending](#on-competitive-advantages-in-lending)
-    - [Credit Genesis](#credit-genesis)
-  - [Comparisons](#comparisons)
-    - [Accounting](#accounting)
-    - [Rehypothecation](#rehypothecation)
     - [Governance](#governance)
 
 ## Overview
 
-There exist two kinds of tokens in the system, the stable credit tokens such as `CREDIT` (along with `credit_ETH`, `credit_UNI`, and so on for those who want to lend or short in these denominations) and the governance token `GUILD`.
+There exist two tokens in the system, the stable credit token `CREDIT` the governance token `GUILD`.
 
 The set of actions possible in the system are tightly constrained.
 
-* in several cases, a certain quorum of `GUILD` holders can perform a system action or make a parameter change, and another quorum veto it. Each also has its own duration:
+### Quorum Actions
+
+In several cases, a certain quorum of `GUILD` holders can perform a system action or make a parameter change, and another quorum veto it. Each action may have distinct quorums and voting periods or other delays.
+
   * adjust the global debt ceiling of any credit token
-  * whitelist a new collateral asset
   * approve a new `LendingTerm`, which defines collateral ratios, interest rates, etc
-  * adjust the split between `GUILD` stakers and the surplus buffer
+  * remove an existing `LendingTerm`
+  * adjust the split of interest between `GUILD` stakers, the `CREDIT` savings rate, and the surplus buffer
   * adjust the voting duration or quorum threshold for any of the above processes
 
-* at any time, an individual `GUILD` holder can vote in the gauges for a `LendingTerm`, increasing its credit limit by their pro rata share of the global debt ceiling of the relevant credit token
-  * this puts their `GUILD` tokens at risk of slashing in case of loss
-  * to unstake, the lending term must have unused credit, or they must first call the loan. This is to ensure no one can exit when they should be slashed
-  * upon unstaking, the credit limit is also reduced
-  * staked `GUILD` holders earn a share of the interest paid under the terms they vote for
+### Gauge Voting
+
+At any time, an individual `GUILD` holder can vote in the gauges for a `LendingTerm`, increasing its credit limit by their pro rata share of the global debt ceiling of the relevant credit token. This puts their `GUILD` tokens at risk of slashing in case of loss. If the slashed tokens are free floating `GUILD`, they are auctioned for `CREDIT`, with the proceeds sent to the surplus buffer. If they are `GUILD` minted against collateral, they are burnt, and a proportional share of the collateral is auctioned, with proceeds likewise sent to the surplus buffer. To unstake, the lending term must be below its debt ceiling, or they must first call one or more loans. This is to ensure no one can exit when they should be slashed, and a staker bears the cost of the call fee on the term they have voted for. Upon unstaking, the debt ceiling is also reduced. Staked `GUILD` holders earn a share of the interest paid under the terms they vote for. This split is determined by governance.
+
+### Borrowing and Liquidation
   
 * anyone can mint and borrow credit tokens from a `LendingTerm` with an available credit limit by providing the requisite collateral
 * anyone can repay anyone's debt at any time
-  * when the loan is repaid, part of the interest is paid to those those `GUILD` holders staking on that loan's terms, the rest along with the principal is burnt
+  * when the loan is repaid, the principal is burnt, part of the interest is paid to those those `GUILD` holders staking on that loan's terms, part to the surplus buffer, and part to the `CREDIT` savings rate
 * anyone can call a loan by paying the call fee (in the borrowed token, deducted from the borrower's debt and burnt)
-  * this initiates the call period during which the borrower is free to repay
+  * this initiates the call period during which the borrower is free to repay at a discount equal to the call fee
 * anyone can liquidate a loan after the call period has passed, repaying all or part of the debt and receiving all or part of the collateral depending on auction results
   * in the event of a partial repayment, the loss is deducted from the surplus buffer, with any further loss marked down for all holders of the relevant credit token
 
-And that's it! More detail on each of these can be found below.
+### Saving
+
+Anyone can subscribe to the `CREDIT` savings rate, allowing them to earn yield on their `CREDIT` distributed through a rebase mechanism. This means by default, smart contracts like Uniswap pairs which are not compatible with the savings rebase are excluded. `CREDIT` holders do not take on additional risk by subscribing to the savings rate vs holding raw `CREDIT`. A subscriber to the savings rate makes a bet that the loans are sound and interest rates appropriate. It is possible that losses will occur in excess of the surplus buffer, resulting in bad debt and a reduction in the unit price of `CREDIT`. While `CREDIT` holders can be passive with only an honest minority trust assumption in the `GUILD` holder set, they should still form a clear understanding of the risks they are exposed to in the collateral types and loan terms supported by the Ethereum Credit Guild.
+
+### GUILD Minting
+
+Anyone can deposit `CREDIT` to mint `GUILD` tokens. The minted tokens cannot be transfered to other users, and are kept in a wrapper contract that allows limited functionality. They can **only** be used to propose new lending terms and vote in the gauges. This allows outside participation of first loss capital, without making the system vulnerable to griefing by capital entering and vetoing all changes. If the `GUILD` minted against `CREDIT` is slashed while voting in a gauge, that `CREDIT` can be seized and used to repay bad debt.
 
 ## Mechanism Detail
 
 ### Lending Terms
 
-A `LendingTerm` is a blueprint for a loan. It is created permissionlessly through a `LendingTermFactory` and stores information such as:
+A [LendingTerm]([.src/loan/LendingTerm.sol](https://github.com/volt-protocol/ethereum-credit-guild/blob/main/src/loan/LendingTerm.sol)) is a blueprint for a loan. It has the following parameters:
+
+* maxDebtPerCollateralToken
+  * max number of debt tokens issued per collateral token
+* interestRate
+  * interest rate paid by the borrower, expressed as an APR
+* maxDelayBetweenPartialRepay
+  * maximum delay, in seconds, between partial debt repayments
+  * if set to 0, no periodic partial repayments are expected
+  * if a partial repayment is missed (delay has passed), the loan can be called without paying the call fee
+  * exists to support loans requiring periodic payments if desired, probably will be zero on most loans
+* minPartialRepayPercent
+  * minimum percent of the total debt (principal + interests) to repay during partial debt repayments
+  * as above, likely zero in most loans
+* callFee
+  * exists to prevent griefing of healthy borrower positions
+  * paid by the caller when loan is called
+  * expressed as percentage of the borrowAmount
+  * if borrower fully repays, or loan is revealed to be healthy at liquidation, caller forfeits the fee to borrower
+  * if loan is unhealthy at liquidation, or underwater, the caller is reimbursed the call fee
+* callPeriod
+  * the length of time between the loan being called and the start of the liquidation auction, during which the borrower has the chance to repay
+* ltvBuffer
+  * the threshold that determines whether a loan is healthy or unhealthy for the purposes of reimbursing the call fee
+* hardCap
+  * the maximum CREDIT mintable by this lending term, regardless of gauge allocations
+* liquidationPenalty
+
+Individual loans have the following structure:
 
 ```
-    // the address of the core contract which stores all system addresses
-    address public core;
-
-    address public collateralToken;
-    address public borrowToken;
-
-    // the number of credits borrowable per collateral token
-    // a token whose unit value is too small will need to be handled differently, TODO
-    uint256 public collateralRatio;
-
-    // expressed as a divisor of the loan
-    // an interestRate of 20 is equivalent to 5% interest (total debt / 20 per year paid in interest)
-    uint256 public interestRate;
-
-    // expressed as a divisor of the loan
-    // the call fee is deducted from the borrower's debt if the loan is called
-    // this protects the borrower from griefing
-    uint256 public callFee;
-
-    // how many seconds must pass between when the loan is called and the first bid can be made in the auction
-    // a longer call period is better for the borrower, and more dangerous for the lender
-    uint256 public callPeriod;
-
-    // the unused debt ceiling of this lending term
-    // denominated in borrowToken
-    uint256 public availableCredit;
-
-    // whether bad debt has accured resulting in slashing for voters
-    bool public isSlashable;
+    struct Loan {
+        address borrower;
+        uint256 borrowAmount;
+        uint256 collateralAmount;
+        address caller; // a caller of 0 indicates that the loan has not been called
+        uint256 callTime; // a call time of 0 indicates that the loan has not been called
+        uint256 originationTime; // the time the loan was initiated
+        uint256 closeTime; // the time the loan was closed (repaid or liquidated)
+    }
 ```
 
-`GUILD` holders can propose to whitelist a new term, and there is a period during which this can be vetoed.
+Using a lending term, a borrower can do the following:
 
-If not denied during the dispute window, any `GUILD` holder can stake on that loan term to increase its credit limit by their pro rata share of the global debt ceiling for that borrow token.
+```
+* borrow(address borrower, uint256 borrowAmount, uint256 collateralAmount) returns (bytes32 loanId) {}
+* borrowbySig(address borrower, uint256 borrowAmount, uint256 collateralAmount, uint256 deadline, Signature calldata sig) returns (bytes32 loanId) {}
+* borrowWithPermit(uint256 borrowAmount, uint256 collateralAmount, uint256 deadline, Signature calldata sig) returns (bytes32 loanId) {}
+* addCollateral(bytes32 loanId, uint256 collateralToAdd) {}
+* addCollateralBySig(address borrower, bytes32 loanId, uint256 collateralToAdd, uint256 deadline, Signature calldata sig) {}
+* addCollateralWithPermit(bytes32 loanId, uint256 collateralToAdd, uint256 deadline, Signature calldata sig) {}
+* addCollateralBySigWithPermit(address borrower, bytes32 loanId, uint256 collateralToAdd, uint256 deadline, Signature calldata addCollateralSig, Signature calldata permitSig) {}
+* partialRepay(bytes32 loanId, uint256 debtToRepay) {}
+* partialRepayBySig(address repayer, bytes32 loanId, uint256 debtToRepay, uint256 deadline, Signature calldata sig) {}
+* partialRepayWithPermit(bytes32 loanId, uint256 debtToRepay, uint256 deadline, Signature calldata sig) {}
+* partialRepayBySigWithPermit(address repayer, bytes32 loanId, uint256 debtToRepay, uint256 deadline, Signature calldata repaySig, Signature calldata permitSig) {}
+* repay(bytes32 loanId) external {}
+* repayBySig(address repayer, bytes32 loanId, uint256 deadline, Signature calldata sig) {}
+* repayWithPermit(bytes32 loanId, uint256 maxDebt, uint256 deadline, Signature calldata sig) {}
+* repayBySigWithPermit(address repayer, bytes32 loanId, uint256 maxDebt, uint256 deadline, Signature calldata repaySig, Signature calldata permitSig) {}
+```
 
--------------
+The bySig and bySigWithPermit variants of each function allow maximum convenience, for example, one could set up conditional orders to open or unwind borrowing positions based on custom data feeds.
 
-### Borrowing and Repayment
+Besides the borrower, others will be interested in calling the following functions. Note the three possible results of a loan once called.
 
-To initiate a loan, a user must find an acceptable set of lending terms and post collateral. The collateral tokens are held in the associated `LendingTerm` contract while the loan is active.
+**Healthy**: above the LTV buffer, the borrower is compensated with the call fee whether they choose to repay or are liquidated by auction
 
-A given lending term mints a fixed number of credits per collateral token, until the available credit is used up. When a user repays their loan, they must repay a greater amount of credits than they borrowed due to the accrued interest. Of the repaid credits, the entire principal is burnt, while the interest is partially burnt, and partially distributed to the gauge contract where it is claimable by the GUILD holders voting for that loan. The portion of the interest burnt is a global governable parameter. Anyone can repay a loan, though only the user can withdraw their collateral.
+**Unhealthy**: below the LTV buffer, the caller is reimbursed the call fee, and the borrower pays the liquidation penalty
 
---------------
+**Underwater**: below the outstanding debt, the caller is reimbursed the call fee, and gauge voters can be slashed
 
-### Calling and Liquidating Loans
+```
+/// the borrower has callPeriod to repay before the collateral can be seize()'d and sent to auction
+* call(bytes32 loanId) {}
+* callMany(bytes32[] memory loanIds) {}
+* callManyBySig(address caller, bytes32[] memory loanIds, uint256 deadline, Signature calldata sig) {}
+* callManyWithPermit(bytes32[] memory loanIds, uint256 deadline, Signature calldata sig) {}
+* callManyBySigWithPermit(address caller, bytes32[] memory loanIds, uint256 deadline, Signature calldata callSig, Signature calldata permitSig) {}
+* seize(bytes32 loanId) {}
+* seizeMany(bytes32[] memory loanIds) {}
 
-Anyone can call a loan issued by the protocol by paying the call fee in credits. The call fee is deducted from the borrower's debt and burnt. There is a period during which the borrower can repay but no one can bid for their collateral known as the `callPeriod`. After this, if the borrower has not repaid, anyone can trigger liquidation by sending the borrower's collateral to the `auctionHouse`. A liquidation auction occurs to repay as much as possible of the borrower's debt by selling off as little as possible of the collateral position. If the auction reveals the loan to be insolvent, the one who triggered the auction is rewarded by being reimbursed the call fee if one was paid plus a liquidation reward. If the loan was insolvent, any `GUILD` holders voting for that loan's terms have their balances slashed.
+/// an emergency function that can be used in the event collateral is frozen and cannot be sent to the auction house, to mark down bad debt
+/// namely, if a centralized stablecoin freezing the lending term address, it would otherwise freee the system
+* forgive(bytes32 loanId) {}
+/// this allows governance to migrate to a new auction house
+/// while it may change the results of a liquidation due to its parameters, the call fee and call period are immutable once a loan is originated
+* setAuctionHouse(address _newValue) onlyCoreRole(CoreRoles.GOVERNOR) {}
+/// adjust the max debt ceiling (actual debt ceiling is whichever is lower of the gauge vote and the max) up or down
+* setHardCap(uint256 _newValue) onlyCoreRole(CoreRoles.TERM_HARDCAP) {}
+```
 
-The liquidation auction is a Dutch auction where a gradually larger portion of the borrower's collateral is offered in exchange for repaying their debt. If the borrower's entire collateral is not enough to pay their debt, a partial payment is accepted.
+Governable functions like `forgive()` and `setAuctionHouse` will be vetoable by a GUILD holder minority, except in special cases, such as where a periphery contract can detect that a centralized stablecoin blacklisted a lending term, and can then trustlessly call `forgive()`. 
 
-The current MVP auction house has a fixed duration for auctions, but this might also be a parameter in the `CreditLendingTerm`.
+### GUILD Minting
 
--------------
+The objective for allowing GUILD minting against collateral is for `GUILD` holders to be able to define how much external first loss capital is desired, and how much yield will be paid to this capital, and to allow external participants in governance without a need to buy GUILD tokens on the market, which restricts the potential participant pool.
+
+Allowing `CREDIT` to be used as the primary collateral to mint `GUILD` makes the system self-governing by its users, which is especially desirable in the early system when we can expect a relatively sophisticated user base. Over time, the `GUILD` holder base will diversify and the `CREDIT` supply will grow to include many more passive users, so there may be less need to input outside first loss capital, especially if a healthy surplus buffer is accumulated.
+
+```
+/// usable by a quorum of GUILD holders to allow a certain collateral asset to mint GUILD at a given rate and ratio
+* addMintingTerm(address collateralToken, uint256 mintRatio, uint256 interestRate) returns (bytes32 termId) {}
+/// usable by a quorum of GUILD to remove a certain minting term for GUILD
+* removeMintingTerm(bytes32 termId) {}
+/// provide collateral and mint GUILD, vote in a gauge
+* openPosition(bytes32 termId, uint256 amountToMint, address gaugeToVote) returns (bytes32 loanId) {}
+/// withdraw vote from gauge, repay loan, withdraw collateral
+* closePosition(bytes32 loanId) {}
+/// change gauge vote
+* vote(address gaugeToVote) {}
+/// if a user is voting for a gauge that has been slashed, check how much their loss is, seize a proportional amount of their collateral, and auction it for GUILD (the seized GUILD has already been auctioned to repay the bad debt)
+/// their debt is also reduced accordingly
+* seizeCollateral(bytes32 loanId) {}
+```
 
 ### Handling Bad Debt
 
@@ -118,119 +188,36 @@ Existing decentralized finance protocols like Aave, Compound, or MakerDAO lack m
 
 We mitigate this risk by eliminating atomic, on demand withdrawals, in favor of the mechanic of callable loans. Most loans will have a call period during which the borrower can repay. A loan may have a call period of zero to simulate the function of a PSM or Compound pool, but since liquidation occurs by auction, it will still set a market price instead of allowing some users to redeem above peg after a loss has occurred.
 
-This alone does not solve bank run risk, as when partial repayment is accepted in a liquidation auction, there are more credits in circulation compared to the amount of credit owed as debt, and so the 'leftover' credits are worthless if all the loans are called or repaid. This is addressed by separately tracking the circulating credit supply, and the total credits issued as debt. When the ratio is not 1:1, the amount of credits minted against collateral or required to repay debts is adjusted accordingly, such that if the entire protocol is unwound, every credit must be used to repay the outstanding loans, and more credits can be issued against the same collateral proportional to the bad debt. The above is true for each credit denomination, meaning bad debt in one denomination will be transparently marked down and legibile throughout the protocol as a whole.
+This alone does not solve bank run risk, as when partial repayment is accepted in a liquidation auction, there are more credits in circulation compared to the amount of credit owed as debt, and so the 'leftover' credits are worthless if all the loans are called or repaid.
 
--------------
+In the case where the liquidation of collateral does not cover the full `CREDIT` debt, the `CREDIT` token value is marked down proportionately (2% bad debt = 2% target `CREDIT` value decrease), and all remaining debt positions are marked up proportionately, so that the value of healthy debt positions remain constant. This is achieved by allowing more `CREDIT` to be minted from the same collateral in the existing lending terms, which should create arbitrage opportunities to decrease the price of `CREDIT` in secondary markets.
 
-### Swaps
+Once bad debt is realized, stakers in the associated gauge can be slashed, and their tokens (or the underlying collateral) auctioned to recover as much value as possible for the lenders. Any recovered value will be claimable by those affected by the bad debt from the surplus buffer. The CREDIT token keeps track of balance timestamps when transfers occur, making it possible to trustlessly verify a user's balance at a point in the past, and for them to claim a distribution of auction proceeds.
 
-A "swap" is a special variant on a `LendingTerm` that has the following properties:
-
-* `callFee == 0`
-* `callPeriod == 0`
-* `interestRate == 0`
-
-A swap is the "callable loan" replacement for a Peg Stability Module as seen in MakerDAO, Fei Protocol, or Volt Protocol. The main difference is that while minting of the "borrow token" is on demand, redemption is by auction, the same as any other callable loan. As discussed [above](#handling-bad-debt), this is to prevent runs in the event of bad debt, as well as adverse selection in the event that a collateral rises in price after the swap terms are set.
-
-Unlike a regular loan, after the auction is complete, any remaining collateral is retained by the protocol. `GUILD` holders can vote to allocate exogenous assets obtained through swaps into new swap terms, or allocate credit limits as in the usual callable loans mechanism.
+This asynchronous process is necessary because if 
 
 -------------
 
 ## Pricing Credit
 
-The behavior of the each credit token will depend on the nature of the loan set that backs it, user interest in CREDIT, and the overall market conditions. There is no foolproof way for software to detect the quality of a collateral token or know what the market interest rate is. These inputs must be provided by humans. The goal of the Ethereum Credit Guild is to allow for market based processes with checks and balances to allow users to enagage in fair and productive lending operations without the need for trusted third parties. If the system is otherwise in equilibrium (no change in demand to hold or borrow credits, or to hold GUILD) then the value of credits will tend to increase over time as the surplus buffer accumulates credits. In reality, the current value of a credit will fluctuate on the market based on net buy and sell demand, as well as changes in the overall market risk and interest environment.
+The CREDIT token's "target price" is set implicitly by the lending terms. If the CREDIT supply is backed on average by loans with a 10% overcollateralization and a 0.50% call fee, with the lowest available collateralization at 0.50% using stablecoin collateral, then the price of CREDIT is unlikely to go outside a range of +-0.50% by more than a minimum needed to incentivize arbitrage. CREDIT will have a soft starting target price of $100, to make clear that it is not a $1 stablecoin, but a stable debt unit with trust minimized governance that allows holders to earn interest from borrowers.
 
-The architecture of the Ethereum Credit Guild can support arbitrary liquidity and yield properties. We can envision other versions with lower liquidity and higher yield. We expect the primary CREDIT token to have the same goals as VOLT:
-* high liquidity, such that a large portion of the supply can be redeemed in the span of a week
-* yield bearing equal to or better than off chain money markets
+The price to obtain liquidity against CREDIT in a given size is calculated by adding up available loans in order from lowest to highest call fee until the desired size is reached. The current market price of CREDIT may trade at a premium when there are net inflows, enough to incentivize minting, or at a small discount based on the available interest rates and cost of calling loans.
 
-Likewise, the various denominations like `credit_ETH` or `credit_OP` should seek to preserve robust liquidity and minimal risk, while opening new and better lending and borrowing opportunities onchain.
-
-The recent USDC peg stability has made it clear that there is no such thing as a perfectly fungible, instantly portable dollar. All stablecoins, bank deposits, Paypal balances, etc have some constraints in their fungibility and transferability under certain conditions. All of these are synthetic assets, for no bank deposit is fully backed by cash. 
-
-A traditional Peg Stability Module is possible in the architecture of CREDIT we've laid out here -- you just need a `LendingTerm` allowing minting of CREDIT 1:1 with USDC at 0% interest, a call fee of 0, and a call period of 0. This is not the desired implementation, however, instead we prefer a potentially liquidatable vault that allows for an upward drift in credit price representing the accured yield: "mint 1 credit per 1.02 USDC at 4% interest". Arbitrage does not need to be risk free, in fact, it cannot be -- if the arbitrageur is not bearing this risk, the protocol and thus the stablecoin holders are. Maintaining a small interest rate and overcollateralization on arbitrage vaults will mean sacrificing a little bit of the upward peg stability the PSM offers, in exchange for ensuring an incentive exist for new loans to be opened against productive collateral The key difference between this mechanism and a Maker-style PSM is that it must still undergo a "liquidation auction" to be redeemed against, meaning it is resilient to bank runs, since a market pricing occurs where multiple parties will have a fair chance to bid.
+We plan to release open source models for monitoring price and liquidity conditions, and also greatly appreciate contributions along these lines.
 
 -------------
 
 ## Bootstrapping Credit
 
-At first, CREDIT will have no liquidity, so it will be difficult for borrowers to use. The members of the Ethereum Credit Guild, such as the core contributors at the Electric Development Co and La Tribu, as well as early investors and advisors who hold the GUILD token, will engage in bootstrapping demand for CREDIT according to their ability and interests. The Electric Development Co will provide liquidity for CREDIT on AMMs to help bootstrap its utility and provide a smooth experience for early borrowers. This will likely take the form of USDC/CREDIT liquidity to provide the lowest cost experience for borrowers obtaining leverage using the Ethereum Credit Guild.
+CREDIT will be launched under a guarded beta with a low debt ceiling. Participants can engage based on their own interest and at their own risk. The Electric Development Co will provide liquidity for CREDIT on AMMs to make the system usable for early borrowers. Launch liquidity will be at the soft target price of $100 per CREDIT, any further liquidity added will be at the current market price. Provision of liquidity by the Electric Development Co is not guaranteed to last over any duration, and borrowers are responsible for any costs they incur opening or closing positions.
 
-GUILD will be distributed on an ongoing basis to CREDIT holders and minters, encouraging decentralization of the supply and an engaged owner-user base in the early period. GUILD will be nontransferable upon protocol launch, discouraging purely speculative yield farming and the growth of an unsustainably large capital base.
+Especially in the early period, supply/demand mismatches in AMM liquidity are to be expected. The protocol supports signed messages, and the open source tooling associated with the ECG will include capacity for swap or borrow requests.
 
-### On Competitive Advantages in Lending
-
-One of the goals of the Ethereum Credit Guild's lending model is to permit more aggressive leverage than pooled lending models generally support against top quality assets. Of all the on chain lending markets, Liquity offers (subject to certain conditions) the highest LTV against ETH at 90.91%, or a maximum acheivable leverage of 11x. Flux Finance, the lending market created by Ondo to support its tokenized securities like OUSG, offers only a 92% collateral factor for OUSG, a short term US treasury ETF, and rates in the market for stablecoins have at times exceeded the underlying treasury yield. Compared to Binance's 20x leverage on ETH, or the 98% collateral factor obtainable on Treasury securities in traditional repo markets[^1], it's tricky to see these venues competing for the business of professional market makers and traders in "offchain" securities. For many traders, whether directional or arbitrage, the amount of leverage available is more important than the interest rate, since the duration of the trade is short.
-
-A lower latency process for governance can enable more efficient lending operations. Onchain operations are constrained by the blocktime, but can do a lot better than traditional governance delays in tuning collateral ratios and interest rates. For low volatility assets like OUSG, the main issue is managing liquidity (as even the best collateral has a varying shiftability), not the risk of a drop in the value of the collateral. In this case, borrowers can be allowed very high leverage, but interest rates should also be very high, so that both CREDIT holders and borrowers can earn an efficient return. For high volatility assets like ETH, one can clearly envision a daily adjustment in available lending terms outperform a static collateral requirement and trusted oracle feed.
-
-### Credit Genesis
-
-Let's walk through what the very beginning of the protocol will look like.
-
-The initial set of GUILD holders will include the Electric Development Company, other core contributors, investors, advisors, and those who earned GUILD/VCON through the Volt Protocol v1 airdrop. These users must reach consensus on an initial set of loan terms (or make however many forks of the code they like!). The larger the size of the protocol, the more often it makes sense to rebalance loan terms from a gas perspective. Therefore, the starting loan terms are expected to be more conservative and (and in need of less frequent updates) than those at scale. **The initial set of loan terms must be able to offer a better deal to some borrower than they can get elsewhere**. At the same time, the early loan set could facilitate efficient liquidity provision.
-
-For example, this set of loan terms might look like:
-
-| Collateral Token      | CREDIT mintable per token |  Interest Rate (% Annual)  |   Call Fee (bips)  |
-| ----------- | ----------- | ----------- | -----------|
-| ETH      | 1400       | 4  |  15 |
-| rETH | 800 | 3.5 | 25 | 
-| cbETH | 800 | 3.5 | 25 |
-| OUSG  | 97  | 4 | 10 |
-| stDAI | 99 | 1 | 5 |
-| USDC | 98 | 0 | 5 |
-| Univ2CREDITUSDC | .9 | 0 | 1 |
-| Univ2CREDITDAI | .9 | 0 | 1 |
-
-Market makers in the early system can take a highly leveraged exposure to CREDIT/USDC or CREDIT/DAI Uniswap v2 LP or other AMM pairing without paying an interest cost. It's possible an incentivized pair could generate profits for the system. While not necessarily highly efficient, providing AMM liquitity is a convenient and familiar way for those bootstrapping the system to provide liquidity and its early users to access it.
-
-In a mature system, it's unlikely GUILD holders will want to vote for zero-interest lending terms, when they could instead vote for a profitable loan. Early on they are likely to do so because they themselves are likely to be bootstrapping CREDIT liquidity.
-
-A few users begin to buy CREDIT on the AMM to start earning GUILD rewards (at first, with no loans issued, it's expected price increase or native yield is zero), pushing its price slightly up. This convinces the first 'real' borrower that it is a good time to take action. They deposit OUSG, which is yielding 4.5%, and borrow CREDIT at 4%, while selling enough CREDIT to bring its price back down to the starting level.
-
-Over time, as borrowers pay interest, the CREDIT price starts to drift up. The available lending terms are adjusted, and the bootstrappers close their AMM positions and repay their loans. Growing demand for CREDIT at this point is met mainly through borrowing against productive collateral like OUSG or stETH. When demand to repay loans or hold CREDIT spikes, users can still arbitrage against stable value collateral, but they must pay sufficient interest to justify GUILD holders voting for those loan terms.
-
-|  Collateral Token      |  CREDIT mintable per token |  Interest Rate (% Annual)  |   Call Fee (bips)  |
-| ----------- | ----------- | ----------- | -----------|
-| ETH      | 2000       | 6  |  10 |
-| stETH | 1700 | 5 | 25 | 
-| rETH | 1700 | 5 | 25 | 
-| cbETH | 1700 | 5 | 25 |
-| OUSG  | 95  | 4 | 10 |
-| stDAI | 96 | 3 | 5 |
-| USDC | 96 | 3 | 5 |
-| Univ2CREDITUSDC | .8 | 2 | 1 |
-| Univ2CREDITDAI | .8 | 2 | 1 |
-
-## Comparisons
-> how credit compares to other lending protocols
-
-### Accounting
-
-There are a few distinguishing features we can look to in classifying "[protocols for loanable funds](https://arxiv.org/abs/2006.13922)". First is the question of how the protocol's debt accounting works. Some have shares with a hard peg to an external reference asset (1:1 mint and redeem with no fee) like Compound cTokens or Aave aTokens. We can call these protocols **deposit receipt issuers**, since their deposits are like bank deposits, ostensibly redeemable on demand and relying on interest rate management and a reserves cushion to maintain this property. The advantage of this model is that it is easy for lenders and borrowers to use, while the disadvantage is that it is vulnerable to runs or adverse selection when one or more of the backing assets lose value. Some protocols like Liquity or Reflexer issue a native debt asset, with the borrower responsible for selling this asset and then rebuying debt units to close the position. We can call these protocols **debt token issuers**. The advantage of this model is that the market can price the native debt asset, so it is resilient to runs or adverse selection. The disadvantage is that the native debt asset may go above peg if the demand to repay loans is high vs the demand to open new borrowing positions. There are also many hybrids between these poles, like MakerDAO. Hybrids will behave like deposit receipts so long as their "debt ceiling" has not been reached, whereupon behavior reverts to that of a debt token. This was demonstrated by DAI price behavior during the recent USDC depeg -- DAI price tracked USDC until the PSM filled up, then it went slighly above USDC price, reflecting partial backing by overcollateralized positions and the MKR backstop. While MakerDAO made it out okay this time, in a counterfactual world where USDC took a loss, some DAI holders would have been able to exit at no loss early through the GUSD and USDP PSMs, and this loss will be redistributed to those who are too slow or to the MKR holders.
-
-Our view is that it is **impossible** to create a synthetic asset which holds a perfect peg to its reference asset. There are circumstances in which any mechanism intended to maintain liquidity of the deposit receipt will prove insufficient. What's more, a deposit/redeem or PSM mechanism which has a lower latency than the liquidation or asset pricing system (in the case of a PSM using an oracle price) brings risk of runs. All issuance and redemption should be through a uniform mechanism that ensures:
-1) all issuance occurs through overcollateralized loans which can be liquidated or called to ensure solvency or meet redemption demand
-2) all redemption occurs either through repayment by the borowers, or through an auction system such that the fair price of liquidity is paid and slower or less sophisticated actors are not penalized in an emergency
-3) there is no discrepancy between the face value of the deposits or credit tokens, and the total debt within the system (fair markdown of bad debt)
-
-These properties greatly mitigate the incentive to conduct runs, and help to protect passive holders of the debt asset.
-
-### Rehypothecation
-
-Aave and Compound let people borrow the collateral assets deposited into the protocol, and issue deposit receipts for each (cETH, aDAI, etc) while Maker, Liquity, et al do not, and only issue a single debt asset (DAI, LUSD). The Ethereum Credit Guild exists in the middle, where spot collateral assets are not borrowable, and there is no deposit receipt token for collateral, but synthetic credit tokens can be borrowed in a variety of denominations, each against a variety of collateral assets. This allows users to obtain both long and short exposure to any asset, while mitigating some of the weaknesses of the cToken/aToken model that is vulnerable to bank runs.
-
-Whenever holder demand to sell or redeem exceeds borrower demand to close their positions, and especially in the case that bad debt arises, a pricing mechanism is necessary to prevent race conditions in which some users can exit at full value, while others are stuck. If a user wants liquidity, they can sell the debt token, transmitting a **price signal** in the market to other potential holders of the debt token (who may be willing to buy more debt tokens at a further discount) as well as to borrowers, who may be willing to close their position and reduce the token supply if sufficiently incentivized to do so by a small "depeg" which is the price of liquidity.
-
-Additionally, a separation of concerns between debt assets and collateral assets gives the protocol the ability to mark down bad debt and continue functioning smoothly. For example, in MakerDAO, if 20% of the PCV was effectively lost through a real world asset that became tied up in court for years, there would be a run on the PSM, and it would be difficult to recover in the resulting state. In the Ethereum Credit Guild, a 20% loss in PCV for `credit_ETH` tokens would result in a markdown of all credits in that denomination, such that if before 1 ETH could mint 1 `credit_ETH`, now, 0.8 ETH can mint 1 `credit_ETH`. Likewise, if a user had borrowed 1000 `credit_ETH` before the loss, they now must repay 1200 `credit_ETH`. Because `credit_ETH` was devalued, borrowers have no incentive to close their loans early, and the loss is fairly distributed across all the holders.
+GUILD will be distributed on an ongoing basis to CREDIT holders and minters, encouraging decentralization of the supply and an engaged owner-user base in the early period. GUILD will be nontransferable upon protocol launch, and only usable for voting and gauge staking, discouraging purely speculative yield farming and the growth of an unsustainably large capital base.
 
 ### Governance
 
-There are no arbitrary code changes possible in the Ethereum Credit Guild system after mainnet launch. Instead, governance is build around explicitly defined processes such as the onboarding and offboarding of lending terms, approving new collateral or debt denominations, or adjusting system parameters such as the surplus buffer fee.
+During the guarded beta, governance will retain emergency powers intended to respond against any unintended system behavior or vulnerability. After the beta period, governance powers will be burnt and no further arbitrary code changes possible. Instead, the system is build around explicitly defined processes such as the onboarding and offboarding of lending terms, or adjusting system parameters such as the surplus buffer fee. 
 
-Some decentralized finance protocol are "open", in the sense that anyone can set their preferred terms (Uniswap LPs, Ajna Finance lending ranges), while others are "closed", in that only a body of tokenholders or a select committee can make decisions.
-
-We recognize that setting loan terms is a more specialized activity than saving, or choosing which yield bearing asset to hold. The protocol attempts to strike a balance through an optimistic governance model, where a relatively small quorum of GUILD is required to onboard new lending terms, collateral assets, and borrow denominations, but this is also vetoable. This means that outsiders have a reasonably low hurdle to making their voice heard (ie, getting just one or two major delegates to support their proposal) while large stakeholders can ensure malicious proposals do not pass. In the event of sufficient disagreement, the system should bias towards safety and stasis, and disgruntled parties who wish for change can exit. Forking is not just expected, but encouraged.
-
-[^1]: Primer: Money Market Funds and the Repo Market. Viktoria Baklanova, Isaac Kuznits, Trevor Tatum. https://www.sec.gov/files/mmfs-and-the-repo-market-021721.pdf
+We recognize that setting loan terms is a more specialized activity than saving, or choosing which yield bearing asset to hold. The protocol attempts to strike a balance through an optimistic governance model, where a relatively small quorum of GUILD is empowered to take system actions but this is also vetoable. This means that outsiders have a reasonably low hurdle to making their voice heard (ie, getting just one or two major delegates to support their proposal) while large stakeholders can ensure malicious proposals do not pass. In the event of sufficient disagreement, the system should bias towards safety and stasis, and disgruntled parties who wish for change can exit. Forking is not just expected, but encouraged.
