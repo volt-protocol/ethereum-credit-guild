@@ -57,6 +57,7 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
     }
 
     /// @notice set the rate limit per second
+    /// @param newRateLimitPerSecond the new rate limit per second of the contract
     function setRateLimitPerSecond(
         uint128 newRateLimitPerSecond
     ) external virtual onlyCoreRole(CoreRoles.GOVERNOR) {
@@ -70,6 +71,8 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
     }
 
     /// @notice set the buffer cap
+    /// TODO if buffer > bufferCap, buffer = bufferCap
+    /// @param newBufferCap new buffer cap to set
     function setBufferCap(
         uint128 newBufferCap
     ) external virtual onlyCoreRole(CoreRoles.GOVERNOR) {
@@ -87,6 +90,7 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
     /// @notice the method that enforces the rate limit.
     /// Decreases buffer by "amount".
     /// If buffer is <= amount, revert
+    /// @param amount to decrease buffer by
     function _depleteBuffer(uint256 amount) internal {
         uint256 newBuffer = buffer();
 
@@ -131,6 +135,7 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
         emit BufferReplenished(amount, bufferStored);
     }
 
+    /// @param newRateLimitPerSecond the new rate limit per second of the contract
     function _setRateLimitPerSecond(uint128 newRateLimitPerSecond) internal {
         uint256 oldRateLimitPerSecond = rateLimitPerSecond;
         rateLimitPerSecond = newRateLimitPerSecond;
@@ -141,6 +146,7 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
         );
     }
 
+    /// @param newBufferCap new buffer cap to set
     function _setBufferCap(uint128 newBufferCap) internal {
         _updateBufferStored();
 
