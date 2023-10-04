@@ -34,10 +34,7 @@ contract LendingTermSignaturesUnitTest is Test {
     uint256 constant _CREDIT_PER_COLLATERAL_TOKEN = 2000e18; // 2000, same decimals
     uint256 constant _INTEREST_RATE = 0.10e18; // 10% APR
     uint256 constant _OPENING_FEE = 0.02e18; // 2%
-    uint256 constant _CALL_FEE = 0.05e18; // 5%
-    uint256 constant _CALL_PERIOD = 1 hours;
     uint256 constant _HARDCAP = 20_000_000e18;
-    uint256 constant _LTV_BUFFER = 0.20e18; // 20%
 
     function setUp() public {
         vm.warp(1679067867);
@@ -59,8 +56,7 @@ contract LendingTermSignaturesUnitTest is Test {
         auctionHouse = new AuctionHouse(
             address(core),
             650,
-            1800,
-            0.1e18
+            1800
         );
         term = new LendingTerm(
             address(core), /*_core*/
@@ -76,10 +72,7 @@ contract LendingTermSignaturesUnitTest is Test {
                 maxDelayBetweenPartialRepay: 0,
                 minPartialRepayPercent: 0,
                 openingFee: _OPENING_FEE,
-                callFee: _CALL_FEE,
-                callPeriod: _CALL_PERIOD,
-                hardCap: _HARDCAP,
-                ltvBuffer: _LTV_BUFFER
+                hardCap: _HARDCAP
             })
         );
         profitManager.initializeReferences(address(credit), address(guild));
@@ -114,10 +107,6 @@ contract LendingTermSignaturesUnitTest is Test {
         vm.label(address(term), "term");
         vm.label(alice, "alice");
         vm.label(bob, "bob");
-    }
-
-    function testInitialState() public {
-        assertEq(term.interestRate(), _INTEREST_RATE);
     }
 
     function testBorrowWithPermit() public {
@@ -169,7 +158,7 @@ contract LendingTermSignaturesUnitTest is Test {
         assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
         assertEq(term.getLoan(loanId).caller, address(0));
         assertEq(term.getLoan(loanId).callTime, 0);
-        assertEq(term.getLoan(loanId).originationTime, block.timestamp);
+        assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
         assertEq(term.getLoan(loanId).closeTime, 0);
 
         // nonce is consumed, cannot broadcast again
@@ -233,7 +222,7 @@ contract LendingTermSignaturesUnitTest is Test {
         assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
         assertEq(term.getLoan(loanId).caller, address(0));
         assertEq(term.getLoan(loanId).callTime, 0);
-        assertEq(term.getLoan(loanId).originationTime, block.timestamp);
+        assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
         assertEq(term.getLoan(loanId).closeTime, 0);
 
         // nonce is consumed, cannot broadcast again
@@ -310,7 +299,7 @@ contract LendingTermSignaturesUnitTest is Test {
         assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
         assertEq(term.getLoan(loanId).caller, address(0));
         assertEq(term.getLoan(loanId).callTime, 0);
-        assertEq(term.getLoan(loanId).originationTime, block.timestamp);
+        assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
         assertEq(term.getLoan(loanId).closeTime, 0);
 
         // nonce is consumed, cannot broadcast again
@@ -527,53 +516,5 @@ contract LendingTermSignaturesUnitTest is Test {
 
         // check not all credit is pulled but just the debt amount
         assertEq(credit.balanceOf(alice), 21_000e18 - debt);
-    }
-
-    function testCallManyWithPermit() public {
-        bytes32 loanId = _doAliceBorrow();
-        bytes32[] memory loanIds = new bytes32[](1);
-        loanIds[0] = loanId;
-
-        // mint enough to cover call fee
-        credit.mint(bob, 1_000e18); 
-
-        // sign permit message valid for 10s
-        bytes32 structHash = keccak256(abi.encode(
-            keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
-            bob,
-            address(term),
-            1_000e18,
-            credit.nonces(bob),
-            block.timestamp + 10
-        ));
-        bytes32 digest = ECDSA.toTypedDataHash(credit.DOMAIN_SEPARATOR(), structHash);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobPrivateKey, digest);
-        assertEq(ECDSA.recover(digest, v, r, s), bob);
-
-        // if deadline is passed, cannot broadcast
-        vm.warp(block.timestamp + 20);
-        vm.expectRevert("ERC20Permit: expired deadline");
-        vm.prank(bob);
-        term.callManyWithPermit(
-            loanIds,
-            block.timestamp - 10,
-            LendingTerm.Signature({ v: v, r: r, s: s })
-        );
-        vm.warp(block.timestamp - 20);
-
-        // call
-        vm.prank(bob);
-        term.callManyWithPermit(
-            loanIds,
-            block.timestamp + 10,
-            LendingTerm.Signature({ v: v, r: r, s: s })
-        );
-
-        // check loan is called
-        assertEq(term.getLoan(loanId).caller, bob);
-        assertEq(term.getLoan(loanId).callTime, block.timestamp);
-
-        // nonce is consumed, cannot broadcast again
-        assertEq(credit.nonces(bob), 1);
     }
 }
