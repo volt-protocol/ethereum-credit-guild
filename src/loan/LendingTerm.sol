@@ -15,6 +15,8 @@ import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 /// @notice Lending Term contract of the Ethereum Credit Guild, a base implementation of
 /// smart contract issuing CREDIT debt and escrowing collateral assets.
+/// Note that interest rate is non-compounding and the percentage is expressed per
+/// period of `YEAR` seconds.
 contract LendingTerm is CoreRef {
     using SafeERC20 for IERC20;
 
@@ -173,6 +175,7 @@ contract LendingTerm is CoreRef {
         address borrower;
         uint256 borrowAmount;
         uint256 collateralAmount;
+        uint256 creditMultiplierOpen; // creditMultiplier when loan was opened
         address caller; // a caller of 0 indicates that the loan has not been called
         uint256 callTime; // a call time of 0 indicates that the loan has not been called
         uint256 originationTime; // the time the loan was initiated
@@ -268,6 +271,8 @@ contract LendingTerm is CoreRef {
             YEAR /
             1e18;
         uint256 loanDebt = borrowAmount + interest;
+        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        loanDebt = loanDebt * loan.creditMultiplierOpen / creditMultiplier;
 
         return loanDebt;
     }
@@ -317,6 +322,8 @@ contract LendingTerm is CoreRef {
         // check that enough collateral is provided
         uint256 maxBorrow = (collateralAmount * maxDebtPerCollateralToken) /
             1e18;
+        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        maxBorrow = maxBorrow * 1e18 / creditMultiplier;
         require(
             borrowAmount <= maxBorrow,
             "LendingTerm: not enough collateral"
@@ -357,6 +364,7 @@ contract LendingTerm is CoreRef {
             borrower: borrower,
             borrowAmount: borrowAmount,
             collateralAmount: collateralAmount,
+            creditMultiplierOpen: creditMultiplier,
             caller: address(0),
             callTime: 0,
             originationTime: block.timestamp,
@@ -562,12 +570,17 @@ contract LendingTerm is CoreRef {
             "LendingTerm: loan opened in same block"
         );
         require(loan.closeTime == 0, "LendingTerm: loan closed");
+        require(loan.callTime == 0, "LendingTerm: loan called");
 
         // compute partial repayment
         uint256 loanDebt = getLoanDebt(loanId);
         require(debtToRepay < loanDebt, "LendingTerm: full repayment");
         uint256 percentRepaid = (debtToRepay * 1e18) / loanDebt; // [0, 1e18[
-        uint256 principalRepaid = (loan.borrowAmount * percentRepaid) / 1e18;
+        uint256 _borrowAmount = loan.borrowAmount;
+        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 principal = _borrowAmount * loan.creditMultiplierOpen / creditMultiplier;
+        uint256 principalRepaid = (principal * percentRepaid) / 1e18;
+        uint256 issuanceDecrease = (_borrowAmount * percentRepaid) / 1e18;
         uint256 interestRepaid = debtToRepay - principalRepaid;
         require(
             principalRepaid != 0 && interestRepaid != 0,
@@ -577,10 +590,15 @@ contract LendingTerm is CoreRef {
             debtToRepay >= (loanDebt * minPartialRepayPercent) / 1e18,
             "LendingTerm: repay below min"
         );
+        require(
+            _borrowAmount - issuanceDecrease > MIN_BORROW,
+            "LendingTerm: below min borrow"
+        );
 
         // update loan in state
-        loans[loanId].borrowAmount -= principalRepaid;
+        loans[loanId].borrowAmount -= issuanceDecrease;
         lastPartialRepay[loanId] = block.timestamp;
+        issuance -= issuanceDecrease;
 
         // pull the debt from the borrower
         CreditToken(creditToken).transferFrom(
@@ -596,7 +614,7 @@ contract LendingTerm is CoreRef {
             int256(interestRepaid)
         );
         CreditToken(creditToken).burn(principalRepaid);
-        RateLimitedMinter(creditMinter).replenishBuffer(principalRepaid);
+        RateLimitedMinter(creditMinter).replenishBuffer(issuanceDecrease);
 
         // emit event
         emit LoanPartialRepay(block.timestamp, loanId, repayer, debtToRepay);
@@ -643,7 +661,9 @@ contract LendingTerm is CoreRef {
         // compute interest owed
         uint256 loanDebt = getLoanDebt(loanId);
         uint256 borrowAmount = loan.borrowAmount;
-        uint256 interest = loanDebt - borrowAmount;
+        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 principal = borrowAmount * loan.creditMultiplierOpen / creditMultiplier;
+        uint256 interest = loanDebt - principal;
 
         /// pull debt from the borrower and replenish the buffer of available debt that can be minted.
         /// @dev `debtToPullForRepay` could be smaller than `loanDebt` if the loan has been called, in this
@@ -660,7 +680,7 @@ contract LendingTerm is CoreRef {
         if (interest != 0) {
             // forward profit portion to the ProfitManager, burn the rest
             CreditToken(creditToken).transfer(profitManager, interest);
-            CreditToken(creditToken).burn(borrowAmount); // == loan.borrowAmount
+            CreditToken(creditToken).burn(principal);
             RateLimitedMinter(creditMinter).replenishBuffer(borrowAmount);
 
             // report profit
@@ -940,6 +960,9 @@ contract LendingTerm is CoreRef {
         uint256 creditOut = result.creditToCaller +
             result.creditToBurn +
             result.creditToProfit;
+        {
+        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 principal = _borrowAmount * loans[loanId].creditMultiplierOpen / creditMultiplier;
         require(
             creditIn == creditOut,
             "LendingTerm: invalid bid credit movement"
@@ -950,7 +973,7 @@ contract LendingTerm is CoreRef {
                 "LendingTerm: invalid profit reported"
             );
             require(
-                result.creditToBurn == _borrowAmount,
+                result.creditToBurn == principal,
                 "LendingTerm: invalid principal burn"
             );
         } else {
@@ -970,10 +993,11 @@ contract LendingTerm is CoreRef {
         require(
             result.pnl ==
                 int256(creditIn) -
-                    int256(_borrowAmount) -
+                    int256(principal) -
                     int256(result.creditToCaller),
             "LendingTerm: invalid pnl"
         );
+        }
 
         // save bid time
         loans[loanId].bidTime = block.timestamp;

@@ -470,6 +470,8 @@ contract LendingTermUnitTest is Test {
         term.partialRepay(loanId, 11_000e18);
 
         // checks
+        assertEq(term.issuance(), 10_000e18);
+        assertEq(term.getLoan(loanId).borrowAmount, 10_000e18);
         assertEq(term.getLoanDebt(loanId), 11_000e18);
         assertEq(term.getLoan(loanId).borrowAmount, 10_000e18);
     }
@@ -503,6 +505,9 @@ contract LendingTermUnitTest is Test {
         term.partialRepay(loanId, 1);
         vm.expectRevert("LendingTerm: repay below min");
         term.partialRepay(loanId, 2_100e18); // min would be 20% = 2_200e18
+        uint256 MIN_BORROW = term.MIN_BORROW();
+        vm.expectRevert("LendingTerm: below min borrow");
+        term.partialRepay(loanId, 11_000e18 - MIN_BORROW + 1);
         term.repay(loanId);
         vm.expectRevert("LendingTerm: loan closed");
         term.partialRepay(loanId, 123);
@@ -1524,5 +1529,251 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.balanceOf(address(term)), 0);
         assertEq(collateral.balanceOf(address(this)), 0);
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
+    }
+
+    // active loans are marked up when CREDIT lose value
+    function testActiveLoansAreMarkedUpWhenCreditLoseValue() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
+
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+
+        // active loan debt is marked up 2x
+        assertEq(term.getLoanDebt(loanId), 44_000e18);
+
+        // repay loan
+        credit.mint(address(this), 24_000e18);
+        credit.approve(address(term), 44_000e18);
+        term.repay(loanId);
+
+        // loan is closed
+        assertEq(term.getLoanDebt(loanId), 0);
+        assertEq(credit.totalSupply(), 0);
+        assertEq(credit.balanceOf(address(this)), 0);
+    }
+
+    // can borrow more when CREDIT lose value
+    function testCanBorrowMoreAfterCreditLoseValue() public {
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        credit.mint(address(this), 100e18);
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-50e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+        credit.burn(100e18);
+
+        // borrow
+        uint256 borrowAmount = 40_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 44_000e18);
+        assertEq(credit.totalSupply(), 40_000e18);
+
+        // repay loan
+        credit.mint(address(this), 4_000e18);
+        credit.approve(address(term), 44_000e18);
+        term.repay(loanId);
+
+        // loan is closed
+        assertEq(term.getLoanDebt(loanId), 0);
+        assertEq(credit.totalSupply(), 0);
+        assertEq(credit.balanceOf(address(this)), 0);
+    }
+
+    function testCannotPartialRepayAfterCall() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), collateralAmount);
+        assertEq(collateral.balanceOf(address(term)), 0);
+
+        // borrow
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        credit.mint(address(this), 2_000e18);
+
+        assertEq(credit.balanceOf(address(this)), 22_000e18);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // call
+        uint256 callFee = 1_000e18;
+        credit.approve(address(term), callFee);
+        term.call(loanId);
+
+        assertEq(credit.balanceOf(address(this)), 21_000e18);
+        assertEq(credit.balanceOf(address(term)), callFee);
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+
+        // partialRepay
+        credit.approve(address(term), 5_000e18);
+        vm.expectRevert("LendingTerm: loan called");
+        term.partialRepay(loanId, 5_000e18);
+    }
+
+    function testProfitAccountingRepayAfterMarkUp() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
+
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+
+        // active loan debt is marked up 2x
+        assertEq(term.getLoanDebt(loanId), 44_000e18);
+
+        // add a saving user to keep track of distriuted profit
+        credit.mint(address(this), 100);
+        credit.enterRebase();
+
+        // repay loan
+        credit.mint(address(this), 24_000e18);
+        credit.approve(address(term), 44_000e18);
+        term.repay(loanId);
+
+        // loan is closed, profit is distributed
+        assertEq(term.getLoanDebt(loanId), 0);
+        assertEq(credit.balanceOf(address(this)), 100 + 4_000e18);
+    }
+
+    function testProfitAccountingPartialRepayAfterMarkUp() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
+
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+
+        // active loan debt is marked up 2x
+        assertEq(term.getLoanDebt(loanId), 44_000e18);
+
+        // add a saving user to keep track of distriuted profit
+        credit.mint(address(this), 100);
+        credit.enterRebase();
+
+        // partially repay loan (50%)
+        credit.mint(address(this), 2_000e18);
+        credit.approve(address(term), 22_000e18);
+        term.partialRepay(loanId, 22_000e18);
+
+        // loan is 50% repaid, profit is distributed
+        assertEq(term.issuance(), 10_000e18);
+        assertEq(term.getLoan(loanId).borrowAmount, 10_000e18);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        assertEq(credit.balanceOf(address(this)), 100 + 2_000e18);
+    }
+
+    function testProfitAccountingCallBidAfterMarkUp() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
+
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+
+        // active loan debt is marked up 2x
+        assertEq(term.getLoanDebt(loanId), 44_000e18);
+
+        // add a saving user to keep track of distriuted profit
+        credit.mint(address(this), 100);
+        credit.enterRebase();
+
+        // seize
+        vm.prank(governor);
+        term.setHardCap(0);
+        term.seize(loanId);
+
+        // bid at midpoint (pay full debt, get full collateral)
+        vm.warp(block.timestamp + auctionHouse.midPoint());
+        vm.roll(block.number + 1);
+        credit.mint(address(this), 24_000e18);
+        credit.approve(address(term), 44_000e18);
+        auctionHouse.bid(loanId);
+
+        // loan is repaid, profit is distributed
+        assertEq(term.issuance(), 0);
+        assertEq(term.getLoanDebt(loanId), 0);
+        assertEq(credit.balanceOf(address(this)), 100 + 4_000e18);
     }
 }

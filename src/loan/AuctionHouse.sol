@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 
 /// @notice Auction House contract of the Ethereum Credit Guild,
 /// where collateral of borrowers is auctioned to cover their CREDIT debt.
@@ -237,6 +238,10 @@ contract AuctionHouse is CoreRef {
         // initialize the auction result object
         bool _loanCalled = auctions[loanId].loanCalled;
         uint256 _callFeeAmount = auctions[loanId].callFeeAmount;
+        LendingTerm term = LendingTerm(auctions[loanId].lendingTerm);
+        uint256 creditMultiplier = ProfitManager(term.profitManager()).creditMultiplier();
+        uint256 creditMultiplierOpen = term.getLoan(loanId).creditMultiplierOpen;
+        uint256 principal = auctions[loanId].borrowAmount * creditMultiplierOpen / creditMultiplier;
         AuctionResult memory result;
         result.collateralToBorrower =
             auctions[loanId].collateralAmount -
@@ -249,7 +254,7 @@ contract AuctionHouse is CoreRef {
         //result.creditToProfit = 0; // implicit
         result.pnl =
             int256(result.creditToBurn) -
-            int256(auctions[loanId].borrowAmount);
+            int256(principal);
 
         // if loan was unsafe, reimburse the call fee to caller and allocate them
         // part of the collateral that is left.
