@@ -123,8 +123,7 @@ contract Proposal_0 is Proposal {
             AuctionHouse auctionHouse = new AuctionHouse(
                 addresses.mainnet("CORE"),
                 650, // midPoint = 10m50s
-                1800, // auctionDuration = 30m
-                0.1e18 // dangerPenalty = 10%
+                1800 // auctionDuration = 30m
             );
             LendingTerm termUSDC1 = new LendingTerm(
                 addresses.mainnet("CORE"),
@@ -140,10 +139,7 @@ contract Proposal_0 is Proposal {
                     maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
                     minPartialRepayPercent: 0, // no minimum size for partial repay
                     openingFee: 0, // 0%
-                    callFee: 0.01e18, // 1%
-                    callPeriod: 120, // 2 minutes
-                    hardCap: 2_000_000e18, // max 2M CREDIT issued
-                    ltvBuffer: 0.05e18 // 5% overcollateralization needed
+                    hardCap: 2_000_000e18 // max 2M CREDIT issued
                 })
             );
             LendingTerm termSDAI1 = new LendingTerm(
@@ -160,10 +156,7 @@ contract Proposal_0 is Proposal {
                     maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
                     minPartialRepayPercent: 0, // no minimum size for partial repay
                     openingFee: 0, // 0%
-                    callFee: 0.01e18, // 1%
-                    callPeriod: 120, // 2 minutes
-                    hardCap: 2_000_000e18, // max 2M CREDIT issued
-                    ltvBuffer: 0 // loans do not require overcollateralization (sDAI is itself worth more than 1 DAI)
+                    hardCap: 2_000_000e18 // max 2M CREDIT issued
                 })
             );
             addresses.addMainnet("PSM_USDC", address(psm));
