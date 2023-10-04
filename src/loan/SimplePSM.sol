@@ -93,8 +93,7 @@ contract SimplePSM is CoreRef {
         uint256 amountIn
     ) external returns (uint256 amountOut) {
         amountOut = getRedeemAmountOut(amountIn);
-        CreditToken(credit).transferFrom(msg.sender, address(this), amountIn);
-        CreditToken(credit).burn(amountIn);
+        CreditToken(credit).burnFrom(msg.sender, amountIn);
         RateLimitedMinter(rlcm).replenishBuffer(amountIn);
         ERC20(pegToken).safeTransfer(to, amountOut);
         emit Redeem(to, amountIn, amountOut);
