@@ -65,13 +65,12 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
             newRateLimitPerSecond <= MAX_RATE_LIMIT_PER_SECOND,
             "RateLimited: rateLimitPerSecond too high"
         );
-        _updateBufferStored();
+        _updateBufferStored(bufferCap);
 
         _setRateLimitPerSecond(newRateLimitPerSecond);
     }
 
     /// @notice set the buffer cap
-    /// TODO if buffer > bufferCap, buffer = bufferCap
     /// @param newBufferCap new buffer cap to set
     function setBufferCap(
         uint128 newBufferCap
@@ -148,7 +147,7 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
 
     /// @param newBufferCap new buffer cap to set
     function _setBufferCap(uint128 newBufferCap) internal {
-        _updateBufferStored();
+        _updateBufferStored(newBufferCap);
 
         uint256 oldBufferCap = bufferCap;
         bufferCap = newBufferCap;
@@ -156,11 +155,16 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
         emit BufferCapUpdate(oldBufferCap, newBufferCap);
     }
 
-    function _updateBufferStored() internal {
+    function _updateBufferStored(uint128 newBufferCap) internal {
         uint224 newBufferStored = buffer().toUint224();
         uint32 newBlockTimestamp = block.timestamp.toUint32();
 
-        bufferStored = newBufferStored;
-        lastBufferUsedTime = newBlockTimestamp;
+        if (newBufferStored > newBufferCap) {
+            bufferStored = uint224(newBufferCap); /// safe upcast as no precision can be lost when going from 128 -> 224
+            lastBufferUsedTime = newBlockTimestamp;
+        } else {
+            bufferStored = newBufferStored;
+            lastBufferUsedTime = newBlockTimestamp;
+        }
     }
 }
