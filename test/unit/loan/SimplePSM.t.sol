@@ -86,7 +86,7 @@ contract SimplePSMUnitTest is Test {
         assertEq(psm.profitManager(), address(profitManager));
         assertEq(psm.rlcm(), address(rlcm));
         assertEq(psm.credit(), address(credit));
-        assertEq(psm.token(), address(token));
+        assertEq(psm.pegToken(), address(token));
         assertEq(psm.decimalCorrection(), 1e12);
     }
 
