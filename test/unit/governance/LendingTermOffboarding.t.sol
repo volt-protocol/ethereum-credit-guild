@@ -32,7 +32,7 @@ contract LendingTermOffboardingUnitTest is Test {
 
     // LendingTerm params
     uint256 private constant _CREDIT_PER_COLLATERAL_TOKEN = 1e18; // 1:1, same decimals
-    uint256 private constant _INTEREST_RATE = 0; // 0% APR
+    uint256 private constant _INTEREST_RATE = 0.05e18; // 5% APR
     uint256 private constant _CALL_FEE = 0.05e18; // 5%
     uint256 private constant _CALL_PERIOD = 1 hours;
     uint256 private constant _HARDCAP = 1_000_000e18;
@@ -246,13 +246,19 @@ contract LendingTermOffboardingUnitTest is Test {
         assertEq(guild.isGauge(address(term)), true);
         offboarder.offboard(address(term));
         assertEq(guild.isGauge(address(term)), false);
-        assertEq(core.hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term)), false);
-
         
+        // get enough CREDIT to pack back interests
+        vm.stopPrank();
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        uint256 debt = term.getLoanDebt(aliceLoanId);
+        credit.mint(alice, debt - aliceLoanSize);
+
         vm.startPrank(alice);
         // can close loans
-        credit.approve(address(term), aliceLoanSize);
+        credit.approve(address(term), debt);
         term.repay(aliceLoanId);
+
         // cannot open new loans
         collateral.approve(address(term), aliceLoanSize);
         vm.expectRevert("LendingTerm: debt ceiling reached");
@@ -278,9 +284,16 @@ contract LendingTermOffboardingUnitTest is Test {
         vm.expectRevert("LendingTermOffboarding: not all loans closed");
         offboarder.cleanup(address(term));
 
+        // get enough CREDIT to pack back interests
+        vm.stopPrank();
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        uint256 debt = term.getLoanDebt(aliceLoanId);
+        credit.mint(alice, debt - aliceLoanSize);
+
         // close loans
         vm.startPrank(alice);
-        credit.approve(address(term), aliceLoanSize);
+        credit.approve(address(term), debt);
         term.repay(aliceLoanId);
         vm.stopPrank();
 
@@ -290,6 +303,7 @@ contract LendingTermOffboardingUnitTest is Test {
         assertEq(offboarder.canOffboard(address(term)), false);
         assertEq(term.hardCap(), 0);
         assertEq(core.hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term)), false);
+        assertEq(core.hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term)), false);
     }
 
     function testCannotVoteTwice() public {

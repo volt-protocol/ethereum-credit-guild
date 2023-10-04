@@ -137,7 +137,6 @@ contract LendingTermOffboarding is CoreRef {
 
         // update protocol config
         GuildToken(guildToken).removeGauge(term);
-        core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
 
         emit Offboard(block.timestamp, term);
     }
@@ -154,6 +153,7 @@ contract LendingTermOffboarding is CoreRef {
 
         // update protocol config
         LendingTerm(term).setHardCap(0);
+        core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
         core().revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, term);
 
         canOffboard[term] = false;
