@@ -33,10 +33,7 @@ contract LendingTermOffboardingUnitTest is Test {
     // LendingTerm params
     uint256 private constant _CREDIT_PER_COLLATERAL_TOKEN = 1e18; // 1:1, same decimals
     uint256 private constant _INTEREST_RATE = 0.05e18; // 5% APR
-    uint256 private constant _CALL_FEE = 0.05e18; // 5%
-    uint256 private constant _CALL_PERIOD = 1 hours;
     uint256 private constant _HARDCAP = 1_000_000e18;
-    uint256 private constant _LTV_BUFFER = 0; // 0%
 
     // LendingTermOffboarding params
     uint32 private constant _QUORUM = 10 minutes;
@@ -64,8 +61,7 @@ contract LendingTermOffboardingUnitTest is Test {
         auctionHouse = new AuctionHouse(
             address(core),
             650,
-            1800,
-            0.1e18
+            1800
         );
         term = new LendingTerm(
             address(core), /*_core*/
@@ -81,10 +77,7 @@ contract LendingTermOffboardingUnitTest is Test {
                 maxDelayBetweenPartialRepay: 0,
                 minPartialRepayPercent: 0,
                 openingFee: 0,
-                callFee: _CALL_FEE,
-                callPeriod: _CALL_PERIOD,
-                hardCap: _HARDCAP,
-                ltvBuffer: _LTV_BUFFER
+                hardCap: _HARDCAP
             })
         );
         

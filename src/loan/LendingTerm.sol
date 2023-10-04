@@ -22,30 +22,25 @@ contract LendingTerm is CoreRef {
 
     // events for the lifecycle of loans that happen in the lending term
     /// @notice emitted when new loans are opened (mint debt to borrower, pull collateral from borrower).
-    event LoanBorrow(
+    event LoanOpen(
         uint256 indexed when,
         bytes32 indexed loanId,
         address indexed borrower,
         uint256 collateralAmount,
         uint256 borrowAmount
     );
-    /// @notice emitted when a loan is called (repayer has `callPeriod` seconds to repay at a discount).
-    event LoanCall(uint256 indexed when, bytes32 indexed loanId);
-    /// @notice emitted when a loan is closed (repay, seize, forgive).
-    /// closeType enum : 0 = repay, 1 = seize, 2 = forgive.
-    /// if closeType == 1 (seize), there will be a subsequent LoanBid event.
+    /// @notice emitted when a loan is called.
+    event LoanCall(
+        uint256 indexed when,
+        bytes32 indexed loanId
+    );
+    /// @notice emitted when a loan is closed (repay, onBid after a call, forgive).
+    enum LoanCloseType { Repay, Call, Forgive }
     event LoanClose(
         uint256 indexed when,
         bytes32 indexed loanId,
-        uint8 indexed closeType,
-        bool loanCalled
-    );
-    /// @notice emitted when there is a bid on a loan's collateral to liquidate the position.
-    event LoanBid(
-        uint256 indexed when,
-        bytes32 indexed loanId,
-        uint256 collateralSold,
-        uint256 debtRecovered
+        LoanCloseType indexed closeType,
+        uint256 debtRepaid
     );
     /// @notice emitted when someone adds collateral to a loan
     event LoanAddCollateral(
@@ -85,9 +80,8 @@ contract LendingTerm is CoreRef {
     /// @notice reference to the GUILD token
     address public immutable guildToken;
 
-    /// @notice reference to the auction house contract where
-    /// the collateral of loans is sent if borrowers do not repay
-    /// their CREDIT debt during the call period.
+    /// @notice reference to the auction house contract used to
+    /// sell loan collateral for CREDIT if loans are called.
     address public auctionHouse;
 
     /// @notice reference to the credit minter contract
@@ -116,7 +110,7 @@ contract LendingTerm is CoreRef {
     /// @notice maximum delay, in seconds, between partial debt repayments.
     /// if set to 0, no periodic partial repayments are expected.
     /// if a partial repayment is missed (delay has passed), the loan
-    /// can be called without paying the call fee.
+    /// can be called.
     uint256 public immutable maxDelayBetweenPartialRepay;
 
     /// @notice minimum percent of the total debt (principal + interests) to
@@ -131,61 +125,29 @@ contract LendingTerm is CoreRef {
 
     /// @notice the opening fee is a small amount of CREDIT provided by the borrower
     /// when the loan is opened.
-    /// The call fee is expressed as a percentage of the borrowAmount, with 18
+    /// The opening fee is expressed as a percentage of the borrowAmount, with 18
     /// decimals, e.g. 0.05e18 = 5% of the borrowed amount.
     uint256 public immutable openingFee;
 
-    /// @notice the call fee is a small amount of CREDIT provided by the caller
-    /// when the loan is called.
-    /// The call fee is expressed as a percentage of the borrowAmount, with 18
-    /// decimals, e.g. 0.05e18 = 5% of the borrowed amount.
-    /// When the loan closes, one of the following situations happen :
-    /// - The borrower repay the CREDIT debt during the call period => caller
-    ///   forfeit their CREDIT and borrower is compensated with the call fee
-    ///   (their CREDIT debt is minored by the CREDIT paid in the call fee).
-    /// - The borrower does not repay during the call period, collateral is
-    ///   auctioned until enough CREDIT is recovered to cover debt + call fee.
-    ///   If there is more than `ltvBuffer` collateral left, the borrower
-    ///   gets the call fee. Otherwise, the caller recover the call fee.
-    ///   If bad debt is created (after selling all the collateral, not enough
-    ///   CREDIT is recovered to cover the debt + the call fee), the caller is
-    ///   reimbursed in priority before the protocol.
-    /// The borrower can close the loan (repay) without call period & call fee.
-    uint256 public immutable callFee;
-
-    /// @notice call period in seconds. Loans are running forever until borrower
-    /// repays or someone calls the loan, which starts the call period. During the
-    /// call period, the borrower can reimburse the CREDIT debt (minus call fee) and
-    /// recover their collateral. If the borrower does not replay the CREDIT debt
-    /// during the call period, the loan is closed by seizing the collateral
-    /// and it is sold in an auction.
-    uint256 public immutable callPeriod;
-
-    /// @notice the absolute maximum amount of debt this lending term can create
-    /// (sum of CREDIT minted), regardless of the gauge allocations.
+    /// @notice the absolute maximum amount of debt this lending term can issue
+    /// at any given time, regardless of the gauge allocations.
     uint256 public hardCap;
 
-    /// @notice the LTV buffer, expressed as a percentage with 18 decimals.
-    /// Example: for a value of 0.1e18 (10%), the LTV buffer will waive the call fee
-    /// (reimburse CREDIT to the caller) if less than 10% of the collateral of the borrower
-    /// is left after a collateral auction, or if bad debt is created.
-    uint256 public immutable ltvBuffer;
-
     struct Loan {
-        address borrower;
-        uint256 borrowAmount;
-        uint256 collateralAmount;
-        uint256 creditMultiplierOpen; // creditMultiplier when loan was opened
+        address borrower; // address of a loan's borrower
+        uint256 borrowTime; // the time the loan was initiated
+        uint256 borrowAmount; // initial CREDIT debt of a loan
+        uint256 borrowCreditMultiplier; // creditMultiplier when loan was opened
+        uint256 collateralAmount; // balance of collateral token provided by the borrower
         address caller; // a caller of 0 indicates that the loan has not been called
         uint256 callTime; // a call time of 0 indicates that the loan has not been called
-        uint256 originationTime; // the time the loan was initiated
-        uint256 closeTime; // the time the loan was closed (repaid or seized)
-        uint256 debtWhenSeized; // the debt when the loan collateral has been seized
-        uint256 bidTime; // the time of auction bid when collateral was liquidated
+        uint256 callDebt; // the CREDIT debt when the loan was called
+        uint256 closeTime; // the time the loan was closed (repaid or call+bid or forgive)
     }
 
-    /// @notice the list of all loans that existed or are still active
-    mapping(bytes32 => Loan) public loans;
+    /// @notice the list of all loans that existed or are still active.
+    /// @dev see public getLoan(loanId) getter.
+    mapping(bytes32 => Loan) internal loans;
 
     /// @notice current number of CREDIT issued in active loans on this term
     uint256 public issuance;
@@ -197,10 +159,7 @@ contract LendingTerm is CoreRef {
         uint256 maxDelayBetweenPartialRepay;
         uint256 minPartialRepayPercent;
         uint256 openingFee;
-        uint256 callFee;
-        uint256 callPeriod;
         uint256 hardCap;
-        uint256 ltvBuffer;
     }
 
     constructor(
@@ -223,10 +182,7 @@ contract LendingTerm is CoreRef {
         maxDelayBetweenPartialRepay = params.maxDelayBetweenPartialRepay;
         minPartialRepayPercent = params.minPartialRepayPercent;
         openingFee = params.openingFee;
-        callFee = params.callFee;
-        callPeriod = params.callPeriod;
         hardCap = params.hardCap;
-        ltvBuffer = params.ltvBuffer;
     }
 
     /// @notice get a loan
@@ -234,45 +190,33 @@ contract LendingTerm is CoreRef {
         return loans[loanId];
     }
 
-    /// @notice call fee of a loan, in CREDIT base units
-    function getLoanCallFee(bytes32 loanId) public view returns (uint256) {
-        Loan storage loan = loans[loanId];
-        uint256 originationTime = loan.originationTime;
-
-        if (originationTime == 0) {
-            return 0;
-        }
-
-        if (loan.closeTime != 0) {
-            return 0;
-        }
-
-        return (loan.borrowAmount * callFee) / 1e18;
-    }
-
     /// @notice outstanding borrowed amount of a loan, including interests
     function getLoanDebt(bytes32 loanId) public view returns (uint256) {
         Loan storage loan = loans[loanId];
-        uint256 originationTime = loan.originationTime;
+        uint256 borrowTime = loan.borrowTime;
 
-        if (originationTime == 0) {
+        if (borrowTime == 0) {
             return 0;
         }
 
         if (loan.closeTime != 0) {
             return 0;
+        }
+
+        if (loan.callTime != 0) {
+            return loan.callDebt;
         }
 
         // compute interest owed
         uint256 borrowAmount = loan.borrowAmount;
         uint256 interest = (borrowAmount *
             interestRate *
-            (block.timestamp - originationTime)) /
+            (block.timestamp - borrowTime)) /
             YEAR /
             1e18;
         uint256 loanDebt = borrowAmount + interest;
         uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
-        loanDebt = loanDebt * loan.creditMultiplierOpen / creditMultiplier;
+        loanDebt = loanDebt * loan.borrowCreditMultiplier / creditMultiplier;
 
         return loanDebt;
     }
@@ -286,7 +230,7 @@ contract LendingTerm is CoreRef {
         if (maxDelayBetweenPartialRepay == 0) return false;
 
         // if loan doesn't exist, return false
-        if (loans[loanId].originationTime == 0) return false;
+        if (loans[loanId].borrowTime == 0) return false;
 
         // if loan is closed, return false
         if (loans[loanId].closeTime != 0) return false;
@@ -311,7 +255,7 @@ contract LendingTerm is CoreRef {
         );
 
         // check that the loan doesn't already exist
-        require(loans[loanId].originationTime == 0, "LendingTerm: loan exists");
+        require(loans[loanId].borrowTime == 0, "LendingTerm: loan exists");
 
         // check that enough CREDIT is borrowed
         require(
@@ -327,13 +271,6 @@ contract LendingTerm is CoreRef {
         require(
             borrowAmount <= maxBorrow,
             "LendingTerm: not enough collateral"
-        );
-
-        // check that ltvBuffer is respected
-        uint256 maxBorrowLtv = (maxBorrow * 1e18) / (1e18 + ltvBuffer);
-        require(
-            borrowAmount <= maxBorrowLtv,
-            "LendingTerm: not enough LTV buffer"
         );
 
         // check the hardcap
@@ -362,15 +299,14 @@ contract LendingTerm is CoreRef {
         // save loan in state
         loans[loanId] = Loan({
             borrower: borrower,
+            borrowTime: block.timestamp,
             borrowAmount: borrowAmount,
+            borrowCreditMultiplier: creditMultiplier,
             collateralAmount: collateralAmount,
-            creditMultiplierOpen: creditMultiplier,
             caller: address(0),
             callTime: 0,
-            originationTime: block.timestamp,
-            closeTime: 0,
-            debtWhenSeized: 0,
-            bidTime: 0
+            callDebt: 0,
+            closeTime: 0
         });
         issuance = _postBorrowIssuance;
         if (maxDelayBetweenPartialRepay != 0) {
@@ -403,7 +339,7 @@ contract LendingTerm is CoreRef {
         );
 
         // emit event
-        emit LoanBorrow(
+        emit LoanOpen(
             block.timestamp,
             loanId,
             borrower,
@@ -490,9 +426,8 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice add collateral on an open loan.
-    /// a borrower might want to add collateral so that his position cannot be called for free.
-    /// if the loan is called & goes into liquidation, and less than `ltvBuffer` percent of his
-    /// collateral is left after debt repayment, the call fee is reimbursed to the caller.
+    /// a borrower might want to add collateral so that his position does not go underwater due to
+    /// interests growing up over time.
     function _addCollateral(
         address borrower,
         bytes32 loanId,
@@ -503,8 +438,9 @@ contract LendingTerm is CoreRef {
         Loan storage loan = loans[loanId];
 
         // check the loan is open
-        require(loan.originationTime != 0, "LendingTerm: loan not found");
+        require(loan.borrowTime != 0, "LendingTerm: loan not found");
         require(loan.closeTime == 0, "LendingTerm: loan closed");
+        require(loan.callTime == 0, "LendingTerm: loan called");
 
         // update loan in state
         loans[loanId].collateralAmount += collateralToAdd;
@@ -551,9 +487,8 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice partially repay an open loan.
-    /// a borrower might want to partially repay debt so that his position cannot be called for free.
-    /// if the loan is called & goes into liquidation, and less than `ltvBuffer` percent of his
-    /// collateral is left after debt repayment, the call fee is reimbursed to the caller.
+    /// a borrower might want to partially repay debt so that his position does not go underwater
+    /// due to interests building up.
     /// some lending terms might also impose periodic partial repayments.
     function _partialRepay(
         address repayer,
@@ -563,10 +498,10 @@ contract LendingTerm is CoreRef {
         Loan storage loan = loans[loanId];
 
         // check the loan is open
-        uint256 originationTime = loan.originationTime;
-        require(originationTime != 0, "LendingTerm: loan not found");
+        uint256 borrowTime = loan.borrowTime;
+        require(borrowTime != 0, "LendingTerm: loan not found");
         require(
-            originationTime < block.timestamp,
+            borrowTime < block.timestamp,
             "LendingTerm: loan opened in same block"
         );
         require(loan.closeTime == 0, "LendingTerm: loan closed");
@@ -576,12 +511,12 @@ contract LendingTerm is CoreRef {
         uint256 loanDebt = getLoanDebt(loanId);
         require(debtToRepay < loanDebt, "LendingTerm: full repayment");
         uint256 percentRepaid = (debtToRepay * 1e18) / loanDebt; // [0, 1e18[
-        uint256 _borrowAmount = loan.borrowAmount;
+        uint256 borrowAmount = loan.borrowAmount;
         uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
-        uint256 principal = _borrowAmount * loan.creditMultiplierOpen / creditMultiplier;
+        uint256 principal = borrowAmount * loan.borrowCreditMultiplier / creditMultiplier;
         uint256 principalRepaid = (principal * percentRepaid) / 1e18;
-        uint256 issuanceDecrease = (_borrowAmount * percentRepaid) / 1e18;
         uint256 interestRepaid = debtToRepay - principalRepaid;
+        uint256 issuanceDecrease = (borrowAmount * percentRepaid) / 1e18;
         require(
             principalRepaid != 0 && interestRepaid != 0,
             "LendingTerm: repay too small"
@@ -591,7 +526,7 @@ contract LendingTerm is CoreRef {
             "LendingTerm: repay below min"
         );
         require(
-            _borrowAmount - issuanceDecrease > MIN_BORROW,
+            borrowAmount - issuanceDecrease > MIN_BORROW,
             "LendingTerm: below min borrow"
         );
 
@@ -599,6 +534,7 @@ contract LendingTerm is CoreRef {
         loans[loanId].borrowAmount -= issuanceDecrease;
         lastPartialRepay[loanId] = block.timestamp;
         issuance -= issuanceDecrease;
+        RateLimitedMinter(creditMinter).replenishBuffer(issuanceDecrease);
 
         // pull the debt from the borrower
         CreditToken(creditToken).transferFrom(
@@ -614,7 +550,6 @@ contract LendingTerm is CoreRef {
             int256(interestRepaid)
         );
         CreditToken(creditToken).burn(principalRepaid);
-        RateLimitedMinter(creditMinter).replenishBuffer(issuanceDecrease);
 
         // emit event
         emit LoanPartialRepay(block.timestamp, loanId, repayer, debtToRepay);
@@ -650,38 +585,32 @@ contract LendingTerm is CoreRef {
         Loan storage loan = loans[loanId];
 
         // check the loan is open
-        uint256 originationTime = loan.originationTime;
-        require(originationTime != 0, "LendingTerm: loan not found");
+        uint256 borrowTime = loan.borrowTime;
+        require(borrowTime != 0, "LendingTerm: loan not found");
         require(
-            originationTime < block.timestamp,
+            borrowTime < block.timestamp,
             "LendingTerm: loan opened in same block"
         );
         require(loan.closeTime == 0, "LendingTerm: loan closed");
+        require(loan.callTime == 0, "LendingTerm: loan called");
 
         // compute interest owed
         uint256 loanDebt = getLoanDebt(loanId);
         uint256 borrowAmount = loan.borrowAmount;
         uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
-        uint256 principal = borrowAmount * loan.creditMultiplierOpen / creditMultiplier;
+        uint256 principal = borrowAmount * loan.borrowCreditMultiplier / creditMultiplier;
         uint256 interest = loanDebt - principal;
 
         /// pull debt from the borrower and replenish the buffer of available debt that can be minted.
-        /// @dev `debtToPullForRepay` could be smaller than `loanDebt` if the loan has been called, in this
-        /// case the caller already transferred some debt tokens to the lending term, and a reduced
-        /// amount has to be pulled from the borrower.
-        uint256 callTime = loan.callTime;
         CreditToken(creditToken).transferFrom(
             repayer,
             address(this),
-            (callTime != 0 && block.timestamp <= callTime + callPeriod)
-                ? (loanDebt - getLoanCallFee(loanId))
-                : loanDebt
+            loanDebt
         );
         if (interest != 0) {
             // forward profit portion to the ProfitManager, burn the rest
             CreditToken(creditToken).transfer(profitManager, interest);
             CreditToken(creditToken).burn(principal);
-            RateLimitedMinter(creditMinter).replenishBuffer(borrowAmount);
 
             // report profit
             ProfitManager(profitManager).notifyPnL(
@@ -693,6 +622,7 @@ contract LendingTerm is CoreRef {
         // close the loan
         loan.closeTime = block.timestamp;
         issuance -= borrowAmount;
+        RateLimitedMinter(creditMinter).replenishBuffer(borrowAmount);
 
         // return the collateral to the borrower
         IERC20(collateralToken).safeTransfer(
@@ -701,7 +631,7 @@ contract LendingTerm is CoreRef {
         );
 
         // emit event
-        emit LoanClose(block.timestamp, loanId, 0, callTime != 0);
+        emit LoanClose(block.timestamp, loanId, LoanCloseType.Repay, loanDebt);
     }
 
     /// @notice repay an open loan
@@ -729,152 +659,56 @@ contract LendingTerm is CoreRef {
         _repay(msg.sender, loanId);
     }
 
-    /// @notice call a loan in state, and return the amount of debt tokens to pull for call fee.
-    function _call(
-        bytes32 loanId,
-        address caller
-    ) internal returns (uint256 debtToPull) {
+    /// @notice call a loan, the collateral will be auctioned to repay outstanding debt.
+    /// Loans can be called only if the term has been offboarded or if a loan missed a periodic partialRepay.
+    function _call(address caller, bytes32 loanId, address _auctionHouse) internal {
         Loan storage loan = loans[loanId];
 
         // check that the loan exists
-        uint256 _originationTime = loan.originationTime;
-        require(_originationTime != 0, "LendingTerm: loan not found");
-
-        // check that the loan has not been created in the same block
-        require(
-            _originationTime < block.timestamp,
-            "LendingTerm: loan opened in same block"
-        );
-
-        // check that the loan is not already called
-        require(loan.callTime == 0, "LendingTerm: loan called");
+        uint256 borrowTime = loan.borrowTime;
+        require(loan.borrowTime != 0, "LendingTerm: loan not found");
 
         // check that the loan is not already closed
         require(loan.closeTime == 0, "LendingTerm: loan closed");
 
-        // calculate the call fee
-        debtToPull = (loan.borrowAmount * callFee) / 1e18;
+        // check that the loan is not already called
+        require(loan.callTime == 0, "LendingTerm: loan called");
 
-        // set the call info
-        loan.caller = caller;
-        loan.callTime = block.timestamp;
+        // check that the loan can be called
+        require(
+            GuildToken(guildToken).isDeprecatedGauge(address(this)) || partialRepayDelayPassed(loanId),
+            "LendingTerm: cannot call"
+        );
+
+        // check that the loan has been running for at least 1 block
+        require(
+            borrowTime < block.timestamp,
+            "LendingTerm: loan opened in same block"
+        );
+
+        // update loan in state
+        uint256 loanDebt = getLoanDebt(loanId);
+        loans[loanId].callTime = block.timestamp;
+        loans[loanId].callDebt = loanDebt;
+        loans[loanId].caller = caller;
+
+        // auction the loan collateral
+        AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt);
 
         // emit event
         emit LoanCall(block.timestamp, loanId);
     }
 
-    /// @notice call a single loan.
-    /// Borrower has `callPeriod` seconds to repay the loan, or their collateral will be seized.
+    /// @notice call a single loan
     function call(bytes32 loanId) external {
-        uint256 callFeeAmount = _call(loanId, msg.sender);
-        if (callFeeAmount != 0) {
-            CreditToken(creditToken).transferFrom(
-                msg.sender,
-                address(this),
-                callFeeAmount
-            );
-        }
+        _call(msg.sender, loanId, auctionHouse);
     }
 
     /// @notice call a list of loans
-    function callMany(bytes32[] memory loanIds) external {
-        uint256 debtToPullForCallFees = 0;
-        for (uint256 i = 0; i < loanIds.length; i++) {
-            debtToPullForCallFees += _call(loanIds[i], msg.sender);
-        }
-
-        // pull the call fees from caller
-        if (debtToPullForCallFees != 0) {
-            CreditToken(creditToken).transferFrom(
-                msg.sender,
-                address(this),
-                debtToPullForCallFees
-            );
-        }
-    }
-
-    /// @notice call with a permit on CREDIT token to pull call fees
-    function callManyWithPermit(
-        bytes32[] memory loanIds,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        uint256 debtToPullForCallFees = 0;
-        for (uint256 i = 0; i < loanIds.length; i++) {
-            debtToPullForCallFees += _call(loanIds[i], msg.sender);
-        }
-
-        // pull the call fees from caller
-        if (debtToPullForCallFees != 0) {
-            IERC20Permit(creditToken).permit(
-                msg.sender,
-                address(this),
-                debtToPullForCallFees,
-                deadline,
-                sig.v,
-                sig.r,
-                sig.s
-            );
-            CreditToken(creditToken).transferFrom(
-                msg.sender,
-                address(this),
-                debtToPullForCallFees
-            );
-        }
-    }
-
-    /// @notice seize the collateral of a loan, to repay outstanding debt.
-    /// Under normal conditions, the loans should be call()'d first, to give the borrower an opportunity to repay (the 'call period').
-    /// Calling of loans can be skipped if the `hardCap` is zero (bad debt created in the past) or if a loan missed a periodic partialRepay.
-    function _seize(bytes32 loanId, address _auctionHouse) internal {
-        Loan storage loan = loans[loanId];
-
-        // check that the loan exists
-        require(loan.originationTime != 0, "LendingTerm: loan not found");
-
-        // check that the loan is not already closed
-        require(loan.closeTime == 0, "LendingTerm: loan closed");
-
-        // set the call info, if not set
-        uint256 _callTime = loan.callTime;
-        bool loanCalled = _callTime != 0;
-        bool canSkipCall = hardCap == 0 || partialRepayDelayPassed(loanId);
-        if (loanCalled) {
-            // check that the call period has elapsed
-            if (!canSkipCall) {
-                require(
-                    block.timestamp >= loan.callTime + callPeriod,
-                    "LendingTerm: call period in progress"
-                );
-            }
-        } else {
-            require(canSkipCall, "LendingTerm: loan not called");
-            loan.caller = address(this);
-            loan.callTime = block.timestamp;
-        }
-
-        // close the loan
-        uint256 loanDebt = getLoanDebt(loanId);
-        loans[loanId].closeTime = block.timestamp;
-        loans[loanId].debtWhenSeized = loanDebt;
-
-        // auction the loan collateral
-        AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt, loanCalled);
-
-        // emit event
-        emit LoanClose(block.timestamp, loanId, 1, loanCalled);
-    }
-
-    /// @notice seize the collateral of a single loan
-    function seize(bytes32 loanId) external {
-        _seize(loanId, auctionHouse);
-    }
-
-    /// @notice seize the collateral of a list of loans
-    function seizeMany(bytes32[] memory loanIds) public {
+    function callMany(bytes32[] memory loanIds) public {
         address _auctionHouse = auctionHouse;
         for (uint256 i = 0; i < loanIds.length; i++) {
-            _seize(loanIds[i], _auctionHouse);
+            _call(msg.sender, loanIds[i], _auctionHouse);
         }
     }
 
@@ -882,24 +716,15 @@ contract LendingTerm is CoreRef {
     /// The loan is closed (borrower keeps the CREDIT), and the collateral stays on the LendingTerm.
     /// Governance can later unstuck the collateral through `emergencyAction`.
     /// This function is made for emergencies where collateral is frozen or other reverting
-    /// conditions on collateral transfers that prevent regular repay() or seize() loan closing.
+    /// conditions on collateral transfers that prevent regular repay() or call() loan closing.
     function forgive(bytes32 loanId) external onlyCoreRole(CoreRoles.GOVERNOR) {
         Loan storage loan = loans[loanId];
 
         // check that the loan exists
-        require(loan.originationTime != 0, "LendingTerm: loan not found");
+        require(loan.borrowTime != 0, "LendingTerm: loan not found");
 
         // check that the loan is not already closed
         require(loan.closeTime == 0, "LendingTerm: loan closed");
-
-        // if loan has been called, reimburse the caller
-        bool loanCalled = loan.callTime != 0;
-        if (loanCalled) {
-            CreditToken(creditToken).transfer(
-                loan.caller,
-                getLoanCallFee(loanId)
-            );
-        }
 
         // close the loan
         loans[loanId].closeTime = block.timestamp;
@@ -913,169 +738,101 @@ contract LendingTerm is CoreRef {
         hardCap = 0;
 
         // emit event
-        emit LoanClose(block.timestamp, loanId, 2, loanCalled);
+        emit LoanClose(block.timestamp, loanId, LoanCloseType.Forgive, 0);
     }
 
     /// @notice callback from the auctionHouse when au auction concludes
     function onBid(
         bytes32 loanId,
         address bidder,
-        AuctionHouse.AuctionResult memory result
+        uint256 collateralToBorrower,
+        uint256 collateralToBidder,
+        uint256 creditFromBidder
     ) external {
         // preliminary checks
         require(msg.sender == auctionHouse, "LendingTerm: invalid caller");
-        uint256 _debtWhenSeized = loans[loanId].debtWhenSeized;
-        require(_debtWhenSeized != 0, "LendingTerm: loan not seized");
-        require(
-            loans[loanId].bidTime == 0,
-            "LendingTerm: loan auction concluded"
-        );
+        require(loans[loanId].callTime != 0 && loans[loanId].callDebt != 0, "LendingTerm: loan not called");
+        require(loans[loanId].closeTime == 0, "LendingTerm: loan closed");
 
-        // sanity checks
+        // sanity check on collateral movement
         // these should never fail for a properly implemented AuctionHouse contract
-        // collateral movements (collateralOut == 0 if forgive())
-        uint256 collateralOut = result.collateralToBorrower +
-            result.collateralToCaller +
-            result.collateralToBidder;
+        // collateralOut == 0 if forgive() while in auctionHouse
+        uint256 collateralOut = collateralToBorrower + collateralToBidder;
         require(
             collateralOut == loans[loanId].collateralAmount ||
                 collateralOut == 0,
             "LendingTerm: invalid collateral movements"
         );
-        // credit movements
-        uint256 _borrowAmount = loans[loanId].borrowAmount;
-        address _caller = loans[loanId].caller;
-        uint256 _callFeeAmount = (_borrowAmount * callFee) / 1e18;
-        require(
-            (_caller == address(this) && result.creditToCaller == 0) || // force closed
-                (_caller != address(this) && result.creditToCaller == 0) || // loan called not in danger zone
-                (_caller != address(this) &&
-                    result.creditToCaller == _callFeeAmount), // loan called & in danger zone
-            "LendingTerm: invalid call fee"
-        );
-        uint256 creditFromCaller = _caller == address(this)
-            ? 0
-            : _callFeeAmount;
-        uint256 creditIn = result.creditFromBidder + creditFromCaller;
-        uint256 creditOut = result.creditToCaller +
-            result.creditToBurn +
-            result.creditToProfit;
-        {
+
+        // compute pnl
         uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
-        uint256 principal = _borrowAmount * loans[loanId].creditMultiplierOpen / creditMultiplier;
-        require(
-            creditIn == creditOut,
-            "LendingTerm: invalid bid credit movement"
-        );
-        if (result.pnl > 0) {
-            require(
-                result.creditToProfit == uint256(result.pnl),
-                "LendingTerm: invalid profit reported"
-            );
-            require(
-                result.creditToBurn == principal,
-                "LendingTerm: invalid principal burn"
-            );
+        uint256 borrowAmount = loans[loanId].borrowAmount;
+        uint256 principal = borrowAmount * loans[loanId].borrowCreditMultiplier / creditMultiplier;
+        int256 pnl;
+        uint256 interest;
+        if (creditFromBidder >= principal) {
+            interest = creditFromBidder - principal;
+            pnl = int256(interest);
         } else {
-            require(
-                result.creditToProfit == 0,
-                "LendingTerm: invalid negative profit"
-            );
-            require(
-                result.creditToBurn == result.creditFromBidder,
-                "LendingTerm: invalid negative principal burn"
-            );
-            require(
-                uint256(-result.pnl) == _borrowAmount - result.creditFromBidder,
-                "LendingTerm: invalid negative pnl"
-            );
-        }
-        require(
-            result.pnl ==
-                int256(creditIn) -
-                    int256(principal) -
-                    int256(result.creditToCaller),
-            "LendingTerm: invalid pnl"
-        );
+            pnl = int256(creditFromBidder) - int256(principal);
+            principal = creditFromBidder;
+            require(collateralToBorrower == 0, "LendingTerm: invalid collateral movement");
         }
 
-        // save bid time
-        loans[loanId].bidTime = block.timestamp;
+        // save loan state
+        loans[loanId].closeTime = block.timestamp;
 
         // pull credit from bidder
-        if (result.creditFromBidder != 0) {
+        if (creditFromBidder != 0) {
             CreditToken(creditToken).transferFrom(
                 bidder,
                 address(this),
-                result.creditFromBidder
-            );
-        }
-
-        // send credit to caller
-        if (result.creditToCaller != 0) {
-            CreditToken(creditToken).transfer(
-                loans[loanId].caller,
-                result.creditToCaller
+                creditFromBidder
             );
         }
 
         // burn credit principal
-        if (result.creditToBurn != 0) {
-            RateLimitedMinter(creditMinter).replenishBuffer(
-                result.creditToBurn
-            );
-            CreditToken(creditToken).burn(result.creditToBurn);
+        if (principal != 0) {
+            CreditToken(creditToken).burn(principal);
         }
 
         // handle profit & losses
-        if (result.pnl != 0) {
-            if (result.pnl > 0) {
-                // forward profit to ProfitManager before notifying it of profits
-                // the ProfitManager will handle profit distribution.
+        if (pnl != 0) {
+            // forward profit, if any
+            if (interest != 0) {
                 CreditToken(creditToken).transfer(
                     profitManager,
-                    result.creditToProfit
+                    interest
                 );
-            } else if (result.pnl < 0) {
-                // if auction resulted in bad debt, prevent new loans from being issued and allow
-                // force-closing of all loans (seize() without call() first).
-                hardCap = 0;
             }
-            ProfitManager(profitManager).notifyPnL(address(this), result.pnl);
+            ProfitManager(profitManager).notifyPnL(address(this), pnl);
         }
 
-        // decrease issuance
-        issuance -= loans[loanId].borrowAmount;
+        // replenish buffer, decrease issuance
+        RateLimitedMinter(creditMinter).replenishBuffer(borrowAmount);
+        issuance -= borrowAmount;
 
         // send collateral to borrower
-        if (result.collateralToBorrower != 0) {
+        if (collateralToBorrower != 0) {
             IERC20(collateralToken).safeTransfer(
                 loans[loanId].borrower,
-                result.collateralToBorrower
-            );
-        }
-
-        // send collateral to caller
-        if (result.collateralToCaller != 0) {
-            IERC20(collateralToken).safeTransfer(
-                loans[loanId].caller,
-                result.collateralToCaller
+                collateralToBorrower
             );
         }
 
         // send collateral to bidder
-        if (result.collateralToBidder != 0) {
+        if (collateralToBidder != 0) {
             IERC20(collateralToken).safeTransfer(
                 bidder,
-                result.collateralToBidder
+                collateralToBidder
             );
         }
 
-        emit LoanBid(
+        emit LoanClose(
             block.timestamp,
             loanId,
-            result.collateralToBidder,
-            result.creditFromBidder
+            LoanCloseType.Call,
+            creditFromBidder
         );
     }
 
