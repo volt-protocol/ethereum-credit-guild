@@ -7,11 +7,11 @@ import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 
 /// @notice Utils to offboard a LendingTerm.
-/// This contracts works somewhat similarly to a Veto governor: any GUILD holder can poll for the removal
+/// This contract works somewhat similarly to a Veto governor: any GUILD holder can poll for the removal
 /// of a lending term, and if enough GUILD holders vote for a removal poll, the term can be offboarded
 /// without delay.
 /// When a term is offboarded, no new loans can be issued, and GUILD holders cannot vote for the term anymore.
-/// After a term is offboarded, all the loans have to be called, and the term can be cleaned up (roles).
+/// After a term is offboarded, all the loans have to be called, then the term can be cleaned up (roles).
 contract LendingTermOffboarding is CoreRef {
     /// @notice emitted when a user supports the removal of a lending term
     event OffboardSupport(
@@ -152,7 +152,6 @@ contract LendingTermOffboarding is CoreRef {
         );
 
         // update protocol config
-        LendingTerm(term).setHardCap(0);
         core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
         core().revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, term);
 

@@ -294,7 +294,6 @@ contract LendingTermOffboardingUnitTest is Test {
         offboarder.cleanup(address(term));
 
         assertEq(offboarder.canOffboard(address(term)), false);
-        assertEq(term.hardCap(), 0);
         assertEq(core.hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term)), false);
         assertEq(core.hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term)), false);
     }
