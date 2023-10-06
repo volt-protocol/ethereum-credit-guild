@@ -125,13 +125,16 @@ contract Proposal_0 is Proposal {
                 650, // midPoint = 10m50s
                 1800 // auctionDuration = 30m
             );
-            LendingTerm termUSDC1 = new LendingTerm(
+            LendingTerm termUSDC1 = new LendingTerm();
+            termUSDC1.initialize(
                 addresses.mainnet("CORE"),
-                addresses.mainnet("PROFIT_MANAGER"),
-                addresses.mainnet("ERC20_GUILD"),
-                address(auctionHouse),
-                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
-                addresses.mainnet("ERC20_CREDIT"),
+                LendingTerm.LendingTermReferences({
+                    profitManager: addresses.mainnet("PROFIT_MANAGER"),
+                    guildToken: addresses.mainnet("ERC20_GUILD"),
+                    auctionHouse: address(auctionHouse),
+                    creditMinter: addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
+                    creditToken: addresses.mainnet("ERC20_CREDIT")
+                }),
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet("ERC20_USDC"),
                     maxDebtPerCollateralToken: 1e30, // 1 CREDIT per USDC collateral + 12 decimals correction
@@ -142,13 +145,16 @@ contract Proposal_0 is Proposal {
                     hardCap: 2_000_000e18 // max 2M CREDIT issued
                 })
             );
-            LendingTerm termSDAI1 = new LendingTerm(
+            LendingTerm termSDAI1 = new LendingTerm();
+            termSDAI1.initialize(
                 addresses.mainnet("CORE"),
-                addresses.mainnet("PROFIT_MANAGER"),
-                addresses.mainnet("ERC20_GUILD"),
-                address(auctionHouse),
-                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
-                addresses.mainnet("ERC20_CREDIT"),
+                LendingTerm.LendingTermReferences({
+                    profitManager: addresses.mainnet("PROFIT_MANAGER"),
+                    guildToken: addresses.mainnet("ERC20_GUILD"),
+                    auctionHouse: address(auctionHouse),
+                    creditMinter: addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
+                    creditToken: addresses.mainnet("ERC20_CREDIT")
+                }),
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction

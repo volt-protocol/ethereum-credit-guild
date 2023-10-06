@@ -53,13 +53,16 @@ contract AuctionHouseUnitTest is Test {
             _MIDPOINT,
             _AUCTION_DURATION
         );
-        term = new LendingTerm(
-            address(core), /*_core*/
-            address(profitManager), /*_profitManager*/
-            address(guild), /*_guildToken*/
-            address(auctionHouse), /*_auctionHouse*/
-            address(rlcm), /*_creditMinter*/
-            address(credit), /*_creditToken*/
+        term = new LendingTerm();
+        term.initialize(
+            address(core),
+            LendingTerm.LendingTermReferences({
+                profitManager: address(profitManager),
+                guildToken: address(guild),
+                auctionHouse: address(auctionHouse),
+                creditMinter: address(rlcm),
+                creditToken: address(credit)
+            }),
             LendingTerm.LendingTermParams({
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: 2000e18, // 2000, same decimals

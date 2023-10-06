@@ -58,13 +58,16 @@ contract LendingTermSignaturesUnitTest is Test {
             650,
             1800
         );
-        term = new LendingTerm(
-            address(core), /*_core*/
-            address(profitManager), /*_profitManager*/
-            address(guild), /*_guildToken*/
-            address(auctionHouse), /*_auctionHouse*/
-            address(rlcm), /*_creditMinter*/
-            address(credit), /*_creditToken*/
+        term = new LendingTerm();
+        term.initialize(
+            address(core),
+            LendingTerm.LendingTermReferences({
+                profitManager: address(profitManager),
+                guildToken: address(guild),
+                auctionHouse: address(auctionHouse),
+                creditMinter: address(rlcm),
+                creditToken: address(credit)
+            }),
             LendingTerm.LendingTermParams({
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
