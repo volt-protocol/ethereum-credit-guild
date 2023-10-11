@@ -21,10 +21,6 @@ contract SurplusGuildMinterUnitTest is Test {
     RateLimitedMinter rlgm;
     SurplusGuildMinter sgm;
 
-    // GUILD params
-    uint32 constant _CYCLE_LENGTH = 1 hours;
-    uint32 constant _FREEZE_PERIOD = 10 minutes;
-
     // GuildMinter params
     uint256 constant RATIO = 2e18;
     uint256 constant INTEREST_RATE = 0.1e18; // 10%
@@ -36,7 +32,7 @@ contract SurplusGuildMinterUnitTest is Test {
 
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit));
         rlgm = new RateLimitedMinter(
             address(core), /*_core*/
             address(guild), /*_token*/
@@ -72,7 +68,7 @@ contract SurplusGuildMinterUnitTest is Test {
 
         // add gauge and vote for it
         guild.setMaxGauges(10);
-        guild.addGauge(term);
+        guild.addGauge(1, term);
         guild.mint(address(this), 50e18);
         guild.incrementGauge(term, uint112(50e18));
 
@@ -266,11 +262,11 @@ contract SurplusGuildMinterUnitTest is Test {
         // add a 2 terms with equal weight
         address term1 = address(1820918292128018201);
         address term2 = address(9080918209281092812);
-        guild.addGauge(term1);
-        guild.addGauge(term2);
+        guild.addGauge(1, term1);
+        guild.addGauge(1, term2);
         guild.mint(address(this), 100e18);
-        guild.incrementGauge(term1, uint112(50e18));
-        guild.incrementGauge(term2, uint112(50e18));
+        guild.incrementGauge(term1, 50e18);
+        guild.incrementGauge(term2, 50e18);
 
         address user1 = address(19028109281092);
         address user2 = address(88120812019200);

@@ -7,6 +7,10 @@ import {ERC20RebaseDistributor} from "@src/tokens/ERC20RebaseDistributor.sol";
 
 contract MockERC20RebaseDistributor is ERC20RebaseDistributor, MockERC20 {
 
+    function decimals() public view override(ERC20, MockERC20) returns (uint8) {
+        return MockERC20.decimals();
+    }
+
     /// ------------------------------------------------------------------------
     /// Overrides required by Solidity.
     /// ------------------------------------------------------------------------

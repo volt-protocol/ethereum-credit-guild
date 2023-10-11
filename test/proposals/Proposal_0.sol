@@ -1,11 +1,14 @@
 //SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
 import {Addresses} from "@test/proposals/Addresses.sol";
 
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
@@ -40,9 +43,7 @@ contract Proposal_0 is Proposal {
             GuildToken guild = new GuildToken(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("PROFIT_MANAGER"),
-                address(credit),
-                7 days, // gaugeCycleLength,
-                0 // incrementFreezeWindow
+                address(credit)
             );
             RateLimitedMinter rateLimitedCreditMinter = new RateLimitedMinter(
                 addresses.mainnet("CORE"),
@@ -112,11 +113,17 @@ contract Proposal_0 is Proposal {
 
         // Terms & Auction House
         {
+            SimplePSM psm = new SimplePSM(
+                addresses.mainnet("CORE"),
+                addresses.mainnet("PROFIT_MANAGER"),
+                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
+                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_USDC")
+            );
             AuctionHouse auctionHouse = new AuctionHouse(
                 addresses.mainnet("CORE"),
                 650, // midPoint = 10m50s
-                1800, // auctionDuration = 30m
-                0.1e18 // dangerPenalty = 10%
+                1800 // auctionDuration = 30m
             );
             LendingTerm termUSDC1 = new LendingTerm(
                 addresses.mainnet("CORE"),
@@ -132,10 +139,7 @@ contract Proposal_0 is Proposal {
                     maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
                     minPartialRepayPercent: 0, // no minimum size for partial repay
                     openingFee: 0, // 0%
-                    callFee: 0.01e18, // 1%
-                    callPeriod: 120, // 2 minutes
-                    hardCap: 2_000_000e18, // max 2M CREDIT issued
-                    ltvBuffer: 0.05e18 // 5% overcollateralization needed
+                    hardCap: 2_000_000e18 // max 2M CREDIT issued
                 })
             );
             LendingTerm termSDAI1 = new LendingTerm(
@@ -152,12 +156,10 @@ contract Proposal_0 is Proposal {
                     maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
                     minPartialRepayPercent: 0, // no minimum size for partial repay
                     openingFee: 0, // 0%
-                    callFee: 0.01e18, // 1%
-                    callPeriod: 120, // 2 minutes
-                    hardCap: 2_000_000e18, // max 2M CREDIT issued
-                    ltvBuffer: 0 // loans do not require overcollateralization (sDAI is itself worth more than 1 DAI)
+                    hardCap: 2_000_000e18 // max 2M CREDIT issued
                 })
             );
+            addresses.addMainnet("PSM_USDC", address(psm));
             addresses.addMainnet("AUCTION_HOUSE_1", address(auctionHouse));
             addresses.addMainnet("TERM_USDC_1", address(termUSDC1));
             addresses.addMainnet("TERM_SDAI_1", address(termSDAI1));
@@ -179,6 +181,7 @@ contract Proposal_0 is Proposal {
         core.grantRole(CoreRoles.CREDIT_MINTER, addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"));
 
         // RATE_LIMITED_CREDIT_MINTER
+        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, addresses.mainnet("PSM_USDC"));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, addresses.mainnet("TERM_USDC_1"));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, addresses.mainnet("TERM_SDAI_1"));
 
@@ -247,13 +250,32 @@ contract Proposal_0 is Proposal {
         );
         GuildToken(addresses.mainnet("ERC20_GUILD")).setMaxGauges(10);
         GuildToken(addresses.mainnet("ERC20_GUILD")).addGauge(
+            1,
             addresses.mainnet("TERM_USDC_1")
         );
         GuildToken(addresses.mainnet("ERC20_GUILD")).addGauge(
+            1,
             addresses.mainnet("TERM_SDAI_1")
         );
-        CreditToken(addresses.mainnet("ERC20_GUILD")).setMaxDelegates(10);
+        GuildToken(addresses.mainnet("ERC20_GUILD")).setMaxDelegates(10);
         CreditToken(addresses.mainnet("ERC20_CREDIT")).setMaxDelegates(10);
+
+        // Mint the first CREDIT tokens and enter rebase
+        // Doing this with a non-dust balance ensures the share price internally
+        // to the CreditToken has a reasonable size.
+        {
+            ERC20 usdc = ERC20(addresses.mainnet("ERC20_USDC"));
+            SimplePSM psm = SimplePSM(addresses.mainnet("PSM_USDC"));
+            CreditToken credit = CreditToken(addresses.mainnet("ERC20_CREDIT"));
+            if (usdc.balanceOf(deployer) >= 100e6) {
+                usdc.approve(
+                    address(psm),
+                    100e6
+                );
+                psm.mint(deployer, 100e6);
+                credit.enterRebase();
+            }
+        }
 
         // deployer renounces governor role
         core.renounceRole(CoreRoles.GOVERNOR, deployer);

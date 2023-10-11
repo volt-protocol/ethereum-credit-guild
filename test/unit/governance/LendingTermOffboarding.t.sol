@@ -30,17 +30,10 @@ contract LendingTermOffboardingUnitTest is Test {
     bytes32 private aliceLoanId;
     uint256 private aliceLoanSize = 500_000e18;
 
-    // GUILD params
-    uint32 private constant _CYCLE_LENGTH = 1 hours;
-    uint32 private constant _FREEZE_PERIOD = 10 minutes;
-
     // LendingTerm params
     uint256 private constant _CREDIT_PER_COLLATERAL_TOKEN = 1e18; // 1:1, same decimals
     uint256 private constant _INTEREST_RATE = 0.05e18; // 5% APR
-    uint256 private constant _CALL_FEE = 0.05e18; // 5%
-    uint256 private constant _CALL_PERIOD = 1 hours;
     uint256 private constant _HARDCAP = 1_000_000e18;
-    uint256 private constant _LTV_BUFFER = 0; // 0%
 
     // LendingTermOffboarding params
     uint32 private constant _QUORUM = 10 minutes;
@@ -53,7 +46,7 @@ contract LendingTermOffboardingUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(profitManager), address(credit), _CYCLE_LENGTH, _FREEZE_PERIOD);
+        guild = new GuildToken(address(core), address(profitManager), address(credit));
         profitManager.initializeReferences(address(credit), address(guild));
         collateral = new MockERC20();
         rlcm = new RateLimitedMinter(
@@ -68,8 +61,7 @@ contract LendingTermOffboardingUnitTest is Test {
         auctionHouse = new AuctionHouse(
             address(core),
             650,
-            1800,
-            0.1e18
+            1800
         );
         term = new LendingTerm(
             address(core), /*_core*/
@@ -85,10 +77,7 @@ contract LendingTermOffboardingUnitTest is Test {
                 maxDelayBetweenPartialRepay: 0,
                 minPartialRepayPercent: 0,
                 openingFee: 0,
-                callFee: _CALL_FEE,
-                callPeriod: _CALL_PERIOD,
-                hardCap: _HARDCAP,
-                ltvBuffer: _LTV_BUFFER
+                hardCap: _HARDCAP
             })
         );
         
@@ -109,9 +98,9 @@ contract LendingTermOffboardingUnitTest is Test {
 
         // add gauge and vote for it
         guild.setMaxGauges(10);
-        guild.addGauge(address(term));
+        guild.addGauge(1, address(term));
         guild.mint(address(this), _HARDCAP * 2);
-        guild.incrementGauge(address(term), uint112(_HARDCAP));
+        guild.incrementGauge(address(term), _HARDCAP);
 
         // allow GUILD delegations
         guild.setMaxDelegates(10);

@@ -8,6 +8,16 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract MockERC20 is ERC20, ERC20Permit, ERC20Burnable {
     constructor() ERC20("MockToken", "MCT") ERC20Permit("MockToken") {}
 
+    uint8 internal _decimals = 18;
+
+    function decimals() public view virtual override returns (uint8) {
+        return _decimals;
+    }
+
+    function setDecimals(uint8 dec) public {
+        _decimals = dec;
+    }
+
     function mint(address account, uint256 amount) public returns (bool) {
         _mint(account, amount);
         return true;
