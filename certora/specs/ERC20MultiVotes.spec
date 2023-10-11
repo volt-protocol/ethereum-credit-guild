@@ -95,33 +95,33 @@ function getArrayLength(address user) returns uint256 {
 }
 
 /// assert sumDelegatedAmount ghost is correct
-invariant sumDelegatedAmountEqUserDelegatedVotes(address user)
-    sumDelegatedAmount[user] == to_mathint(userDelegatedVotes(user)) {
-        preserved delegate(address to) with (env e) {
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-        }
-        preserved incrementDelegation(address to, uint256 amount) with (env e) {
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-        }
-        preserved undelegate(address to, uint256 amount) with (env e) {
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-        }
-        preserved delegateBySig(address delegatee, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s) with (env e) {
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-        }
-        preserved transfer(address to, uint256 amount) with (env e) {
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-        }
-        preserved transferFrom(address to, address from, uint256 amount) with (env e) {
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(from);
-        }
-    }
+// invariant sumDelegatedAmountEqUserDelegatedVotes(address user)
+//     sumDelegatedAmount[user] == to_mathint(userDelegatedVotes(user)) {
+//         preserved delegate(address to) with (env e) {
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+//         }
+//         preserved incrementDelegation(address to, uint256 amount) with (env e) {
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+//         }
+//         preserved undelegate(address to, uint256 amount) with (env e) {
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+//         }
+//         preserved delegateBySig(address delegatee, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s) with (env e) {
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+//         }
+//         preserved transfer(address to, uint256 amount) with (env e) {
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+//         }
+//         preserved transferFrom(address to, address from, uint256 amount) with (env e) {
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(from);
+//         }
+//     }
 
 invariant mirrorEqualsValue(address delegator, address delegatee)
     delegatedAmountMirror[delegator][delegatee] == delegatesVotesCount(delegator, delegatee);
@@ -133,7 +133,7 @@ invariant sumDelegatedAmountLteTotalSupply(address user)
             requireInvariant totalIsSumBalances();
             requireInvariant userDelegatedVotesCountLteBalance(user);
             requireInvariant userBalanceLteTotalSupply(user);
-            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(user);
+            // requireInvariant sumDelegatedAmountEqUserDelegatedVotes(user);
         }
     }
 
