@@ -72,32 +72,19 @@ contract LendingTermOnboardingUnitTest is Test {
             1800
         );
         termImplementation = new LendingTerm();
-        termImplementation.initialize(
-            address(core),
-            LendingTerm.LendingTermReferences({
-                profitManager: address(profitManager),
-                guildToken: address(guild),
-                auctionHouse: address(auctionHouse),
-                creditMinter: address(rlcm),
-                creditToken: address(credit)
-            }),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(0),
-                maxDebtPerCollateralToken: 0,
-                interestRate: 0,
-                maxDelayBetweenPartialRepay: 0,
-                minPartialRepayPercent: 0,
-                openingFee: 0,
-                hardCap: 0
-            })
-        );
         timelock = new VoltTimelockController(
             address(core),
             _TIMELOCK_MIN_DELAY
         );
         onboarder = new LendingTermOnboarding(
             address(termImplementation), // _lendingTermImplementation
-            address(guild), // _guildToken
+            LendingTerm.LendingTermReferences({
+                profitManager: address(profitManager),
+                guildToken: address(guild),
+                auctionHouse: address(auctionHouse),
+                creditMinter: address(rlcm),
+                creditToken: address(credit)
+            }), /// _lendingTermReferences
             1, // _gaugeType
             address(core), // _core
             address(timelock), // _timelock
@@ -176,7 +163,7 @@ contract LendingTermOnboardingUnitTest is Test {
             hardCap: _HARDCAP
         })));
         vm.label(address(term), "term");
-        assertEq(address(term.core()), address(termImplementation.core()));
+        assertEq(address(term.core()), address(onboarder.core()));
 
         LendingTerm.LendingTermReferences memory refs = term.getReferences();
         assertEq(refs.profitManager, address(profitManager));
@@ -213,7 +200,7 @@ contract LendingTermOnboardingUnitTest is Test {
         // propose onboard
         vm.prank(alice);
         vm.expectRevert("Pausable: paused");
-        uint256 proposalId = onboarder.proposeOnboard(address(this));
+        onboarder.proposeOnboard(address(this));
     }
 
     function testProposeOnboard() public {

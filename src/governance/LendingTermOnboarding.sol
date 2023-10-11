@@ -37,9 +37,18 @@ contract LendingTermOnboarding is VoltGovernor {
     /// (used to check that a term has been created by this factory)
     mapping(address=>uint256) public created;
 
+    /// @notice reference to profitManager to set in created lending terms
+    address public immutable profitManager;
+    /// @notice reference to auctionHouse to set in created lending terms
+    address public immutable auctionHouse;
+    /// @notice reference to creditMinter to set in created lending terms
+    address public immutable creditMinter;
+    /// @notice reference to creditToken to set in created lending terms
+    address public immutable creditToken;
+
     constructor(
         address _lendingTermImplementation,
-        address _guildToken,
+        LendingTerm.LendingTermReferences memory _lendingTermReferences,
         uint256 _gaugeType,
         address _core,
         address _timelock,
@@ -51,7 +60,7 @@ contract LendingTermOnboarding is VoltGovernor {
         VoltGovernor(
             _core,
             _timelock,
-            _guildToken,
+            _lendingTermReferences.guildToken,
             initialVotingDelay,
             initialVotingPeriod,
             initialProposalThreshold,
@@ -59,16 +68,26 @@ contract LendingTermOnboarding is VoltGovernor {
         )
     {
         lendingTermImplementation = _lendingTermImplementation;
-        guildToken = _guildToken;
+        guildToken = _lendingTermReferences.guildToken;
         gaugeType = _gaugeType;
+        profitManager = _lendingTermReferences.profitManager;
+        auctionHouse = _lendingTermReferences.auctionHouse;
+        creditMinter = _lendingTermReferences.creditMinter;
+        creditToken = _lendingTermReferences.creditToken;
     }
 
     /// @notice Create a new LendingTerm and initialize it.
     function createTerm(LendingTerm.LendingTermParams calldata params) external returns (address) {
         address term = Clones.clone(lendingTermImplementation);
         LendingTerm(term).initialize(
-            address(LendingTerm(lendingTermImplementation).core()),
-            LendingTerm(lendingTermImplementation).getReferences(),
+            address(core()),
+            LendingTerm.LendingTermReferences({
+                profitManager: profitManager,
+                guildToken: guildToken,
+                auctionHouse: auctionHouse,
+                creditMinter: creditMinter,
+                creditToken: creditToken
+            }),
             params
         );
         created[term] = block.timestamp;

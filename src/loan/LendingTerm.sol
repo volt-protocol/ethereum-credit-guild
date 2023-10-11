@@ -162,7 +162,11 @@ contract LendingTerm is CoreRef {
     /// @notice Params of the LendingTerm (see struct for more details)
     LendingTermParams internal params;
 
-    constructor() CoreRef(address(0)) {}
+    constructor() CoreRef(address(1)) {
+        // prevent implementation to be initialized,
+        // only proxies on the implementation can be initialized.
+        _setCore(address(1));
+    }
 
     /// @notice initialize storage with references to other protocol contracts
     /// and the lending term parameters for this instance.

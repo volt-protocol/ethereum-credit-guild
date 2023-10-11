@@ -88,25 +88,6 @@ contract Proposal_0 is Proposal {
             );
 
             LendingTerm termV1 = new LendingTerm();
-            termV1.initialize(
-                addresses.mainnet("CORE"),
-                LendingTerm.LendingTermReferences({
-                    profitManager: addresses.mainnet("PROFIT_MANAGER"),
-                    guildToken: addresses.mainnet("ERC20_GUILD"),
-                    auctionHouse: address(auctionHouse),
-                    creditMinter: addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
-                    creditToken: addresses.mainnet("ERC20_CREDIT")
-                }),
-                LendingTerm.LendingTermParams({
-                    collateralToken: address(0),
-                    maxDebtPerCollateralToken: 0,
-                    interestRate: 0,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: 0
-                })
-            );
 
             addresses.addMainnet("AUCTION_HOUSE_1", address(auctionHouse));
             addresses.addMainnet("LENDING_TERM_V1", address(termV1));
@@ -140,7 +121,13 @@ contract Proposal_0 is Proposal {
             );
             LendingTermOnboarding termOnboarding = new LendingTermOnboarding(
                 addresses.mainnet("LENDING_TERM_V1"), // _lendingTermImplementation
-                addresses.mainnet("ERC20_GUILD"), // _guildToken
+                LendingTerm.LendingTermReferences({
+                    profitManager: addresses.mainnet("PROFIT_MANAGER"),
+                    guildToken: addresses.mainnet("ERC20_GUILD"),
+                    auctionHouse: addresses.mainnet("AUCTION_HOUSE_V1"),
+                    creditMinter: addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
+                    creditToken: addresses.mainnet("ERC20_CREDIT")
+                }), /// _lendingTermReferences
                 1, // _gaugeType
                 addresses.mainnet("CORE"), // _core
                 addresses.mainnet("TIMELOCK"), // _timelock
