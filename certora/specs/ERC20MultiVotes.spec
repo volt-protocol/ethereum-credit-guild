@@ -95,33 +95,55 @@ function getArrayLength(address user) returns uint256 {
 }
 
 /// assert sumDelegatedAmount ghost is correct
-// invariant sumDelegatedAmountEqUserDelegatedVotes(address user)
-//     sumDelegatedAmount[user] == to_mathint(userDelegatedVotes(user)) {
-//         preserved delegate(address to) with (env e) {
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-//         }
-//         preserved incrementDelegation(address to, uint256 amount) with (env e) {
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-//         }
-//         preserved undelegate(address to, uint256 amount) with (env e) {
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-//         }
-//         preserved delegateBySig(address delegatee, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s) with (env e) {
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-//         }
-//         preserved transfer(address to, uint256 amount) with (env e) {
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
-//         }
-//         preserved transferFrom(address to, address from, uint256 amount) with (env e) {
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
-//             requireInvariant sumDelegatedAmountEqUserDelegatedVotes(from);
-//         }
-//     }
+invariant sumDelegatedAmountEqUserDelegatedVotes(address user)
+    sumDelegatedAmount[user] == to_mathint(userDelegatedVotes(user)) {
+        preserved {
+            requireInvariant mirrorIsTrue(user);
+        }
+        preserved delegate(address to) with (env e) {
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(user);
+            requireInvariant mirrorIsTrue(e.msg.sender);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved incrementDelegation(address to, uint256 amount) with (env e) {
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(user);
+            requireInvariant mirrorIsTrue(e.msg.sender);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved undelegate(address to, uint256 amount) with (env e) {
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(user);
+            requireInvariant mirrorIsTrue(e.msg.sender);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved delegateBySig(address delegatee, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s) with (env e) {
+            requireInvariant mirrorIsTrue(delegatee);
+            requireInvariant mirrorIsTrue(user);
+            requireInvariant mirrorIsTrue(e.msg.sender);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved transfer(address to, uint256 amount) with (env e) {
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(user);
+            requireInvariant mirrorIsTrue(e.msg.sender);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved transferFrom(address to, address from, uint256 amount) with (env e) {
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(from);
+            requireInvariant mirrorIsTrue(user);
+            requireInvariant mirrorIsTrue(e.msg.sender);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(from);
+        }
+    }
 
 invariant mirrorEqualsValue(address delegator, address delegatee)
     delegatedAmountMirror[delegator][delegatee] == delegatesVotesCount(delegator, delegatee);
@@ -129,13 +151,149 @@ invariant mirrorEqualsValue(address delegator, address delegatee)
 invariant sumDelegatedAmountLteTotalSupply(address user)
     sumDelegatedAmount[user] <= to_mathint(totalSupply()) {
         preserved {
+            address a;
+            requireInvariant totalIsSumBalances();
+            requireInvariant totalSupplyIsSumOfBalances();
+            requireInvariant userBalanceLteTotalSupply(user);
+            requireInvariant userDelegatedVotesCountLteBalance(user);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(user);
+            requireInvariant delegatesVotesCountLteUserDelegatedVotes(user, a);
+        }
+        preserved delegate(address to) with (env e) {
             requireInvariant totalSupplyIsSumOfBalances();
             requireInvariant totalIsSumBalances();
             requireInvariant userDelegatedVotesCountLteBalance(user);
             requireInvariant userBalanceLteTotalSupply(user);
-            // requireInvariant sumDelegatedAmountEqUserDelegatedVotes(user);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(user);
+            requireInvariant delegatesVotesCountCorrect(e.msg.sender, to);
+            requireInvariant delegatesVotesCountLteUserDelegatedVotes(e.msg.sender, to);
+        }
+        preserved incrementDelegation(address to, uint256 amt) with (env e) {
+            requireInvariant totalSupplyIsSumOfBalances();
+            requireInvariant totalIsSumBalances();
+            requireInvariant userDelegatedVotesCountLteBalance(user);
+            requireInvariant userBalanceLteTotalSupply(user);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(user);
+            requireInvariant delegatesVotesCountCorrect(e.msg.sender, to);
+            requireInvariant delegatesVotesCountLteUserDelegatedVotes(e.msg.sender, to);
+        }
+        preserved delegateBySig(address to, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s) with (env e) {
+            requireInvariant totalSupplyIsSumOfBalances();
+            requireInvariant totalIsSumBalances();
+            requireInvariant userDelegatedVotesCountLteBalance(user);
+            requireInvariant userBalanceLteTotalSupply(user);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(user);
+            requireInvariant delegatesVotesCountCorrect(e.msg.sender, to);
+            requireInvariant delegatesVotesCountLteUserDelegatedVotes(e.msg.sender, to);
         }
     }
+
+invariant delegatesVotesCountLteUserDelegatedVotes(address delegator, address delegatee)
+    ((delegator != delegatee) && (delegatesVotesCount(delegator, delegatee) != 0)) =>
+        delegatesVotesCount(delegator, delegatee) <= userDelegatedVotes(delegator) {
+            preserved {
+                requireInvariant userBalanceLteTotalSupply(delegatee);
+                requireInvariant userBalanceLteTotalSupply(delegator);
+                requireInvariant checkCvlLength(delegatee);
+                requireInvariant checkCvlLength(delegator);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegatee);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegator);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegator);
+            }
+            preserved delegate(address to) with (env e) {
+                requireInvariant userBalanceLteTotalSupply(delegatee);
+                requireInvariant userBalanceLteTotalSupply(delegator);
+                requireInvariant userBalanceLteTotalSupply(to);
+                requireInvariant userBalanceLteTotalSupply(e.msg.sender);
+                requireInvariant checkCvlLength(to);
+                requireInvariant checkCvlLength(delegatee);
+                requireInvariant checkCvlLength(delegator);
+                requireInvariant checkCvlLength(e.msg.sender);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegatee);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegator);
+                requireInvariant sumDelegatedAmountLteTotalSupply(e.msg.sender);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegator);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+                requireInvariant sumOfTwo(to, e.msg.sender);
+            }
+            preserved undelegate(address to, uint256 amt) with (env e) {
+                requireInvariant userBalanceLteTotalSupply(delegatee);
+                requireInvariant userBalanceLteTotalSupply(delegator);
+                requireInvariant userBalanceLteTotalSupply(to);
+                requireInvariant userBalanceLteTotalSupply(e.msg.sender);
+                requireInvariant checkCvlLength(to);
+                requireInvariant checkCvlLength(delegatee);
+                requireInvariant checkCvlLength(delegator);
+                requireInvariant checkCvlLength(e.msg.sender);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegatee);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegator);
+                requireInvariant sumDelegatedAmountLteTotalSupply(e.msg.sender);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegator);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+                requireInvariant sumOfTwo(to, e.msg.sender);
+            }
+            preserved delegateBySig(address to, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s) with (env e) {
+                requireInvariant userBalanceLteTotalSupply(delegatee);
+                requireInvariant userBalanceLteTotalSupply(delegator);
+                requireInvariant userBalanceLteTotalSupply(to);
+                requireInvariant userBalanceLteTotalSupply(e.msg.sender);
+                requireInvariant checkCvlLength(to);
+                requireInvariant checkCvlLength(delegatee);
+                requireInvariant checkCvlLength(delegator);
+                requireInvariant checkCvlLength(e.msg.sender);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegatee);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegator);
+                requireInvariant sumDelegatedAmountLteTotalSupply(e.msg.sender);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegator);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+                requireInvariant sumOfTwo(to, e.msg.sender);
+            }
+            preserved transfer(address to, uint256 amt) with (env e) {
+                requireInvariant sumOfTwo(to, e.msg.sender);
+                requireInvariant userBalanceLteTotalSupply(delegatee);
+                requireInvariant userBalanceLteTotalSupply(delegator);
+                requireInvariant userBalanceLteTotalSupply(to);
+                requireInvariant userBalanceLteTotalSupply(e.msg.sender);
+                requireInvariant checkCvlLength(to);
+                requireInvariant checkCvlLength(delegatee);
+                requireInvariant checkCvlLength(delegator);
+                requireInvariant checkCvlLength(e.msg.sender);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegatee);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegator);
+                requireInvariant sumDelegatedAmountLteTotalSupply(e.msg.sender);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegator);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            }
+            preserved transferFrom(address to, address from, uint256 amt) with (env e) {
+                requireInvariant sumOfTwo(from, to);
+                requireInvariant userBalanceLteTotalSupply(delegatee);
+                requireInvariant userBalanceLteTotalSupply(delegator);
+                requireInvariant userBalanceLteTotalSupply(to);
+                requireInvariant userBalanceLteTotalSupply(from);
+                requireInvariant userBalanceLteTotalSupply(e.msg.sender);
+                requireInvariant checkCvlLength(to);
+                requireInvariant checkCvlLength(from);
+                requireInvariant checkCvlLength(delegatee);
+                requireInvariant checkCvlLength(delegator);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegatee);
+                requireInvariant sumDelegatedAmountLteTotalSupply(delegator);
+                requireInvariant sumDelegatedAmountLteTotalSupply(to);
+                requireInvariant sumDelegatedAmountLteTotalSupply(from);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegator);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+                requireInvariant sumDelegatedAmountEqUserDelegatedVotes(from);
+            }
+        }
 
 invariant totalSupplyIsSumOfBalances()
     to_mathint(totalSupply()) == sumBalances;
@@ -179,7 +337,7 @@ invariant delegatesVotesCountCorrect(address delegator, address delegatee)
     }
 
 invariant userDelegatedVotesCountLteBalance(address delegator)
-    balanceOf(delegator) <= userDelegatedVotes(delegator) {
+    balanceOf(delegator) >= userDelegatedVotes(delegator) {
         preserved {
             address delegatee;
 
@@ -190,6 +348,53 @@ invariant userDelegatedVotesCountLteBalance(address delegator)
             /// balance checks
             requireInvariant mirrorIsTrue(delegator);
             requireInvariant userBalanceLteTotalSupply(delegator);
+        }
+        preserved delegate(address to) with (env e) {
+            requireInvariant userDelegatesVotesCount(e.msg.sender, to);
+            requireInvariant checkCvlLength(delegator);
+            requireInvariant checkCvlLength(to);
+            requireInvariant checkCvlLength(e.msg.sender);
+            /// total supply check
+            requireInvariant totalIsSumBalances();
+            /// balance checks
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(delegator);
+            requireInvariant mirrorIsTrue(e.msg.sender);
+            requireInvariant userBalanceLteTotalSupply(to);
+            requireInvariant userBalanceLteTotalSupply(delegator);
+            requireInvariant userBalanceLteTotalSupply(e.msg.sender);
+        }
+        preserved transfer(address to, uint256 amt) with (env e) {
+            requireInvariant userDelegatesVotesCount(e.msg.sender, to);
+            requireInvariant checkCvlLength(delegator);
+            requireInvariant checkCvlLength(to);
+            requireInvariant checkCvlLength(e.msg.sender);
+            /// total supply check
+            requireInvariant totalIsSumBalances();
+            /// balance checks
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(delegator);
+            requireInvariant mirrorIsTrue(e.msg.sender);
+            requireInvariant userBalanceLteTotalSupply(to);
+            requireInvariant userBalanceLteTotalSupply(delegator);
+            requireInvariant userBalanceLteTotalSupply(e.msg.sender);
+        }
+        preserved transferFrom(address to, address from, uint256 amt) with (env e) {
+            requireInvariant userDelegatesVotesCount(to, from);
+            requireInvariant checkCvlLength(delegator);
+            requireInvariant checkCvlLength(to);
+            requireInvariant checkCvlLength(from);
+            requireInvariant checkCvlLength(e.msg.sender);
+            /// total supply check
+            requireInvariant totalIsSumBalances();
+            /// balance checks
+            requireInvariant mirrorIsTrue(from);
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(delegator);
+            requireInvariant mirrorIsTrue(e.msg.sender);
+            requireInvariant userBalanceLteTotalSupply(to);
+            requireInvariant userBalanceLteTotalSupply(delegator);
+            requireInvariant userBalanceLteTotalSupply(e.msg.sender);
         }
     }
 
