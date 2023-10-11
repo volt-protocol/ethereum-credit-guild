@@ -48,12 +48,6 @@ hook Sstore _delegatesVotesCount[KEY address delegator][KEY address delegatee] u
     sumDelegatedAmount[delegatee] = sumDelegatedAmount[delegatee] - oldValue + newValue;
 }
 
-invariant mirrorEqualsValue(address delegator, address delegatee)
-    delegatedAmountMirror[delegator][delegatee] == delegatesVotesCount(delegator, delegatee);
-
-invariant sumDelegatedAmountLteBalance(address user)
-    sumDelegatedAmount[user] <= to_mathint(balanceOf(user));
-
 /// ---------------- Balances Ghost ----------------
 
 /// @title A ghost to mirror the balances, needed for `sumBalances`
@@ -100,10 +94,61 @@ function getArrayLength(address user) returns uint256 {
     return array.length;
 }
 
+/// assert sumDelegatedAmount ghost is correct
+invariant sumDelegatedAmountEqUserDelegatedVotes(address user)
+    sumDelegatedAmount[user] == to_mathint(userDelegatedVotes(user)) {
+        preserved delegate(address to) with (env e) {
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved incrementDelegation(address to, uint256 amount) with (env e) {
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved undelegate(address to, uint256 amount) with (env e) {
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved delegateBySig(address delegatee, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s) with (env e) {
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(delegatee);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved transfer(address to, uint256 amount) with (env e) {
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(e.msg.sender);
+        }
+        preserved transferFrom(address to, address from, uint256 amount) with (env e) {
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(to);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(from);
+        }
+    }
 
+invariant mirrorEqualsValue(address delegator, address delegatee)
+    delegatedAmountMirror[delegator][delegatee] == delegatesVotesCount(delegator, delegatee);
+
+invariant sumDelegatedAmountLteTotalSupply(address user)
+    sumDelegatedAmount[user] <= to_mathint(totalSupply()) {
+        preserved {
+            requireInvariant totalSupplyIsSumOfBalances();
+            requireInvariant totalIsSumBalances();
+            requireInvariant userDelegatedVotesCountLteBalance(user);
+            requireInvariant userBalanceLteTotalSupply(user);
+            requireInvariant sumDelegatedAmountEqUserDelegatedVotes(user);
+        }
+    }
 
 invariant totalSupplyIsSumOfBalances()
     to_mathint(totalSupply()) == sumBalances;
+
+invariant userBalanceLteTotalSupply(address user)
+    totalSupply() >= balanceOf(user) {
+        preserved {
+            /// assert mirrors
+            requireInvariant mirrorIsTrue(user);
+            requireInvariant totalSupplyIsSumOfBalances();
+            requireInvariant totalIsSumBalances();
+        }
+    }
 
 invariant delegatesLteMaxDelegatesAmt(address user)
     getArrayLength(user) <= maxDelegates() || canContractExceedMaxDelegates(user);
@@ -114,15 +159,120 @@ invariant contractCannotExceedMaxDelegates(address user)
 invariant checkCvlLength(address user)
     getArrayLength(user) == delegateCount(user);
 
-invariant delegatesVotesCount(address delegator, address delegatee)
+/// if user a has delegated to user b, then a must contain delegate b (invalid state)
+/// ensure either user does not have more delegatesVotesCountCorrect than balance (invalid state)
+/// user delegate counts must sum the length of the array of their delegates (invalid state)
+invariant delegatesVotesCountCorrect(address delegator, address delegatee)
     (((delegatesVotesCount(delegator, delegatee) != 0)) => (containsDelegate(delegator, delegatee))) &&
-    ((delegatesVotesCount(delegatee, delegator) != 0) => containsDelegate(delegatee, delegator));
+    ((delegatesVotesCount(delegatee, delegator) != 0) => containsDelegate(delegatee, delegator)) {
+        preserved {
+            /// user cannot have delegated more votes than their balance
+            requireInvariant userDelegatesVotesCount(delegator, delegatee);
+            requireInvariant userDelegatesVotesCount(delegatee, delegator);
+            /// user cannot have delegated to more than max 
+            requireInvariant delegatesLteMaxDelegatesAmt(delegatee);
+            requireInvariant delegatesLteMaxDelegatesAmt(delegator);
+            /// user delegate counts must add up
+            requireInvariant checkCvlLength(delegatee);
+            requireInvariant checkCvlLength(delegator);
+        }
+    }
 
-invariant userDelegatedVotesLteBalance(address delegator, address delegatee)
-    balanceOf(delegator) >= delegatesVotesCount(delegator, delegatee);
+invariant userDelegatedVotesCountLteBalance(address delegator)
+    balanceOf(delegator) <= userDelegatedVotes(delegator) {
+        preserved {
+            address delegatee;
+
+            requireInvariant userDelegatesVotesCount(delegator, delegatee);
+            requireInvariant checkCvlLength(delegator);
+            /// total supply check
+            requireInvariant totalIsSumBalances();
+            /// balance checks
+            requireInvariant mirrorIsTrue(delegator);
+            requireInvariant userBalanceLteTotalSupply(delegator);
+        }
+    }
+
+/// user delegated votes 
+invariant userDelegatesVotesCount(address delegator, address delegatee)
+    balanceOf(delegator) >= delegatesVotesCount(delegator, delegatee) {
+        preserved {
+            /// checks cvl length
+            /// checks delegates lte max delegates amt
+            /// checks user delegated votes lte balance
+            requireInvariant delegatesVotesCountCorrect(delegator, delegatee);
+            /// ensure user has not delegated more votes than balance
+            requireInvariant userDelegatedVotesCountLteBalance(delegator);
+            requireInvariant userDelegatedVotesCountLteBalance(delegatee);
+        }
+        preserved delegate(address to) with (env e) {
+            requireInvariant delegatesVotesCountCorrect(delegator, delegatee);
+            /// ensure user has not delegated more votes than balance
+            requireInvariant userDelegatedVotesCountLteBalance(delegator);
+            requireInvariant userDelegatedVotesCountLteBalance(delegatee);
+            requireInvariant delegatesVotesCountCorrect(delegator, delegatee);
+            requireInvariant userDelegatesVotesCount(e.msg.sender, to);
+            /// ensure user has not delegated more votes than balance
+            requireInvariant userDelegatedVotesCountLteBalance(to);
+            requireInvariant userDelegatedVotesCountLteBalance(e.msg.sender);
+            requireInvariant sumOfTwo(e.msg.sender, to);
+        }
+        preserved transfer(address to, uint256 amount) with (env e) {
+            requireInvariant delegatesVotesCountCorrect(delegator, delegatee);
+            /// ensure user has not delegated more votes than balance
+            requireInvariant userDelegatedVotesCountLteBalance(delegator);
+            requireInvariant userDelegatedVotesCountLteBalance(delegatee);
+            requireInvariant delegatesVotesCountCorrect(delegator, delegatee);
+            requireInvariant userDelegatesVotesCount(e.msg.sender, to);
+            /// ensure user has not delegated more votes than balance
+            requireInvariant userDelegatedVotesCountLteBalance(e.msg.sender);
+            requireInvariant sumOfTwo(e.msg.sender, to);
+        }
+        preserved transferFrom(address to, address from, uint256 amount) with (env e) {
+            requireInvariant delegatesVotesCountCorrect(delegator, delegatee);
+            /// ensure user has not delegated more votes than balance
+            requireInvariant userDelegatedVotesCountLteBalance(delegator);
+            requireInvariant userDelegatedVotesCountLteBalance(delegatee);
+            requireInvariant sumOfTwo(from, to); /// balances lte total supply ghost
+            requireInvariant userDelegatesVotesCount(to, from);
+
+            requireInvariant userDelegatedVotesCountLteBalance(to);
+            requireInvariant userDelegatedVotesCountLteBalance(from);
+        }
+    }
 
 invariant userBalancesLteUintMax(address a, address b)
-    (balanceOf(a) + balanceOf(b)) <= max_uint256;
+    (a != b) => ((balanceOf(a) + balanceOf(b)) <= max_uint256) {
+        preserved {
+            requireInvariant totalIsSumBalances();
+            requireInvariant totalSupplyIsSumOfBalances();
+            requireInvariant mirrorIsTrue(a);
+            requireInvariant mirrorIsTrue(b);
+            requireInvariant sumOfTwo(a, b);
+        }
+        preserved transfer(address to, uint256 amount) with (env e1) {
+            requireInvariant totalIsSumBalances();
+            requireInvariant totalSupplyIsSumOfBalances();
+            requireInvariant mirrorIsTrue(a);
+            requireInvariant mirrorIsTrue(b);
+            requireInvariant sumOfTwo(a, b);
+            requireInvariant sumOfTwo(a, e1.msg.sender);
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(e1.msg.sender);
+        }
+        preserved transferFrom(address to, address from, uint256 amount) with (env e1) {
+            requireInvariant totalIsSumBalances();
+            requireInvariant totalSupplyIsSumOfBalances();
+            requireInvariant mirrorIsTrue(a);
+            requireInvariant mirrorIsTrue(b);
+            requireInvariant sumOfTwo(a, b);
+            requireInvariant sumOfTwo(to, from);
+            requireInvariant mirrorIsTrue(from);
+            requireInvariant mirrorIsTrue(to);
+            requireInvariant mirrorIsTrue(from);
+            requireInvariant mirrorIsTrue(e1.msg.sender);
+        }
+    }
 
 /// @title Formally prove that `balanceOfMirror` mirrors `balanceOf`
 invariant mirrorIsTrue(address a)
