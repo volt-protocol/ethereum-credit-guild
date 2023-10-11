@@ -86,7 +86,7 @@ contract LendingTermOnboarding is VoltGovernor {
     }
 
     /// @notice Propose the onboarding of a term
-    function proposeOnboard(address term) external returns (uint256 proposalId) {
+    function proposeOnboard(address term) external whenNotPaused returns (uint256 proposalId) {
         // Check that the term has been created by this factory
         require(created[term] != 0, "LendingTermOnboarding: invalid term");
 

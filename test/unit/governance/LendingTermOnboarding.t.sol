@@ -19,6 +19,7 @@ import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol
 
 contract LendingTermOnboardingUnitTest is Test {
     address private governor = address(1);
+    address private guardian = address(2);
     Core private core;
     ProfitManager private profitManager;
     GuildToken private guild;
@@ -108,6 +109,7 @@ contract LendingTermOnboardingUnitTest is Test {
         
         // permissions
         core.grantRole(CoreRoles.GOVERNOR, governor);
+        core.grantRole(CoreRoles.GUARDIAN, guardian);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
         core.grantRole(CoreRoles.GUILD_MINTER, address(this));
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
@@ -201,6 +203,17 @@ contract LendingTermOnboardingUnitTest is Test {
         bytes[] memory payloads = new bytes[](1);
         vm.expectRevert("LendingTermOnboarding: cannot propose arbitrary actions");
         onboarder.propose(targets, values, payloads, "test");
+    }
+
+    function testProposeOnboardPausable() public {
+        // pause term
+        vm.prank(guardian);
+        onboarder.pause();
+
+        // propose onboard
+        vm.prank(alice);
+        vm.expectRevert("Pausable: paused");
+        uint256 proposalId = onboarder.proposeOnboard(address(this));
     }
 
     function testProposeOnboard() public {
