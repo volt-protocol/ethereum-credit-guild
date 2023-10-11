@@ -100,7 +100,6 @@ contract LendingTermOnboardingUnitTest is Test {
             1, // _gaugeType
             address(core), // _core
             address(timelock), // _timelock
-            address(guild), // _token
             _VOTING_DELAY, // initialVotingDelay
             _VOTING_PERIOD, // initialVotingPeriod
             _PROPOSAL_THRESHOLD, // initialProposalThreshold

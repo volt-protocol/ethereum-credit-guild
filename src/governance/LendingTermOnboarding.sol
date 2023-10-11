@@ -21,20 +21,28 @@ import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
 /// A term can be onboarded for the first time, or re-onboarded after it has been offboarded.
 contract LendingTermOnboarding is VoltGovernor {
 
+    /// @notice minimum delay between proposals of onboarding of a given term
     uint256 MIN_DELAY_BETWEEN_PROPOSALS = 7 days;
-    address public immutable lendingTermImplementation;
-    address public immutable guildToken;
-    uint256 public immutable gaugeType;
-    mapping(address=>uint256) public created;
+    /// @notice time of last proposal of a given term
     mapping(address=>uint256) public lastProposal;
-    
+
+    /// @notice immutable reference to the lending term implementation to clone
+    address public immutable lendingTermImplementation;
+    /// @notice immutable reference to the guild token
+    address public immutable guildToken;
+    /// @notice immutable reference to the gauge type to use for the terms onboarded
+    uint256 public immutable gaugeType;
+
+    /// @notice timestamp of creation of a term
+    /// (used to check that a term has been created by this factory)
+    mapping(address=>uint256) public created;
+
     constructor(
         address _lendingTermImplementation,
         address _guildToken,
         uint256 _gaugeType,
         address _core,
         address _timelock,
-        address _token,
         uint256 initialVotingDelay,
         uint256 initialVotingPeriod,
         uint256 initialProposalThreshold,
@@ -43,7 +51,7 @@ contract LendingTermOnboarding is VoltGovernor {
         VoltGovernor(
             _core,
             _timelock,
-            _token,
+            _guildToken,
             initialVotingDelay,
             initialVotingPeriod,
             initialProposalThreshold,
@@ -87,6 +95,10 @@ contract LendingTermOnboarding is VoltGovernor {
         lastProposal[term] = block.timestamp;
         
         // Check that the term is not already active
+        // note that terms that have been offboarded in the past can be re-onboarded
+        // and won't fail this check. This is intentional, because some terms might be offboarded
+        // due to specific market conditions, and it might be desirable to re-onboard them
+        // at a later date.
         bool isGauge = GuildToken(guildToken).isGauge(term);
         require(!isGauge, "LendingTermOnboarding: active term");
 
