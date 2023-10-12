@@ -163,9 +163,8 @@ contract LendingTerm is CoreRef {
     LendingTermParams internal params;
 
     constructor() CoreRef(address(1)) {
-        // prevent implementation to be initialized,
+        // core is set to address(1) to prevent implementation from being initialized,
         // only proxies on the implementation can be initialized.
-        _setCore(address(1));
     }
 
     /// @notice initialize storage with references to other protocol contracts
