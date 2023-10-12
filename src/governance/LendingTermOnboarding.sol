@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Governor, IGovernor} from "@openzeppelin/contracts/governance/Governor.sol";
@@ -78,6 +79,40 @@ contract LendingTermOnboarding is VoltGovernor {
 
     /// @notice Create a new LendingTerm and initialize it.
     function createTerm(LendingTerm.LendingTermParams calldata params) external returns (address) {
+        // must be an ERC20 (maybe, at least it prevents dumb input mistakes)
+        (bool success, bytes memory returned) = params.collateralToken.call(abi.encodeWithSelector(IERC20.totalSupply.selector));
+        require(success && returned.length == 32, "LendingTermOnboarding: invalid collateralToken");
+    
+        require(
+            params.maxDebtPerCollateralToken != 0, // must be able to mint non-zero debt
+            "LendingTermOnboarding: invalid maxDebtPerCollateralToken"
+        );
+
+        require(
+            params.interestRate < 1e18, // interest rate [0, 100[% APR
+            "LendingTermOnboarding: invalid interestRate"
+        );
+
+        require(
+            params.maxDelayBetweenPartialRepay < 31557601, // periodic payment every [0, 1 year]
+            "LendingTermOnboarding: invalid maxDelayBetweenPartialRepay"
+        );
+
+        require(
+            params.minPartialRepayPercent < 1e18, // periodic payment sizes [0, 100[%
+            "LendingTermOnboarding: invalid minPartialRepayPercent"
+        );
+
+        require(
+            params.openingFee <= 0.1e18, // open fee expected [0, 10]%
+            "LendingTermOnboarding: invalid openingFee"
+        );
+
+        require(
+            params.hardCap != 0, // non-zero hardcap
+            "LendingTermOnboarding: invalid hardCap"
+        );
+
         address term = Clones.clone(lendingTermImplementation);
         LendingTerm(term).initialize(
             address(core()),

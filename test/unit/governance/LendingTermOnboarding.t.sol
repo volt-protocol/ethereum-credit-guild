@@ -184,6 +184,79 @@ contract LendingTermOnboardingUnitTest is Test {
         assertEq(onboarder.created(address(term)), block.timestamp);
     }
 
+    function testCreateCheckParams() public {
+        vm.expectRevert("LendingTermOnboarding: invalid collateralToken");
+        LendingTerm(onboarder.createTerm(LendingTerm.LendingTermParams({
+            collateralToken: address(0), // not a token
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 123,
+            minPartialRepayPercent: 456,
+            openingFee: 789,
+            hardCap: _HARDCAP
+        })));
+        vm.expectRevert("LendingTermOnboarding: invalid maxDebtPerCollateralToken");
+        LendingTerm(onboarder.createTerm(LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: 0, // no debt available
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 123,
+            minPartialRepayPercent: 456,
+            openingFee: 789,
+            hardCap: _HARDCAP
+        })));
+        vm.expectRevert("LendingTermOnboarding: invalid interestRate");
+        LendingTerm(onboarder.createTerm(LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: 1e18, // 100% APR is too high
+            maxDelayBetweenPartialRepay: 123,
+            minPartialRepayPercent: 456,
+            openingFee: 789,
+            hardCap: _HARDCAP
+        })));
+        vm.expectRevert("LendingTermOnboarding: invalid maxDelayBetweenPartialRepay");
+        LendingTerm(onboarder.createTerm(LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 2 * 365 * 24 * 3600, // 2 years between payments is too long
+            minPartialRepayPercent: 456,
+            openingFee: 789,
+            hardCap: _HARDCAP
+        })));
+        vm.expectRevert("LendingTermOnboarding: invalid minPartialRepayPercent");
+        LendingTerm(onboarder.createTerm(LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 123,
+            minPartialRepayPercent: 1e18, // min repay of 100% is too high
+            openingFee: 789,
+            hardCap: _HARDCAP
+        })));
+        vm.expectRevert("LendingTermOnboarding: invalid openingFee");
+        LendingTerm(onboarder.createTerm(LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 123,
+            minPartialRepayPercent: 456,
+            openingFee: 1e18, // 100% opening fee is too high
+            hardCap: _HARDCAP
+        })));
+        vm.expectRevert("LendingTermOnboarding: invalid hardCap");
+        LendingTerm(onboarder.createTerm(LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 123,
+            minPartialRepayPercent: 456,
+            openingFee: 789,
+            hardCap: 0 // hardCap of 0 makes no debt available
+        })));
+    }
+
     function testProposeArbitraryCallsReverts() public {
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
