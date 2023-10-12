@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+
 import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
@@ -63,7 +65,7 @@ contract LendingTermOffboardingUnitTest is Test {
             650,
             1800
         );
-        term = new LendingTerm();
+        term = LendingTerm(Clones.clone(address(new LendingTerm())));
         term.initialize(
             address(core),
             LendingTerm.LendingTermReferences({
