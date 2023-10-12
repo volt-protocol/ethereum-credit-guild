@@ -3,6 +3,8 @@ pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+import "@forge-std/Test.sol";
+
 import {Core} from "@src/core/Core.sol";
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
@@ -27,9 +29,6 @@ import {ProtocolConstants as constants} from "@src/utils/ProtocolConstants.sol";
 
 contract Proposal_0 is Proposal {
     string public name = "Proposal_0";
-
-    /// Credit Veto DAO
-    uint256 public constant initialQuorumVetoDao = 2_500_000e18;
 
     /// Guild Governor DAO
     uint256 public constant initialQuorum = 10_000_000e18; // initialQuorum
@@ -79,7 +78,7 @@ contract Proposal_0 is Proposal {
                 CoreRoles.RATE_LIMITED_GUILD_MINTER,
                 0, // maxRateLimitPerSecond
                 0, // rateLimitPerSecond
-                1_000_000_000e18 // bufferCap
+                0 // bufferCap
             );
             SurplusGuildMinter guildMinter = new SurplusGuildMinter(
                 addresses.mainnet(strings.CORE),
@@ -125,7 +124,7 @@ contract Proposal_0 is Proposal {
         {
             VoltTimelockController timelock = new VoltTimelockController(
                 addresses.mainnet(strings.CORE),
-                3 days
+                constants.TIMELOCK_DELAY
             );
             VoltGovernor governor = new VoltGovernor(
                 addresses.mainnet(strings.CORE),
@@ -161,11 +160,11 @@ contract Proposal_0 is Proposal {
                 }), /// _lendingTermReferences
                 1, // _gaugeType
                 addresses.mainnet(strings.CORE), // _core
-                addresses.mainnet(strings.TIMELOCK), // _timelock
-                initialVotingDelay, // initialVotingDelay
-                initialVotingPeriod, // initialVotingPeriod (~7000 blocks/day)
-                2_500_000e18, // initialProposalThreshold
-                10_000_000e18 // initialQuorum
+                address(timelock), // _timelock
+                constants.VOTING_DELAY, // initialVotingDelay
+                constants.VOTING_PERIOD, // initialVotingPeriod (~7000 blocks/day)
+                constants.PROPOSAL_THRESHOLD, // initialProposalThreshold
+                constants.INITIAL_QUORUM // initialQuorum
             );
 
             addresses.addMainnet(strings.TIMELOCK, address(timelock));
@@ -273,7 +272,7 @@ contract Proposal_0 is Proposal {
         );
 
         // RATE_LIMITED_GUILD_MINTER
-        core.grantRole(CoreRoles.RATE_LIMITED_GUILD_MINTER, deployer);
+        core.grantRole(CoreRoles.GUILD_MINTER, deployer);
 
         GuildToken(addresses.mainnet(strings.GUILD_TOKEN)).mint(
             addresses.mainnet(strings.TEAM_MULTISIG),
@@ -411,11 +410,18 @@ contract Proposal_0 is Proposal {
             CreditToken credit = CreditToken(
                 addresses.mainnet(strings.CREDIT_TOKEN)
             );
-            if (usdc.balanceOf(deployer) >= 100e6) {
-                usdc.approve(address(psm), 100e6);
-                psm.mint(deployer, 100e6);
-                credit.enterRebase();
+
+            if (usdc.balanceOf(deployer) < constants.INITIAL_USDC_MINT_AMOUNT) {
+                deal(
+                    address(usdc),
+                    deployer,
+                    constants.INITIAL_USDC_MINT_AMOUNT
+                );
             }
+
+            usdc.approve(address(psm), constants.INITIAL_USDC_MINT_AMOUNT);
+            psm.mint(deployer, constants.INITIAL_USDC_MINT_AMOUNT);
+            credit.enterRebase();
         }
 
         // deployer renounces governor role
@@ -424,7 +430,8 @@ contract Proposal_0 is Proposal {
         core.renounceRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, deployer);
         core.renounceRole(CoreRoles.GAUGE_PARAMETERS, deployer);
         core.renounceRole(CoreRoles.GAUGE_ADD, deployer);
-        core.renounceRole(CoreRoles.RATE_LIMITED_GUILD_MINTER, deployer);
+        /// deployer renounces guild minter role used to create supply
+        core.renounceRole(CoreRoles.GUILD_MINTER, deployer);
     }
 
     function run(Addresses addresses, address deployer) public pure {}
@@ -536,6 +543,11 @@ contract Proposal_0 is Proposal {
                     .maxDelegates(),
                 constants.MAX_DELEGATES
             );
+            /// guild token starts non-transferrable
+            assertFalse(
+                GuildToken(addresses.mainnet(strings.GUILD_TOKEN))
+                    .transferable()
+            );
             assertEq(
                 ERC20MultiVotes(addresses.mainnet(strings.GUILD_TOKEN))
                     .maxDelegates(),
@@ -590,8 +602,18 @@ contract Proposal_0 is Proposal {
                     .getProfitSharingConfig();
 
             assertEq(surplusBufferSplit, constants.SURPLUS_BUFFER_SPLIT);
-            assertEq(surplusBufferSplit, constants.SURPLUS_BUFFER_SPLIT);
-            assertEq(surplusBufferSplit, constants.SURPLUS_BUFFER_SPLIT);
+            assertEq(creditSplit, constants.CREDIT_SPLIT);
+            assertEq(guildSplit, constants.GUILD_SPLIT);
+            assertEq(otherSplit, constants.OTHER_SPLIT);
+            assertEq(otherRecipient, address(0));
+        }
+        /// TIMELOCK Verification
+        {
+            VoltTimelockController timelock = VoltTimelockController(
+                payable(addresses.mainnet(strings.TIMELOCK))
+            );
+
+            assertEq(timelock.getMinDelay(), constants.TIMELOCK_DELAY);
         }
     }
 }
