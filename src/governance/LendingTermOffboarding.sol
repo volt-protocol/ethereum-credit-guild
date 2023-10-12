@@ -150,6 +150,10 @@ contract LendingTermOffboarding is CoreRef {
             LendingTerm(term).issuance() == 0,
             "LendingTermOffboarding: not all loans closed"
         );
+        require(
+            GuildToken(guildToken).isDeprecatedGauge(term),
+            "LendingTermOffboarding: re-onboarded"
+        );
 
         // update protocol config
         core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);

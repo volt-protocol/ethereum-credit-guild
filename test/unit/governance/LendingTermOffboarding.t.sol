@@ -328,4 +328,37 @@ contract LendingTermOffboardingUnitTest is Test {
         assertEq(offboarder.polls(snapshotBlock, address(term)), _QUORUM / 2 + 1);
         assertEq(offboarder.canOffboard(address(term)), false);
     }
+
+    function testCannotCleanupAfterReonboard() public {
+        // prepare (1)
+        guild.mint(bob, _QUORUM);
+        vm.startPrank(bob);
+        guild.delegate(bob);
+        uint256 snapshotBlock = block.number;
+        offboarder.proposeOffboard(address(term));
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        offboarder.supportOffboard(snapshotBlock, address(term));
+        offboarder.offboard(address(term));
+
+        // get enough CREDIT to pack back interests
+        vm.stopPrank();
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        uint256 debt = term.getLoanDebt(aliceLoanId);
+        credit.mint(alice, debt - aliceLoanSize);
+
+        // close loans
+        vm.startPrank(alice);
+        credit.approve(address(term), debt);
+        term.repay(aliceLoanId);
+        vm.stopPrank();
+
+        // re-onboard
+        guild.addGauge(1, address(term));
+
+        // cleanup
+        vm.expectRevert("LendingTermOffboarding: re-onboarded");
+        offboarder.cleanup(address(term));
+    }
 }
