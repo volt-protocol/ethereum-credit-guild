@@ -1269,4 +1269,23 @@ contract LendingTermUnitTest is Test {
         assertEq(term.getLoanDebt(loanId), 0);
         assertEq(credit.balanceOf(address(this)), 100 + 4_000e18);
     }
+
+    // MIN_BORROW increases when creditMultiplier decreases
+    function testMinBorrowAfterCreditLoseValue() public {
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        credit.mint(address(this), 100e18);
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-50e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+        credit.burn(100e18);
+
+        // borrow should fail because we try to borrow 1.75x
+        // the MIN_BORROW, but CREDIT value went up 2x.
+        uint256 MIN_BORROW = term.MIN_BORROW();
+        vm.expectRevert("LendingTerm: borrow amount too low");
+        term.borrow(MIN_BORROW * 175 / 100, 10000000000e18);
+    }
 }

@@ -257,12 +257,6 @@ contract LendingTerm is CoreRef {
         // check that the loan doesn't already exist
         require(loans[loanId].borrowTime == 0, "LendingTerm: loan exists");
 
-        // check that enough CREDIT is borrowed
-        require(
-            borrowAmount >= MIN_BORROW,
-            "LendingTerm: borrow amount too low"
-        );
-
         // check that enough collateral is provided
         uint256 maxBorrow = (collateralAmount * maxDebtPerCollateralToken) /
             1e18;
@@ -271,6 +265,12 @@ contract LendingTerm is CoreRef {
         require(
             borrowAmount <= maxBorrow,
             "LendingTerm: not enough collateral"
+        );
+
+        // check that enough CREDIT is borrowed
+        require(
+            borrowAmount >= MIN_BORROW * 1e18 / creditMultiplier,
+            "LendingTerm: borrow amount too low"
         );
 
         // check the hardcap
