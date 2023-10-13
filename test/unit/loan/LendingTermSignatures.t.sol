@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+
 import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
@@ -58,7 +60,7 @@ contract LendingTermSignaturesUnitTest is Test {
             650,
             1800
         );
-        term = new LendingTerm();
+        term = LendingTerm(Clones.clone(address(new LendingTerm())));
         term.initialize(
             address(core),
             LendingTerm.LendingTermReferences({
