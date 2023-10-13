@@ -731,7 +731,10 @@ contract LendingTerm is CoreRef {
         issuance -= loan.borrowAmount;
 
         // mark loan as a total loss
-        int256 pnl = -int256(loan.borrowAmount);
+        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 borrowAmount = loans[loanId].borrowAmount;
+        uint256 principal = borrowAmount * loans[loanId].borrowCreditMultiplier / creditMultiplier;
+        int256 pnl = -int256(principal);
         ProfitManager(profitManager).notifyPnL(address(this), pnl);
 
         // set hardcap to 0 to prevent new borrows

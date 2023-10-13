@@ -1270,6 +1270,41 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.balanceOf(address(this)), 100 + 4_000e18);
     }
 
+    function testProfitAccountingForgiveAfterMarkUp() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
+
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        credit.mint(address(this), 20_000e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-20_000e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+
+        // active loan debt is marked up 2x
+        assertEq(term.getLoanDebt(loanId), 44_000e18);
+
+        // forgive loan
+        // loan debt principal = 20k * 2 = 40k
+        // totalSupply = 20k (borrowed) + 20k (bad debt in other terms) = 40k
+        // should put creditMultiplier to 0 (all circulating CREDIT is bad)
+        vm.prank(governor);
+        term.forgive(loanId);
+        assertEq(profitManager.creditMultiplier(), 0);
+    }
+
     // MIN_BORROW increases when creditMultiplier decreases
     function testMinBorrowAfterCreditLoseValue() public {
         // prank the term to report a loss in another loan
