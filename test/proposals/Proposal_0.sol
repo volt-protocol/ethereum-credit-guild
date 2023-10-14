@@ -196,8 +196,8 @@ contract Proposal_0 is Proposal {
             address termUSDC1 = termOnboarding.createTerm(
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet(strings.USDC),
-                    maxDebtPerCollateralToken: constants.MAX_USDC_CREDIT_RATIO, // 0.01 CREDIT per USDC collateral + 12 decimals correction
-                    interestRate: 0, // 0%
+                    maxDebtPerCollateralToken: constants.MAX_USDC_CREDIT_RATIO, // 1 CREDIT per USDC collateral + 12 decimals correction
+                    interestRate: constants.USDC_RATE, // 0%
                     maxDelayBetweenPartialRepay: 0, // no periodic partial repay needed
                     minPartialRepayPercent: 0, // no minimum size for partial repay
                     openingFee: 0, // 0%
@@ -207,8 +207,8 @@ contract Proposal_0 is Proposal {
             address termSDAI1 = termOnboarding.createTerm(
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet(strings.SDAI),
-                    maxDebtPerCollateralToken: constants.MAX_SDAI_CREDIT_RATIO, // 0.01 CREDIT per SDAI collateral + no decimals correction
-                    interestRate: 0.03e18, // 3%
+                    maxDebtPerCollateralToken: constants.MAX_SDAI_CREDIT_RATIO, // 1 CREDIT per SDAI collateral + no decimals correction
+                    interestRate: constants.SDAI_RATE, // 3%
                     maxDelayBetweenPartialRepay: 0, // no periodic partial repay needed
                     minPartialRepayPercent: 0, // no minimum size for partial repay
                     openingFee: 0, // 0%
