@@ -20,46 +20,9 @@ import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol
 import {ProtocolConstants as constants} from "@src/utils/ProtocolConstants.sol";
 
 contract IntegrationTestOnboardOffboard is PostProposalCheck {
-    Core core;
-    GuildToken guild;
-    VoltGovernor governor;
-    LendingTermOnboarding onboarder;
-    LendingTermOffboarding offboarder;
-    LendingTerm term;
-    MockERC20 collateral;
-
-    uint256 public constant initialQuorum = 10_000_000e18; // initialQuorum
-    uint256 public constant initialVotingPeriod = 7000 * 3; // initialVotingPeriod (~7000 blocks/day)
-
-    /// @notice LendingTerm params
-    uint256 private constant _INTEREST_RATE = 0.05e18; // 5% APR
-    uint256 private constant _HARDCAP = 1_000_000e18;
-
     function setUp() public override {
         super.setUp();
-        guild = GuildToken(addresses.mainnet(strings.GUILD_TOKEN));
-        governor = VoltGovernor(payable(addresses.mainnet(strings.GOVERNOR)));
-        onboarder = LendingTermOnboarding(
-            payable(addresses.mainnet(strings.LENDING_TERM_ONBOARDING))
-        );
-        offboarder = LendingTermOffboarding(
-            addresses.mainnet(strings.LENDING_TERM_OFFBOARDING)
-        );
-        core = Core(addresses.mainnet(strings.CORE));
 
-        term = LendingTerm(
-            onboarder.createTerm(
-                LendingTerm.LendingTermParams({
-                    collateralToken: address(collateral),
-                    maxDebtPerCollateralToken: constants.MAX_USDC_CREDIT_RATIO,
-                    interestRate: _INTEREST_RATE,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: _HARDCAP
-                })
-            )
-        );
         vm.prank(addresses.mainnet(strings.TIMELOCK));
         guild.enableTransfer();
 
@@ -89,7 +52,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheck {
         );
 
         vm.roll(block.number + constants.VOTING_PERIOD - 1);
-        vm.warp(onboarder.proposalDeadline(proposalId) - 1);
+        vm.warp(block.timestamp + onboarder.proposalDeadline(proposalId) - 1);
 
         assertEq(
             uint8(onboarder.state(proposalId)),
@@ -183,5 +146,66 @@ contract IntegrationTestOnboardOffboard is PostProposalCheck {
         assertFalse(
             core.hasRole(roles.RATE_LIMITED_CREDIT_MINTER, address(term))
         );
+
+        /// assert that term borrowable amount is 0
+        assertEq(guild.calculateGaugeAllocation(address(term), 100_000_000), 0);
+    }
+
+    function testOnboardOffBoardOnboard() public {
+        testOnboarding();
+
+        vm.warp(block.timestamp + onboarder.MIN_DELAY_BETWEEN_PROPOSALS() + 1);
+
+        /// offboarding flow
+
+        uint256 startingBlockNumber = block.number;
+        offboarder.proposeOffboard(address(term));
+
+        _roleValidation();
+
+        vm.roll(block.number + 1);
+
+        offboarder.supportOffboard(startingBlockNumber, address(term));
+
+        _roleValidation();
+
+        assertTrue(offboarder.canOffboard(address(term)));
+
+        assertTrue(guild.isGauge(address(term)));
+
+        offboarder.offboard(address(term));
+
+        assertFalse(guild.isGauge(address(term)));
+
+        _roleValidation();
+
+        /// do not cleanup
+
+        /// now onboard again
+        testOnboarding();
+
+        /// try to cleanup, and fail
+
+        vm.expectRevert("LendingTermOffboarding: re-onboarded");
+        offboarder.cleanup(address(term));
+
+        /// offboard again as offboard vote already passed before but did not finalize
+        assertTrue(guild.isGauge(address(term)));
+
+        offboarder.offboard(address(term));
+
+        assertTrue(offboarder.canOffboard(address(term)));
+        assertFalse(guild.isGauge(address(term)));
+        offboarder.cleanup(address(term));
+
+        assertFalse(offboarder.canOffboard(address(term)));
+
+        assertFalse(core.hasRole(roles.GAUGE_PNL_NOTIFIER, address(term)));
+        assertFalse(
+            core.hasRole(roles.RATE_LIMITED_CREDIT_MINTER, address(term))
+        );
+
+        /// assert that term borrowable amount is 0
+        assertEq(guild.calculateGaugeAllocation(address(term), 100_000_000), 0);
     }
 }
