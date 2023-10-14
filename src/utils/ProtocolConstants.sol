@@ -22,7 +22,23 @@ library ProtocolConstants {
     uint256 internal constant MAX_SDAI_CREDIT_RATIO = 1e18;
 
     /// @notice credit hardcap at launch
-    uint256 internal constant CREDIT_HARDCAP = 20_000 * 1e18;
+    uint256 internal constant CREDIT_HARDCAP = 2_000_000 * 1e18;
+
+    /// @notice USDC credit hardcap at launch
+    uint256 internal constant USDC_CREDIT_HARDCAP = 1_000_000 * 1e18;
+
+    /// @notice SDAI credit hardcap at launch
+    uint256 internal constant SDAI_CREDIT_HARDCAP = 1_000_000 * 1e18;
+
+    /// ------------------------------------------------------------------------
+    /// @notice Interest Rate Parameters
+    /// ------------------------------------------------------------------------
+
+    /// @notice rate to borrow against SDAI collateral
+    uint256 internal constant SDAI_RATE = 0.04e18;
+
+    /// @notice rate to borrow against USDC collateral
+    uint256 internal constant USDC_RATE = 0;
 
     /// ------------------------------------------------------------------------
     /// @notice Governance Parameters
@@ -44,7 +60,7 @@ library ProtocolConstants {
     uint256 internal constant INITIAL_QUORUM = 10_000_000 * 1e18;
 
     /// @notice initial quorum for a proposal to be vetoed on the Veto DAO is 25k CREDIT
-    uint256 internal constant INITIAL_QUORUM_VETO_DAO = 25_000 * 1e18;
+    uint256 internal constant INITIAL_QUORUM_VETO_DAO = 250_000 * 1e18;
 
     /// @notice initial quorum for a proposal to be vetoed on the Veto DAO by Credit holders
     uint256 internal constant LENDING_TERM_OFFBOARDING_QUORUM =
