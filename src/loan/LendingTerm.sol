@@ -271,12 +271,6 @@ contract LendingTerm is CoreRef {
         // check that the loan doesn't already exist
         require(loans[loanId].borrowTime == 0, "LendingTerm: loan exists");
 
-        // check that enough CREDIT is borrowed
-        require(
-            borrowAmount >= MIN_BORROW,
-            "LendingTerm: borrow amount too low"
-        );
-
         // check that enough collateral is provided
         uint256 maxBorrow = (collateralAmount * params.maxDebtPerCollateralToken) /
             1e18;
@@ -285,6 +279,12 @@ contract LendingTerm is CoreRef {
         require(
             borrowAmount <= maxBorrow,
             "LendingTerm: not enough collateral"
+        );
+
+        // check that enough CREDIT is borrowed
+        require(
+            borrowAmount >= MIN_BORROW * 1e18 / creditMultiplier,
+            "LendingTerm: borrow amount too low"
         );
 
         // check the hardcap
@@ -540,7 +540,7 @@ contract LendingTerm is CoreRef {
             "LendingTerm: repay below min"
         );
         require(
-            borrowAmount - issuanceDecrease > MIN_BORROW,
+            borrowAmount - issuanceDecrease > MIN_BORROW * 1e18 / creditMultiplier,
             "LendingTerm: below min borrow"
         );
 
@@ -745,7 +745,10 @@ contract LendingTerm is CoreRef {
         issuance -= loan.borrowAmount;
 
         // mark loan as a total loss
-        int256 pnl = -int256(loan.borrowAmount);
+        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
+        uint256 borrowAmount = loans[loanId].borrowAmount;
+        uint256 principal = borrowAmount * loans[loanId].borrowCreditMultiplier / creditMultiplier;
+        int256 pnl = -int256(principal);
         ProfitManager(refs.profitManager).notifyPnL(address(this), pnl);
 
         // set hardcap to 0 to prevent new borrows

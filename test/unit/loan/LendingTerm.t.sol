@@ -1276,4 +1276,93 @@ contract LendingTermUnitTest is Test {
         assertEq(term.getLoanDebt(loanId), 0);
         assertEq(credit.balanceOf(address(this)), 100 + 4_000e18);
     }
+
+    function testProfitAccountingForgiveAfterMarkUp() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
+
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        credit.mint(address(this), 20_000e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-20_000e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+
+        // active loan debt is marked up 2x
+        assertEq(term.getLoanDebt(loanId), 44_000e18);
+
+        // forgive loan
+        // loan debt principal = 20k * 2 = 40k
+        // totalSupply = 20k (borrowed) + 20k (bad debt in other terms) = 40k
+        // should put creditMultiplier to 0 (all circulating CREDIT is bad)
+        vm.prank(governor);
+        term.forgive(loanId);
+        assertEq(profitManager.creditMultiplier(), 0);
+    }
+
+    // MIN_BORROW increases when creditMultiplier decreases - borrow()
+    function testMinBorrowAfterCreditLoseValue1() public {
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        credit.mint(address(this), 100e18);
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-50e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+        credit.burn(100e18);
+
+        // borrow should fail because we try to borrow 1.75x
+        // the MIN_BORROW, but CREDIT value went up 2x.
+        uint256 MIN_BORROW = term.MIN_BORROW();
+        vm.expectRevert("LendingTerm: borrow amount too low");
+        term.borrow(MIN_BORROW * 175 / 100, 10000000000e18);
+    }
+
+    // MIN_BORROW increases when creditMultiplier decreases - partialRepay()
+    function testMinBorrowAfterCreditLoseValue2() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, interest accrued
+        vm.warp(block.timestamp + term.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term.getLoanDebt(loanId), 22_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
+
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        credit.mint(address(this), 20_000e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-20_000e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+
+        // active loan debt is marked up 2x
+        assertEq(term.getLoanDebt(loanId), 44_000e18);
+
+        // attempt to partialRepay with a resulting loan below MIN_BORROW
+        uint256 MIN_BORROW = term.MIN_BORROW();
+        credit.mint(address(this), 4_000e18);
+        assertEq(credit.balanceOf(address(this)), 44_000e18);
+        credit.approve(address(term), 41_000e18);
+        term.partialRepay(loanId, 41_000e18);
+    }
 }
