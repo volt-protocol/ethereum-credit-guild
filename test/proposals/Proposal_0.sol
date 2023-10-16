@@ -20,13 +20,14 @@ import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
-import {NameLib as strings} from "@src/utils/NameLib.sol";
+import {NameLib as strings} from "@test/utils/NameLib.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
-import {ProtocolConstants as constants} from "@src/utils/ProtocolConstants.sol";
+import {ProtocolConstants as constants} from "@test/utils/ProtocolConstants.sol";
 
+/// @notice deployer must have 100 USDC to deploy the system on mainnet for the initial PSM mint.
 contract Proposal_0 is Proposal {
     string public name = "Proposal_0";
 
@@ -78,7 +79,7 @@ contract Proposal_0 is Proposal {
                 CoreRoles.RATE_LIMITED_GUILD_MINTER,
                 0, // maxRateLimitPerSecond
                 0, // rateLimitPerSecond
-                0 // bufferCap
+                uint128(constants.GUILD_SUPPLY) // 1b
             );
             SurplusGuildMinter guildMinter = new SurplusGuildMinter(
                 addresses.mainnet(strings.CORE),
@@ -255,13 +256,14 @@ contract Proposal_0 is Proposal {
             CoreRoles.RATE_LIMITED_GUILD_MINTER,
             addresses.mainnet(strings.SURPLUS_GUILD_MINTER)
         );
-
+        
         // RATE_LIMITED_GUILD_MINTER
         core.grantRole(CoreRoles.GUILD_MINTER, deployer);
-
-        GuildToken(addresses.mainnet(strings.GUILD_TOKEN)).mint(
-            addresses.mainnet(strings.TEAM_MULTISIG),
-            constants.GUILD_SUPPLY
+        
+        /// Grant Multisig Guild Rate Limited Minter
+        core.grantRole(
+            CoreRoles.RATE_LIMITED_GUILD_MINTER,
+            addresses.mainnet(strings.TEAM_MULTISIG)
         );
 
         // GAUGE_ADD
@@ -529,12 +531,12 @@ contract Proposal_0 is Proposal {
             assertEq(
                 ERC20MultiVotes(addresses.mainnet(strings.GUILD_TOKEN))
                     .totalSupply(),
-                constants.GUILD_SUPPLY
+                0
             );
             assertEq(
                 ERC20MultiVotes(addresses.mainnet(strings.GUILD_TOKEN))
                     .balanceOf(addresses.mainnet(strings.TEAM_MULTISIG)),
-                constants.GUILD_SUPPLY
+                0
             );
             assertEq(
                 ERC20MultiVotes(addresses.mainnet(strings.CREDIT_TOKEN))
