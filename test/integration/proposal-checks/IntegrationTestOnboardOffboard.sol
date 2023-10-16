@@ -22,6 +22,19 @@ import {ProtocolConstants as constants} from "@test/utils/ProtocolConstants.sol"
 contract IntegrationTestOnboardOffboard is PostProposalCheck {
     function setUp() public override {
         super.setUp();
+        term = LendingTerm(
+            onboarder.createTerm(
+                LendingTerm.LendingTermParams({
+                    collateralToken: addresses.mainnet(strings.SDAI),
+                    maxDebtPerCollateralToken: constants.MAX_SDAI_CREDIT_RATIO,
+                    interestRate: constants.SDAI_RATE,
+                    maxDelayBetweenPartialRepay: 0,
+                    minPartialRepayPercent: 0,
+                    openingFee: 0,
+                    hardCap: constants.SDAI_CREDIT_HARDCAP
+                })
+            )
+        );
 
         vm.prank(addresses.mainnet(strings.TIMELOCK));
         guild.enableTransfer();
