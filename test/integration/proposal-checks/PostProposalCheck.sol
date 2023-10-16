@@ -31,6 +31,12 @@ contract PostProposalCheck is Test {
     uint256 preProposalsSnapshot;
     uint256 postProposalsSnapshot;
 
+    /// Users
+    address public userOne = address(0x1111);
+    address public userTwo = address(0x2222);
+    address public userThree = address(0x3333);
+
+    /// Core
     Core public core;
 
     /// Lending
@@ -116,18 +122,6 @@ contract PostProposalCheck is Test {
             addresses.mainnet(strings.LENDING_TERM_OFFBOARDING)
         );
 
-        term = LendingTerm(
-            onboarder.createTerm(
-                LendingTerm.LendingTermParams({
-                    collateralToken: address(collateral),
-                    maxDebtPerCollateralToken: constants.MAX_USDC_CREDIT_RATIO,
-                    interestRate: constants.USDC_RATE,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: constants.USDC_CREDIT_HARDCAP
-                })
-            )
-        );
+        term = LendingTerm(addresses.mainnet(strings.TERM_SDAI_1));
     }
 }
