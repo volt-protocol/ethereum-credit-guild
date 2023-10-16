@@ -39,6 +39,16 @@ abstract contract CoreRef is Pausable {
     function setCore(
         address newCore
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        _setCore(newCore);
+    }
+
+        /// @notice WARNING CALLING THIS FUNCTION CAN POTENTIALLY
+    /// BRICK A CONTRACT IF CORE IS SET INCORRECTLY
+    /// @notice set new reference to core
+    /// @param newCore to reference
+    function _setCore(
+        address newCore
+    ) internal {
         address oldCore = address(_core);
         _core = Core(newCore);
 

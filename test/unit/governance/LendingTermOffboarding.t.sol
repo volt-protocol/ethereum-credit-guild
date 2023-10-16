@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+
 import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
@@ -63,13 +65,16 @@ contract LendingTermOffboardingUnitTest is Test {
             650,
             1800
         );
-        term = new LendingTerm(
-            address(core), /*_core*/
-            address(profitManager), /*_profitManager*/
-            address(guild), /*_guildToken*/
-            address(auctionHouse), /*_auctionHouse*/
-            address(rlcm), /*_creditMinter*/
-            address(credit), /*_creditToken*/
+        term = LendingTerm(Clones.clone(address(new LendingTerm())));
+        term.initialize(
+            address(core),
+            LendingTerm.LendingTermReferences({
+                profitManager: address(profitManager),
+                guildToken: address(guild),
+                auctionHouse: address(auctionHouse),
+                creditMinter: address(rlcm),
+                creditToken: address(credit)
+            }),
             LendingTerm.LendingTermParams({
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
@@ -294,7 +299,6 @@ contract LendingTermOffboardingUnitTest is Test {
         offboarder.cleanup(address(term));
 
         assertEq(offboarder.canOffboard(address(term)), false);
-        assertEq(term.hardCap(), 0);
         assertEq(core.hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term)), false);
         assertEq(core.hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term)), false);
     }
@@ -323,5 +327,38 @@ contract LendingTermOffboardingUnitTest is Test {
         offboarder.supportOffboard(snapshotBlock, address(term));
         assertEq(offboarder.polls(snapshotBlock, address(term)), _QUORUM / 2 + 1);
         assertEq(offboarder.canOffboard(address(term)), false);
+    }
+
+    function testCannotCleanupAfterReonboard() public {
+        // prepare (1)
+        guild.mint(bob, _QUORUM);
+        vm.startPrank(bob);
+        guild.delegate(bob);
+        uint256 snapshotBlock = block.number;
+        offboarder.proposeOffboard(address(term));
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        offboarder.supportOffboard(snapshotBlock, address(term));
+        offboarder.offboard(address(term));
+
+        // get enough CREDIT to pack back interests
+        vm.stopPrank();
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        uint256 debt = term.getLoanDebt(aliceLoanId);
+        credit.mint(alice, debt - aliceLoanSize);
+
+        // close loans
+        vm.startPrank(alice);
+        credit.approve(address(term), debt);
+        term.repay(aliceLoanId);
+        vm.stopPrank();
+
+        // re-onboard
+        guild.addGauge(1, address(term));
+
+        // cleanup
+        vm.expectRevert("LendingTermOffboarding: re-onboarded");
+        offboarder.cleanup(address(term));
     }
 }
