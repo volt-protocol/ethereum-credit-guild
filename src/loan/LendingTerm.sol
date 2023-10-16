@@ -526,7 +526,7 @@ contract LendingTerm is CoreRef {
             "LendingTerm: repay below min"
         );
         require(
-            borrowAmount - issuanceDecrease > MIN_BORROW,
+            borrowAmount - issuanceDecrease > MIN_BORROW * 1e18 / creditMultiplier,
             "LendingTerm: below min borrow"
         );
 
