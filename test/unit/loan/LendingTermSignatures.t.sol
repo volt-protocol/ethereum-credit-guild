@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+
 import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
@@ -58,13 +60,16 @@ contract LendingTermSignaturesUnitTest is Test {
             650,
             1800
         );
-        term = new LendingTerm(
-            address(core), /*_core*/
-            address(profitManager), /*_profitManager*/
-            address(guild), /*_guildToken*/
-            address(auctionHouse), /*_auctionHouse*/
-            address(rlcm), /*_creditMinter*/
-            address(credit), /*_creditToken*/
+        term = LendingTerm(Clones.clone(address(new LendingTerm())));
+        term.initialize(
+            address(core),
+            LendingTerm.LendingTermReferences({
+                profitManager: address(profitManager),
+                guildToken: address(guild),
+                auctionHouse: address(auctionHouse),
+                creditMinter: address(rlcm),
+                creditToken: address(credit)
+            }),
             LendingTerm.LendingTermParams({
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,

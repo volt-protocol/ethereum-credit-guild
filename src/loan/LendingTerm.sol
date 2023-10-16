@@ -74,64 +74,10 @@ contract LendingTerm is CoreRef {
     /// would set a debt ceiling to 100 CREDIT, the issuance could go as high as 120 CREDIT.
     uint256 public constant GAUGE_CAP_TOLERANCE = 1.2e18;
 
-    /// @notice reference to the ProfitManager
-    address public immutable profitManager;
-
-    /// @notice reference to the GUILD token
-    address public immutable guildToken;
-
-    /// @notice reference to the auction house contract used to
-    /// sell loan collateral for CREDIT if loans are called.
-    address public auctionHouse;
-
-    /// @notice reference to the credit minter contract
-    address public immutable creditMinter;
-
-    /// @notice reference to the CREDIT token
-    address public immutable creditToken;
-
-    /// @notice reference to the collateral token
-    address public immutable collateralToken;
-
-    /// @notice max number of debt tokens issued per collateral token.
-    /// @dev be mindful of the decimals here, because if collateral
-    /// token doesn't have 18 decimals, this variable is used to scale
-    /// the decimals.
-    /// For example, for USDC collateral, this variable should be around
-    /// ~1e30, to allow 1e6 * 1e30 / 1e18 ~= 1e18 CREDIT to be borrowed for
-    /// each 1e6 units (1 USDC) of collateral, if CREDIT is targeted to be
-    /// worth around 1 USDC.
-    uint256 public immutable maxDebtPerCollateralToken;
-
-    /// @notice interest rate paid by the borrower, expressed as an APR
-    /// with 18 decimals (0.01e18 = 1% APR). The base for 1 year is the YEAR constant.
-    uint256 public immutable interestRate;
-
-    /// @notice maximum delay, in seconds, between partial debt repayments.
-    /// if set to 0, no periodic partial repayments are expected.
-    /// if a partial repayment is missed (delay has passed), the loan
-    /// can be called.
-    uint256 public immutable maxDelayBetweenPartialRepay;
-
-    /// @notice minimum percent of the total debt (principal + interests) to
-    /// repay during partial debt repayments.
-    /// percentage is expressed with 18 decimals, e.g. 0.05e18 = 5% debt.
-    uint256 public immutable minPartialRepayPercent;
-
     /// @notice timestamp of last partial repayment for a given loanId.
     /// during borrow(), this is initialized to the borrow timestamp, if
     /// maxDelayBetweenPartialRepay is != 0
     mapping(bytes32 => uint256) public lastPartialRepay;
-
-    /// @notice the opening fee is a small amount of CREDIT provided by the borrower
-    /// when the loan is opened.
-    /// The opening fee is expressed as a percentage of the borrowAmount, with 18
-    /// decimals, e.g. 0.05e18 = 5% of the borrowed amount.
-    uint256 public immutable openingFee;
-
-    /// @notice the absolute maximum amount of debt this lending term can issue
-    /// at any given time, regardless of the gauge allocations.
-    uint256 public hardCap;
 
     struct Loan {
         address borrower; // address of a loan's borrower
@@ -152,37 +98,105 @@ contract LendingTerm is CoreRef {
     /// @notice current number of CREDIT issued in active loans on this term
     uint256 public issuance;
 
+    struct LendingTermReferences {
+        /// @notice reference to the ProfitManager
+        address profitManager;
+
+        /// @notice reference to the GUILD token
+        address guildToken;
+
+        /// @notice reference to the auction house contract used to
+        /// sell loan collateral for CREDIT if loans are called.
+        address auctionHouse;
+
+        /// @notice reference to the credit minter contract
+        address creditMinter;
+
+        /// @notice reference to the CREDIT token
+        address creditToken;
+    }
+
+    /// @notice References to other protocol contracts (see struct for more details)
+    LendingTermReferences internal refs;
+
     struct LendingTermParams {
+        /// @notice reference to the collateral token
         address collateralToken;
+
+        /// @notice max number of debt tokens issued per collateral token.
+        /// @dev be mindful of the decimals here, because if collateral
+        /// token doesn't have 18 decimals, this variable is used to scale
+        /// the decimals.
+        /// For example, for USDC collateral, this variable should be around
+        /// ~1e30, to allow 1e6 * 1e30 / 1e18 ~= 1e18 CREDIT to be borrowed for
+        /// each 1e6 units (1 USDC) of collateral, if CREDIT is targeted to be
+        /// worth around 1 USDC.
         uint256 maxDebtPerCollateralToken;
+
+        /// @notice interest rate paid by the borrower, expressed as an APR
+        /// with 18 decimals (0.01e18 = 1% APR). The base for 1 year is the YEAR constant.
         uint256 interestRate;
+
+        /// @notice maximum delay, in seconds, between partial debt repayments.
+        /// if set to 0, no periodic partial repayments are expected.
+        /// if a partial repayment is missed (delay has passed), the loan
+        /// can be called.
         uint256 maxDelayBetweenPartialRepay;
+
+        /// @notice minimum percent of the total debt (principal + interests) to
+        /// repay during partial debt repayments.
+        /// percentage is expressed with 18 decimals, e.g. 0.05e18 = 5% debt.
         uint256 minPartialRepayPercent;
+
+        /// @notice the opening fee is a small amount of CREDIT provided by the borrower
+        /// when the loan is opened.
+        /// The opening fee is expressed as a percentage of the borrowAmount, with 18
+        /// decimals, e.g. 0.05e18 = 5% of the borrowed amount.
         uint256 openingFee;
+
+        /// @notice the absolute maximum amount of debt this lending term can issue
+        /// at any given time, regardless of the gauge allocations.
         uint256 hardCap;
     }
 
-    constructor(
+    /// @notice Params of the LendingTerm (see struct for more details)
+    LendingTermParams internal params;
+
+    constructor() CoreRef(address(1)) {
+        // core is set to address(1) to prevent implementation from being initialized,
+        // only proxies on the implementation can be initialized.
+    }
+
+    /// @notice initialize storage with references to other protocol contracts
+    /// and the lending term parameters for this instance.
+    function initialize(
         address _core,
-        address _profitManager,
-        address _guildToken,
-        address _auctionHouse,
-        address _creditMinter,
-        address _creditToken,
-        LendingTermParams memory params
-    ) CoreRef(_core) {
-        profitManager = _profitManager;
-        guildToken = _guildToken;
-        auctionHouse = _auctionHouse;
-        creditMinter = _creditMinter;
-        creditToken = _creditToken;
-        collateralToken = params.collateralToken;
-        maxDebtPerCollateralToken = params.maxDebtPerCollateralToken;
-        interestRate = params.interestRate;
-        maxDelayBetweenPartialRepay = params.maxDelayBetweenPartialRepay;
-        minPartialRepayPercent = params.minPartialRepayPercent;
-        openingFee = params.openingFee;
-        hardCap = params.hardCap;
+        LendingTermReferences calldata _refs,
+        LendingTermParams calldata _params
+    ) external {
+        // can initialize only once
+        assert(address(core()) == address(0));
+        assert(_core != address(0));
+
+        // initialize storage
+        _setCore(_core);
+        refs = _refs;
+        params = _params;
+    }
+
+    /// @notice get references of this term to other protocol contracts
+    function getReferences() external view returns (LendingTermReferences memory) {
+        return refs;
+    }
+
+    /// @notice get parameters of this term
+    function getParameters() external view returns (LendingTermParams memory) {
+        return params;
+    }
+
+    /// @notice get parameter 'collateralToken' of this term
+    function collateralToken() external view returns (address) {
+        return params.collateralToken;
     }
 
     /// @notice get a loan
@@ -210,12 +224,12 @@ contract LendingTerm is CoreRef {
         // compute interest owed
         uint256 borrowAmount = loan.borrowAmount;
         uint256 interest = (borrowAmount *
-            interestRate *
+            params.interestRate *
             (block.timestamp - borrowTime)) /
             YEAR /
             1e18;
         uint256 loanDebt = borrowAmount + interest;
-        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
         loanDebt = loanDebt * loan.borrowCreditMultiplier / creditMultiplier;
 
         return loanDebt;
@@ -227,7 +241,7 @@ contract LendingTerm is CoreRef {
         bytes32 loanId
     ) public view returns (bool) {
         // if no periodic partial repays are expected, always return false
-        if (maxDelayBetweenPartialRepay == 0) return false;
+        if (params.maxDelayBetweenPartialRepay == 0) return false;
 
         // if loan doesn't exist, return false
         if (loans[loanId].borrowTime == 0) return false;
@@ -238,7 +252,7 @@ contract LendingTerm is CoreRef {
         // return true if delay is passed
         return
             lastPartialRepay[loanId] <
-            block.timestamp - maxDelayBetweenPartialRepay;
+            block.timestamp - params.maxDelayBetweenPartialRepay;
     }
 
     /// @notice initiate a new loan
@@ -258,9 +272,9 @@ contract LendingTerm is CoreRef {
         require(loans[loanId].borrowTime == 0, "LendingTerm: loan exists");
 
         // check that enough collateral is provided
-        uint256 maxBorrow = (collateralAmount * maxDebtPerCollateralToken) /
+        uint256 maxBorrow = (collateralAmount * params.maxDebtPerCollateralToken) /
             1e18;
-        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
         maxBorrow = maxBorrow * 1e18 / creditMultiplier;
         require(
             borrowAmount <= maxBorrow,
@@ -276,11 +290,11 @@ contract LendingTerm is CoreRef {
         // check the hardcap
         uint256 _issuance = issuance;
         uint256 _postBorrowIssuance = _issuance + borrowAmount;
-        require(_postBorrowIssuance <= hardCap, "LendingTerm: hardcap reached");
+        require(_postBorrowIssuance <= params.hardCap, "LendingTerm: hardcap reached");
 
         // check the debt ceiling
-        uint256 _totalSupply = CreditToken(creditToken).totalSupply();
-        uint256 debtCeiling = (GuildToken(guildToken).calculateGaugeAllocation(
+        uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
+        uint256 debtCeiling = (GuildToken(refs.guildToken).calculateGaugeAllocation(
             address(this),
             _totalSupply + borrowAmount
         ) * GAUGE_CAP_TOLERANCE) / 1e18;
@@ -309,30 +323,30 @@ contract LendingTerm is CoreRef {
             closeTime: 0
         });
         issuance = _postBorrowIssuance;
-        if (maxDelayBetweenPartialRepay != 0) {
+        if (params.maxDelayBetweenPartialRepay != 0) {
             lastPartialRepay[loanId] = block.timestamp;
         }
 
         // mint debt to the borrower
-        RateLimitedMinter(creditMinter).mint(borrower, borrowAmount);
+        RateLimitedMinter(refs.creditMinter).mint(borrower, borrowAmount);
 
         // pull opening fee from the borrower, if any
-        if (openingFee != 0) {
-            uint256 _openingFee = (borrowAmount * openingFee) / 1e18;
+        if (params.openingFee != 0) {
+            uint256 _openingFee = (borrowAmount * params.openingFee) / 1e18;
             // transfer from borrower to ProfitManager & report profit
-            CreditToken(creditToken).transferFrom(
+            CreditToken(refs.creditToken).transferFrom(
                 borrower,
-                profitManager,
+                refs.profitManager,
                 _openingFee
             );
-            ProfitManager(profitManager).notifyPnL(
+            ProfitManager(refs.profitManager).notifyPnL(
                 address(this),
                 int256(_openingFee)
             );
         }
 
         // pull the collateral from the borrower
-        IERC20(collateralToken).safeTransferFrom(
+        IERC20(params.collateralToken).safeTransferFrom(
             borrower,
             address(this),
             collateralAmount
@@ -363,7 +377,7 @@ contract LendingTerm is CoreRef {
         uint256 deadline,
         Signature calldata sig
     ) external whenNotPaused returns (bytes32 loanId) {
-        IERC20Permit(collateralToken).permit(
+        IERC20Permit(params.collateralToken).permit(
             msg.sender,
             address(this),
             collateralAmount,
@@ -382,10 +396,10 @@ contract LendingTerm is CoreRef {
         uint256 deadline,
         Signature calldata sig
     ) external whenNotPaused returns (bytes32 loanId) {
-        IERC20Permit(creditToken).permit(
+        IERC20Permit(refs.creditToken).permit(
             msg.sender,
             address(this),
-            (borrowAmount * openingFee) / 1e18,
+            (borrowAmount * params.openingFee) / 1e18,
             deadline,
             sig.v,
             sig.r,
@@ -402,17 +416,17 @@ contract LendingTerm is CoreRef {
         Signature calldata collateralPermitSig,
         Signature calldata creditPermitSig
     ) external whenNotPaused returns (bytes32 loanId) {
-        IERC20Permit(creditToken).permit(
+        IERC20Permit(refs.creditToken).permit(
             msg.sender,
             address(this),
-            (borrowAmount * openingFee) / 1e18,
+            (borrowAmount * params.openingFee) / 1e18,
             deadline,
             creditPermitSig.v,
             creditPermitSig.r,
             creditPermitSig.s
         );
 
-        IERC20Permit(collateralToken).permit(
+        IERC20Permit(params.collateralToken).permit(
             msg.sender,
             address(this),
             collateralAmount,
@@ -446,7 +460,7 @@ contract LendingTerm is CoreRef {
         loans[loanId].collateralAmount += collateralToAdd;
 
         // pull the collateral from the borrower
-        IERC20(collateralToken).safeTransferFrom(
+        IERC20(params.collateralToken).safeTransferFrom(
             borrower,
             address(this),
             collateralToAdd
@@ -473,7 +487,7 @@ contract LendingTerm is CoreRef {
         uint256 deadline,
         Signature calldata sig
     ) external {
-        IERC20Permit(collateralToken).permit(
+        IERC20Permit(params.collateralToken).permit(
             msg.sender,
             address(this),
             collateralToAdd,
@@ -512,7 +526,7 @@ contract LendingTerm is CoreRef {
         require(debtToRepay < loanDebt, "LendingTerm: full repayment");
         uint256 percentRepaid = (debtToRepay * 1e18) / loanDebt; // [0, 1e18[
         uint256 borrowAmount = loan.borrowAmount;
-        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
         uint256 principal = borrowAmount * loan.borrowCreditMultiplier / creditMultiplier;
         uint256 principalRepaid = (principal * percentRepaid) / 1e18;
         uint256 interestRepaid = debtToRepay - principalRepaid;
@@ -522,7 +536,7 @@ contract LendingTerm is CoreRef {
             "LendingTerm: repay too small"
         );
         require(
-            debtToRepay >= (loanDebt * minPartialRepayPercent) / 1e18,
+            debtToRepay >= (loanDebt * params.minPartialRepayPercent) / 1e18,
             "LendingTerm: repay below min"
         );
         require(
@@ -534,22 +548,22 @@ contract LendingTerm is CoreRef {
         loans[loanId].borrowAmount -= issuanceDecrease;
         lastPartialRepay[loanId] = block.timestamp;
         issuance -= issuanceDecrease;
-        RateLimitedMinter(creditMinter).replenishBuffer(issuanceDecrease);
+        RateLimitedMinter(refs.creditMinter).replenishBuffer(issuanceDecrease);
 
         // pull the debt from the borrower
-        CreditToken(creditToken).transferFrom(
+        CreditToken(refs.creditToken).transferFrom(
             repayer,
             address(this),
             debtToRepay
         );
 
         // forward profit portion to the ProfitManager, burn the rest
-        CreditToken(creditToken).transfer(profitManager, interestRepaid);
-        ProfitManager(profitManager).notifyPnL(
+        CreditToken(refs.creditToken).transfer(refs.profitManager, interestRepaid);
+        ProfitManager(refs.profitManager).notifyPnL(
             address(this),
             int256(interestRepaid)
         );
-        CreditToken(creditToken).burn(principalRepaid);
+        CreditToken(refs.creditToken).burn(principalRepaid);
 
         // emit event
         emit LoanPartialRepay(block.timestamp, loanId, repayer, debtToRepay);
@@ -567,7 +581,7 @@ contract LendingTerm is CoreRef {
         uint256 deadline,
         Signature calldata sig
     ) external {
-        IERC20Permit(creditToken).permit(
+        IERC20Permit(refs.creditToken).permit(
             msg.sender,
             address(this),
             debtToRepay,
@@ -597,23 +611,23 @@ contract LendingTerm is CoreRef {
         // compute interest owed
         uint256 loanDebt = getLoanDebt(loanId);
         uint256 borrowAmount = loan.borrowAmount;
-        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
         uint256 principal = borrowAmount * loan.borrowCreditMultiplier / creditMultiplier;
         uint256 interest = loanDebt - principal;
 
         /// pull debt from the borrower and replenish the buffer of available debt that can be minted.
-        CreditToken(creditToken).transferFrom(
+        CreditToken(refs.creditToken).transferFrom(
             repayer,
             address(this),
             loanDebt
         );
         if (interest != 0) {
             // forward profit portion to the ProfitManager, burn the rest
-            CreditToken(creditToken).transfer(profitManager, interest);
-            CreditToken(creditToken).burn(principal);
+            CreditToken(refs.creditToken).transfer(refs.profitManager, interest);
+            CreditToken(refs.creditToken).burn(principal);
 
             // report profit
-            ProfitManager(profitManager).notifyPnL(
+            ProfitManager(refs.profitManager).notifyPnL(
                 address(this),
                 int256(interest)
             );
@@ -622,10 +636,10 @@ contract LendingTerm is CoreRef {
         // close the loan
         loan.closeTime = block.timestamp;
         issuance -= borrowAmount;
-        RateLimitedMinter(creditMinter).replenishBuffer(borrowAmount);
+        RateLimitedMinter(refs.creditMinter).replenishBuffer(borrowAmount);
 
         // return the collateral to the borrower
-        IERC20(collateralToken).safeTransfer(
+        IERC20(params.collateralToken).safeTransfer(
             loan.borrower,
             loan.collateralAmount
         );
@@ -646,7 +660,7 @@ contract LendingTerm is CoreRef {
         uint256 deadline,
         Signature calldata sig
     ) external {
-        IERC20Permit(creditToken).permit(
+        IERC20Permit(refs.creditToken).permit(
             msg.sender,
             address(this),
             maxDebt,
@@ -676,7 +690,7 @@ contract LendingTerm is CoreRef {
 
         // check that the loan can be called
         require(
-            GuildToken(guildToken).isDeprecatedGauge(address(this)) || partialRepayDelayPassed(loanId),
+            GuildToken(refs.guildToken).isDeprecatedGauge(address(this)) || partialRepayDelayPassed(loanId),
             "LendingTerm: cannot call"
         );
 
@@ -701,12 +715,12 @@ contract LendingTerm is CoreRef {
 
     /// @notice call a single loan
     function call(bytes32 loanId) external {
-        _call(msg.sender, loanId, auctionHouse);
+        _call(msg.sender, loanId, refs.auctionHouse);
     }
 
     /// @notice call a list of loans
     function callMany(bytes32[] memory loanIds) public {
-        address _auctionHouse = auctionHouse;
+        address _auctionHouse = refs.auctionHouse;
         for (uint256 i = 0; i < loanIds.length; i++) {
             _call(msg.sender, loanIds[i], _auctionHouse);
         }
@@ -731,14 +745,14 @@ contract LendingTerm is CoreRef {
         issuance -= loan.borrowAmount;
 
         // mark loan as a total loss
-        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
         uint256 borrowAmount = loans[loanId].borrowAmount;
         uint256 principal = borrowAmount * loans[loanId].borrowCreditMultiplier / creditMultiplier;
         int256 pnl = -int256(principal);
-        ProfitManager(profitManager).notifyPnL(address(this), pnl);
+        ProfitManager(refs.profitManager).notifyPnL(address(this), pnl);
 
         // set hardcap to 0 to prevent new borrows
-        hardCap = 0;
+        params.hardCap = 0;
 
         // emit event
         emit LoanClose(block.timestamp, loanId, LoanCloseType.Forgive, 0);
@@ -753,7 +767,7 @@ contract LendingTerm is CoreRef {
         uint256 creditFromBidder
     ) external {
         // preliminary checks
-        require(msg.sender == auctionHouse, "LendingTerm: invalid caller");
+        require(msg.sender == refs.auctionHouse, "LendingTerm: invalid caller");
         require(loans[loanId].callTime != 0 && loans[loanId].callDebt != 0, "LendingTerm: loan not called");
         require(loans[loanId].closeTime == 0, "LendingTerm: loan closed");
 
@@ -768,7 +782,7 @@ contract LendingTerm is CoreRef {
         );
 
         // compute pnl
-        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
+        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
         uint256 borrowAmount = loans[loanId].borrowAmount;
         uint256 principal = borrowAmount * loans[loanId].borrowCreditMultiplier / creditMultiplier;
         int256 pnl;
@@ -787,7 +801,7 @@ contract LendingTerm is CoreRef {
 
         // pull credit from bidder
         if (creditFromBidder != 0) {
-            CreditToken(creditToken).transferFrom(
+            CreditToken(refs.creditToken).transferFrom(
                 bidder,
                 address(this),
                 creditFromBidder
@@ -796,28 +810,28 @@ contract LendingTerm is CoreRef {
 
         // burn credit principal
         if (principal != 0) {
-            CreditToken(creditToken).burn(principal);
+            CreditToken(refs.creditToken).burn(principal);
         }
 
         // handle profit & losses
         if (pnl != 0) {
             // forward profit, if any
             if (interest != 0) {
-                CreditToken(creditToken).transfer(
-                    profitManager,
+                CreditToken(refs.creditToken).transfer(
+                    refs.profitManager,
                     interest
                 );
             }
-            ProfitManager(profitManager).notifyPnL(address(this), pnl);
+            ProfitManager(refs.profitManager).notifyPnL(address(this), pnl);
         }
 
         // replenish buffer, decrease issuance
-        RateLimitedMinter(creditMinter).replenishBuffer(borrowAmount);
+        RateLimitedMinter(refs.creditMinter).replenishBuffer(borrowAmount);
         issuance -= borrowAmount;
 
         // send collateral to borrower
         if (collateralToBorrower != 0) {
-            IERC20(collateralToken).safeTransfer(
+            IERC20(params.collateralToken).safeTransfer(
                 loans[loanId].borrower,
                 collateralToBorrower
             );
@@ -825,7 +839,7 @@ contract LendingTerm is CoreRef {
 
         // send collateral to bidder
         if (collateralToBidder != 0) {
-            IERC20(collateralToken).safeTransfer(
+            IERC20(params.collateralToken).safeTransfer(
                 bidder,
                 collateralToBidder
             );
@@ -849,11 +863,11 @@ contract LendingTerm is CoreRef {
         // lifecycle, as it would prevent the former auctionHouse (that have active auctions)
         // from reporting the result to the lending term.
         require(
-            AuctionHouse(auctionHouse).nAuctionsInProgress() == 0,
+            AuctionHouse(refs.auctionHouse).nAuctionsInProgress() == 0,
             "LendingTerm: auctions in progress"
         );
 
-        auctionHouse = _newValue;
+        refs.auctionHouse = _newValue;
     }
 
     /// @notice set the hardcap of CREDIT mintable in this term.
@@ -861,6 +875,6 @@ contract LendingTerm is CoreRef {
     function setHardCap(
         uint256 _newValue
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
-        hardCap = _newValue;
+        params.hardCap = _newValue;
     }
 }

@@ -48,6 +48,7 @@
   ],
   "PROPOSER": [
     "GOVERNOR",
+    "LENDING_TERM_ONBOARDING",
     "TEAM_MULTISIG"
   ],
   "EXECUTOR": [

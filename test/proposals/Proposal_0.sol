@@ -18,6 +18,7 @@ import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
+import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 
@@ -78,6 +79,20 @@ contract Proposal_0 is Proposal {
             addresses.addMainnet("SURPLUS_GUILD_MINTER", address(guildMinter));
         }
 
+        // Auction House & LendingTerm Implementation V1
+        {
+            AuctionHouse auctionHouse = new AuctionHouse(
+                addresses.mainnet("CORE"),
+                650, // midPoint = 10m50s
+                1800 // auctionDuration = 30m
+            );
+
+            LendingTerm termV1 = new LendingTerm();
+
+            addresses.addMainnet("AUCTION_HOUSE_1", address(auctionHouse));
+            addresses.addMainnet("LENDING_TERM_V1", address(termV1));
+        }
+
         // Governance
         {
             VoltTimelockController timelock = new VoltTimelockController(
@@ -104,14 +119,32 @@ contract Proposal_0 is Proposal {
                 addresses.mainnet("ERC20_GUILD"),
                 5_000_000e18 // quorum
             );
+            LendingTermOnboarding termOnboarding = new LendingTermOnboarding(
+                addresses.mainnet("LENDING_TERM_V1"), // _lendingTermImplementation
+                LendingTerm.LendingTermReferences({
+                    profitManager: addresses.mainnet("PROFIT_MANAGER"),
+                    guildToken: addresses.mainnet("ERC20_GUILD"),
+                    auctionHouse: addresses.mainnet("AUCTION_HOUSE_V1"),
+                    creditMinter: addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
+                    creditToken: addresses.mainnet("ERC20_CREDIT")
+                }), /// _lendingTermReferences
+                1, // _gaugeType
+                addresses.mainnet("CORE"), // _core
+                addresses.mainnet("TIMELOCK"), // _timelock
+                0, // initialVotingDelay
+                7000 * 3, // initialVotingPeriod (~7000 blocks/day)
+                2_500_000e18, // initialProposalThreshold
+                10_000_000e18 // initialQuorum
+            );
 
             addresses.addMainnet("TIMELOCK", address(timelock));
             addresses.addMainnet("GOVERNOR", address(governor));
             addresses.addMainnet("VETO_GOVERNOR", address(vetoGovernor));
             addresses.addMainnet("LENDING_TERM_OFFBOARDING", address(termOffboarding));
+            addresses.addMainnet("LENDING_TERM_ONBOARDING", address(termOnboarding));
         }
 
-        // Terms & Auction House
+        // Terms & PSM
         {
             SimplePSM psm = new SimplePSM(
                 addresses.mainnet("CORE"),
@@ -120,49 +153,32 @@ contract Proposal_0 is Proposal {
                 addresses.mainnet("ERC20_CREDIT"),
                 addresses.mainnet("ERC20_USDC")
             );
-            AuctionHouse auctionHouse = new AuctionHouse(
-                addresses.mainnet("CORE"),
-                650, // midPoint = 10m50s
-                1800 // auctionDuration = 30m
+
+            LendingTermOnboarding termOnboarding = LendingTermOnboarding(
+                payable(addresses.mainnet("LENDING_TERM_ONBOARDING"))
             );
-            LendingTerm termUSDC1 = new LendingTerm(
-                addresses.mainnet("CORE"),
-                addresses.mainnet("PROFIT_MANAGER"),
-                addresses.mainnet("ERC20_GUILD"),
-                address(auctionHouse),
-                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
-                addresses.mainnet("ERC20_CREDIT"),
-                LendingTerm.LendingTermParams({
-                    collateralToken: addresses.mainnet("ERC20_USDC"),
-                    maxDebtPerCollateralToken: 1e30, // 1 CREDIT per USDC collateral + 12 decimals correction
-                    interestRate: 0, // 0%
-                    maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
-                    minPartialRepayPercent: 0, // no minimum size for partial repay
-                    openingFee: 0, // 0%
-                    hardCap: 2_000_000e18 // max 2M CREDIT issued
-                })
-            );
-            LendingTerm termSDAI1 = new LendingTerm(
-                addresses.mainnet("CORE"),
-                addresses.mainnet("PROFIT_MANAGER"),
-                addresses.mainnet("ERC20_GUILD"),
-                address(auctionHouse),
-                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
-                addresses.mainnet("ERC20_CREDIT"),
-                LendingTerm.LendingTermParams({
-                    collateralToken: addresses.mainnet("ERC20_SDAI"),
-                    maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
-                    interestRate: 0.03e18, // 3%
-                    maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
-                    minPartialRepayPercent: 0, // no minimum size for partial repay
-                    openingFee: 0, // 0%
-                    hardCap: 2_000_000e18 // max 2M CREDIT issued
-                })
-            );
+            address termUSDC1 = termOnboarding.createTerm(LendingTerm.LendingTermParams({
+                collateralToken: addresses.mainnet("ERC20_USDC"),
+                maxDebtPerCollateralToken: 1e30, // 1 CREDIT per USDC collateral + 12 decimals correction
+                interestRate: 0, // 0%
+                maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
+                minPartialRepayPercent: 0, // no minimum size for partial repay
+                openingFee: 0, // 0%
+                hardCap: 2_000_000e18 // max 2M CREDIT issued
+            }));
+            address termSDAI1 = termOnboarding.createTerm(LendingTerm.LendingTermParams({
+                collateralToken: addresses.mainnet("ERC20_SDAI"),
+                maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
+                interestRate: 0.03e18, // 3%
+                maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
+                minPartialRepayPercent: 0, // no minimum size for partial repay
+                openingFee: 0, // 0%
+                hardCap: 2_000_000e18 // max 2M CREDIT issued
+            }));
+
             addresses.addMainnet("PSM_USDC", address(psm));
-            addresses.addMainnet("AUCTION_HOUSE_1", address(auctionHouse));
-            addresses.addMainnet("TERM_USDC_1", address(termUSDC1));
-            addresses.addMainnet("TERM_SDAI_1", address(termSDAI1));
+            addresses.addMainnet("TERM_USDC_1", termUSDC1);
+            addresses.addMainnet("TERM_SDAI_1", termSDAI1);
         }
     }
 
@@ -223,6 +239,7 @@ contract Proposal_0 is Proposal {
 
         // TIMELOCK_PROPOSER
         core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("GOVERNOR"));
+        core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("LENDING_TERM_ONBOARDING"));
         core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("TEAM_MULTISIG"));
 
         // TIMELOCK_EXECUTOR

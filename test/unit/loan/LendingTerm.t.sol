@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+
 import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
@@ -53,13 +55,16 @@ contract LendingTermUnitTest is Test {
             650,
             1800
         );
-        term = new LendingTerm(
-            address(core), /*_core*/
-            address(profitManager), /*_profitManager*/
-            address(guild), /*_guildToken*/
-            address(auctionHouse), /*_auctionHouse*/
-            address(rlcm), /*_creditMinter*/
-            address(credit), /*_creditToken*/
+        term = LendingTerm(Clones.clone(address(new LendingTerm())));
+        term.initialize(
+            address(core),
+            LendingTerm.LendingTermReferences({
+                profitManager: address(profitManager),
+                guildToken: address(guild),
+                auctionHouse: address(auctionHouse),
+                creditMinter: address(rlcm),
+                creditToken: address(credit)
+            }),
             LendingTerm.LendingTermParams({
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
@@ -105,16 +110,21 @@ contract LendingTermUnitTest is Test {
 
     function testInitialState() public {
         assertEq(address(term.core()), address(core));
-        assertEq(address(term.guildToken()), address(guild));
-        assertEq(address(term.auctionHouse()), address(auctionHouse));
-        assertEq(address(term.creditMinter()), address(rlcm));
-        assertEq(address(term.creditToken()), address(credit));
-        assertEq(address(term.collateralToken()), address(collateral));
-        assertEq(term.maxDebtPerCollateralToken(), _CREDIT_PER_COLLATERAL_TOKEN);
-        assertEq(term.interestRate(), _INTEREST_RATE);
-        assertEq(term.maxDelayBetweenPartialRepay(), _MAX_DELAY_BETWEEN_PARTIAL_REPAY);
-        assertEq(term.minPartialRepayPercent(), _MIN_PARTIAL_REPAY_PERCENT);
-        assertEq(term.hardCap(), _HARDCAP);
+
+        LendingTerm.LendingTermReferences memory refs = term.getReferences();
+        assertEq(refs.guildToken, address(guild));
+        assertEq(refs.auctionHouse, address(auctionHouse));
+        assertEq(refs.creditMinter, address(rlcm));
+        assertEq(refs.creditToken, address(credit));
+
+        LendingTerm.LendingTermParams memory params = term.getParameters();
+        assertEq(params.collateralToken, address(collateral));
+        assertEq(params.maxDebtPerCollateralToken, _CREDIT_PER_COLLATERAL_TOKEN);
+        assertEq(params.interestRate, _INTEREST_RATE);
+        assertEq(params.maxDelayBetweenPartialRepay, _MAX_DELAY_BETWEEN_PARTIAL_REPAY);
+        assertEq(params.minPartialRepayPercent, _MIN_PARTIAL_REPAY_PERCENT);
+        assertEq(params.hardCap, _HARDCAP);
+
         assertEq(term.issuance(), 0);
         assertEq(term.getLoan(bytes32(0)).borrowTime, 0);
         assertEq(term.getLoanDebt(bytes32(0)), 0);
@@ -160,13 +170,10 @@ contract LendingTermUnitTest is Test {
     // borrow with opening fee success
     function testBorrowWithOpeningFeeSuccess() public {
         // create a similar term but with 5% opening fee
-        LendingTerm term2 = new LendingTerm(
-            address(core), /*_core*/
-            address(profitManager), /*profitManager*/
-            address(guild), /*_guildToken*/
-            address(auctionHouse), /*_auctionHouse*/
-            address(rlcm), /*_creditMinter*/
-            address(credit), /*_creditToken*/
+        LendingTerm term2 = LendingTerm(Clones.clone(address(new LendingTerm())));
+        term2.initialize(
+            address(core),
+            term.getReferences(),
             LendingTerm.LendingTermParams({
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
@@ -759,12 +766,12 @@ contract LendingTermUnitTest is Test {
 
     // test governor-only setter for auctionHouse
     function testGovernorSetAuctionHouse() public {
-        assertEq(term.auctionHouse(), address(auctionHouse));
+        assertEq(term.getReferences().auctionHouse, address(auctionHouse));
         
         vm.prank(governor);
         term.setAuctionHouse(address(this));
 
-        assertEq(term.auctionHouse(), address(this));
+        assertEq(term.getReferences().auctionHouse, address(this));
 
         vm.expectRevert("UNAUTHORIZED");
         term.setAuctionHouse(address(auctionHouse));
@@ -772,12 +779,12 @@ contract LendingTermUnitTest is Test {
 
     // test setter for hardCap
     function testSetHardCap() public {
-        assertEq(term.hardCap(), _HARDCAP);
+        assertEq(term.getParameters().hardCap, _HARDCAP);
         
         vm.prank(governor);
         term.setHardCap(type(uint256).max);
 
-        assertEq(term.hardCap(), type(uint256).max);
+        assertEq(term.getParameters().hardCap, type(uint256).max);
 
         vm.expectRevert("UNAUTHORIZED");
         term.setHardCap(12345);
