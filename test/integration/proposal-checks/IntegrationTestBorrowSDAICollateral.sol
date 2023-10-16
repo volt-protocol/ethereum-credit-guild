@@ -22,16 +22,34 @@ import {ProtocolConstants as constants} from "@test/utils/ProtocolConstants.sol"
 contract IntegrationTestBorrowAgainstSDAICollateral is PostProposalCheck {
     function testTermParamSetup() public {
         assertEq(term.collateralToken(), address(sdai));
-        LendingTerm.LendingTermParams memory params = term.getParameters();
-        assertEq(params.collateralToken, address(sdai));
-        assertEq(params.openingFee, 0);
-        assertEq(params.interestRate, constants.SDAI_RATE);
-        assertEq(params.minPartialRepayPercent, 0);
-        assertEq(params.maxDelayBetweenPartialRepay, 0);
-        assertEq(
-            params.maxDebtPerCollateralToken,
-            constants.MAX_SDAI_CREDIT_RATIO
-        );
+        {
+            LendingTerm.LendingTermParams memory params = term.getParameters();
+            assertEq(params.collateralToken, address(sdai));
+            assertEq(params.openingFee, 0);
+            assertEq(params.interestRate, constants.SDAI_RATE);
+            assertEq(params.minPartialRepayPercent, 0);
+            assertEq(params.maxDelayBetweenPartialRepay, 0);
+            assertEq(
+                params.maxDebtPerCollateralToken,
+                constants.MAX_SDAI_CREDIT_RATIO
+            );
+        }
+        {
+            LendingTerm.LendingTermReferences memory params = term
+                .getReferences();
+
+            assertEq(
+                params.profitManager,
+                addresses.mainnet(strings.PROFIT_MANAGER)
+            );
+            assertEq(params.guildToken, address(guild));
+            assertEq(
+                params.auctionHouse,
+                addresses.mainnet(strings.AUCTION_HOUSE)
+            );
+            assertEq(params.creditMinter, address(rateLimitedCreditMinter));
+            assertEq(params.creditToken, address(credit));
+        }
     }
 
     function testVoteForSDAIGauge() public {
@@ -54,7 +72,9 @@ contract IntegrationTestBorrowAgainstSDAICollateral is PostProposalCheck {
         assertTrue(guild.isUserGauge(address(this), address(term)));
     }
 
-    function testSupplyCollateralUserOne(uint128 supplyAmount) public returns (bytes32 loanId) {
+    function testSupplyCollateralUserOne(
+        uint128 supplyAmount
+    ) public returns (bytes32 loanId) {
         supplyAmount = uint128(
             _bound(
                 uint256(supplyAmount),
@@ -98,6 +118,7 @@ contract IntegrationTestBorrowAgainstSDAICollateral is PostProposalCheck {
             block.timestamp,
             "incorrect last buffer used time"
         );
+        assertEq(term.issuance(), supplyAmount, "incorrect supply issuance");
     }
 
     function testRepayLoan(uint128 supplyAmount) public {
@@ -124,11 +145,7 @@ contract IntegrationTestBorrowAgainstSDAICollateral is PostProposalCheck {
             constants.CREDIT_SUPPLY,
             "incorrect credit supply"
         );
-        assertEq(
-            credit.balanceOf(userOne),
-            0,
-            "incorrect credit balance"
-        );
+        assertEq(credit.balanceOf(userOne), 0, "incorrect credit balance");
         assertEq(
             rateLimitedCreditMinter.buffer(),
             constants.CREDIT_HARDCAP - constants.CREDIT_SUPPLY,
@@ -139,5 +156,87 @@ contract IntegrationTestBorrowAgainstSDAICollateral is PostProposalCheck {
             block.timestamp,
             "incorrect last buffer used time"
         );
+        assertEq(term.issuance(), 0, "incorrect issuance, should be 0");
+    }
+
+    function testTermOffboarding() public {
+        if (guild.balanceOf(address(this)) == 0) {
+            testVoteForSDAIGauge();
+        }
+
+        vm.roll(block.number + 2);
+        vm.warp(block.timestamp + 1);
+
+        offboarder.proposeOffboard(address(term));
+        vm.roll(block.number + 1);
+        offboarder.supportOffboard(block.number - 1, address(term));
+        offboarder.offboard(address(term));
+
+        assertFalse(guild.isGauge(address(term)));
+    }
+
+    function testCallLoan() public returns (bytes32) {
+        uint256 supplyAmount = 10_000e18;
+        bytes32 loanId = testSupplyCollateralUserOne(uint128(supplyAmount));
+
+        testTermOffboarding();
+
+        uint256 loanDebt = term.getLoanDebt(loanId);
+
+        term.call(loanId);
+
+        assertEq(
+            auctionHouse.nAuctionsInProgress(),
+            1,
+            "incorrect number of auctions post call"
+        );
+
+        LendingTerm.Loan memory loan = term.getLoan(loanId);
+
+        assertEq(loan.closeTime, 0, "incorrect close time");
+        assertEq(loan.callTime, block.timestamp, "incorrect call time");
+        assertEq(loan.callDebt, loanDebt, "incorrect call debt");
+        assertEq(loan.caller, address(this), "incorrect caller");
+
+        return loanId;
+    }
+
+    function testBid() public {
+        bytes32 loanId = testCallLoan();
+        uint256 creditRepayAmount = term.getLoanDebt(loanId);
+        uint256 loanAmount = 10_000e18;
+        uint256 profit = creditRepayAmount - loanAmount;
+
+        /// bid at start of auction, so receive 0 collateral
+
+        vm.startPrank(userTwo);
+
+        deal(address(credit), userTwo, creditRepayAmount);
+        credit.approve(address(term), creditRepayAmount);
+        auctionHouse.bid(loanId);
+
+        vm.stopPrank();
+
+        LendingTerm.Loan memory loan = term.getLoan(loanId);
+
+        assertEq(loan.closeTime, block.timestamp, "incorrect close time");
+        assertEq(
+            auctionHouse.nAuctionsInProgress(),
+            0,
+            "incorrect number of auctions post bid"
+        );
+        assertEq(sdai.balanceOf(userTwo), 0);
+        assertEq(sdai.balanceOf(userOne), loanAmount);
+        assertEq(credit.balanceOf(userOne), loanAmount);
+        assertEq(credit.balanceOf(userTwo), 0); /// user two spent all of their credit
+        assertEq(
+            auctionHouse.nAuctionsInProgress(),
+            0,
+            "incorrect number of auctions completed"
+        );
+        assertEq(term.issuance(), 0, "incorrect issuance");
+
+        /// TODO test assertions of surplus buffer being updated correctly
+        profit;
     }
 }
