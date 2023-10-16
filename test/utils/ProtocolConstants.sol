@@ -15,20 +15,14 @@ library ProtocolConstants {
     /// @notice maximum delegates for both credit and guild token
     uint256 internal constant MAX_DELEGATES = 12;
 
-    /// @notice for each USDC collateral, up to 1 credit can be borrowed
-    uint256 internal constant MAX_USDC_CREDIT_RATIO = 1e30;
-
     /// @notice for each SDAI collateral, up to 1 credit can be borrowed
     uint256 internal constant MAX_SDAI_CREDIT_RATIO = 1e18;
 
     /// @notice credit hardcap at launch
     uint256 internal constant CREDIT_HARDCAP = 2_000_000 * 1e18;
 
-    /// @notice USDC credit hardcap at launch
-    uint256 internal constant USDC_CREDIT_HARDCAP = 1_000_000 * 1e18;
-
     /// @notice SDAI credit hardcap at launch
-    uint256 internal constant SDAI_CREDIT_HARDCAP = 1_000_000 * 1e18;
+    uint256 internal constant SDAI_CREDIT_HARDCAP = 2_000_000 * 1e18;
 
     /// ------------------------------------------------------------------------
     /// @notice Interest Rate Parameters
@@ -36,9 +30,6 @@ library ProtocolConstants {
 
     /// @notice rate to borrow against SDAI collateral
     uint256 internal constant SDAI_RATE = 0.04e18;
-
-    /// @notice rate to borrow against USDC collateral
-    uint256 internal constant USDC_RATE = 0;
 
     /// ------------------------------------------------------------------------
     /// @notice Governance Parameters
