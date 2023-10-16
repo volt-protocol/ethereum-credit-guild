@@ -50,10 +50,10 @@ library ProtocolConstants {
     /// @notice initial quorum for a proposal to pass on the DAO
     uint256 internal constant INITIAL_QUORUM = 10_000_000 * 1e18;
 
-    /// @notice initial quorum for a proposal to be vetoed on the Veto DAO is 25k CREDIT
-    uint256 internal constant INITIAL_QUORUM_VETO_DAO = 250_000 * 1e18;
+    /// @notice initial quorum for a proposal to be vetoed on the Veto DAO is 500k CREDIT
+    uint256 internal constant INITIAL_QUORUM_VETO_DAO = 500_000 * 1e18;
 
-    /// @notice initial quorum for a proposal to be vetoed on the Veto DAO by Credit holders
+    /// @notice initial quorum for a proposal to be offboarded on the Offboarding contract is 5m GUILD
     uint256 internal constant LENDING_TERM_OFFBOARDING_QUORUM =
         5_000_000 * 1e18;
 
