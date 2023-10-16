@@ -256,10 +256,10 @@ contract Proposal_0 is Proposal {
             CoreRoles.RATE_LIMITED_GUILD_MINTER,
             addresses.mainnet(strings.SURPLUS_GUILD_MINTER)
         );
-        
+
         // RATE_LIMITED_GUILD_MINTER
         core.grantRole(CoreRoles.GUILD_MINTER, deployer);
-        
+
         /// Grant Multisig Guild Rate Limited Minter
         core.grantRole(
             CoreRoles.RATE_LIMITED_GUILD_MINTER,
@@ -496,6 +496,21 @@ contract Proposal_0 is Proposal {
                 rateLimitedCreditMinter.role(),
                 CoreRoles.RATE_LIMITED_CREDIT_MINTER
             );
+            assertEq(
+                rateLimitedCreditMinter.rateLimitPerSecond(),
+                0,
+                "rate limit per second credit incorrect"
+            );
+            assertEq(
+                rateLimitedCreditMinter.bufferCap(),
+                constants.CREDIT_HARDCAP,
+                "credit buffercap incorrect"
+            );
+            assertEq(
+                rateLimitedCreditMinter.buffer(),
+                constants.CREDIT_HARDCAP - constants.CREDIT_SUPPLY,
+                "credit buffer incorrect"
+            );
         }
         {
             RateLimitedMinter rateLimitedGuildMinter = RateLimitedMinter(
@@ -509,6 +524,13 @@ contract Proposal_0 is Proposal {
                 rateLimitedGuildMinter.role(),
                 CoreRoles.RATE_LIMITED_GUILD_MINTER
             );
+            assertEq(rateLimitedGuildMinter.rateLimitPerSecond(), 0, "rate limit per second guild incorrect");
+            assertEq(
+                rateLimitedGuildMinter.bufferCap(),
+                constants.GUILD_SUPPLY,
+                "guild buffercap incorrect"
+            );
+            assertEq(rateLimitedGuildMinter.buffer(), constants.GUILD_SUPPLY, "guild buffer incorrect");
         }
 
         /// GUILD and CREDIT Token Total Supply and balances
