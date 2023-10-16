@@ -94,6 +94,7 @@ contract LendingTermOnboarding is VoltGovernor {
         );
 
         require(
+            // 31557601 comes from the constant LendingTerm.YEAR() + 1
             params.maxDelayBetweenPartialRepay < 31557601, // periodic payment every [0, 1 year]
             "LendingTermOnboarding: invalid maxDelayBetweenPartialRepay"
         );
