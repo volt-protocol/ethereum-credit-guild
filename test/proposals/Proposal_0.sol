@@ -193,17 +193,7 @@ contract Proposal_0 is Proposal {
             LendingTermOnboarding termOnboarding = LendingTermOnboarding(
                 payable(addresses.mainnet(strings.LENDING_TERM_ONBOARDING))
             );
-            address termUSDC1 = termOnboarding.createTerm(
-                LendingTerm.LendingTermParams({
-                    collateralToken: addresses.mainnet(strings.USDC),
-                    maxDebtPerCollateralToken: constants.MAX_USDC_CREDIT_RATIO, // 1 CREDIT per USDC collateral + 12 decimals correction
-                    interestRate: constants.USDC_RATE, // 0%
-                    maxDelayBetweenPartialRepay: 0, // no periodic partial repay needed
-                    minPartialRepayPercent: 0, // no minimum size for partial repay
-                    openingFee: 0, // 0%
-                    hardCap: constants.CREDIT_HARDCAP // max 20k CREDIT issued
-                })
-            );
+
             address termSDAI1 = termOnboarding.createTerm(
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet(strings.SDAI),
@@ -217,7 +207,6 @@ contract Proposal_0 is Proposal {
             );
 
             addresses.addMainnet(strings.PSM_USDC, address(psm));
-            addresses.addMainnet(strings.TERM_USDC_1, termUSDC1);
             addresses.addMainnet(strings.TERM_SDAI_1, termSDAI1);
         }
     }
@@ -249,10 +238,6 @@ contract Proposal_0 is Proposal {
         core.grantRole(
             CoreRoles.RATE_LIMITED_CREDIT_MINTER,
             addresses.mainnet(strings.PSM_USDC)
-        );
-        core.grantRole(
-            CoreRoles.RATE_LIMITED_CREDIT_MINTER,
-            addresses.mainnet(strings.TERM_USDC_1)
         );
         core.grantRole(
             CoreRoles.RATE_LIMITED_CREDIT_MINTER,
@@ -304,10 +289,6 @@ contract Proposal_0 is Proposal {
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, deployer);
 
         // GAUGE_PNL_NOTIFIER
-        core.grantRole(
-            CoreRoles.GAUGE_PNL_NOTIFIER,
-            addresses.mainnet(strings.TERM_USDC_1)
-        );
         core.grantRole(
             CoreRoles.GAUGE_PNL_NOTIFIER,
             addresses.mainnet(strings.TERM_SDAI_1)
@@ -388,10 +369,6 @@ contract Proposal_0 is Proposal {
         GuildToken(addresses.mainnet(strings.GUILD_TOKEN)).setMaxGauges(10);
         GuildToken(addresses.mainnet(strings.GUILD_TOKEN)).addGauge(
             1,
-            addresses.mainnet(strings.TERM_USDC_1)
-        );
-        GuildToken(addresses.mainnet(strings.GUILD_TOKEN)).addGauge(
-            1,
             addresses.mainnet(strings.TERM_SDAI_1)
         );
         GuildToken(addresses.mainnet(strings.GUILD_TOKEN)).setMaxDelegates(
@@ -443,9 +420,6 @@ contract Proposal_0 is Proposal {
         Core core = Core(addresses.mainnet(strings.CORE));
         {
             SimplePSM psm = SimplePSM(addresses.mainnet(strings.PSM_USDC));
-            LendingTerm term1 = LendingTerm(
-                addresses.mainnet(strings.TERM_USDC_1)
-            );
             LendingTerm term2 = LendingTerm(
                 addresses.mainnet(strings.TERM_SDAI_1)
             );
@@ -481,7 +455,6 @@ contract Proposal_0 is Proposal {
             assertEq(address(core), address(sgm.core()));
             assertEq(address(core), address(psm.core()));
             assertEq(address(core), address(guild.core()));
-            assertEq(address(core), address(term1.core()));
             assertEq(address(core), address(term2.core()));
             assertEq(address(core), address(credit.core()));
             assertEq(address(core), address(timelock.core()));

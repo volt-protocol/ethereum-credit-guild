@@ -9,9 +9,6 @@ library NameLib {
     /// @notice system timelock
     string internal constant TIMELOCK = "TIMELOCK";
 
-    /// @notice first lending term for USDC
-    string internal constant TERM_USDC_1 = "TERM_USDC_1";
-
     /// @notice first lending term for SDAI
     string internal constant TERM_SDAI_1 = "TERM_SDAI_1";
 
