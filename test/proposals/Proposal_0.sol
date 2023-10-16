@@ -421,10 +421,17 @@ contract Proposal_0 is Proposal {
         /// CORE Verification
         Core core = Core(addresses.mainnet(strings.CORE));
         {
-            SimplePSM psm = SimplePSM(addresses.mainnet(strings.PSM_USDC));
-            LendingTerm term2 = LendingTerm(
-                addresses.mainnet(strings.TERM_SDAI_1)
+            assertEq(
+                address(core),
+                address(SimplePSM(addresses.mainnet(strings.PSM_USDC)).core())
             );
+            assertEq(
+                address(core),
+                address(
+                    LendingTerm(addresses.mainnet(strings.TERM_SDAI_1)).core()
+                )
+            );
+
             CreditToken credit = CreditToken(
                 addresses.mainnet(strings.CREDIT_TOKEN)
             );
@@ -452,16 +459,26 @@ contract Proposal_0 is Proposal {
             RateLimitedMinter rateLimitedGuildMinter = RateLimitedMinter(
                 addresses.mainnet(strings.RATE_LIMITED_GUILD_MINTER)
             );
+            AuctionHouse auctionHouse = AuctionHouse(
+                addresses.mainnet(strings.AUCTION_HOUSE)
+            );
+            VoltGovernor governor = VoltGovernor(
+                payable(addresses.mainnet(strings.GOVERNOR))
+            );
+            VoltVetoGovernor vetoGovernor = VoltVetoGovernor(
+                payable(addresses.mainnet(strings.VETO_GOVERNOR))
+            );
 
             assertEq(address(core), address(mgr.core()));
             assertEq(address(core), address(sgm.core()));
-            assertEq(address(core), address(psm.core()));
             assertEq(address(core), address(guild.core()));
-            assertEq(address(core), address(term2.core()));
             assertEq(address(core), address(credit.core()));
             assertEq(address(core), address(timelock.core()));
+            assertEq(address(core), address(governor.core()));
             assertEq(address(core), address(onboarder.core()));
             assertEq(address(core), address(offboarding.core()));
+            assertEq(address(core), address(auctionHouse.core()));
+            assertEq(address(core), address(vetoGovernor.core()));
             assertEq(address(core), address(rateLimitedGuildMinter.core()));
             assertEq(address(core), address(rateLimitedCreditMinter.core()));
         }
@@ -524,13 +541,21 @@ contract Proposal_0 is Proposal {
                 rateLimitedGuildMinter.role(),
                 CoreRoles.RATE_LIMITED_GUILD_MINTER
             );
-            assertEq(rateLimitedGuildMinter.rateLimitPerSecond(), 0, "rate limit per second guild incorrect");
+            assertEq(
+                rateLimitedGuildMinter.rateLimitPerSecond(),
+                0,
+                "rate limit per second guild incorrect"
+            );
             assertEq(
                 rateLimitedGuildMinter.bufferCap(),
                 constants.GUILD_SUPPLY,
                 "guild buffercap incorrect"
             );
-            assertEq(rateLimitedGuildMinter.buffer(), constants.GUILD_SUPPLY, "guild buffer incorrect");
+            assertEq(
+                rateLimitedGuildMinter.buffer(),
+                constants.GUILD_SUPPLY,
+                "guild buffer incorrect"
+            );
         }
 
         /// GUILD and CREDIT Token Total Supply and balances
@@ -611,6 +636,62 @@ contract Proposal_0 is Proposal {
             );
 
             assertEq(timelock.getMinDelay(), constants.TIMELOCK_DELAY);
+        }
+        /// Auction House Verification
+        {
+            AuctionHouse auctionHouse = AuctionHouse(
+                addresses.mainnet(strings.AUCTION_HOUSE)
+            );
+
+            assertEq(auctionHouse.midPoint(), 650);
+            assertEq(auctionHouse.auctionDuration(), 30 minutes);
+            assertEq(auctionHouse.nAuctionsInProgress(), 0);
+        }
+
+        /// Governor Verification
+        {
+            VoltGovernor governor = VoltGovernor(
+                payable(addresses.mainnet(strings.GOVERNOR))
+            );
+            VoltVetoGovernor vetoGovernor = VoltVetoGovernor(
+                payable(addresses.mainnet(strings.VETO_GOVERNOR))
+            );
+
+            assertEq(
+                governor.quorum(0),
+                constants.INITIAL_QUORUM,
+                "governor quorum"
+            );
+            assertEq(
+                governor.votingDelay(),
+                constants.VOTING_DELAY,
+                "governor voting delay"
+            );
+            assertEq(
+                governor.votingPeriod(),
+                constants.VOTING_PERIOD,
+                "governor voting period"
+            );
+            assertEq(
+                governor.proposalThreshold(),
+                constants.PROPOSAL_THRESHOLD,
+                "proposal threshold"
+            );
+            assertEq(
+                vetoGovernor.quorum(0),
+                constants.INITIAL_QUORUM_VETO_DAO,
+                "veto governor quorum"
+            );
+            assertEq(
+                vetoGovernor.votingDelay(),
+                constants.VOTING_DELAY,
+                "veto governor voting delay"
+            );
+            assertEq(
+                vetoGovernor.votingPeriod(),
+                2425847,
+                "veto governor voting period"
+            );
         }
     }
 }
