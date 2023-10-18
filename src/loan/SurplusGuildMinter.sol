@@ -141,6 +141,9 @@ contract SurplusGuildMinter is CoreRef {
         uint256 creditStaked = stakes[msg.sender][term];
         require(creditStaked != 0, "SurplusGuildMinter: not staking");
 
+        // update state
+        stakes[msg.sender][term] = 0;
+
         // check if losses (slashing) occurred since user joined
         uint256 _lastGaugeLoss = GuildToken(guild).lastGaugeLoss(term);
         uint256 _userLastGaugeLoss = lastGaugeLoss[msg.sender][term];
@@ -198,9 +201,6 @@ contract SurplusGuildMinter is CoreRef {
         if (creditToUser != 0) {
             CreditToken(credit).transfer(msg.sender, creditToUser);
         }
-
-        // update state
-        stakes[msg.sender][term] = 0;
 
         // emit event
         emit Unstake(
