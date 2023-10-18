@@ -480,4 +480,125 @@ contract ProfitManagerUnitTest is Test {
         assertEq(profitManager.surplusBuffer(), 0);
         assertEq(credit.balanceOf(address(profitManager)), 0);
     }
+
+    function testDonateToTermSurplusBuffer() public {
+        // initial state
+        assertEq(profitManager.termSurplusBuffer(address(this)), 0);
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        assertEq(credit.balanceOf(address(this)), 200e18);
+        assertEq(credit.balanceOf(address(profitManager)), 0);
+
+        // cannot donate more than current balance/approval
+        vm.expectRevert("ERC20: insufficient allowance");
+        profitManager.donateToTermSurplusBuffer(address(this), 999e18);
+
+        // donate to term surplus buffer
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+
+        // checks
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 100e18);
+    }
+
+    function testWithdrawFromTermSurplusBuffer() public {
+        // initial state
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 100e18);
+
+        // without role, cannot withdraw
+        vm.expectRevert("UNAUTHORIZED");
+        profitManager.withdrawFromTermSurplusBuffer(address(this), 10e18);
+
+        // grant role to test contract
+        vm.prank(governor);
+        core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
+
+        // withdraw
+        profitManager.withdrawFromTermSurplusBuffer(address(this), 10e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 90e18);
+        assertEq(credit.balanceOf(address(this)), 110e18);
+        assertEq(credit.balanceOf(address(profitManager)), 90e18);
+
+        // cannot withdraw more than current buffer
+        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // underflow
+        profitManager.withdrawFromTermSurplusBuffer(address(this), 999e18);
+    }
+
+    function testDepleteTermSurplusBuffer() public {
+        // grant roles to test contract
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
+        core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
+        vm.stopPrank();
+
+        // initial state
+        // 100 CREDIT circulating (assuming backed by >= 100 USD)
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        assertEq(credit.totalSupply(), 100e18);
+
+        // donate 100 to term surplus buffer
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 100e18);
+        assertEq(credit.totalSupply(), 200e18);
+
+        // donate 100 to surplus buffer
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToSurplusBuffer(100e18);
+        assertEq(profitManager.surplusBuffer(), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 200e18);
+        assertEq(credit.totalSupply(), 300e18);
+
+        // apply a loss below termSurplusBuffer (30)
+        // deplete term surplus buffer, 70 leftover transferred to
+        // general surplus buffer
+        profitManager.notifyPnL(address(this), -30e18);
+        assertEq(profitManager.creditMultiplier(), 1e18); // 0% discounted
+        assertEq(profitManager.termSurplusBuffer(address(this)), 0);
+        assertEq(profitManager.surplusBuffer(), 170e18);
+        assertEq(credit.balanceOf(address(profitManager)), 170e18);
+
+        // donate 100 to term surplus buffer
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(profitManager.surplusBuffer(), 170e18);
+        assertEq(credit.balanceOf(address(profitManager)), 270e18);
+        assertEq(credit.totalSupply(), 370e18);
+
+        // apply a loss above termSurplusBuffer (170)
+        // deplete term surplus buffer, 70 removed from general surplus buffer
+        profitManager.notifyPnL(address(this), -170e18);
+        assertEq(profitManager.creditMultiplier(), 1e18); // 0% discounted
+        assertEq(profitManager.termSurplusBuffer(address(this)), 0);
+        assertEq(profitManager.surplusBuffer(), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 100e18);
+
+        // donate 100 to term surplus buffer
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(profitManager.surplusBuffer(), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 200e18);
+        assertEq(credit.totalSupply(), 300e18);
+
+        // apply a loss above termSurplusBuffer (100) + surplusBuffer (100) = -50
+        profitManager.notifyPnL(address(this), -250e18);
+        assertEq(profitManager.creditMultiplier(), 0.5e18); // 50% discounted
+        assertEq(profitManager.termSurplusBuffer(address(this)), 0);
+        assertEq(profitManager.surplusBuffer(), 0);
+        assertEq(credit.balanceOf(address(profitManager)), 0);
+        assertEq(credit.totalSupply(), 100e18);
+    }
 }
