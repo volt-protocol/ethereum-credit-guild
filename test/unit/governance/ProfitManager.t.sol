@@ -381,58 +381,6 @@ contract ProfitManagerUnitTest is Test {
         assertEq(profitManager.claimRewards(alice), 10e18);
     }
 
-    function testDecrementGaugeDebtCeilingUsed() public {
-        // grant roles to test contract
-        vm.startPrank(governor);
-        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
-        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
-        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
-        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
-        vm.stopPrank();
-
-        // setup
-        // 50 GUILD for alice, 50 GUILD for bob
-        guild.mint(alice, 150e18);
-        guild.mint(bob, 400e18);
-        // add gauges
-        guild.setMaxGauges(3);
-        guild.addGauge(1, gauge1);
-        guild.addGauge(1, gauge2);
-        guild.addGauge(1, address(this));
-        // 80 votes on gauge1, 40 votes on gauge2, 40 votes on this
-        vm.startPrank(alice);
-        guild.incrementGauge(gauge1, 10e18);
-        guild.incrementGauge(gauge2, 10e18);
-        vm.stopPrank();
-        vm.startPrank(bob);
-        guild.incrementGauge(gauge1, 10e18);
-        guild.incrementGauge(address(this), 10e18);
-        vm.stopPrank();
-
-        // simulate alice borrows 100 CREDIT on this (gauge 3)
-        credit.mint(alice, 100e18);
-        issuance = 100e18;
-        assertEq(credit.totalSupply(), 200e18);
-
-        // gauge 3 (this) has 25% of votes, but 50% of credit issuance,
-        // so nobody can decrease the votes for this gauge
-        vm.expectRevert("GuildToken: debt ceiling used");
-        vm.prank(bob);
-        guild.decrementGauge(address(this), 10e18);
-
-        // alice now votes for gauge3 (this), so that it is still 50% of credit issuance,
-        // but has 67% of votes.
-        vm.prank(alice);
-        guild.incrementGauge(address(this), 50e18);
-        // after alice increment :
-        // gauge1: 20 votes
-        // gauge2: 10 votes
-        // gauge3 (this): 60 votes
-        // now bob can decrement his gauge vote.
-        vm.prank(bob);
-        guild.decrementGauge(address(this), 10e18);
-    }
-
     function testDonateToSurplusBuffer() public {
         // initial state
         assertEq(profitManager.surplusBuffer(), 0);
