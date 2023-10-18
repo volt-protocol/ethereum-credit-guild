@@ -1359,7 +1359,6 @@ contract LendingTermUnitTest is Test {
         assertEq(term.getLoanDebt(loanId), 44_000e18);
 
         // attempt to partialRepay with a resulting loan below MIN_BORROW
-        uint256 MIN_BORROW = term.MIN_BORROW();
         credit.mint(address(this), 4_000e18);
         assertEq(credit.balanceOf(address(this)), 44_000e18);
         credit.approve(address(term), 41_000e18);
