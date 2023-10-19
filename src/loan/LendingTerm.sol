@@ -622,9 +622,8 @@ contract LendingTerm is CoreRef {
             loanDebt
         );
         if (interest != 0) {
-            // forward profit portion to the ProfitManager, burn the rest
+            // forward profit portion to the ProfitManager
             CreditToken(refs.creditToken).transfer(refs.profitManager, interest);
-            CreditToken(refs.creditToken).burn(principal);
 
             // report profit
             ProfitManager(refs.profitManager).notifyPnL(
@@ -632,6 +631,9 @@ contract LendingTerm is CoreRef {
                 int256(interest)
             );
         }
+
+        // burn loan principal
+        CreditToken(refs.creditToken).burn(principal);
 
         // close the loan
         loan.closeTime = block.timestamp;
