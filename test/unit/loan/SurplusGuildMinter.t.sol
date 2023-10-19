@@ -22,8 +22,8 @@ contract SurplusGuildMinterUnitTest is Test {
     SurplusGuildMinter sgm;
 
     // GuildMinter params
-    uint256 constant RATIO = 2e18;
-    uint256 constant INTEREST_RATE = 0.1e18; // 10%
+    uint256 constant MINT_RATIO = 2e18;
+    uint256 constant REWARD_RATIO = 5e18;
 
     function setUp() public {
         vm.warp(1679067867);
@@ -47,8 +47,8 @@ contract SurplusGuildMinterUnitTest is Test {
             address(credit),
             address(guild),
             address(rlgm),
-            RATIO,
-            INTEREST_RATE
+            MINT_RATIO,
+            REWARD_RATIO
         );
         profitManager.initializeReferences(address(credit), address(guild));
 
@@ -88,14 +88,14 @@ contract SurplusGuildMinterUnitTest is Test {
         assertEq(address(sgm.credit()), address(credit));
         assertEq(address(sgm.guild()), address(guild));
         assertEq(address(sgm.rlgm()), address(rlgm));
-        assertEq(sgm.ratio(), RATIO);
-        assertEq(sgm.interestRate(), INTEREST_RATE);
+        assertEq(sgm.mintRatio(), MINT_RATIO);
+        assertEq(sgm.rewardRatio(), REWARD_RATIO);
     }
 
     // test stake function
     function testStake() public {
         // initial state
-        assertEq(profitManager.surplusBuffer(), 0);
+        assertEq(profitManager.termSurplusBuffer(term), 0);
         assertEq(guild.balanceOf(address(sgm)), 0);
         assertEq(guild.getGaugeWeight(term), 50e18);
 
@@ -111,16 +111,34 @@ contract SurplusGuildMinterUnitTest is Test {
         
         // check after-stake state
         assertEq(credit.balanceOf(address(this)), 0);
-        assertEq(profitManager.surplusBuffer(), 100e18);
+        assertEq(profitManager.termSurplusBuffer(term), 100e18);
         assertEq(guild.balanceOf(address(sgm)), 200e18);
         assertEq(guild.getGaugeWeight(term), 250e18);
-        assertEq(sgm.stakes(address(this), term), 100e18);
+        SurplusGuildMinter.UserStake memory stake = sgm.getUserStake(address(this), term);
+        assertEq(uint256(stake.stakeTime), block.timestamp);
+        assertEq(stake.lastGaugeLoss, 0);
+        assertEq(stake.profitIndex, 0);
+        assertEq(stake.credit, 100e18);
+        assertEq(stake.guild, 200e18);
 
-        // cannot stake twice
-        credit.mint(address(this), 100e18);
-        credit.approve(address(sgm), 100e18);
-        vm.expectRevert("SurplusGuildMinter: already staking");
-        sgm.stake(term, 100e18);
+        // stake 150 CREDIT
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        credit.mint(address(this), 150e18);
+        credit.approve(address(sgm), 150e18);
+        sgm.stake(term, 150e18);
+        
+        // check after-stake state
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(profitManager.termSurplusBuffer(term), 250e18);
+        assertEq(guild.balanceOf(address(sgm)), 500e18);
+        assertEq(guild.getGaugeWeight(term), 550e18);
+        stake = sgm.getUserStake(address(this), term);
+        assertEq(uint256(stake.stakeTime), block.timestamp);
+        assertEq(stake.lastGaugeLoss, 0);
+        assertEq(stake.profitIndex, 0);
+        assertEq(stake.credit, 250e18);
+        assertEq(stake.guild, 500e18);
     }
 
     // test unstake function without loss & with interests
@@ -130,10 +148,10 @@ contract SurplusGuildMinterUnitTest is Test {
         credit.approve(address(sgm), 150e18);
         sgm.stake(term, 150e18);
         assertEq(credit.balanceOf(address(this)), 0);
-        assertEq(profitManager.surplusBuffer(), 150e18);
+        assertEq(profitManager.termSurplusBuffer(term), 150e18);
         assertEq(guild.balanceOf(address(sgm)), 300e18);
         assertEq(guild.getGaugeWeight(term), 350e18);
-        assertEq(sgm.stakes(address(this), term), 150e18);
+        assertEq(sgm.getUserStake(address(this), term).credit, 150e18);
 
         // the guild token earn interests
         vm.prank(governor);
@@ -146,29 +164,46 @@ contract SurplusGuildMinterUnitTest is Test {
         );
         credit.mint(address(profitManager), 35e18);
         profitManager.notifyPnL(term, 35e18);
-        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18);
+        assertEq(profitManager.surplusBuffer(), 17.5e18);
+        assertEq(profitManager.termSurplusBuffer(term), 150e18);
         (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
         (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
         assertEq(rewardsThis, 2.5e18);
         assertEq(rewardsSgm, 15e18);
 
-        // fast-forward 1 year
-        vm.warp(block.timestamp + sgm.YEAR());
+        // next block
+        vm.warp(block.timestamp + 13);
         vm.roll(block.number + 1);
 
-        // unstake (sgm)
-        sgm.unstake(term);
+        // unstake half (sgm)
+        sgm.unstake(term, 75e18);
+        assertEq(credit.balanceOf(address(this)), 75e18 + rewardsSgm);
+        assertEq(guild.balanceOf(address(this)), rewardsSgm * REWARD_RATIO / 1e18 + 50e18);
+        assertEq(credit.balanceOf(address(sgm)), 0);
+        assertEq(guild.balanceOf(address(sgm)), 150e18);
+        assertEq(profitManager.surplusBuffer(), 17.5e18);
+        assertEq(profitManager.termSurplusBuffer(term), 75e18);
+        assertEq(guild.getGaugeWeight(term), 50e18 + 150e18);
+        assertEq(sgm.getUserStake(address(this), term).credit, 75e18);
+
+        // cannot unstake below staked amount
+        vm.expectRevert("SurplusGuildMinter: invalid amount");
+        sgm.unstake(term, 80e18);
+
+        // unstake 2nd half (sgm)
+        sgm.unstake(term, 75e18);
         assertEq(credit.balanceOf(address(this)), 150e18 + rewardsSgm);
-        assertEq(guild.balanceOf(address(this)), 300e18 * INTEREST_RATE / 1e18 + 50e18);
+        assertEq(guild.balanceOf(address(this)), rewardsSgm * REWARD_RATIO / 1e18 + 50e18);
         assertEq(credit.balanceOf(address(sgm)), 0);
         assertEq(guild.balanceOf(address(sgm)), 0);
         assertEq(profitManager.surplusBuffer(), 17.5e18);
+        assertEq(profitManager.termSurplusBuffer(term), 0);
         assertEq(guild.getGaugeWeight(term), 50e18);
-        assertEq(sgm.stakes(address(this), term), 0);
+        assertEq(sgm.getUserStake(address(this), term).stakeTime, 0); // no stake anymore
 
-        // cannot unstake twice
-        vm.expectRevert("SurplusGuildMinter: not staking");
-        sgm.unstake(term);
+        // cannot unstake if nothing staked
+        vm.expectRevert("SurplusGuildMinter: invalid amount");
+        sgm.unstake(term, 1);
     }
 
     // test unstake function with loss & interests
@@ -178,10 +213,11 @@ contract SurplusGuildMinterUnitTest is Test {
         credit.approve(address(sgm), 150e18);
         sgm.stake(term, 150e18);
         assertEq(credit.balanceOf(address(this)), 0);
-        assertEq(profitManager.surplusBuffer(), 150e18);
+        assertEq(profitManager.surplusBuffer(), 0);
+        assertEq(profitManager.termSurplusBuffer(term), 150e18);
         assertEq(guild.balanceOf(address(sgm)), 300e18);
         assertEq(guild.getGaugeWeight(term), 350e18);
-        assertEq(sgm.stakes(address(this), term), 150e18);
+        assertEq(sgm.getUserStake(address(this), term).credit, 150e18);
 
         // the guild token earn interests
         vm.prank(governor);
@@ -194,34 +230,39 @@ contract SurplusGuildMinterUnitTest is Test {
         );
         credit.mint(address(profitManager), 35e18);
         profitManager.notifyPnL(term, 35e18);
-        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18);
+        assertEq(profitManager.surplusBuffer(), 17.5e18);
+        assertEq(profitManager.termSurplusBuffer(term), 150e18);
         (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
         (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
         assertEq(rewardsThis, 2.5e18);
         assertEq(rewardsSgm, 15e18);
 
-        // fast-forward 1 year
-        vm.warp(block.timestamp + sgm.YEAR());
+        // next block
+        vm.warp(block.timestamp + 13);
         vm.roll(block.number + 1);
 
         // loss in gauge
         profitManager.notifyPnL(term, -27.5e18);
-        assertEq(profitManager.surplusBuffer(), 150e18 - 10e18);
+        assertEq(profitManager.surplusBuffer(), 17.5e18 + 150e18 - 27.5e18); // 140e18
+        assertEq(profitManager.termSurplusBuffer(term), 0);
+
+        // cannot stake if there was just a loss
+        vm.expectRevert("SurplusGuildMinter: loss in block");
+        sgm.stake(term, 123);
 
         // unstake (sgm)
-        sgm.unstake(term);
+        sgm.unstake(term, 123);
         assertEq(credit.balanceOf(address(this)), rewardsSgm); // lost 150 credit principal but earn the 15 credit of dividends
-        assertEq(guild.balanceOf(address(this)), 50e18 + 0); // no guild reward from interest rate
+        assertEq(guild.balanceOf(address(this)), 50e18 + 0); // no guild reward because position is slashed
         assertEq(credit.balanceOf(address(sgm)), 0); // did not withdraw from surplus buffer
         assertEq(guild.balanceOf(address(sgm)), 300e18); // still not slashed
-        assertEq(profitManager.surplusBuffer(), 150e18 - 10e18); // did not withdraw from surplus buffer
-        assertEq(guild.getGaugeWeight(term), 350e18); // did no decrementWeight
-        assertEq(sgm.stakes(address(this), term), 0);
+        assertEq(guild.getGaugeWeight(term), 350e18); // did not decrementWeight
+        assertEq(sgm.getUserStake(address(this), term).credit, 0); // position slashed
 
         // slash sgm
         guild.applyGaugeLoss(term, address(sgm));
         assertEq(guild.balanceOf(address(sgm)), 0); // slashed
-        assertEq(guild.getGaugeWeight(term), 50e18);
+        assertEq(guild.getGaugeWeight(term), 50e18); // weight decremented
     }
 
     // test pausability
@@ -233,28 +274,28 @@ contract SurplusGuildMinterUnitTest is Test {
         sgm.stake(term, 100e18);
     }
 
-    // test governor setter for ratio
-    function testSetRatio() public {
-        assertEq(sgm.ratio(), RATIO);
+    // test governor setter for mint ratio
+    function testSetMintRatio() public {
+        assertEq(sgm.mintRatio(), MINT_RATIO);
 
         vm.expectRevert("UNAUTHORIZED");
-        sgm.setRatio(3e18);
+        sgm.setMintRatio(3e18);
 
         vm.prank(governor);
-        sgm.setRatio(3e18);
-        assertEq(sgm.ratio(), 3e18);
+        sgm.setMintRatio(3e18);
+        assertEq(sgm.mintRatio(), 3e18);
     }
 
-    // test governor setter for interestRate
-    function testSetInterestRate() public {
-        assertEq(sgm.interestRate(), INTEREST_RATE);
+    // test governor setter for mint ratio
+    function testSetRewardRatio() public {
+        assertEq(sgm.rewardRatio(), REWARD_RATIO);
 
         vm.expectRevert("UNAUTHORIZED");
-        sgm.setInterestRate(0.2e18);
+        sgm.setRewardRatio(3e18);
 
         vm.prank(governor);
-        sgm.setInterestRate(0.2e18);
-        assertEq(sgm.interestRate(), 0.2e18);
+        sgm.setRewardRatio(3e18);
+        assertEq(sgm.rewardRatio(), 3e18);
     }
 
     // test with multiple users, some gauges with losses and some not
@@ -286,6 +327,10 @@ contract SurplusGuildMinterUnitTest is Test {
         sgm.stake(term2, 100e18);
         vm.stopPrank();
 
+        assertEq(profitManager.surplusBuffer(), 0);
+        assertEq(profitManager.termSurplusBuffer(term1), 150e18);
+        assertEq(profitManager.termSurplusBuffer(term2), 150e18);
+
         // both gauges earn interests
         vm.prank(governor);
         profitManager.setProfitSharingConfig(
@@ -299,8 +344,12 @@ contract SurplusGuildMinterUnitTest is Test {
         profitManager.notifyPnL(term1, 140e18);
         profitManager.notifyPnL(term2, 280e18);
 
-        // fast-forward 1 year
-        vm.warp(block.timestamp + sgm.YEAR());
+        assertEq(profitManager.surplusBuffer(), 210e18);
+        assertEq(profitManager.termSurplusBuffer(term1), 150e18);
+        assertEq(profitManager.termSurplusBuffer(term2), 150e18);
+
+        // next block
+        vm.warp(block.timestamp + 13);
         vm.roll(block.number + 1);
 
         // loss in term1 + slash sgm
@@ -308,7 +357,9 @@ contract SurplusGuildMinterUnitTest is Test {
         assertEq(guild.balanceOf(address(sgm)), 600e18);
         guild.applyGaugeLoss(term1, address(sgm));
         assertEq(guild.balanceOf(address(sgm)), 300e18);
-        assertEq(profitManager.surplusBuffer(), 300e18 + (140e18 + 280e18) / 2 - 20e18);
+        assertEq(profitManager.surplusBuffer(), 210e18 + 150e18 - 20e18);
+        assertEq(profitManager.termSurplusBuffer(term1), 0);
+        assertEq(profitManager.termSurplusBuffer(term2), 150e18);
 
         // gauge1 has 50 (this) + 50*2 (sgm user1) + 100*2 (sgm user2) = 350 weight
         // gauge2 has 50 (this) + 50*2 (sgm user1) + 100*2 (sgm user2) = 350 weight
@@ -322,117 +373,70 @@ contract SurplusGuildMinterUnitTest is Test {
         // gauge2 dividends are 200/350*140 = 80 for user2
 
         // user1 unstake
-        vm.startPrank(user1);
-        sgm.unstake(term1);
+        // on term1, getRewards applied the unstake because position has been slashed
+        sgm.getRewards(user1, term1);
         assertEq(credit.balanceOf(user1), 20e18);
         assertEq(guild.balanceOf(user1), 0);
-        sgm.unstake(term2);
+        assertEq(sgm.getUserStake(user1, term1).stakeTime, 0);
+        // on term2, regular unstake
+        vm.startPrank(user1);
+        sgm.unstake(term2, 50e18);
         assertEq(credit.balanceOf(user1), 20e18 + 40e18 + 50e18);
-        assertEq(guild.balanceOf(user1), 0 + 10e18);
+        assertEq(guild.balanceOf(user1), 0 + 200e18); // 40 * reward ratio
+        assertEq(sgm.getUserStake(user1, term2).stakeTime, 0); // stake position completely cleaned
         vm.stopPrank();
+
+        assertEq(profitManager.surplusBuffer(), 210e18 + 150e18 - 20e18);
+        assertEq(profitManager.termSurplusBuffer(term1), 0);
+        assertEq(profitManager.termSurplusBuffer(term2), 100e18);
+
+        // policy change, reward ratio goes from 5 to 10
+        vm.prank(governor);
+        sgm.setRewardRatio(10e18);
 
         // user2 unstake
         vm.startPrank(user2);
-        sgm.unstake(term1);
-        assertEq(credit.balanceOf(user2), 40e18);
+        sgm.unstake(term1, 100e18);
+        assertEq(credit.balanceOf(user2), 40e18); // lost principal, only got 40 from dividends
         assertEq(guild.balanceOf(user2), 0);
-        sgm.unstake(term2);
-        assertEq(credit.balanceOf(user2), 40e18 + 80e18 + 100e18);
-        assertEq(guild.balanceOf(user2), 0 + 20e18);
+        sgm.unstake(term2, 100e18);
+        assertEq(credit.balanceOf(user2), 40e18 + 80e18 + 100e18); // 80 dividends + 100 staked
+        assertEq(guild.balanceOf(user2), 0 + 800e18); // 10 reward ratio * 80 credit dividends
         vm.stopPrank();
+
+        assertEq(profitManager.surplusBuffer(), 210e18 + 150e18 - 20e18);
+        assertEq(profitManager.termSurplusBuffer(term1), 0);
+        assertEq(profitManager.termSurplusBuffer(term2), 0);
     }
 
-    // test downgrade function
-    function testDowngrade() public {
+    // test updateMintRatio (up & down)
+    function testUpdateMintRatio() public {
         // setup
         credit.mint(address(this), 150e18);
         credit.approve(address(sgm), 150e18);
         sgm.stake(term, 150e18);
-        assertEq(credit.balanceOf(address(this)), 0);
-        assertEq(profitManager.surplusBuffer(), 150e18);
+        assertEq(profitManager.termSurplusBuffer(term), 150e18);
         assertEq(guild.balanceOf(address(sgm)), 300e18);
-        assertEq(guild.getGaugeWeight(term), 350e18);
-        assertEq(sgm.stakes(address(this), term), 150e18);
+        assertEq(guild.getGaugeWeight(term), 50e18 + 300e18);
 
-        // the guild token earn interests
+        // adjust down
         vm.prank(governor);
-        profitManager.setProfitSharingConfig(
-            0.5e18, // surplusBufferSplit
-            0, // creditSplit
-            0.5e18, // guildSplit
-            0, // otherSplit
-            address(0) // otherRecipient
-        );
-        credit.mint(address(profitManager), 35e18);
-        profitManager.notifyPnL(term, 35e18);
-        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18);
-        (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
-        (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
-        assertEq(rewardsThis, 2.5e18);
-        assertEq(rewardsSgm, 15e18);
+        sgm.setMintRatio(MINT_RATIO / 2); // 1:1
 
-        // fast-forward 1 year
-        vm.warp(block.timestamp + sgm.YEAR());
-        vm.roll(block.number + 1);
+        sgm.updateMintRatio(address(this), term);
 
-        // cannot downgrade because ratio didn't go down
-        vm.expectRevert("SurplusGuildMinter: cannot downgrade");
-        sgm.downgrade(address(this), term);
-
-        // decrease ratio
-        vm.prank(governor);
-        sgm.setRatio(RATIO / 2); // 1:1
-
-        // downgrade (new ratio)
-        sgm.downgrade(address(this), term);
-
-        assertEq(credit.balanceOf(address(this)), rewardsSgm);
-        assertEq(guild.balanceOf(address(this)), 300e18 * INTEREST_RATE / 1e18 + 50e18);
-        assertEq(credit.balanceOf(address(sgm)), 0);
-        assertEq(guild.balanceOf(address(sgm)), 150e18); // instead of 300 because ratio 2->1
-        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18);
-        assertEq(guild.getGaugeWeight(term), 150e18 + 50e18);
-        assertEq(sgm.stakes(address(this), term), 150e18);
-
-        // fast-forward 1 year
-        vm.warp(block.timestamp + sgm.YEAR());
-        vm.roll(block.number + 1);
-
-        // decrease interestRate
-        vm.prank(governor);
-        sgm.setInterestRate(INTEREST_RATE / 2); // 5%
-
-        // downgrade (new rate)
-        sgm.downgrade(address(this), term);
-
-        assertEq(credit.balanceOf(address(this)), rewardsSgm); // unchanged
-        assertEq(guild.balanceOf(address(this)), 300e18 * INTEREST_RATE / 1e18 + 50e18 + 150e18 * INTEREST_RATE / 1e18);
-        assertEq(credit.balanceOf(address(sgm)), 0);
-        assertEq(guild.balanceOf(address(sgm)), 150e18); // unchanged
-        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18); // unchanged
-        assertEq(guild.getGaugeWeight(term), 150e18 + 50e18); // unchanged
-        assertEq(sgm.stakes(address(this), term), 150e18); // unchanged
-
-        // loss in term + slash sgm
-        profitManager.notifyPnL(term, -20e18);
+        assertEq(profitManager.termSurplusBuffer(term), 150e18);
         assertEq(guild.balanceOf(address(sgm)), 150e18);
-        guild.applyGaugeLoss(term, address(sgm));
-        assertEq(guild.balanceOf(address(sgm)), 0);
-        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18 - 20e18);
+        assertEq(guild.getGaugeWeight(term), 50e18 + 150e18);
 
-        // decrease interestRate
+        // adjust up
         vm.prank(governor);
-        sgm.setInterestRate(INTEREST_RATE / 4); // 2.5%
+        sgm.setMintRatio(MINT_RATIO * 2); // 1:4
 
-        // downgrade (new rate)
-        sgm.downgrade(address(this), term);
+        sgm.updateMintRatio(address(this), term);
 
-        assertEq(credit.balanceOf(address(this)), rewardsSgm); // unchanged
-        assertEq(guild.balanceOf(address(this)), 300e18 * INTEREST_RATE / 1e18 + 50e18 + 150e18 * INTEREST_RATE / 1e18); // unchanged
-        assertEq(credit.balanceOf(address(sgm)), 0); // unchanged
-        assertEq(guild.balanceOf(address(sgm)), 0);
-        assertEq(profitManager.surplusBuffer(), 150e18 + 17.5e18 - 20e18); // unchanged
-        assertEq(guild.getGaugeWeight(term), 50e18);
-        assertEq(sgm.stakes(address(this), term), 0); // unstaked
+        assertEq(profitManager.termSurplusBuffer(term), 150e18);
+        assertEq(guild.balanceOf(address(sgm)), 600e18);
+        assertEq(guild.getGaugeWeight(term), 50e18 + 600e18);
     }
 }
