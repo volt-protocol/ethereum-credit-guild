@@ -130,7 +130,7 @@ contract Proposal_0 is Proposal {
                 }), /// _lendingTermReferences
                 1, // _gaugeType
                 addresses.mainnet("CORE"), // _core
-                addresses.mainnet("TIMELOCK"), // _timelock
+                address(timelock), // _timelock
                 0, // initialVotingDelay
                 7000 * 3, // initialVotingPeriod (~7000 blocks/day)
                 2_500_000e18, // initialProposalThreshold
