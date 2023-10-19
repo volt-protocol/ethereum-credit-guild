@@ -648,6 +648,49 @@ contract Proposal_0 is Proposal {
             assertEq(auctionHouse.nAuctionsInProgress(), 0);
         }
 
+        {
+            ProfitManager profitManager = ProfitManager(
+                addresses.mainnet(strings.PROFIT_MANAGER)
+            );
+            assertEq(
+                profitManager.surplusBuffer(),
+                0,
+                "starting surplus not 0"
+            );
+            assertEq(
+                profitManager.credit(),
+                addresses.mainnet(strings.CREDIT_TOKEN),
+                "credit address incorrect"
+            );
+            assertEq(
+                profitManager.guild(),
+                addresses.mainnet(strings.GUILD_TOKEN),
+                "guild address incorrect"
+            );
+            assertEq(
+                profitManager.creditMultiplier(),
+                1e18,
+                "credit multiplier incorrect"
+            );
+
+            (
+                uint256 surplusBufferSplit,
+                uint256 creditSplit,
+                uint256 guildSplit,
+                uint256 otherSplit,
+                address otherRecipient
+            ) = profitManager.getProfitSharingConfig();
+            assertEq(
+                surplusBufferSplit,
+                0.1e18,
+                "incorrect surplus buffer split"
+            );
+            assertEq(creditSplit, 0.9e18, "incorrect credit split");
+            assertEq(guildSplit, 0, "incorrect guild split");
+            assertEq(otherSplit, 0, "incorrect other split");
+            assertEq(otherRecipient, address(0));
+        }
+
         /// Governor Verification
         {
             VoltGovernor governor = VoltGovernor(

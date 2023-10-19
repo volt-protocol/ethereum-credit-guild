@@ -67,15 +67,19 @@ contract PostProposalCheck is Test {
     RateLimitedMinter public rateLimitedCreditMinter;
     RateLimitedMinter public rateLimitedGuildMinter;
 
+    TestProposals public proposals;
+    address public proposalZero;
+
     function setUp() public virtual {
         preProposalsSnapshot = vm.snapshot();
 
         // Run all pending proposals before doing e2e tests
-        TestProposals proposals = new TestProposals();
+        proposals = new TestProposals();
         proposals.setUp();
         proposals.setDebug(false);
         proposals.testProposals();
         addresses = proposals.addresses();
+        proposalZero = address(proposals.proposals(0));
 
         postProposalsSnapshot = vm.snapshot();
 
