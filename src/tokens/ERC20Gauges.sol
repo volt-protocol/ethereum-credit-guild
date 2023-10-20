@@ -126,7 +126,9 @@ abstract contract ERC20Gauges is ERC20 {
 
     /// @notice returns the set of currently live gauges
     function liveGauges() external view returns (address[] memory _liveGauges) {
-        _liveGauges = new address[](_gauges.length() - _deprecatedGauges.length());
+        _liveGauges = new address[](
+            _gauges.length() - _deprecatedGauges.length()
+        );
         address[] memory allGauges = _gauges.values();
         uint256 j;
         for (uint256 i; i < allGauges.length && j < _liveGauges.length; ) {
@@ -287,11 +289,7 @@ abstract contract ERC20Gauges is ERC20 {
                 ++i;
             }
         }
-        return
-            _incrementUserAndGlobalWeights(
-                msg.sender,
-                weightsSum
-            );
+        return _incrementUserAndGlobalWeights(msg.sender, weightsSum);
     }
 
     /** 
@@ -394,7 +392,10 @@ abstract contract ERC20Gauges is ERC20 {
     /// @notice an approve list for contracts to go above the max gauge limit.
     mapping(address => bool) public canExceedMaxGauges;
 
-    function _addGauge(uint256 _type, address gauge) internal returns (uint256 weight) {
+    function _addGauge(
+        uint256 _type,
+        address gauge
+    ) internal returns (uint256 weight) {
         bool newAdd = _gauges.add(gauge);
         bool previouslyDeprecated = _deprecatedGauges.remove(gauge);
         // add and fail loud if zero address or already present and not deprecated
@@ -423,7 +424,10 @@ abstract contract ERC20Gauges is ERC20 {
 
     function _removeGauge(address gauge) internal {
         // add to deprecated and fail loud if not present
-        require(_gauges.contains(gauge) && _deprecatedGauges.add(gauge), "ERC20Gauges: invalid gauge");
+        require(
+            _gauges.contains(gauge) && _deprecatedGauges.add(gauge),
+            "ERC20Gauges: invalid gauge"
+        );
 
         // Remove weight from total but keep the gauge and user weights in storage in case gauge is re-added.
         uint256 weight = getGaugeWeight[gauge];
@@ -517,11 +521,7 @@ abstract contract ERC20Gauges is ERC20 {
             uint256 userGaugeWeight = getUserGaugeWeight[user][gauge];
             if (userGaugeWeight != 0) {
                 userFreed += userGaugeWeight;
-                _decrementGaugeWeight(
-                    user,
-                    gauge,
-                    userGaugeWeight
-                );
+                _decrementGaugeWeight(user, gauge, userGaugeWeight);
 
                 // If the gauge is live (not deprecated), include its weight in the total to remove
                 if (!_deprecatedGauges.contains(gauge)) {

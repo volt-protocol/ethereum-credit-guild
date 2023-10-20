@@ -30,12 +30,13 @@ contract LendingTerm is CoreRef {
         uint256 borrowAmount
     );
     /// @notice emitted when a loan is called.
-    event LoanCall(
-        uint256 indexed when,
-        bytes32 indexed loanId
-    );
+    event LoanCall(uint256 indexed when, bytes32 indexed loanId);
     /// @notice emitted when a loan is closed (repay, onBid after a call, forgive).
-    enum LoanCloseType { Repay, Call, Forgive }
+    enum LoanCloseType {
+        Repay,
+        Call,
+        Forgive
+    }
     event LoanClose(
         uint256 indexed when,
         bytes32 indexed loanId,
@@ -101,17 +102,13 @@ contract LendingTerm is CoreRef {
     struct LendingTermReferences {
         /// @notice reference to the ProfitManager
         address profitManager;
-
         /// @notice reference to the GUILD token
         address guildToken;
-
         /// @notice reference to the auction house contract used to
         /// sell loan collateral for CREDIT if loans are called.
         address auctionHouse;
-
         /// @notice reference to the credit minter contract
         address creditMinter;
-
         /// @notice reference to the CREDIT token
         address creditToken;
     }
@@ -122,7 +119,6 @@ contract LendingTerm is CoreRef {
     struct LendingTermParams {
         /// @notice reference to the collateral token
         address collateralToken;
-
         /// @notice max number of debt tokens issued per collateral token.
         /// @dev be mindful of the decimals here, because if collateral
         /// token doesn't have 18 decimals, this variable is used to scale
@@ -132,28 +128,23 @@ contract LendingTerm is CoreRef {
         /// each 1e6 units (1 USDC) of collateral, if CREDIT is targeted to be
         /// worth around 1 USDC.
         uint256 maxDebtPerCollateralToken;
-
         /// @notice interest rate paid by the borrower, expressed as an APR
         /// with 18 decimals (0.01e18 = 1% APR). The base for 1 year is the YEAR constant.
         uint256 interestRate;
-
         /// @notice maximum delay, in seconds, between partial debt repayments.
         /// if set to 0, no periodic partial repayments are expected.
         /// if a partial repayment is missed (delay has passed), the loan
         /// can be called.
         uint256 maxDelayBetweenPartialRepay;
-
         /// @notice minimum percent of the total debt (principal + interests) to
         /// repay during partial debt repayments.
         /// percentage is expressed with 18 decimals, e.g. 0.05e18 = 5% debt.
         uint256 minPartialRepayPercent;
-
         /// @notice the opening fee is a small amount of CREDIT provided by the borrower
         /// when the loan is opened.
         /// The opening fee is expressed as a percentage of the borrowAmount, with 18
         /// decimals, e.g. 0.05e18 = 5% of the borrowed amount.
         uint256 openingFee;
-
         /// @notice the absolute maximum amount of debt this lending term can issue
         /// at any given time, regardless of the gauge allocations.
         uint256 hardCap;
@@ -185,7 +176,11 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice get references of this term to other protocol contracts
-    function getReferences() external view returns (LendingTermReferences memory) {
+    function getReferences()
+        external
+        view
+        returns (LendingTermReferences memory)
+    {
         return refs;
     }
 
@@ -229,8 +224,9 @@ contract LendingTerm is CoreRef {
             YEAR /
             1e18;
         uint256 loanDebt = borrowAmount + interest;
-        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
-        loanDebt = loanDebt * loan.borrowCreditMultiplier / creditMultiplier;
+        uint256 creditMultiplier = ProfitManager(refs.profitManager)
+            .creditMultiplier();
+        loanDebt = (loanDebt * loan.borrowCreditMultiplier) / creditMultiplier;
 
         return loanDebt;
     }
@@ -272,10 +268,11 @@ contract LendingTerm is CoreRef {
         require(loans[loanId].borrowTime == 0, "LendingTerm: loan exists");
 
         // check that enough collateral is provided
-        uint256 maxBorrow = (collateralAmount * params.maxDebtPerCollateralToken) /
-            1e18;
-        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
-        maxBorrow = maxBorrow * 1e18 / creditMultiplier;
+        uint256 maxBorrow = (collateralAmount *
+            params.maxDebtPerCollateralToken) / 1e18;
+        uint256 creditMultiplier = ProfitManager(refs.profitManager)
+            .creditMultiplier();
+        maxBorrow = (maxBorrow * 1e18) / creditMultiplier;
         require(
             borrowAmount <= maxBorrow,
             "LendingTerm: not enough collateral"
@@ -283,21 +280,25 @@ contract LendingTerm is CoreRef {
 
         // check that enough CREDIT is borrowed
         require(
-            borrowAmount >= MIN_BORROW * 1e18 / creditMultiplier,
+            borrowAmount >= (MIN_BORROW * 1e18) / creditMultiplier,
             "LendingTerm: borrow amount too low"
         );
 
         // check the hardcap
         uint256 _issuance = issuance;
         uint256 _postBorrowIssuance = _issuance + borrowAmount;
-        require(_postBorrowIssuance <= params.hardCap, "LendingTerm: hardcap reached");
+        require(
+            _postBorrowIssuance <= params.hardCap,
+            "LendingTerm: hardcap reached"
+        );
 
         // check the debt ceiling
         uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
-        uint256 debtCeiling = (GuildToken(refs.guildToken).calculateGaugeAllocation(
-            address(this),
-            _totalSupply + borrowAmount
-        ) * GAUGE_CAP_TOLERANCE) / 1e18;
+        uint256 debtCeiling = (GuildToken(refs.guildToken)
+            .calculateGaugeAllocation(
+                address(this),
+                _totalSupply + borrowAmount
+            ) * GAUGE_CAP_TOLERANCE) / 1e18;
         if (_totalSupply == 0) {
             // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
             // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
@@ -526,8 +527,10 @@ contract LendingTerm is CoreRef {
         require(debtToRepay < loanDebt, "LendingTerm: full repayment");
         uint256 percentRepaid = (debtToRepay * 1e18) / loanDebt; // [0, 1e18[
         uint256 borrowAmount = loan.borrowAmount;
-        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
-        uint256 principal = borrowAmount * loan.borrowCreditMultiplier / creditMultiplier;
+        uint256 creditMultiplier = ProfitManager(refs.profitManager)
+            .creditMultiplier();
+        uint256 principal = (borrowAmount * loan.borrowCreditMultiplier) /
+            creditMultiplier;
         uint256 principalRepaid = (principal * percentRepaid) / 1e18;
         uint256 interestRepaid = debtToRepay - principalRepaid;
         uint256 issuanceDecrease = (borrowAmount * percentRepaid) / 1e18;
@@ -540,7 +543,8 @@ contract LendingTerm is CoreRef {
             "LendingTerm: repay below min"
         );
         require(
-            borrowAmount - issuanceDecrease > MIN_BORROW * 1e18 / creditMultiplier,
+            borrowAmount - issuanceDecrease >
+                (MIN_BORROW * 1e18) / creditMultiplier,
             "LendingTerm: below min borrow"
         );
 
@@ -558,7 +562,10 @@ contract LendingTerm is CoreRef {
         );
 
         // forward profit portion to the ProfitManager, burn the rest
-        CreditToken(refs.creditToken).transfer(refs.profitManager, interestRepaid);
+        CreditToken(refs.creditToken).transfer(
+            refs.profitManager,
+            interestRepaid
+        );
         ProfitManager(refs.profitManager).notifyPnL(
             address(this),
             int256(interestRepaid)
@@ -611,8 +618,10 @@ contract LendingTerm is CoreRef {
         // compute interest owed
         uint256 loanDebt = getLoanDebt(loanId);
         uint256 borrowAmount = loan.borrowAmount;
-        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
-        uint256 principal = borrowAmount * loan.borrowCreditMultiplier / creditMultiplier;
+        uint256 creditMultiplier = ProfitManager(refs.profitManager)
+            .creditMultiplier();
+        uint256 principal = (borrowAmount * loan.borrowCreditMultiplier) /
+            creditMultiplier;
         uint256 interest = loanDebt - principal;
 
         /// pull debt from the borrower and replenish the buffer of available debt that can be minted.
@@ -623,7 +632,10 @@ contract LendingTerm is CoreRef {
         );
         if (interest != 0) {
             // forward profit portion to the ProfitManager
-            CreditToken(refs.creditToken).transfer(refs.profitManager, interest);
+            CreditToken(refs.creditToken).transfer(
+                refs.profitManager,
+                interest
+            );
 
             // report profit
             ProfitManager(refs.profitManager).notifyPnL(
@@ -677,7 +689,11 @@ contract LendingTerm is CoreRef {
 
     /// @notice call a loan, the collateral will be auctioned to repay outstanding debt.
     /// Loans can be called only if the term has been offboarded or if a loan missed a periodic partialRepay.
-    function _call(address caller, bytes32 loanId, address _auctionHouse) internal {
+    function _call(
+        address caller,
+        bytes32 loanId,
+        address _auctionHouse
+    ) internal {
         Loan storage loan = loans[loanId];
 
         // check that the loan exists
@@ -692,7 +708,8 @@ contract LendingTerm is CoreRef {
 
         // check that the loan can be called
         require(
-            GuildToken(refs.guildToken).isDeprecatedGauge(address(this)) || partialRepayDelayPassed(loanId),
+            GuildToken(refs.guildToken).isDeprecatedGauge(address(this)) ||
+                partialRepayDelayPassed(loanId),
             "LendingTerm: cannot call"
         );
 
@@ -747,9 +764,11 @@ contract LendingTerm is CoreRef {
         issuance -= loan.borrowAmount;
 
         // mark loan as a total loss
-        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
+        uint256 creditMultiplier = ProfitManager(refs.profitManager)
+            .creditMultiplier();
         uint256 borrowAmount = loans[loanId].borrowAmount;
-        uint256 principal = borrowAmount * loans[loanId].borrowCreditMultiplier / creditMultiplier;
+        uint256 principal = (borrowAmount *
+            loans[loanId].borrowCreditMultiplier) / creditMultiplier;
         int256 pnl = -int256(principal);
         ProfitManager(refs.profitManager).notifyPnL(address(this), pnl);
 
@@ -770,7 +789,10 @@ contract LendingTerm is CoreRef {
     ) external {
         // preliminary checks
         require(msg.sender == refs.auctionHouse, "LendingTerm: invalid caller");
-        require(loans[loanId].callTime != 0 && loans[loanId].callDebt != 0, "LendingTerm: loan not called");
+        require(
+            loans[loanId].callTime != 0 && loans[loanId].callDebt != 0,
+            "LendingTerm: loan not called"
+        );
         require(loans[loanId].closeTime == 0, "LendingTerm: loan closed");
 
         // sanity check on collateral movement
@@ -784,9 +806,11 @@ contract LendingTerm is CoreRef {
         );
 
         // compute pnl
-        uint256 creditMultiplier = ProfitManager(refs.profitManager).creditMultiplier();
+        uint256 creditMultiplier = ProfitManager(refs.profitManager)
+            .creditMultiplier();
         uint256 borrowAmount = loans[loanId].borrowAmount;
-        uint256 principal = borrowAmount * loans[loanId].borrowCreditMultiplier / creditMultiplier;
+        uint256 principal = (borrowAmount *
+            loans[loanId].borrowCreditMultiplier) / creditMultiplier;
         int256 pnl;
         uint256 interest;
         if (creditFromBidder >= principal) {
@@ -795,7 +819,10 @@ contract LendingTerm is CoreRef {
         } else {
             pnl = int256(creditFromBidder) - int256(principal);
             principal = creditFromBidder;
-            require(collateralToBorrower == 0, "LendingTerm: invalid collateral movement");
+            require(
+                collateralToBorrower == 0,
+                "LendingTerm: invalid collateral movement"
+            );
         }
 
         // save loan state
