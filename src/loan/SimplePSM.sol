@@ -45,9 +45,19 @@ contract SimplePSM is CoreRef {
     bool public redemptionsPaused;
 
     /// @notice event emitted upon a redemption
-    event Redeem(uint256 indexed when, address indexed to, uint256 amountIn, uint256 amountOut);
+    event Redeem(
+        uint256 indexed when,
+        address indexed to,
+        uint256 amountIn,
+        uint256 amountOut
+    );
     /// @notice event emitted when credit gets minted
-    event Mint(uint256 indexed when, address indexed to, uint256 amountIn, uint256 amountOut);
+    event Mint(
+        uint256 indexed when,
+        address indexed to,
+        uint256 amountIn,
+        uint256 amountOut
+    );
     /// @notice event emitted when redemption pausability status changes
     event RedemptionsPaused(uint256 indexed when, bool status);
 
@@ -112,7 +122,9 @@ contract SimplePSM is CoreRef {
     /// @notice set `redemptionsPaused`
     /// governor-only, to allow full governance to update the psm mechanisms,
     /// or automated processes to pause redemptions under certain conditions.
-    function setRedemptionsPaused(bool paused) external onlyCoreRole(CoreRoles.GOVERNOR) {
+    function setRedemptionsPaused(
+        bool paused
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         redemptionsPaused = paused;
         emit RedemptionsPaused(block.timestamp, paused);
     }
