@@ -234,6 +234,19 @@ abstract contract ERC20MultiVotes is ERC20Permit {
     }
 
     /**
+     * @notice Checks whether delegatee is in the `delegator` mapping.
+     * @param delegator the account which is delegating votes to delegates.
+     * @param delegatee the account which receives votes from delegate.
+     * @return true or false
+     */
+    function containsDelegate(
+        address delegator,
+        address delegatee
+    ) public view returns (bool) {
+        return _delegates[delegator].contains(delegatee);
+    }
+
+    /**
      * @notice Get the number of delegates from `delegator`.
      * @param delegator the account which is delegating votes to delegates.
      * @return the number of delegated accounts.
