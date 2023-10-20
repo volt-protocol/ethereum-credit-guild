@@ -197,7 +197,9 @@ contract LendingTermOnboarding is VoltGovernor {
         values = new uint256[](3);
         calldatas = new bytes[](3);
         description = string.concat(
-            "[", Strings.toString(block.number), "]",
+            "[",
+            Strings.toString(block.number),
+            "]",
             " Enable term ",
             Strings.toHexString(term)
         );

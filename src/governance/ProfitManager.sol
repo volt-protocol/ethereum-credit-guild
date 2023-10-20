@@ -65,7 +65,7 @@ contract ProfitManager is CoreRef {
     /// cases where a loss is reported through `notifyPnL` in a given term.
     /// When a loss is reported in a given term, its termSuplusBuffer is donated to the general
     /// surplusBuffer before calculating the loss.
-    mapping(address=>uint256) public termSurplusBuffer;
+    mapping(address => uint256) public termSurplusBuffer;
 
     /// @notice multiplier for CREDIT value in the system.
     /// e.g. a value of 0.7e18 would mean that CREDIT has been discounted by 30% so far in the system,
@@ -86,7 +86,11 @@ contract ProfitManager is CoreRef {
     event SurplusBufferUpdate(uint256 indexed when, uint256 newValue);
 
     /// @notice emitted when surplus buffer of a given term is updated.
-    event TermSurplusBufferUpdate(uint256 indexed when, address indexed term, uint256 newValue);
+    event TermSurplusBufferUpdate(
+        uint256 indexed when,
+        address indexed term,
+        uint256 newValue
+    );
 
     /// @notice emitted when CREDIT multiplier is updated.
     event CreditMultiplierUpdate(uint256 indexed when, uint256 newValue);
