@@ -41,10 +41,15 @@ contract SimplePSM is CoreRef {
     /// with 6 decimals (because CREDIT has 18 decimals)
     uint256 public immutable decimalCorrection;
 
+    /// @notice true if the redemptions are currently paused
+    bool public redemptionsPaused;
+
     /// @notice event emitted upon a redemption
-    event Redeem(address indexed to, uint256 amountIn, uint256 amountOut);
+    event Redeem(uint256 indexed when, address indexed to, uint256 amountIn, uint256 amountOut);
     /// @notice event emitted when credit gets minted
-    event Mint(address indexed to, uint256 amountIn, uint256 amountOut);
+    event Mint(uint256 indexed when, address indexed to, uint256 amountIn, uint256 amountOut);
+    /// @notice event emitted when redemption pausability status changes
+    event RedemptionsPaused(uint256 indexed when, bool status);
 
     constructor(
         address _core,
@@ -87,7 +92,7 @@ contract SimplePSM is CoreRef {
         amountOut = getMintAmountOut(amountIn);
         ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
         RateLimitedMinter(rlcm).mint(to, amountOut);
-        emit Mint(to, amountIn, amountOut);
+        emit Mint(block.timestamp, to, amountIn, amountOut);
     }
 
     /// @notice redeem `amountIn` CREDIT for `amountOut` underlying tokens and send to address `to`
@@ -96,10 +101,19 @@ contract SimplePSM is CoreRef {
         address to,
         uint256 amountIn
     ) external returns (uint256 amountOut) {
+        require(!redemptionsPaused, "SimplePSM: redemptions paused");
         amountOut = getRedeemAmountOut(amountIn);
         CreditToken(credit).burnFrom(msg.sender, amountIn);
         RateLimitedMinter(rlcm).replenishBuffer(amountIn);
         ERC20(pegToken).safeTransfer(to, amountOut);
-        emit Redeem(to, amountIn, amountOut);
+        emit Redeem(block.timestamp, to, amountIn, amountOut);
+    }
+
+    /// @notice set `redemptionsPaused`
+    /// governor-only, to allow full governance to update the psm mechanisms,
+    /// or automated processes to pause redemptions under certain conditions.
+    function setRedemptionsPaused(bool paused) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        redemptionsPaused = paused;
+        emit RedemptionsPaused(block.timestamp, paused);
     }
 }
