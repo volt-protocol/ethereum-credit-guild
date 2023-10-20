@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 
@@ -40,6 +41,9 @@ contract LendingTermOffboarding is CoreRef {
     /// @notice reference to the GUILD token
     address public immutable guildToken;
 
+    /// @notice reference to the PSM
+    address public immutable psm;
+
     /// @notice list of removal polls created.
     /// keys = [snapshotBlock][termAddress] -> quorum supporting the removal.
     mapping(uint256 => mapping(address => uint256)) public polls;
@@ -56,12 +60,17 @@ contract LendingTermOffboarding is CoreRef {
     /// @notice mapping of terms that can be offboarded.
     mapping(address => bool) public canOffboard;
 
+    /// @notice number of offboardings in progress.
+    uint256 public nOffboardingsInProgress;
+
     constructor(
         address _core,
         address _guildToken,
+        address _psm,
         uint256 _quorum
     ) CoreRef(_core) {
         guildToken = _guildToken;
+        psm = _psm;
         quorum = _quorum;
     }
 
@@ -142,6 +151,11 @@ contract LendingTermOffboarding is CoreRef {
         // update protocol config
         GuildToken(guildToken).removeGauge(term);
 
+        // pause psm redemptions
+        if (nOffboardingsInProgress++ == 0 && !SimplePSM(psm).redemptionsPaused()) {
+            SimplePSM(psm).setRedemptionsPaused(true);
+        }
+
         emit Offboard(block.timestamp, term);
     }
 
@@ -162,6 +176,11 @@ contract LendingTermOffboarding is CoreRef {
         // update protocol config
         core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
         core().revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, term);
+
+        // unpause psm redemptions
+        if (--nOffboardingsInProgress == 0 && SimplePSM(psm).redemptionsPaused()) {
+            SimplePSM(psm).setRedemptionsPaused(false);
+        }
 
         canOffboard[term] = false;
         emit Cleanup(block.timestamp, term);

@@ -7,6 +7,7 @@ import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
+import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
@@ -22,6 +23,7 @@ contract LendingTermOffboardingUnitTest is Test {
     GuildToken private guild;
     CreditToken private credit;
     MockERC20 private collateral;
+    SimplePSM private psm;
     LendingTerm private term;
     AuctionHouse auctionHouse;
     RateLimitedMinter rlcm;
@@ -59,7 +61,19 @@ contract LendingTermOffboardingUnitTest is Test {
             type(uint128).max, /*_rateLimitPerSecond*/
             type(uint128).max /*_bufferCap*/
         );
-        offboarder = new LendingTermOffboarding(address(core), address(guild), _QUORUM);
+        psm = new SimplePSM(
+            address(core),
+            address(profitManager),
+            address(rlcm),
+            address(credit),
+            address(collateral)
+        );
+        offboarder = new LendingTermOffboarding(
+            address(core),
+            address(guild),
+            address(psm),
+            _QUORUM
+        );
         auctionHouse = new AuctionHouse(
             address(core),
             650,
@@ -138,6 +152,7 @@ contract LendingTermOffboardingUnitTest is Test {
         assertEq(offboarder.polls(block.number, address(term)), 0);
         assertEq(offboarder.lastPollBlock(address(term)), 0);
         assertEq(offboarder.canOffboard(address(term)), false);
+        assertEq(psm.redemptionsPaused(), false);
     }
 
     function testSetQuorum() public {
@@ -242,8 +257,12 @@ contract LendingTermOffboardingUnitTest is Test {
 
         // properly offboard a term
         assertEq(guild.isGauge(address(term)), true);
+        assertEq(psm.redemptionsPaused(), false);
+        assertEq(offboarder.nOffboardingsInProgress(), 0);
         offboarder.offboard(address(term));
         assertEq(guild.isGauge(address(term)), false);
+        assertEq(psm.redemptionsPaused(), true);
+        assertEq(offboarder.nOffboardingsInProgress(), 1);
         
         // get enough CREDIT to pack back interests
         vm.stopPrank();
@@ -296,7 +315,11 @@ contract LendingTermOffboardingUnitTest is Test {
         vm.stopPrank();
 
         // cleanup
+        assertEq(psm.redemptionsPaused(), true);
+        assertEq(offboarder.nOffboardingsInProgress(), 1);
         offboarder.cleanup(address(term));
+        assertEq(psm.redemptionsPaused(), false);
+        assertEq(offboarder.nOffboardingsInProgress(), 0);
 
         assertEq(offboarder.canOffboard(address(term)), false);
         assertEq(core.hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term)), false);
