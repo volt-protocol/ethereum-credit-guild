@@ -224,7 +224,11 @@ contract SurplusGuildMinter is CoreRef {
         // check that the position can be downgraded
         uint256 _ratio = ratio;
         uint256 _interestRate = interestRate;
-        require(stakeRatio[user][term] > _ratio || stakeInterestRate[user][term] > _interestRate, "SurplusGuildMinter: cannot downgrade");
+        require(
+            stakeRatio[user][term] > _ratio ||
+                stakeInterestRate[user][term] > _interestRate,
+            "SurplusGuildMinter: cannot downgrade"
+        );
 
         // check if losses (slashing) occurred since user joined
         uint256 _lastGaugeLoss = GuildToken(guild).lastGaugeLoss(term);
@@ -232,16 +236,17 @@ contract SurplusGuildMinter is CoreRef {
 
         // compute CREDIT rewards
         ProfitManager(profitManager).claimRewards(address(this)); // this will update profit indexes
-        uint256 _profitIndex = ProfitManager(profitManager).userGaugeProfitIndex(address(this), term);
+        uint256 _profitIndex = ProfitManager(profitManager)
+            .userGaugeProfitIndex(address(this), term);
         if (_profitIndex == 0) _profitIndex = 1e18;
-        uint256 guildAmount = stakeRatio[user][term] * creditStaked / 1e18;
+        uint256 guildAmount = (stakeRatio[user][term] * creditStaked) / 1e18;
         uint256 creditToUser;
         {
             uint256 _userProfitIndex = profitIndex[user][term];
             if (_userProfitIndex == 0) _userProfitIndex = 1e18;
             uint256 deltaIndex = _profitIndex - _userProfitIndex;
             if (deltaIndex != 0) {
-                creditToUser = guildAmount * deltaIndex / 1e18;
+                creditToUser = (guildAmount * deltaIndex) / 1e18;
             }
         }
 
@@ -255,7 +260,8 @@ contract SurplusGuildMinter is CoreRef {
                 _lastGaugeLoss != block.timestamp)
         ) {
             {
-                uint256 guildDecrement = guildAmount - (_ratio * creditStaked / 1e18);
+                uint256 guildDecrement = guildAmount -
+                    ((_ratio * creditStaked) / 1e18);
                 if (guildDecrement != 0) {
                     // decrement GUILD voting weight
                     GuildToken(guild).decrementGauge(term, guildDecrement);
@@ -267,10 +273,9 @@ contract SurplusGuildMinter is CoreRef {
             }
 
             // mint interest rates to users
-            uint256 guildReward =
-                (((guildAmount * stakeInterestRate[user][term]) / 1e18) *
-                    (block.timestamp - stakeTimestamp[user][term])) /
-                YEAR;
+            uint256 guildReward = (((guildAmount *
+                stakeInterestRate[user][term]) / 1e18) *
+                (block.timestamp - stakeTimestamp[user][term])) / YEAR;
             if (guildReward != 0) {
                 RateLimitedMinter(rlgm).mint(user, guildReward);
                 emit GuildReward(block.timestamp, user, guildReward);

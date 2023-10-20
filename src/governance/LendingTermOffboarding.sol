@@ -46,7 +46,8 @@ contract LendingTermOffboarding is CoreRef {
 
     /// @notice list of user votes in removal polls
     /// keys = [userAddress][snapshotBlock][termAddress] -> user vote weight.
-    mapping(address => mapping(uint256 => mapping(address => uint256))) public userPollVotes;
+    mapping(address => mapping(uint256 => mapping(address => uint256)))
+        public userPollVotes;
 
     /// @notice block number of last removal polls created for each term.
     /// key = [termAddress] -> block number.
@@ -113,7 +114,10 @@ contract LendingTermOffboarding is CoreRef {
             snapshotBlock
         );
         require(userWeight != 0, "LendingTermOffboarding: zero weight");
-        require(userPollVotes[msg.sender][snapshotBlock][term] == 0, "LendingTermOffboarding: already voted");
+        require(
+            userPollVotes[msg.sender][snapshotBlock][term] == 0,
+            "LendingTermOffboarding: already voted"
+        );
 
         userPollVotes[msg.sender][snapshotBlock][term] = userWeight;
         polls[snapshotBlock][term] = _weight + userWeight;
