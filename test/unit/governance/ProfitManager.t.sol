@@ -107,6 +107,7 @@ contract ProfitManagerUnitTest is Test {
         // apply a gain on an existing loan
         credit.mint(address(profitManager), 70e18);
         profitManager.notifyPnL(address(this), 70e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(profitManager.creditMultiplier(), 0.56e18); // unchanged, does not go back up
 
         // new CREDIT is minted
@@ -248,6 +249,7 @@ contract ProfitManagerUnitTest is Test {
         // 10 goes to test (rebasing credit)
         credit.mint(address(profitManager), 20e18);
         profitManager.notifyPnL(gauge1, 20e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(profitManager.claimRewards(alice), 10e18);
         assertEq(profitManager.claimRewards(bob), 0);
         assertEq(credit.balanceOf(address(this)), 110e18);
@@ -258,6 +260,7 @@ contract ProfitManagerUnitTest is Test {
         // 25 goes to test (rebasing credit)
         credit.mint(address(profitManager), 50e18);
         profitManager.notifyPnL(gauge2, 50e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(profitManager.claimRewards(alice), 5e18);
         assertEq(profitManager.claimRewards(bob), 20e18);
         assertEq(credit.balanceOf(address(this)), 135e18);
@@ -275,6 +278,7 @@ contract ProfitManagerUnitTest is Test {
         profitManager.notifyPnL(gauge2, 100e18);
         credit.mint(address(profitManager), 100e18);
         profitManager.notifyPnL(gauge3, 100e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         //assertEq(profitManager.claimRewards(alice), 10e18);
         vm.prank(alice);
         guild.incrementGauge(gauge2, 50e18); // should claim her 10 pending rewards in gauge2
@@ -293,6 +297,7 @@ contract ProfitManagerUnitTest is Test {
         // 150 goes to test (rebasing credit)
         credit.mint(address(profitManager), 300e18);
         profitManager.notifyPnL(gauge2, 300e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         //assertEq(profitManager.claimRewards(alice), 50e18);
         vm.prank(alice);
         guild.decrementGauge(gauge2, 100e18); // should claim her 50 pending rewards in gauge2
@@ -317,6 +322,7 @@ contract ProfitManagerUnitTest is Test {
         // simulate 100 profit on gauge3
         credit.mint(address(profitManager), 100e18);
         profitManager.notifyPnL(gauge3, 100e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
         assertEq(credit.balanceOf(alice), 50e18 + 15e18 + 10e18 + 50e18 + 100e18);
     }
