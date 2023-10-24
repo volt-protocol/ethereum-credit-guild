@@ -258,7 +258,7 @@ contract Proposal_0 is Proposal {
                 addresses.mainnet("PROFIT_MANAGER"),
                 addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
                 addresses.mainnet("CREDIT_TOKEN"),
-                addresses.mainnet("USDC")
+                addresses.mainnet("ERC20_USDC")
             );
 
             LendingTermOnboarding termOnboarding = LendingTermOnboarding(
@@ -267,7 +267,7 @@ contract Proposal_0 is Proposal {
 
             address termSDAI1 = termOnboarding.createTerm(
                 LendingTerm.LendingTermParams({
-                    collateralToken: addresses.mainnet("SDAI"),
+                    collateralToken: addresses.mainnet("ERC20_SDAI"),
                     maxDebtPerCollateralToken: MAX_SDAI_CREDIT_RATIO, // 1 CREDIT per SDAI collateral + no decimals correction
                     interestRate: SDAI_RATE, // 3%
                     maxDelayBetweenPartialRepay: 0, // no periodic partial repay needed
@@ -454,7 +454,7 @@ contract Proposal_0 is Proposal {
         // Doing this with a non-dust balance ensures the share price internally
         // to the CreditToken has a reasonable size.
         {
-            ERC20 usdc = ERC20(addresses.mainnet("USDC"));
+            ERC20 usdc = ERC20(addresses.mainnet("ERC20_USDC"));
             SimplePSM psm = SimplePSM(addresses.mainnet("PSM_USDC"));
             CreditToken credit = CreditToken(
                 addresses.mainnet("CREDIT_TOKEN")
@@ -557,7 +557,7 @@ contract Proposal_0 is Proposal {
         {
             SimplePSM psm = SimplePSM(addresses.mainnet("PSM_USDC"));
 
-            assertEq(psm.pegToken(), addresses.mainnet("USDC"));
+            assertEq(psm.pegToken(), addresses.mainnet("ERC20_USDC"));
             assertEq(psm.decimalCorrection(), 1e12);
             assertEq(psm.credit(), addresses.mainnet("CREDIT_TOKEN"));
             assertEq(
