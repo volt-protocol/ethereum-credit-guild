@@ -25,7 +25,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         term = LendingTerm(
             onboarder.createTerm(
                 LendingTerm.LendingTermParams({
-                    collateralToken: addresses.mainnet(strings.SDAI),
+                    collateralToken: addresses.mainnet(strings.ERC20_SDAI),
                     maxDebtPerCollateralToken: constants.MAX_SDAI_CREDIT_RATIO,
                     interestRate: constants.SDAI_RATE,
                     maxDelayBetweenPartialRepay: 0,
