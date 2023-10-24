@@ -3,12 +3,11 @@ pragma solidity 0.8.13;
 
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
-
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
 
-contract IntegrationTestRoles is PostProposalCheck {
+contract IntegrationTestRoles is PostProposalCheckFixture {
 
     bytes32[] roleHashes;
     mapping(bytes32=>string) roleHashToLabel;

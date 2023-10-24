@@ -14,12 +14,12 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
 import {NameLib as strings} from "@test/utils/NameLib.sol";
 import {CoreRoles as roles} from "@src/core/CoreRoles.sol";
-import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
-import {ProtocolConstants as constants} from "@test/utils/ProtocolConstants.sol";
+import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
+import {DeploymentConstants as constants} from "@test/utils/DeploymentConstants.sol";
 
-contract IntegrationTestOnboardOffboard is PostProposalCheck {
+contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
     function setUp() public override {
         super.setUp();
         term = LendingTerm(

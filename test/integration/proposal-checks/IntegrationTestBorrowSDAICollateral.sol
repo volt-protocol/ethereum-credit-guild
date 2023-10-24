@@ -1,25 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
-import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
-import {Governor, IGovernor} from "@openzeppelin/contracts/governance/Governor.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import "@forge-std/Test.sol";
 
-import {Core} from "@src/core/Core.sol";
-import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {MockERC20} from "@test/mock/MockERC20.sol";
-import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
-import {NameLib as strings} from "@test/utils/NameLib.sol";
-import {CoreRoles as roles} from "@src/core/CoreRoles.sol";
-import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
-import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
-import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
-import {ProtocolConstants as constants} from "@test/utils/ProtocolConstants.sol";
+import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
+import {DeploymentConstants as constants} from "@test/utils/DeploymentConstants.sol";
 
-contract IntegrationTestBorrowSDAICollateral is PostProposalCheck {
+contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     function testTermParamSetup() public {
         assertEq(term.collateralToken(), address(sdai));
         {
@@ -38,24 +26,19 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheck {
             LendingTerm.LendingTermReferences memory params = term
                 .getReferences();
 
-            assertEq(
-                params.profitManager,
-                addresses.mainnet(strings.PROFIT_MANAGER)
-            );
+            assertEq(params.profitManager, addresses.mainnet("PROFIT_MANAGER"));
             assertEq(params.guildToken, address(guild));
-            assertEq(
-                params.auctionHouse,
-                addresses.mainnet(strings.AUCTION_HOUSE)
-            );
+            assertEq(params.auctionHouse, addresses.mainnet("AUCTION_HOUSE"));
             assertEq(params.creditMinter, address(rateLimitedCreditMinter));
             assertEq(params.creditToken, address(credit));
         }
     }
 
     function testVoteForSDAIGauge() public {
+        uint256 mintAmount = governor.quorum(0);
         /// setup
-        vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
-        rateLimitedGuildMinter.mint(address(this), constants.GUILD_SUPPLY); /// mint all of the guild to this contract
+        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        rateLimitedGuildMinter.mint(address(this), mintAmount);
         guild.delegate(address(this));
 
         assertTrue(guild.isGauge(address(term)));
@@ -66,26 +49,29 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheck {
     function testAllocateGaugeToSDAI() public {
         testVoteForSDAIGauge();
 
-        guild.incrementGauge(address(term), constants.GUILD_SUPPLY);
+        guild.incrementGauge(address(term), guild.balanceOf(address(this)));
 
-        assertEq(guild.totalWeight(), constants.GUILD_SUPPLY);
+        assertEq(guild.totalWeight(), guild.balanceOf(address(this)));
         assertTrue(guild.isUserGauge(address(this), address(term)));
     }
 
     function testSupplyCollateralUserOne(
         uint128 supplyAmount
-    ) public returns (bytes32 loanId) {
+    ) public returns (bytes32 loanId, uint128 suppliedAmount) {
         supplyAmount = uint128(
             _bound(
                 uint256(supplyAmount),
                 term.MIN_BORROW(),
-                constants.CREDIT_HARDCAP - constants.CREDIT_SUPPLY
+                rateLimitedCreditMinter.buffer()
             )
         );
+        suppliedAmount = supplyAmount;
 
         testAllocateGaugeToSDAI();
 
         deal(address(sdai), userOne, supplyAmount);
+
+        uint256 startingTotalSupply = credit.totalSupply();
 
         vm.startPrank(userOne);
         sdai.approve(address(term), supplyAmount);
@@ -100,7 +86,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheck {
         );
         assertEq(
             credit.totalSupply(),
-            supplyAmount + constants.CREDIT_SUPPLY,
+            supplyAmount + startingTotalSupply,
             "incorrect credit supply"
         );
         assertEq(
@@ -110,7 +96,9 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheck {
         );
         assertEq(
             rateLimitedCreditMinter.buffer(),
-            constants.CREDIT_HARDCAP - constants.CREDIT_SUPPLY - supplyAmount,
+            rateLimitedCreditMinter.bufferCap() -
+                startingTotalSupply -
+                supplyAmount,
             "incorrect buffer"
         );
         assertEq(
@@ -121,17 +109,29 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheck {
         assertEq(term.issuance(), supplyAmount, "incorrect supply issuance");
     }
 
-    function testRepayLoan(uint128 supplyAmount) public {
-        bytes32 loanId = testSupplyCollateralUserOne(supplyAmount);
+    function testRepayLoan(uint128 seed) public {
+        uint256 startingCreditSupply = credit.totalSupply(); /// start off at 100
+        (bytes32 loanId, uint128 suppliedAmount) = testSupplyCollateralUserOne(
+            seed
+        ); /// borrow 100
+
+        /// total supply is 200
+
         vm.warp(block.timestamp + 1);
 
-        /// account for accrued interest
-        deal(address(credit), userOne, term.getLoanDebt(loanId));
+        /// account for accrued interest, adjust total supply of credit
+        uint256 loanDebt = term.getLoanDebt(loanId);
+        uint256 interest = loanDebt - suppliedAmount;
 
-        vm.startPrank(userOne);
+        deal(address(credit), userTwo, loanDebt, true); /// mint 101 CREDIT to userOne to repay debt
+        /// total supply is 301
+
+        vm.startPrank(userTwo);
         credit.approve(address(term), term.getLoanDebt(loanId));
         term.repay(loanId);
         vm.stopPrank();
+
+        /// total supply is 201
 
         assertEq(term.getLoanDebt(loanId), 0, "incorrect loan debt");
 
@@ -142,13 +142,19 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheck {
         );
         assertEq(
             credit.totalSupply(),
-            constants.CREDIT_SUPPLY,
+            interest + startingCreditSupply + suppliedAmount,
             "incorrect credit supply"
         );
-        assertEq(credit.balanceOf(userOne), 0, "incorrect credit balance");
+        assertEq(
+            credit.balanceOf(userOne),
+            suppliedAmount,
+            "incorrect credit balance"
+        );
+
+        console.log("startingCreditSupply: ", startingCreditSupply);
         assertEq(
             rateLimitedCreditMinter.buffer(),
-            constants.CREDIT_HARDCAP - constants.CREDIT_SUPPLY,
+            rateLimitedCreditMinter.bufferCap() - startingCreditSupply,
             "incorrect buffer"
         );
         assertEq(
@@ -212,7 +218,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheck {
 
     function testCallLoan() public returns (bytes32) {
         uint256 supplyAmount = 10_000e18;
-        bytes32 loanId = testSupplyCollateralUserOne(uint128(supplyAmount));
+        (bytes32 loanId, ) = testSupplyCollateralUserOne(uint128(supplyAmount));
 
         testTermOffboarding();
 

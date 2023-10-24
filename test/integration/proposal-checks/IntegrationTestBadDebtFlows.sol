@@ -1,41 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
 import "@forge-std/Test.sol";
 
-import {Core} from "@src/core/Core.sol";
-import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {MockERC20} from "@test/mock/MockERC20.sol";
-import {GuildToken} from "@src/tokens/GuildToken.sol";
-import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
-import {NameLib as strings} from "@test/utils/NameLib.sol";
-import {CoreRoles as roles} from "@src/core/CoreRoles.sol";
-import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
-import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
-import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
-import {ProtocolConstants as constants} from "@test/utils/ProtocolConstants.sol";
+import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
 
-contract IntegrationTestBadDebtFlows is PostProposalCheck {
+contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
     function testVoteForSDAIGauge() public {
+        uint256 mintAmount = governor.quorum(0);
         /// setup
-        vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
-        rateLimitedGuildMinter.mint(address(this), constants.GUILD_SUPPLY); /// mint all of the guild to this contract
+        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        rateLimitedGuildMinter.mint(address(this), mintAmount);
         guild.delegate(address(this));
 
         assertTrue(guild.isGauge(address(term)));
         assertEq(guild.numGauges(), 1);
         assertEq(guild.numLiveGauges(), 1);
+        assertEq(guild.balanceOf(address(this)), mintAmount);
     }
 
     function testAllocateGaugeToSDAI() public {
         testVoteForSDAIGauge();
 
-        guild.incrementGauge(address(term), constants.GUILD_SUPPLY);
+        guild.incrementGauge(address(term), guild.balanceOf(address(this)));
 
-        assertEq(guild.totalWeight(), constants.GUILD_SUPPLY);
+        assertEq(guild.totalWeight(), guild.balanceOf(address(this)));
         assertTrue(guild.isUserGauge(address(this), address(term)));
     }
 
@@ -44,6 +33,8 @@ contract IntegrationTestBadDebtFlows is PostProposalCheck {
         uint128 supplyAmount
     ) public returns (bytes32 loanId) {
         deal(address(sdai), userOne, supplyAmount);
+
+        uint256 startingCreditSupply = credit.totalSupply();
 
         vm.startPrank(userOne);
         sdai.approve(address(term), supplyAmount);
@@ -58,7 +49,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheck {
         );
         assertEq(
             credit.totalSupply(),
-            borrowAmount + constants.CREDIT_SUPPLY,
+            borrowAmount + startingCreditSupply,
             "incorrect credit supply"
         );
         assertEq(
@@ -68,7 +59,9 @@ contract IntegrationTestBadDebtFlows is PostProposalCheck {
         );
         assertEq(
             rateLimitedCreditMinter.buffer(),
-            constants.CREDIT_HARDCAP - constants.CREDIT_SUPPLY - borrowAmount,
+            rateLimitedCreditMinter.bufferCap() -
+                startingCreditSupply -
+                borrowAmount,
             "incorrect buffer"
         );
         assertEq(
@@ -77,104 +70,6 @@ contract IntegrationTestBadDebtFlows is PostProposalCheck {
             "incorrect last buffer used time"
         );
         assertEq(term.issuance(), borrowAmount, "incorrect supply issuance");
-    }
-
-    function testRepayLoan(
-        uint128 supplyAmount,
-        uint128 borrowAmount,
-        uint32 warpAmount
-    ) public {
-        testAllocateGaugeToSDAI(); /// setup
-        supplyAmount = uint128(
-            _bound(
-                uint256(supplyAmount),
-                term.MIN_BORROW(),
-                type(uint128).max /// you can supply up to this amount
-            )
-        );
-        
-        borrowAmount = uint128(
-            _bound(
-                uint256(borrowAmount),
-                term.MIN_BORROW(),
-                Math.min(
-                    constants.CREDIT_HARDCAP - constants.CREDIT_SUPPLY,
-                    supplyAmount
-                ) /// lesser of the two, cannot borrow more than supply amt or buffer
-            )
-        );
-
-        warpAmount = uint32(_bound(uint256(warpAmount), 1, 10 * 365 days)); /// bound from 1 second to 10 year warp
-
-        bytes32 loanId = _supplyCollateralUserOne(borrowAmount, supplyAmount);
-        vm.warp(block.timestamp + warpAmount);
-        vm.roll(block.number + warpAmount / 12); /// roll the amt of blocks that would have passed on mainnet
-
-        uint256 profit = term.getLoanDebt(loanId) - borrowAmount;
-
-        uint256 amountMinted = _doMint(
-            userTwo,
-            uint128(term.getLoanDebt(loanId) / 1e12 + 1)
-        );
-
-        console.log("warpAmount: ", warpAmount);
-        console.log("borrowAmount: ", borrowAmount);
-        console.log("supplyAmount: ", supplyAmount);
-        console.log("erc20TotalSupply: ", credit.erc20TotalSupply());
-        console.log("pendingRebaseRewards: ", credit.pendingRebaseRewards());
-        console.log("user one starting credit balance:: ", credit.balanceOf(userOne));
-        
-        vm.startPrank(userTwo);
-        credit.approve(address(term), term.getLoanDebt(loanId));
-        term.repay(loanId);
-        credit.burn(credit.balanceOf(userTwo));
-        vm.stopPrank();
-
-
-        console.log("user one credit balance after repay:: ", credit.balanceOf(userOne));
-        
-        assertEq(term.getLoanDebt(loanId), 0, "incorrect loan debt");
-
-        assertEq(
-            credit.balanceOf(userOne),
-            borrowAmount,
-            "incorrect userOne credit balance"
-        );
-        assertEq(
-            sdai.balanceOf(address(term)),
-            0,
-            "sdai balance of term incorrect"
-        );
-        uint256 expectedProfit = (profit * 9) % 10 == 0
-            ? (profit * 9) / 10
-            : (profit * 9) / 10 + 1;
-
-        /// total supply should equal
-        // amountMinted + expectedProfit
-
-        console.log("profit: ", profit);
-        console.log("amountMinted: ", amountMinted);
-        console.log("expectedProfit: ", expectedProfit);
-        console.log("erc20TotalSupply: ", credit.erc20TotalSupply());
-        console.log("pendingRebaseRewards: ", credit.pendingRebaseRewards());
-
-        assertEq(
-            credit.totalSupply(),
-            constants.CREDIT_SUPPLY + borrowAmount + expectedProfit,
-            "incorrect credit supply"
-        );
-        assertEq(credit.balanceOf(userOne), 0, "incorrect credit balance");
-        assertEq(
-            rateLimitedCreditMinter.buffer(),
-            constants.CREDIT_HARDCAP - constants.CREDIT_SUPPLY,
-            "incorrect buffer"
-        );
-        assertEq(
-            rateLimitedCreditMinter.lastBufferUsedTime(),
-            block.timestamp,
-            "incorrect last buffer used time"
-        );
-        assertEq(term.issuance(), 0, "incorrect issuance, should be 0");
     }
 
     function testTermOffboarding() public {
@@ -191,6 +86,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheck {
         offboarder.offboard(address(term));
 
         assertFalse(guild.isGauge(address(term)));
+        assertTrue(guild.isDeprecatedGauge(address(term)));
     }
 
     function _psmMint(uint128 amount) public {
@@ -228,5 +124,141 @@ contract IntegrationTestBadDebtFlows is PostProposalCheck {
         );
 
         return amountOut;
+    }
+
+    function testBadDebtRepricesCreditBid() public {
+        /// TODO uncomment once changes around pausing PSM when term is offboarded come online
+        /// user two purchases credit in PSM
+        // deal(address(usdc), userTwo, 100e6);
+        // vm.startPrank(userTwo);
+        // usdc.approve(address(psm), 100e6);
+        // psm.mint(userTwo, 100e6);
+        // vm.stopPrank();
+
+        testAllocateGaugeToSDAI();
+
+        uint256 borrowAmount = 100e18;
+        uint128 supplyAmount = 100e18;
+
+        /// supply collateral and borrow
+
+        bytes32 loanId = _supplyCollateralUserOne(borrowAmount, supplyAmount);
+
+        /// offboard term
+
+        testTermOffboarding();
+
+        /// test cannot redeem in PSM once that feature merges
+
+        /// call loans
+
+        term.call(loanId);
+
+        /// wait for auction to allow seizing of collateral for 0 credit
+
+        vm.warp(block.timestamp + auctionHouse.auctionDuration() + 1);
+
+        /// seize, check collateral balance of liquidator
+
+        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+            .getBidDetail(loanId);
+
+        assertEq(
+            collateralReceived,
+            supplyAmount,
+            "incorrect collateral received"
+        );
+        assertEq(creditAsked, 0, "incorrect credit asked");
+        assertEq(auctionHouse.nAuctionsInProgress(), 1);
+
+        uint256 startingSdaiBalance = sdai.balanceOf(address(this));
+        
+        rateLimitedCreditMinter.buffer();
+
+        auctionHouse.bid(loanId); /// get collateral for free, TODO check that forgive could be called at this point as well
+
+        uint256 endingSdaiBalance = sdai.balanceOf(address(this));
+
+        assertEq(auctionHouse.nAuctionsInProgress(), 0);
+        assertEq(
+            endingSdaiBalance - startingSdaiBalance,
+            supplyAmount,
+            "incorrect sdai balance after liquidation"
+        );
+
+        /// ensure credit reprices
+        assertEq(
+            profitManager.creditMultiplier() < 1e18,
+            true,
+            "credit multiplier should be less than 1"
+        );
+
+        rateLimitedCreditMinter.buffer();
+    }
+
+    function testBadDebtRepricesCreditForgive() public {
+        /// TODO uncomment once changes around pausing PSM when term is offboarded come online
+        /// user two purchases credit in PSM
+        // deal(address(usdc), userTwo, 100e6);
+        // vm.startPrank(userTwo);
+        // usdc.approve(address(psm), 100e6);
+        // psm.mint(userTwo, 100e6);
+        // vm.stopPrank();
+
+        testAllocateGaugeToSDAI();
+
+        uint256 borrowAmount = 100e18;
+        uint128 supplyAmount = 100e18;
+
+        /// supply collateral and borrow
+
+        bytes32 loanId = _supplyCollateralUserOne(borrowAmount, supplyAmount);
+
+        /// offboard term
+
+        testTermOffboarding();
+
+        /// test cannot redeem in PSM once that feature merges
+
+        /// call loans
+
+        term.call(loanId);
+
+        /// wait for auction to allow seizing of collateral for 0 credit
+
+        vm.warp(block.timestamp + auctionHouse.auctionDuration() + 1);
+
+        /// seize, check collateral balance of liquidator
+
+        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+            .getBidDetail(loanId);
+
+        assertEq(
+            collateralReceived,
+            supplyAmount,
+            "incorrect collateral received"
+        );
+        assertEq(creditAsked, 0, "incorrect credit asked");
+        assertEq(auctionHouse.nAuctionsInProgress(), 1);
+
+        uint256 startingSdaiBalance = sdai.balanceOf(address(this));
+
+        auctionHouse.forgive(loanId); /// get collateral for free, TODO check that forgive could be called at this point as well
+
+        uint256 endingSdaiBalance = sdai.balanceOf(address(this));
+
+        assertEq(auctionHouse.nAuctionsInProgress(), 0);
+        assertEq(
+            endingSdaiBalance,
+            startingSdaiBalance,
+            "incorrect sdai balance after liquidation"
+        );
+
+        /// ensure credit reprices
+        assertEq(
+            profitManager.creditMultiplier() < 1e18,
+            true,
+            "credit multiplier should be less than 1"
+        );
     }
 }
