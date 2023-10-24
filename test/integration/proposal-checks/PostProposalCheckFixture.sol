@@ -74,8 +74,8 @@ contract PostProposalCheckFixture is PostProposalCheck {
         /// core
         core = Core(addresses.mainnet(strings.CORE));
 
-        usdc = ERC20(addresses.mainnet(strings.USDC));
-        sdai = ERC20(addresses.mainnet(strings.SDAI));
+        usdc = ERC20(addresses.mainnet(strings.ERC20_USDC));
+        sdai = ERC20(addresses.mainnet(strings.ERC20_SDAI));
         guild = GuildToken(addresses.mainnet(strings.GUILD_TOKEN));
         credit = CreditToken(addresses.mainnet(strings.CREDIT_TOKEN));
 
