@@ -52,10 +52,10 @@ library NameLib {
     string internal constant PSM_USDC = "PSM_USDC";
 
     /// @notice reference to mainnet USDC
-    string internal constant USDC = "USDC";
+    string internal constant ERC20_USDC = "ERC20_USDC";
 
     /// @notice reference to mainnet SDAI
-    string internal constant SDAI = "SDAI";
+    string internal constant ERC20_SDAI = "ERC20_SDAI";
 
     /// @notice team multisig
     string internal constant TEAM_MULTISIG = "TEAM_MULTISIG";
