@@ -49,11 +49,7 @@ contract RateLimitedMinter is RateLimitedV2 {
     function mint(
         address to,
         uint256 amount
-    )
-        external
-        onlyCoreRole(role)
-        whenNotPaused
-    {
+    ) external onlyCoreRole(role) whenNotPaused {
         _depleteBuffer(amount); /// check and effects
         IERC20Mintable(token).mint(to, amount); /// interactions
     }
@@ -61,12 +57,7 @@ contract RateLimitedMinter is RateLimitedV2 {
     /// @notice replenish the buffer.
     /// This can be used when tokens are burnt, for instance.
     /// @param amount of tokens to replenish buffer by
-    function replenishBuffer(
-        uint256 amount
-    )
-        external
-        onlyCoreRole(role)
-    {
+    function replenishBuffer(uint256 amount) external onlyCoreRole(role) {
         _replenishBuffer(amount); /// effects
     }
 }

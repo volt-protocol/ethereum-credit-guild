@@ -8,7 +8,6 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 /// @notice Auction House contract of the Ethereum Credit Guild,
 /// where collateral of borrowers is auctioned to cover their CREDIT debt.
 contract AuctionHouse is CoreRef {
-
     /// @notice emitted when au action starts
     event AuctionStart(
         uint256 indexed when,
@@ -73,10 +72,7 @@ contract AuctionHouse is CoreRef {
     /// in order to pay the debt of a loan.
     /// @param loanId the ID of the loan which collateral is auctioned
     /// @param callDebt the amount of CREDIT debt to recover from the collateral auction
-    function startAuction(
-        bytes32 loanId,
-        uint256 callDebt
-    ) external {
+    function startAuction(bytes32 loanId, uint256 callDebt) external {
         // check that caller is a lending term that still has PnL reporting role
         require(
             core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, msg.sender),
@@ -153,10 +149,7 @@ contract AuctionHouse is CoreRef {
             uint256 PHASE_2_DURATION = auctionDuration - midPoint;
             uint256 elapsed = block.timestamp - _startTime - midPoint; // [0, PHASE_2_DURATION[
             uint256 _callDebt = auctions[loanId].callDebt; // SLOAD
-            creditAsked =
-                _callDebt -
-                (_callDebt * elapsed) /
-                PHASE_2_DURATION;
+            creditAsked = _callDebt - (_callDebt * elapsed) / PHASE_2_DURATION;
         }
         // second phase fully elapsed, anyone can receive the full collateral and give 0 CREDIT
         // in practice, somebody should have taken the arb before we reach this condition.

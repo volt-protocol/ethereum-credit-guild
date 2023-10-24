@@ -21,11 +21,10 @@ import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
 /// Only terms that have been deployed through this factory can be onboarded.
 /// A term can be onboarded for the first time, or re-onboarded after it has been offboarded.
 contract LendingTermOnboarding is VoltGovernor {
-
     /// @notice minimum delay between proposals of onboarding of a given term
     uint256 public constant MIN_DELAY_BETWEEN_PROPOSALS = 7 days;
     /// @notice time of last proposal of a given term
-    mapping(address=>uint256) public lastProposal;
+    mapping(address => uint256) public lastProposal;
 
     /// @notice immutable reference to the lending term implementation to clone
     address public immutable lendingTermImplementation;
@@ -36,7 +35,7 @@ contract LendingTermOnboarding is VoltGovernor {
 
     /// @notice timestamp of creation of a term
     /// (used to check that a term has been created by this factory)
-    mapping(address=>uint256) public created;
+    mapping(address => uint256) public created;
 
     /// @notice reference to profitManager to set in created lending terms
     address public immutable profitManager;
@@ -78,11 +77,18 @@ contract LendingTermOnboarding is VoltGovernor {
     }
 
     /// @notice Create a new LendingTerm and initialize it.
-    function createTerm(LendingTerm.LendingTermParams calldata params) external returns (address) {
+    function createTerm(
+        LendingTerm.LendingTermParams calldata params
+    ) external returns (address) {
         // must be an ERC20 (maybe, at least it prevents dumb input mistakes)
-        (bool success, bytes memory returned) = params.collateralToken.call(abi.encodeWithSelector(IERC20.totalSupply.selector));
-        require(success && returned.length == 32, "LendingTermOnboarding: invalid collateralToken");
-    
+        (bool success, bytes memory returned) = params.collateralToken.call(
+            abi.encodeWithSelector(IERC20.totalSupply.selector)
+        );
+        require(
+            success && returned.length == 32,
+            "LendingTermOnboarding: invalid collateralToken"
+        );
+
         require(
             params.maxDebtPerCollateralToken != 0, // must be able to mint non-zero debt
             "LendingTermOnboarding: invalid maxDebtPerCollateralToken"
@@ -94,6 +100,7 @@ contract LendingTermOnboarding is VoltGovernor {
         );
 
         require(
+            // 31557601 comes from the constant LendingTerm.YEAR() + 1
             params.maxDelayBetweenPartialRepay < 31557601, // periodic payment every [0, 1 year]
             "LendingTermOnboarding: invalid maxDelayBetweenPartialRepay"
         );
@@ -140,14 +147,19 @@ contract LendingTermOnboarding is VoltGovernor {
     }
 
     /// @notice Propose the onboarding of a term
-    function proposeOnboard(address term) external whenNotPaused returns (uint256 proposalId) {
+    function proposeOnboard(
+        address term
+    ) external whenNotPaused returns (uint256 proposalId) {
         // Check that the term has been created by this factory
         require(created[term] != 0, "LendingTermOnboarding: invalid term");
 
         // Check that the term was not subject to an onboard vote recently
-        require(lastProposal[term] + MIN_DELAY_BETWEEN_PROPOSALS < block.timestamp, "LendingTermOnboarding: recently proposed");
+        require(
+            lastProposal[term] + MIN_DELAY_BETWEEN_PROPOSALS < block.timestamp,
+            "LendingTermOnboarding: recently proposed"
+        );
         lastProposal[term] = block.timestamp;
-        
+
         // Check that the term is not already active
         // note that terms that have been offboarded in the past can be re-onboarded
         // and won't fail this check. This is intentional, because some terms might be offboarded
@@ -169,16 +181,25 @@ contract LendingTermOnboarding is VoltGovernor {
     }
 
     /// @notice Generate the calldata for the onboarding of a term
-    function getOnboardProposeArgs(address term) public view returns (
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        string memory description
-    ) {
+    function getOnboardProposeArgs(
+        address term
+    )
+        public
+        view
+        returns (
+            address[] memory targets,
+            uint256[] memory values,
+            bytes[] memory calldatas,
+            string memory description
+        )
+    {
         targets = new address[](3);
         values = new uint256[](3);
         calldatas = new bytes[](3);
-        description = string.concat("Enable term ", Strings.toHexString(uint160(term), 20));
+        description = string.concat(
+            "Enable term ",
+            Strings.toHexString(uint160(term), 20)
+        );
 
         // 1st call: guild.addGauge(term)
         targets[0] = guildToken;

@@ -59,19 +59,23 @@ contract SimplePSM is CoreRef {
         pegToken = _pegToken;
 
         uint256 decimals = uint256(ERC20(_pegToken).decimals());
-        decimalCorrection = 10**(18 - decimals);
+        decimalCorrection = 10 ** (18 - decimals);
     }
 
     /// @notice calculate the amount of CREDIT out for a given `amountIn` of underlying
     function getMintAmountOut(uint256 amountIn) public view returns (uint256) {
-        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
-        return amountIn * decimalCorrection * 1e18 / creditMultiplier;
+        uint256 creditMultiplier = ProfitManager(profitManager)
+            .creditMultiplier();
+        return (amountIn * decimalCorrection * 1e18) / creditMultiplier;
     }
 
     /// @notice calculate the amount of underlying out for a given `amountIn` of CREDIT
-    function getRedeemAmountOut(uint256 amountIn) public view returns (uint256) {
-        uint256 creditMultiplier = ProfitManager(profitManager).creditMultiplier();
-        return amountIn * creditMultiplier / 1e18 / decimalCorrection;
+    function getRedeemAmountOut(
+        uint256 amountIn
+    ) public view returns (uint256) {
+        uint256 creditMultiplier = ProfitManager(profitManager)
+            .creditMultiplier();
+        return (amountIn * creditMultiplier) / 1e18 / decimalCorrection;
     }
 
     /// @notice mint `amountOut` CREDIT to address `to` for `amountIn` underlying tokens
