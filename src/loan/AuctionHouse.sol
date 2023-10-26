@@ -169,6 +169,7 @@ contract AuctionHouse is CoreRef {
         (uint256 collateralReceived, uint256 creditAsked) = getBidDetail(
             loanId
         );
+        require(creditAsked != 0, "AuctionHouse: cannot bid 0");
 
         // close the auction in state
         auctions[loanId].endTime = block.timestamp;

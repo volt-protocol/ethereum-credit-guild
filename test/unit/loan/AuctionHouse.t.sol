@@ -329,6 +329,22 @@ contract AuctionHouseUnitTest is Test {
         auctionHouse.bid(loanId);
     }
 
+    // bid fail if auction bid period is over, should use forgive instead
+    function testBidFailBidPeriodElapsed() public {
+        bytes32 loanId = _setupAndCallLoan();
+
+        vm.warp(block.timestamp + auctionHouse.auctionDuration() + 1);
+        ( , uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+        assertEq(creditAsked, 0);
+        assertEq(auctionHouse.getAuction(loanId).endTime, 0);
+
+        vm.expectRevert("AuctionHouse: cannot bid 0");
+        auctionHouse.bid(loanId);
+
+        auctionHouse.forgive(loanId);
+        assertEq(auctionHouse.getAuction(loanId).endTime, block.timestamp);
+    }
+
     // bid success, that creates bad debt
     function testBidSuccessBadDebt() public {
         bytes32 loanId = _setupAndCallLoan();
