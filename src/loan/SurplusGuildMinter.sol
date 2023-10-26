@@ -47,6 +47,10 @@ contract SurplusGuildMinter is CoreRef {
         address indexed user,
         uint256 amount
     );
+    /// @notice emitted when the mintRatio is updated
+    event MintRatioUpdate(uint256 indexed timestamp, uint256 ratio);
+    /// @notice emitted when the rewardRatio is updated
+    event RewardRatioUpdate(uint256 indexed timestamp, uint256 ratio);
 
     /// @notice reference to the ProfitManager
     address public immutable profitManager;
@@ -302,6 +306,7 @@ contract SurplusGuildMinter is CoreRef {
         uint256 _mintRatio
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         mintRatio = _mintRatio;
+        emit MintRatioUpdate(block.timestamp, _mintRatio);
     }
 
     /// @notice governor-only function to set the ratio of GUILD tokens rewarded
@@ -310,5 +315,6 @@ contract SurplusGuildMinter is CoreRef {
         uint256 _rewardRatio
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         rewardRatio = _rewardRatio;
+        emit RewardRatioUpdate(block.timestamp, _rewardRatio);
     }
 }
