@@ -70,11 +70,6 @@ contract LendingTerm is CoreRef {
     /// @notice minimum number of CREDIT to borrow when opening a new loan
     uint256 public constant MIN_BORROW = 100e18;
 
-    /// @notice debt ceiling tolerance vs. ideal gauge weights to avoid deadlock situations and allow organic growth of borrows.
-    /// Expressed as a percentage, with 18 decimals, e.g. 1.2e18 = 120% tolerance, meaning if GUILD holders' gauge weights
-    /// would set a debt ceiling to 100 CREDIT, the issuance could go as high as 120 CREDIT.
-    uint256 public constant GAUGE_CAP_TOLERANCE = 1.2e18;
-
     /// @notice timestamp of last partial repayment for a given loanId.
     /// during borrow(), this is initialized to the borrow timestamp, if
     /// maxDelayBetweenPartialRepay is != 0
@@ -294,11 +289,10 @@ contract LendingTerm is CoreRef {
 
         // check the debt ceiling
         uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
-        uint256 debtCeiling = (GuildToken(refs.guildToken)
-            .calculateGaugeAllocation(
-                address(this),
-                _totalSupply + borrowAmount
-            ) * GAUGE_CAP_TOLERANCE) / 1e18;
+        uint256 debtCeiling = GuildToken(refs.guildToken).calculateGaugeAllocation(
+            address(this),
+            _totalSupply + borrowAmount
+        );
         if (_totalSupply == 0) {
             // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
             // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
