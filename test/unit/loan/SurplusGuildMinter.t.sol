@@ -192,6 +192,10 @@ contract SurplusGuildMinterUnitTest is Test {
         vm.expectRevert("SurplusGuildMinter: invalid amount");
         sgm.unstake(term, 80e18);
 
+        // cannot unstake with a remaining credit amount below MIN_STAKE
+        vm.expectRevert("SurplusGuildMinter: remaining stake below min");
+        sgm.unstake(term, 74.5e18);
+
         // unstake 2nd half (sgm)
         sgm.unstake(term, 75e18);
         assertEq(credit.balanceOf(address(this)), 150e18 + rewardsSgm);
