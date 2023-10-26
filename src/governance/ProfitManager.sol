@@ -202,22 +202,24 @@ contract ProfitManager is CoreRef {
 
     /// @notice withdraw from surplus buffer
     function withdrawFromSurplusBuffer(
+        address to,
         uint256 amount
     ) external onlyCoreRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW) {
         uint256 newSurplusBuffer = surplusBuffer - amount; // this would revert due to underflow if withdrawing > surplusBuffer
         surplusBuffer = newSurplusBuffer;
-        CreditToken(credit).transfer(msg.sender, amount);
+        CreditToken(credit).transfer(to, amount);
         emit SurplusBufferUpdate(block.timestamp, newSurplusBuffer);
     }
 
     /// @notice withdraw from surplus buffer of a given term
     function withdrawFromTermSurplusBuffer(
         address term,
+        address to,
         uint256 amount
     ) external onlyCoreRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW) {
         uint256 newSurplusBuffer = termSurplusBuffer[term] - amount; // this would revert due to underflow if withdrawing > termSurplusBuffer
         termSurplusBuffer[term] = newSurplusBuffer;
-        CreditToken(credit).transfer(msg.sender, amount);
+        CreditToken(credit).transfer(to, amount);
         emit TermSurplusBufferUpdate(block.timestamp, term, newSurplusBuffer);
     }
 

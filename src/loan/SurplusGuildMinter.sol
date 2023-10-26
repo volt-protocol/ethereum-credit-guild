@@ -183,9 +183,9 @@ contract SurplusGuildMinter is CoreRef {
         // withdraw & transfer CREDIT
         ProfitManager(profitManager).withdrawFromTermSurplusBuffer(
             term,
+            msg.sender,
             amount
         );
-        CreditToken(credit).transfer(msg.sender, amount);
 
         // burn GUILD
         GuildToken(guild).decrementGauge(term, guildAmount);

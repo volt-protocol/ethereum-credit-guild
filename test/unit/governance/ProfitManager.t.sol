@@ -419,21 +419,21 @@ contract ProfitManagerUnitTest is Test {
 
         // without role, cannot withdraw
         vm.expectRevert("UNAUTHORIZED");
-        profitManager.withdrawFromSurplusBuffer(10e18);
+        profitManager.withdrawFromSurplusBuffer(address(this), 10e18);
 
         // grant role to test contract
         vm.prank(governor);
         core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
 
         // withdraw
-        profitManager.withdrawFromSurplusBuffer(10e18);
+        profitManager.withdrawFromSurplusBuffer(address(this), 10e18);
         assertEq(profitManager.surplusBuffer(), 90e18);
         assertEq(credit.balanceOf(address(this)), 110e18);
         assertEq(credit.balanceOf(address(profitManager)), 90e18);
 
         // cannot withdraw more than current buffer
         vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // underflow
-        profitManager.withdrawFromSurplusBuffer(999e18);
+        profitManager.withdrawFromSurplusBuffer(address(this), 999e18);
     }
 
     function testDepleteSurplusBuffer() public {
@@ -519,21 +519,21 @@ contract ProfitManagerUnitTest is Test {
 
         // without role, cannot withdraw
         vm.expectRevert("UNAUTHORIZED");
-        profitManager.withdrawFromTermSurplusBuffer(address(this), 10e18);
+        profitManager.withdrawFromTermSurplusBuffer(address(this), address(this), 10e18);
 
         // grant role to test contract
         vm.prank(governor);
         core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
 
         // withdraw
-        profitManager.withdrawFromTermSurplusBuffer(address(this), 10e18);
+        profitManager.withdrawFromTermSurplusBuffer(address(this), address(this), 10e18);
         assertEq(profitManager.termSurplusBuffer(address(this)), 90e18);
         assertEq(credit.balanceOf(address(this)), 110e18);
         assertEq(credit.balanceOf(address(profitManager)), 90e18);
 
         // cannot withdraw more than current buffer
         vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // underflow
-        profitManager.withdrawFromTermSurplusBuffer(address(this), 999e18);
+        profitManager.withdrawFromTermSurplusBuffer(address(this), address(this), 999e18);
     }
 
     function testDepleteTermSurplusBuffer() public {
