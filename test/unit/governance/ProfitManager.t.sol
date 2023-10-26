@@ -7,6 +7,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
+import {MockLendingTerm} from "@test/mock/MockLendingTerm.sol";
 
 contract ProfitManagerUnitTest is Test {
     address private governor = address(1);
@@ -16,9 +17,9 @@ contract ProfitManagerUnitTest is Test {
     GuildToken guild;
     address constant alice = address(0x616c696365);
     address constant bob = address(0xB0B);
-    address constant gauge1 = address(0xDEAD);
-    address constant gauge2 = address(0xBEEF);
-    address constant gauge3 = address(0x3333);
+    address private gauge1;
+    address private gauge2;
+    address private gauge3;
 
     uint256 public issuance; // for mocked behavior
 
@@ -29,6 +30,9 @@ contract ProfitManagerUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
         guild = new GuildToken(address(core), address(profitManager), address(credit));
+        gauge1 = address(new MockLendingTerm(address(core)));
+        gauge2 = address(new MockLendingTerm(address(core)));
+        gauge3 = address(new MockLendingTerm(address(core)));
 
         // labels
         vm.label(address(core), "core");

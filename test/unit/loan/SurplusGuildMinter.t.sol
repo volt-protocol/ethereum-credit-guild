@@ -7,13 +7,14 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
+import {MockLendingTerm} from "@test/mock/MockLendingTerm.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 
 contract SurplusGuildMinterUnitTest is Test {
     address private governor = address(1);
     address private guardian = address(2);
-    address private term = address(1182791270913933);
+    address private term;
     Core private core;
     ProfitManager private profitManager;
     CreditToken credit;
@@ -51,6 +52,7 @@ contract SurplusGuildMinterUnitTest is Test {
             REWARD_RATIO
         );
         profitManager.initializeReferences(address(credit), address(guild));
+        term = address(new MockLendingTerm(address(core)));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -301,8 +303,8 @@ contract SurplusGuildMinterUnitTest is Test {
     // test with multiple users, some gauges with losses and some not
     function testMultipleUsers() public {
         // add a 2 terms with equal weight
-        address term1 = address(1820918292128018201);
-        address term2 = address(9080918209281092812);
+        address term1 = address(new MockLendingTerm(address(core)));
+        address term2 = address(new MockLendingTerm(address(core)));
         guild.addGauge(1, term1);
         guild.addGauge(1, term2);
         guild.mint(address(this), 100e18);

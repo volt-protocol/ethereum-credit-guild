@@ -218,16 +218,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
 
         // check if gauge is currently using its allocated debt ceiling.
         // To decrement gauge weight, guild holders might have to call loans if the debt ceiling is used.
-        // issuance() is read with a try/catch to prevent broken terms from breaking the guild token.
-        uint256 issuance;
-        {
-            (bool success, bytes memory result) = gauge.staticcall(
-                abi.encodeWithSignature("issuance()")
-            );
-            if (success) {
-                issuance = uint256(bytes32(result));
-            }
-        }
+        uint256 issuance = LendingTerm(gauge).issuance();
         if (issuance != 0) {
             uint256 creditTotalSupply = CreditToken(credit).totalSupply();
             uint256 debtCeilingAfterDecrement = 0;
