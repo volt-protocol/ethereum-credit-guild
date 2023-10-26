@@ -20,6 +20,11 @@ import {CreditToken} from "@src/tokens/CreditToken.sol";
     When a loan generates profit (interests), the profit is traced back to users voting for
     this lending term (gauge), which subsequently allows pro-rata distribution of profits to
     GUILD holders that vote for the most productive gauges.
+
+    Seniority stack of the debt, in case of losses :
+    - per term surplus buffer (donated to global surplus buffer when loss is reported)
+    - global surplus buffer
+    - finally, credit holders (by updating down the creditMultiplier)
 */
 contract ProfitManager is CoreRef {
     /// @notice reference to GUILD token.
