@@ -126,10 +126,28 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         deal(address(credit), userTwo, loanDebt, true); /// mint 101 CREDIT to userOne to repay debt
         /// total supply is 301
 
+        credit.totalSupply();
+
         vm.startPrank(userTwo);
         credit.approve(address(term), term.getLoanDebt(loanId));
         term.repay(loanId);
         vm.stopPrank();
+
+        {
+            (uint256 surplusSplit, , , , ) = profitManager
+                .getProfitSharingConfig();
+            assertEq(
+                credit.totalSupply(),
+                ((interest * surplusSplit) / 1e18) + /// 10% of interest goes into total supply,
+                    startingCreditSupply + /// the rest goes to profit, which is interpolated over the period
+                    suppliedAmount,
+                "incorrect credit supply before interpolating"
+            );
+        }
+
+        uint256 repayTime = block.timestamp;
+
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
         /// total supply is 201
 
@@ -159,7 +177,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         );
         assertEq(
             rateLimitedCreditMinter.lastBufferUsedTime(),
-            block.timestamp,
+            repayTime,
             "incorrect last buffer used time"
         );
         assertEq(term.issuance(), 0, "incorrect issuance, should be 0");
@@ -264,6 +282,8 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         vm.stopPrank();
 
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
+
         uint256 endingDeployerBalance = credit.balanceOf(proposalZero);
         LendingTerm.Loan memory loan = term.getLoan(loanId);
 
@@ -345,8 +365,6 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             startingCreditSupply,
             "incorrect credit total supply"
         );
-
-        assertEq(creditAmount, credit.pendingRebaseRewards());
     }
 
     function testDistributeReducesCreditTotalSupply(
@@ -375,7 +393,6 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             "incorrect credit total supply"
         );
 
-        assertEq(0, credit.pendingRebaseRewards(), "incorrect rebase rewards");
         assertEq(0, credit.totalRebasingShares(), "incorrect rebasing shares");
     }
 }
