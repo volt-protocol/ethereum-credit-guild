@@ -3,7 +3,7 @@
     "LENDING_TERM_OFFBOARDING",
     "TIMELOCK"
   ],
-  "TIMELOCK_CANCELLER": [
+  "CANCELLER": [
     "GOVERNOR",
     "TEAM_MULTISIG",
     "VETO_GOVERNOR"
@@ -57,9 +57,5 @@
   ],
   "EXECUTOR": [
     "ZERO_ADDRESS"
-  ],
-  "CANCELLER": [
-    "VETO_GOVERNOR",
-    "TEAM_MULTISIG"
   ]
 }
