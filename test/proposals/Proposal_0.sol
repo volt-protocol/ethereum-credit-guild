@@ -119,17 +119,12 @@ contract Proposal_0 is Proposal {
             ProfitManager profitManager = new ProfitManager(
                 addresses.mainnet("CORE")
             );
-            addresses.addMainnet(
-                "PROFIT_MANAGER",
-                address(profitManager)
-            );
+            addresses.addMainnet("PROFIT_MANAGER", address(profitManager));
         }
 
         // Tokens & minting
         {
-            CreditToken credit = new CreditToken(
-                addresses.mainnet("CORE")
-            );
+            CreditToken credit = new CreditToken(addresses.mainnet("CORE"));
             GuildToken guild = new GuildToken(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("PROFIT_MANAGER"),
@@ -141,7 +136,7 @@ contract Proposal_0 is Proposal {
                 CoreRoles.RATE_LIMITED_CREDIT_MINTER,
                 0, // maxRateLimitPerSecond
                 0, // rateLimitPerSecond
-                2_000_000e18 // bufferCap
+                uint128(CREDIT_HARDCAP) // bufferCap
             );
             RateLimitedMinter rateLimitedGuildMinter = new RateLimitedMinter(
                 addresses.mainnet("CORE"),
@@ -171,13 +166,10 @@ contract Proposal_0 is Proposal {
                 "RATE_LIMITED_GUILD_MINTER",
                 address(rateLimitedGuildMinter)
             );
-            addresses.addMainnet(
-                "SURPLUS_GUILD_MINTER",
-                address(guildMinter)
-            );
+            addresses.addMainnet("SURPLUS_GUILD_MINTER", address(guildMinter));
         }
 
-        // Auction House & LendingTerm Implementation V1
+        // Auction House & LendingTerm Implementation V1 & PSM
         {
             AuctionHouse auctionHouse = new AuctionHouse(
                 addresses.mainnet("CORE"),
@@ -187,8 +179,17 @@ contract Proposal_0 is Proposal {
 
             LendingTerm termV1 = new LendingTerm();
 
+            SimplePSM psm = new SimplePSM(
+                addresses.mainnet("CORE"),
+                addresses.mainnet("PROFIT_MANAGER"),
+                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
+                addresses.mainnet("CREDIT_TOKEN"),
+                addresses.mainnet("ERC20_USDC")
+            );
+
             addresses.addMainnet("AUCTION_HOUSE", address(auctionHouse));
             addresses.addMainnet("LENDING_TERM", address(termV1));
+            addresses.addMainnet("PSM_USDC", address(psm));
         }
 
         // Governance
@@ -216,6 +217,7 @@ contract Proposal_0 is Proposal {
             LendingTermOffboarding termOffboarding = new LendingTermOffboarding(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("GUILD_TOKEN"),
+                addresses.mainnet("PSM_USDC"),
                 LENDING_TERM_OFFBOARDING_QUORUM
             );
             LendingTermOnboarding termOnboarding = new LendingTermOnboarding(
@@ -251,16 +253,8 @@ contract Proposal_0 is Proposal {
             );
         }
 
-        // Terms & PSM
+        // Terms
         {
-            SimplePSM psm = new SimplePSM(
-                addresses.mainnet("CORE"),
-                addresses.mainnet("PROFIT_MANAGER"),
-                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
-                addresses.mainnet("CREDIT_TOKEN"),
-                addresses.mainnet("ERC20_USDC")
-            );
-
             LendingTermOnboarding termOnboarding = LendingTermOnboarding(
                 payable(addresses.mainnet("LENDING_TERM_ONBOARDING"))
             );
@@ -277,7 +271,6 @@ contract Proposal_0 is Proposal {
                 })
             );
 
-            addresses.addMainnet("PSM_USDC", address(psm));
             addresses.addMainnet("TERM_SDAI_1", termSDAI1);
         }
     }
@@ -294,10 +287,7 @@ contract Proposal_0 is Proposal {
         );
 
         // GUARDIAN
-        core.grantRole(
-            CoreRoles.GUARDIAN,
-            addresses.mainnet("TEAM_MULTISIG")
-        );
+        core.grantRole(CoreRoles.GUARDIAN, addresses.mainnet("TEAM_MULTISIG"));
 
         // CREDIT_MINTER
         core.grantRole(
@@ -337,17 +327,11 @@ contract Proposal_0 is Proposal {
         );
 
         // GAUGE_ADD
-        core.grantRole(
-            CoreRoles.GAUGE_ADD,
-            addresses.mainnet("TIMELOCK")
-        );
+        core.grantRole(CoreRoles.GAUGE_ADD, addresses.mainnet("TIMELOCK"));
         core.grantRole(CoreRoles.GAUGE_ADD, deployer);
 
         // GAUGE_REMOVE
-        core.grantRole(
-            CoreRoles.GAUGE_REMOVE,
-            addresses.mainnet("TIMELOCK")
-        );
+        core.grantRole(CoreRoles.GAUGE_REMOVE, addresses.mainnet("TIMELOCK"));
         core.grantRole(
             CoreRoles.GAUGE_REMOVE,
             addresses.mainnet("LENDING_TERM_OFFBOARDING")
@@ -416,15 +400,18 @@ contract Proposal_0 is Proposal {
         );
         core.grantRole(
             CoreRoles.TIMELOCK_CANCELLER,
+            addresses.mainnet("GOVERNOR")
+        );
+        core.grantRole(
+            CoreRoles.TIMELOCK_CANCELLER,
             addresses.mainnet("TEAM_MULTISIG")
         );
 
         // Configuration
-        ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
-            .initializeReferences(
-                addresses.mainnet("CREDIT_TOKEN"),
-                addresses.mainnet("GUILD_TOKEN")
-            );
+        ProfitManager(addresses.mainnet("PROFIT_MANAGER")).initializeReferences(
+            addresses.mainnet("CREDIT_TOKEN"),
+            addresses.mainnet("GUILD_TOKEN")
+        );
         ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
             .setProfitSharingConfig(
                 SURPLUS_BUFFER_SPLIT, // 10% surplusBufferSplit
@@ -433,11 +420,10 @@ contract Proposal_0 is Proposal {
                 OTHER_SPLIT, // otherSplit
                 address(0) // otherRecipient
             );
-        GuildToken(addresses.mainnet("GUILD_TOKEN"))
-            .setCanExceedMaxGauges(
-                addresses.mainnet("SURPLUS_GUILD_MINTER"),
-                true
-            );
+        GuildToken(addresses.mainnet("GUILD_TOKEN")).setCanExceedMaxGauges(
+            addresses.mainnet("SURPLUS_GUILD_MINTER"),
+            true
+        );
         GuildToken(addresses.mainnet("GUILD_TOKEN")).setMaxGauges(10);
         GuildToken(addresses.mainnet("GUILD_TOKEN")).addGauge(
             1,
@@ -456,16 +442,10 @@ contract Proposal_0 is Proposal {
         {
             ERC20 usdc = ERC20(addresses.mainnet("ERC20_USDC"));
             SimplePSM psm = SimplePSM(addresses.mainnet("PSM_USDC"));
-            CreditToken credit = CreditToken(
-                addresses.mainnet("CREDIT_TOKEN")
-            );
+            CreditToken credit = CreditToken(addresses.mainnet("CREDIT_TOKEN"));
 
             if (usdc.balanceOf(deployer) < INITIAL_USDC_MINT_AMOUNT) {
-                deal(
-                    address(usdc),
-                    deployer,
-                    INITIAL_USDC_MINT_AMOUNT
-                );
+                deal(address(usdc), deployer, INITIAL_USDC_MINT_AMOUNT);
             }
 
             usdc.approve(address(psm), INITIAL_USDC_MINT_AMOUNT);
@@ -493,21 +473,17 @@ contract Proposal_0 is Proposal {
         {
             assertEq(
                 address(core),
-                address(SimplePSM(addresses.mainnet("PSM_USDC")).core())
+                address(SimplePSM(addresses.mainnet("PSM_USDC")).core()),
+                "USDC PSM Incorrect Core Address"
             );
             assertEq(
                 address(core),
-                address(
-                    LendingTerm(addresses.mainnet("TERM_SDAI_1")).core()
-                )
+                address(LendingTerm(addresses.mainnet("TERM_SDAI_1")).core()),
+                "sDAI Term Incorrect Core Address"
             );
 
-            CreditToken credit = CreditToken(
-                addresses.mainnet("CREDIT_TOKEN")
-            );
-            GuildToken guild = GuildToken(
-                addresses.mainnet("GUILD_TOKEN")
-            );
+            CreditToken credit = CreditToken(addresses.mainnet("CREDIT_TOKEN"));
+            GuildToken guild = GuildToken(addresses.mainnet("GUILD_TOKEN"));
             LendingTermOnboarding onboarder = LendingTermOnboarding(
                 payable(addresses.mainnet("LENDING_TERM_ONBOARDING"))
             );
@@ -520,7 +496,7 @@ contract Proposal_0 is Proposal {
             SurplusGuildMinter sgm = SurplusGuildMinter(
                 addresses.mainnet("SURPLUS_GUILD_MINTER")
             );
-            ProfitManager mgr = ProfitManager(
+            ProfitManager profitManager = ProfitManager(
                 addresses.mainnet("PROFIT_MANAGER")
             );
             RateLimitedMinter rateLimitedCreditMinter = RateLimitedMinter(
@@ -539,34 +515,96 @@ contract Proposal_0 is Proposal {
                 payable(addresses.mainnet("VETO_GOVERNOR"))
             );
 
-            assertEq(address(core), address(mgr.core()));
-            assertEq(address(core), address(sgm.core()));
-            assertEq(address(core), address(guild.core()));
-            assertEq(address(core), address(credit.core()));
-            assertEq(address(core), address(timelock.core()));
-            assertEq(address(core), address(governor.core()));
-            assertEq(address(core), address(onboarder.core()));
-            assertEq(address(core), address(offboarding.core()));
-            assertEq(address(core), address(auctionHouse.core()));
-            assertEq(address(core), address(vetoGovernor.core()));
-            assertEq(address(core), address(rateLimitedGuildMinter.core()));
-            assertEq(address(core), address(rateLimitedCreditMinter.core()));
+            assertEq(
+                address(core),
+                address(profitManager.core()),
+                "Profit Manager Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(sgm.core()),
+                "Surplus Guild Minter Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(guild.core()),
+                "Guild Token Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(credit.core()),
+                "Credit Token Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(timelock.core()),
+                "Timelock Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(governor.core()),
+                "Governor Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(onboarder.core()),
+                "Onboarder Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(offboarding.core()),
+                "Offboarding Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(auctionHouse.core()),
+                "Auction House Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(vetoGovernor.core()),
+                "Veto Governor Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(rateLimitedGuildMinter.core()),
+                "Rate Limited Guild Minter Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(rateLimitedCreditMinter.core()),
+                "Rate Limited Credit Minter Incorrect Core Address"
+            );
         }
 
         /// PSM Verification
         {
             SimplePSM psm = SimplePSM(addresses.mainnet("PSM_USDC"));
 
-            assertEq(psm.pegToken(), addresses.mainnet("ERC20_USDC"));
-            assertEq(psm.decimalCorrection(), 1e12);
-            assertEq(psm.credit(), addresses.mainnet("CREDIT_TOKEN"));
+            assertEq(
+                psm.pegToken(),
+                addresses.mainnet("ERC20_USDC"),
+                "USDC PSM Incorrect Peg Token Address"
+            );
+            assertEq(
+                psm.decimalCorrection(),
+                1e12,
+                "USDC PSM Incorrect Decimal Correction"
+            );
+            assertEq(
+                psm.credit(),
+                addresses.mainnet("CREDIT_TOKEN"),
+                "USDC PSM Incorrect Credit Token Address"
+            );
             assertEq(
                 psm.rlcm(),
-                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER")
+                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
+                "USDC PSM Incorrect Rate Limited Credit Minter Address"
             );
             assertEq(
                 psm.profitManager(),
-                addresses.mainnet("PROFIT_MANAGER")
+                addresses.mainnet("PROFIT_MANAGER"),
+                "USDC PSM Incorrect Profit Manager Address"
             );
         }
 
@@ -577,11 +615,13 @@ contract Proposal_0 is Proposal {
             );
             assertEq(
                 rateLimitedCreditMinter.token(),
-                addresses.mainnet("CREDIT_TOKEN")
+                addresses.mainnet("CREDIT_TOKEN"),
+                "credit token incorrect"
             );
             assertEq(
                 rateLimitedCreditMinter.role(),
-                CoreRoles.RATE_LIMITED_CREDIT_MINTER
+                CoreRoles.RATE_LIMITED_CREDIT_MINTER,
+                "credit minter role incorrect"
             );
             assertEq(
                 rateLimitedCreditMinter.rateLimitPerSecond(),
@@ -605,11 +645,13 @@ contract Proposal_0 is Proposal {
             );
             assertEq(
                 rateLimitedGuildMinter.token(),
-                addresses.mainnet("GUILD_TOKEN")
+                addresses.mainnet("GUILD_TOKEN"),
+                "guild token incorrect address rl guild minter"
             );
             assertEq(
                 rateLimitedGuildMinter.role(),
-                CoreRoles.RATE_LIMITED_GUILD_MINTER
+                CoreRoles.RATE_LIMITED_GUILD_MINTER,
+                "guild minter role incorrect rl guild minter"
             );
             assertEq(
                 rateLimitedGuildMinter.rateLimitPerSecond(),
@@ -637,8 +679,7 @@ contract Proposal_0 is Proposal {
             );
             /// guild token starts non-transferrable
             assertFalse(
-                GuildToken(addresses.mainnet("GUILD_TOKEN"))
-                    .transferable()
+                GuildToken(addresses.mainnet("GUILD_TOKEN")).transferable()
             );
             assertEq(
                 ERC20MultiVotes(addresses.mainnet("GUILD_TOKEN"))
@@ -646,13 +687,13 @@ contract Proposal_0 is Proposal {
                 MAX_DELEGATES
             );
             assertEq(
-                ERC20MultiVotes(addresses.mainnet("GUILD_TOKEN"))
-                    .totalSupply(),
+                ERC20MultiVotes(addresses.mainnet("GUILD_TOKEN")).totalSupply(),
                 0
             );
             assertEq(
-                ERC20MultiVotes(addresses.mainnet("GUILD_TOKEN"))
-                    .balanceOf(addresses.mainnet("TEAM_MULTISIG")),
+                ERC20MultiVotes(addresses.mainnet("GUILD_TOKEN")).balanceOf(
+                    addresses.mainnet("TEAM_MULTISIG")
+                ),
                 0
             );
             assertEq(
@@ -661,27 +702,29 @@ contract Proposal_0 is Proposal {
                 CREDIT_SUPPLY
             );
             assertEq(
-                ERC20MultiVotes(addresses.mainnet("CREDIT_TOKEN"))
-                    .balanceOf(deployer),
+                ERC20MultiVotes(addresses.mainnet("CREDIT_TOKEN")).balanceOf(
+                    deployer
+                ),
                 CREDIT_SUPPLY
             );
         }
         /// PROFIT MANAGER Verification
         {
             assertEq(
-                ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
-                    .credit(),
-                addresses.mainnet("CREDIT_TOKEN")
+                ProfitManager(addresses.mainnet("PROFIT_MANAGER")).credit(),
+                addresses.mainnet("CREDIT_TOKEN"),
+                "Profit Manager credit token incorrect"
             );
             assertEq(
-                ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
-                    .guild(),
-                addresses.mainnet("GUILD_TOKEN")
+                ProfitManager(addresses.mainnet("PROFIT_MANAGER")).guild(),
+                addresses.mainnet("GUILD_TOKEN"),
+                "Profit Manager guild token incorrect"
             );
             assertEq(
                 ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
                     .surplusBuffer(),
-                0
+                0,
+                "Profit Manager surplus buffer incorrect"
             );
 
             (
@@ -693,11 +736,31 @@ contract Proposal_0 is Proposal {
             ) = ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
                     .getProfitSharingConfig();
 
-            assertEq(surplusBufferSplit, SURPLUS_BUFFER_SPLIT);
-            assertEq(creditSplit, CREDIT_SPLIT);
-            assertEq(guildSplit, GUILD_SPLIT);
-            assertEq(otherSplit, OTHER_SPLIT);
-            assertEq(otherRecipient, address(0));
+            assertEq(
+                surplusBufferSplit,
+                SURPLUS_BUFFER_SPLIT,
+                "Profit Manager surplus buffer split incorrect"
+            );
+            assertEq(
+                creditSplit,
+                CREDIT_SPLIT,
+                "Profit Manager credit split incorrect"
+            );
+            assertEq(
+                guildSplit,
+                GUILD_SPLIT,
+                "Profit Manager guild split incorrect"
+            );
+            assertEq(
+                otherSplit,
+                OTHER_SPLIT,
+                "Profit Manager other split incorrect"
+            );
+            assertEq(
+                otherRecipient,
+                address(0),
+                "Profit Manager other recipient incorrect"
+            );
         }
         /// TIMELOCK Verification
         {
@@ -705,7 +768,11 @@ contract Proposal_0 is Proposal {
                 payable(addresses.mainnet("TIMELOCK"))
             );
 
-            assertEq(timelock.getMinDelay(), TIMELOCK_DELAY);
+            assertEq(
+                timelock.getMinDelay(),
+                TIMELOCK_DELAY,
+                "Timelock delay incorrect"
+            );
         }
         /// Auction House Verification
         {
@@ -713,9 +780,21 @@ contract Proposal_0 is Proposal {
                 addresses.mainnet("AUCTION_HOUSE")
             );
 
-            assertEq(auctionHouse.midPoint(), 650);
-            assertEq(auctionHouse.auctionDuration(), 30 minutes);
-            assertEq(auctionHouse.nAuctionsInProgress(), 0);
+            assertEq(
+                auctionHouse.midPoint(),
+                650,
+                "Auction House mid point incorrect"
+            );
+            assertEq(
+                auctionHouse.auctionDuration(),
+                30 minutes,
+                "Auction House duration incorrect"
+            );
+            assertEq(
+                auctionHouse.nAuctionsInProgress(),
+                0,
+                "Auction House n auctions in progress incorrect"
+            );
         }
 
         {
@@ -758,7 +837,7 @@ contract Proposal_0 is Proposal {
             assertEq(creditSplit, 0.9e18, "incorrect credit split");
             assertEq(guildSplit, 0, "incorrect guild split");
             assertEq(otherSplit, 0, "incorrect other split");
-            assertEq(otherRecipient, address(0));
+            assertEq(otherRecipient, address(0), "incorrect other recipient");
         }
 
         /// Governor Verification
@@ -770,11 +849,7 @@ contract Proposal_0 is Proposal {
                 payable(addresses.mainnet("VETO_GOVERNOR"))
             );
 
-            assertEq(
-                governor.quorum(0),
-                INITIAL_QUORUM,
-                "governor quorum"
-            );
+            assertEq(governor.quorum(0), INITIAL_QUORUM, "governor quorum");
             assertEq(
                 governor.votingDelay(),
                 VOTING_DELAY,
@@ -804,6 +879,11 @@ contract Proposal_0 is Proposal {
                 vetoGovernor.votingPeriod(),
                 2425847,
                 "veto governor voting period"
+            );
+            assertEq(
+                address(vetoGovernor.token()),
+                addresses.mainnet("CREDIT_TOKEN"),
+                "veto governor token incorrect"
             );
         }
     }

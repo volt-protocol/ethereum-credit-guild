@@ -20,6 +20,11 @@ import {CreditToken} from "@src/tokens/CreditToken.sol";
     When a loan generates profit (interests), the profit is traced back to users voting for
     this lending term (gauge), which subsequently allows pro-rata distribution of profits to
     GUILD holders that vote for the most productive gauges.
+
+    Seniority stack of the debt, in case of losses :
+    - per term surplus buffer (donated to global surplus buffer when loss is reported)
+    - global surplus buffer
+    - finally, credit holders (by updating down the creditMultiplier)
 */
 contract ProfitManager is CoreRef {
     /// @notice reference to GUILD token.
@@ -60,6 +65,13 @@ contract ProfitManager is CoreRef {
     /// if the loss is greater than the surplus buffer, the `creditMultiplier` is updated down.
     uint256 public surplusBuffer;
 
+    /// @notice amount of first-loss capital for a given term.
+    /// This is a number of CREDIT token held on this contract that can be used to absorb losses in
+    /// cases where a loss is reported through `notifyPnL` in a given term.
+    /// When a loss is reported in a given term, its termSuplusBuffer is donated to the general
+    /// surplusBuffer before calculating the loss.
+    mapping(address => uint256) public termSurplusBuffer;
+
     /// @notice multiplier for CREDIT value in the system.
     /// e.g. a value of 0.7e18 would mean that CREDIT has been discounted by 30% so far in the system,
     /// and that all lending terms will allow 1/0.7=1.42 times more CREDIT to be borrowed per collateral
@@ -77,6 +89,13 @@ contract ProfitManager is CoreRef {
 
     /// @notice emitted when surplus buffer is updated.
     event SurplusBufferUpdate(uint256 indexed when, uint256 newValue);
+
+    /// @notice emitted when surplus buffer of a given term is updated.
+    event TermSurplusBufferUpdate(
+        uint256 indexed when,
+        address indexed term,
+        uint256 newValue
+    );
 
     /// @notice emitted when CREDIT multiplier is updated.
     event CreditMultiplierUpdate(uint256 indexed when, uint256 newValue);
@@ -173,14 +192,35 @@ contract ProfitManager is CoreRef {
         emit SurplusBufferUpdate(block.timestamp, newSurplusBuffer);
     }
 
+    /// @notice donate to surplus buffer of a given term
+    function donateToTermSurplusBuffer(address term, uint256 amount) external {
+        CreditToken(credit).transferFrom(msg.sender, address(this), amount);
+        uint256 newSurplusBuffer = termSurplusBuffer[term] + amount;
+        termSurplusBuffer[term] = newSurplusBuffer;
+        emit TermSurplusBufferUpdate(block.timestamp, term, newSurplusBuffer);
+    }
+
     /// @notice withdraw from surplus buffer
     function withdrawFromSurplusBuffer(
+        address to,
         uint256 amount
     ) external onlyCoreRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW) {
         uint256 newSurplusBuffer = surplusBuffer - amount; // this would revert due to underflow if withdrawing > surplusBuffer
         surplusBuffer = newSurplusBuffer;
-        CreditToken(credit).transfer(msg.sender, amount);
+        CreditToken(credit).transfer(to, amount);
         emit SurplusBufferUpdate(block.timestamp, newSurplusBuffer);
+    }
+
+    /// @notice withdraw from surplus buffer of a given term
+    function withdrawFromTermSurplusBuffer(
+        address term,
+        address to,
+        uint256 amount
+    ) external onlyCoreRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW) {
+        uint256 newSurplusBuffer = termSurplusBuffer[term] - amount; // this would revert due to underflow if withdrawing > termSurplusBuffer
+        termSurplusBuffer[term] = newSurplusBuffer;
+        CreditToken(credit).transfer(to, amount);
+        emit TermSurplusBufferUpdate(block.timestamp, term, newSurplusBuffer);
     }
 
     /// @notice notify profit and loss in a given gauge
@@ -191,6 +231,7 @@ contract ProfitManager is CoreRef {
         int256 amount
     ) external onlyCoreRole(CoreRoles.GAUGE_PNL_NOTIFIER) {
         uint256 _surplusBuffer = surplusBuffer;
+        uint256 _termSurplusBuffer = termSurplusBuffer[gauge];
         address _credit = credit;
 
         // handling loss
@@ -199,6 +240,14 @@ contract ProfitManager is CoreRef {
 
             // save gauge loss
             GuildToken(guild).notifyGaugeLoss(gauge);
+
+            // deplete the term surplus buffer, if any, and
+            // donate its content to the general surplus buffer
+            if (_termSurplusBuffer != 0) {
+                termSurplusBuffer[gauge] = 0;
+                emit TermSurplusBufferUpdate(block.timestamp, gauge, 0);
+                _surplusBuffer += _termSurplusBuffer;
+            }
 
             if (loss < _surplusBuffer) {
                 // deplete the surplus buffer

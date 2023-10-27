@@ -309,6 +309,12 @@ contract LendingTermOnboardingUnitTest is Test {
         // propose onboard
         vm.prank(alice);
         uint256 proposalId = onboarder.proposeOnboard(address(term));
+        (
+            address[] memory targets,
+            uint256[] memory values,
+            bytes[] memory calldatas,
+            string memory description
+        ) = onboarder.getOnboardProposeArgs(address(term));
 
         // cannot propose the same term multiple times in a short interval of time
         vm.expectRevert("LendingTermOnboarding: recently proposed");
@@ -330,12 +336,6 @@ contract LendingTermOnboardingUnitTest is Test {
         // queue
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 13);
-        (
-            address[] memory targets,
-            uint256[] memory values,
-            bytes[] memory calldatas,
-            string memory description
-        ) = onboarder.getOnboardProposeArgs(address(term));
         onboarder.queue(targets, values, calldatas, keccak256(bytes(description)));
         assertEq(uint8(onboarder.state(proposalId)), uint8(IGovernor.ProposalState.Queued));
 
@@ -365,5 +365,81 @@ contract LendingTermOnboardingUnitTest is Test {
         assertEq(collateral.balanceOf(address(this)), 0);
         assertEq(collateral.balanceOf(address(term)), 1e24);
         assertEq(credit.balanceOf(address(this)), 1e24);
+    }
+
+    function testOnboardAgainLater() public {
+        LendingTerm term = LendingTerm(onboarder.createTerm(LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 0,
+            minPartialRepayPercent: 0,
+            openingFee: 0,
+            hardCap: _HARDCAP
+        })));
+        vm.label(address(term), "term");
+
+        // mint GUILD & self delegate
+        guild.mint(bob, _QUORUM);
+        vm.prank(bob);
+        guild.incrementDelegation(bob, _QUORUM);
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+
+        // do onboard
+        vm.startPrank(bob);
+        uint256 proposalId = onboarder.proposeOnboard(address(term));
+        (
+            address[] memory targets,
+            uint256[] memory values,
+            bytes[] memory calldatas,
+            string memory description
+        ) = onboarder.getOnboardProposeArgs(address(term));
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        onboarder.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.For));
+        vm.roll(block.number + _VOTING_PERIOD + 1);
+        vm.warp(block.timestamp + 13);
+        onboarder.queue(targets, values, calldatas, keccak256(bytes(description)));
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + _TIMELOCK_MIN_DELAY + 13);
+        onboarder.execute(targets, values, calldatas, keccak256(bytes(description)));
+        vm.stopPrank();
+
+        // check execution
+        assertEq(guild.isGauge(address(term)), true);
+
+        // offboard
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 7 days + 13);
+        guild.removeGauge(address(term));
+        vm.startPrank(governor);
+        core.revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
+        core.revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
+        vm.stopPrank();
+        assertEq(guild.isGauge(address(term)), false);
+
+        // do onboard another time
+        vm.startPrank(bob);
+        proposalId = onboarder.proposeOnboard(address(term));
+        (
+            targets,
+            values,
+            calldatas,
+            description
+        ) = onboarder.getOnboardProposeArgs(address(term));
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        onboarder.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.For));
+        vm.roll(block.number + _VOTING_PERIOD + 1);
+        vm.warp(block.timestamp + 13);
+        onboarder.queue(targets, values, calldatas, keccak256(bytes(description)));
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + _TIMELOCK_MIN_DELAY + 13);
+        onboarder.execute(targets, values, calldatas, keccak256(bytes(description)));
+        vm.stopPrank();
+
+        // check execution
+        assertEq(guild.isGauge(address(term)), true);
     }
 }

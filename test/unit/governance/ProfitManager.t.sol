@@ -7,6 +7,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
+import {MockLendingTerm} from "@test/mock/MockLendingTerm.sol";
 
 contract ProfitManagerUnitTest is Test {
     address private governor = address(1);
@@ -16,9 +17,9 @@ contract ProfitManagerUnitTest is Test {
     GuildToken guild;
     address constant alice = address(0x616c696365);
     address constant bob = address(0xB0B);
-    address constant gauge1 = address(0xDEAD);
-    address constant gauge2 = address(0xBEEF);
-    address constant gauge3 = address(0x3333);
+    address private gauge1;
+    address private gauge2;
+    address private gauge3;
 
     uint256 public issuance; // for mocked behavior
 
@@ -29,6 +30,9 @@ contract ProfitManagerUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
         guild = new GuildToken(address(core), address(profitManager), address(credit));
+        gauge1 = address(new MockLendingTerm(address(core)));
+        gauge2 = address(new MockLendingTerm(address(core)));
+        gauge3 = address(new MockLendingTerm(address(core)));
 
         // labels
         vm.label(address(core), "core");
@@ -107,6 +111,7 @@ contract ProfitManagerUnitTest is Test {
         // apply a gain on an existing loan
         credit.mint(address(profitManager), 70e18);
         profitManager.notifyPnL(address(this), 70e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(profitManager.creditMultiplier(), 0.56e18); // unchanged, does not go back up
 
         // new CREDIT is minted
@@ -248,6 +253,7 @@ contract ProfitManagerUnitTest is Test {
         // 10 goes to test (rebasing credit)
         credit.mint(address(profitManager), 20e18);
         profitManager.notifyPnL(gauge1, 20e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(profitManager.claimRewards(alice), 10e18);
         assertEq(profitManager.claimRewards(bob), 0);
         assertEq(credit.balanceOf(address(this)), 110e18);
@@ -258,6 +264,7 @@ contract ProfitManagerUnitTest is Test {
         // 25 goes to test (rebasing credit)
         credit.mint(address(profitManager), 50e18);
         profitManager.notifyPnL(gauge2, 50e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(profitManager.claimRewards(alice), 5e18);
         assertEq(profitManager.claimRewards(bob), 20e18);
         assertEq(credit.balanceOf(address(this)), 135e18);
@@ -275,6 +282,7 @@ contract ProfitManagerUnitTest is Test {
         profitManager.notifyPnL(gauge2, 100e18);
         credit.mint(address(profitManager), 100e18);
         profitManager.notifyPnL(gauge3, 100e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         //assertEq(profitManager.claimRewards(alice), 10e18);
         vm.prank(alice);
         guild.incrementGauge(gauge2, 50e18); // should claim her 10 pending rewards in gauge2
@@ -293,6 +301,7 @@ contract ProfitManagerUnitTest is Test {
         // 150 goes to test (rebasing credit)
         credit.mint(address(profitManager), 300e18);
         profitManager.notifyPnL(gauge2, 300e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         //assertEq(profitManager.claimRewards(alice), 50e18);
         vm.prank(alice);
         guild.decrementGauge(gauge2, 100e18); // should claim her 50 pending rewards in gauge2
@@ -317,6 +326,7 @@ contract ProfitManagerUnitTest is Test {
         // simulate 100 profit on gauge3
         credit.mint(address(profitManager), 100e18);
         profitManager.notifyPnL(gauge3, 100e18);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
         assertEq(credit.balanceOf(alice), 50e18 + 15e18 + 10e18 + 50e18 + 100e18);
     }
@@ -381,58 +391,6 @@ contract ProfitManagerUnitTest is Test {
         assertEq(profitManager.claimRewards(alice), 10e18);
     }
 
-    function testDecrementGaugeDebtCeilingUsed() public {
-        // grant roles to test contract
-        vm.startPrank(governor);
-        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
-        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
-        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
-        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
-        vm.stopPrank();
-
-        // setup
-        // 50 GUILD for alice, 50 GUILD for bob
-        guild.mint(alice, 150e18);
-        guild.mint(bob, 400e18);
-        // add gauges
-        guild.setMaxGauges(3);
-        guild.addGauge(1, gauge1);
-        guild.addGauge(1, gauge2);
-        guild.addGauge(1, address(this));
-        // 80 votes on gauge1, 40 votes on gauge2, 40 votes on this
-        vm.startPrank(alice);
-        guild.incrementGauge(gauge1, 10e18);
-        guild.incrementGauge(gauge2, 10e18);
-        vm.stopPrank();
-        vm.startPrank(bob);
-        guild.incrementGauge(gauge1, 10e18);
-        guild.incrementGauge(address(this), 10e18);
-        vm.stopPrank();
-
-        // simulate alice borrows 100 CREDIT on this (gauge 3)
-        credit.mint(alice, 100e18);
-        issuance = 100e18;
-        assertEq(credit.totalSupply(), 200e18);
-
-        // gauge 3 (this) has 25% of votes, but 50% of credit issuance,
-        // so nobody can decrease the votes for this gauge
-        vm.expectRevert("GuildToken: debt ceiling used");
-        vm.prank(bob);
-        guild.decrementGauge(address(this), 10e18);
-
-        // alice now votes for gauge3 (this), so that it is still 50% of credit issuance,
-        // but has 67% of votes.
-        vm.prank(alice);
-        guild.incrementGauge(address(this), 50e18);
-        // after alice increment :
-        // gauge1: 20 votes
-        // gauge2: 10 votes
-        // gauge3 (this): 60 votes
-        // now bob can decrement his gauge vote.
-        vm.prank(bob);
-        guild.decrementGauge(address(this), 10e18);
-    }
-
     function testDonateToSurplusBuffer() public {
         // initial state
         assertEq(profitManager.surplusBuffer(), 0);
@@ -465,21 +423,21 @@ contract ProfitManagerUnitTest is Test {
 
         // without role, cannot withdraw
         vm.expectRevert("UNAUTHORIZED");
-        profitManager.withdrawFromSurplusBuffer(10e18);
+        profitManager.withdrawFromSurplusBuffer(address(this), 10e18);
 
         // grant role to test contract
         vm.prank(governor);
         core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
 
         // withdraw
-        profitManager.withdrawFromSurplusBuffer(10e18);
+        profitManager.withdrawFromSurplusBuffer(address(this), 10e18);
         assertEq(profitManager.surplusBuffer(), 90e18);
         assertEq(credit.balanceOf(address(this)), 110e18);
         assertEq(credit.balanceOf(address(profitManager)), 90e18);
 
         // cannot withdraw more than current buffer
         vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // underflow
-        profitManager.withdrawFromSurplusBuffer(999e18);
+        profitManager.withdrawFromSurplusBuffer(address(this), 999e18);
     }
 
     function testDepleteSurplusBuffer() public {
@@ -531,5 +489,126 @@ contract ProfitManagerUnitTest is Test {
         assertEq(profitManager.creditMultiplier(), 0.7e18); // 30% discounted (30 credit net loss)
         assertEq(profitManager.surplusBuffer(), 0);
         assertEq(credit.balanceOf(address(profitManager)), 0);
+    }
+
+    function testDonateToTermSurplusBuffer() public {
+        // initial state
+        assertEq(profitManager.termSurplusBuffer(address(this)), 0);
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        assertEq(credit.balanceOf(address(this)), 200e18);
+        assertEq(credit.balanceOf(address(profitManager)), 0);
+
+        // cannot donate more than current balance/approval
+        vm.expectRevert("ERC20: insufficient allowance");
+        profitManager.donateToTermSurplusBuffer(address(this), 999e18);
+
+        // donate to term surplus buffer
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+
+        // checks
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 100e18);
+    }
+
+    function testWithdrawFromTermSurplusBuffer() public {
+        // initial state
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 100e18);
+
+        // without role, cannot withdraw
+        vm.expectRevert("UNAUTHORIZED");
+        profitManager.withdrawFromTermSurplusBuffer(address(this), address(this), 10e18);
+
+        // grant role to test contract
+        vm.prank(governor);
+        core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
+
+        // withdraw
+        profitManager.withdrawFromTermSurplusBuffer(address(this), address(this), 10e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 90e18);
+        assertEq(credit.balanceOf(address(this)), 110e18);
+        assertEq(credit.balanceOf(address(profitManager)), 90e18);
+
+        // cannot withdraw more than current buffer
+        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // underflow
+        profitManager.withdrawFromTermSurplusBuffer(address(this), address(this), 999e18);
+    }
+
+    function testDepleteTermSurplusBuffer() public {
+        // grant roles to test contract
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
+        core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
+        vm.stopPrank();
+
+        // initial state
+        // 100 CREDIT circulating (assuming backed by >= 100 USD)
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        assertEq(credit.totalSupply(), 100e18);
+
+        // donate 100 to term surplus buffer
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 100e18);
+        assertEq(credit.totalSupply(), 200e18);
+
+        // donate 100 to surplus buffer
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToSurplusBuffer(100e18);
+        assertEq(profitManager.surplusBuffer(), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 200e18);
+        assertEq(credit.totalSupply(), 300e18);
+
+        // apply a loss below termSurplusBuffer (30)
+        // deplete term surplus buffer, 70 leftover transferred to
+        // general surplus buffer
+        profitManager.notifyPnL(address(this), -30e18);
+        assertEq(profitManager.creditMultiplier(), 1e18); // 0% discounted
+        assertEq(profitManager.termSurplusBuffer(address(this)), 0);
+        assertEq(profitManager.surplusBuffer(), 170e18);
+        assertEq(credit.balanceOf(address(profitManager)), 170e18);
+
+        // donate 100 to term surplus buffer
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(profitManager.surplusBuffer(), 170e18);
+        assertEq(credit.balanceOf(address(profitManager)), 270e18);
+        assertEq(credit.totalSupply(), 370e18);
+
+        // apply a loss above termSurplusBuffer (170)
+        // deplete term surplus buffer, 70 removed from general surplus buffer
+        profitManager.notifyPnL(address(this), -170e18);
+        assertEq(profitManager.creditMultiplier(), 1e18); // 0% discounted
+        assertEq(profitManager.termSurplusBuffer(address(this)), 0);
+        assertEq(profitManager.surplusBuffer(), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 100e18);
+
+        // donate 100 to term surplus buffer
+        credit.mint(address(this), 100e18);
+        credit.approve(address(profitManager), 100e18);
+        profitManager.donateToTermSurplusBuffer(address(this), 100e18);
+        assertEq(profitManager.termSurplusBuffer(address(this)), 100e18);
+        assertEq(profitManager.surplusBuffer(), 100e18);
+        assertEq(credit.balanceOf(address(profitManager)), 200e18);
+        assertEq(credit.totalSupply(), 300e18);
+
+        // apply a loss above termSurplusBuffer (100) + surplusBuffer (100) = -50
+        profitManager.notifyPnL(address(this), -250e18);
+        assertEq(profitManager.creditMultiplier(), 0.5e18); // 50% discounted
+        assertEq(profitManager.termSurplusBuffer(address(this)), 0);
+        assertEq(profitManager.surplusBuffer(), 0);
+        assertEq(credit.balanceOf(address(profitManager)), 0);
+        assertEq(credit.totalSupply(), 100e18);
     }
 }

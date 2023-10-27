@@ -70,11 +70,6 @@ contract LendingTerm is CoreRef {
     /// @notice minimum number of CREDIT to borrow when opening a new loan
     uint256 public constant MIN_BORROW = 100e18;
 
-    /// @notice debt ceiling tolerance vs. ideal gauge weights to avoid deadlock situations and allow organic growth of borrows.
-    /// Expressed as a percentage, with 18 decimals, e.g. 1.2e18 = 120% tolerance, meaning if GUILD holders' gauge weights
-    /// would set a debt ceiling to 100 CREDIT, the issuance could go as high as 120 CREDIT.
-    uint256 public constant GAUGE_CAP_TOLERANCE = 1.2e18;
-
     /// @notice timestamp of last partial repayment for a given loanId.
     /// during borrow(), this is initialized to the borrow timestamp, if
     /// maxDelayBetweenPartialRepay is != 0
@@ -294,11 +289,10 @@ contract LendingTerm is CoreRef {
 
         // check the debt ceiling
         uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
-        uint256 debtCeiling = (GuildToken(refs.guildToken)
-            .calculateGaugeAllocation(
-                address(this),
-                _totalSupply + borrowAmount
-            ) * GAUGE_CAP_TOLERANCE) / 1e18;
+        uint256 debtCeiling = GuildToken(refs.guildToken).calculateGaugeAllocation(
+            address(this),
+            _totalSupply + borrowAmount
+        );
         if (_totalSupply == 0) {
             // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
             // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
@@ -552,7 +546,6 @@ contract LendingTerm is CoreRef {
         loans[loanId].borrowAmount -= issuanceDecrease;
         lastPartialRepay[loanId] = block.timestamp;
         issuance -= issuanceDecrease;
-        RateLimitedMinter(refs.creditMinter).replenishBuffer(issuanceDecrease);
 
         // pull the debt from the borrower
         CreditToken(refs.creditToken).transferFrom(
@@ -571,6 +564,7 @@ contract LendingTerm is CoreRef {
             int256(interestRepaid)
         );
         CreditToken(refs.creditToken).burn(principalRepaid);
+        RateLimitedMinter(refs.creditMinter).replenishBuffer(principalRepaid);
 
         // emit event
         emit LoanPartialRepay(block.timestamp, loanId, repayer, debtToRepay);
@@ -631,12 +625,11 @@ contract LendingTerm is CoreRef {
             loanDebt
         );
         if (interest != 0) {
-            // forward profit portion to the ProfitManager, burn the rest
+            // forward profit portion to the ProfitManager
             CreditToken(refs.creditToken).transfer(
                 refs.profitManager,
                 interest
             );
-            CreditToken(refs.creditToken).burn(principal);
 
             // report profit
             ProfitManager(refs.profitManager).notifyPnL(
@@ -645,10 +638,13 @@ contract LendingTerm is CoreRef {
             );
         }
 
+        // burn loan principal
+        CreditToken(refs.creditToken).burn(principal);
+        RateLimitedMinter(refs.creditMinter).replenishBuffer(principal);
+
         // close the loan
         loan.closeTime = block.timestamp;
         issuance -= borrowAmount;
-        RateLimitedMinter(refs.creditMinter).replenishBuffer(borrowAmount);
 
         // return the collateral to the borrower
         IERC20(params.collateralToken).safeTransfer(
@@ -835,9 +831,10 @@ contract LendingTerm is CoreRef {
             );
         }
 
-        // burn credit principal
+        // burn credit principal, replenish buffer
         if (principal != 0) {
             CreditToken(refs.creditToken).burn(principal);
+        RateLimitedMinter(refs.creditMinter).replenishBuffer(principal);
         }
 
         // handle profit & losses
@@ -852,8 +849,7 @@ contract LendingTerm is CoreRef {
             ProfitManager(refs.profitManager).notifyPnL(address(this), pnl);
         }
 
-        // replenish buffer, decrease issuance
-        RateLimitedMinter(refs.creditMinter).replenishBuffer(borrowAmount);
+        // decrease issuance
         issuance -= borrowAmount;
 
         // send collateral to borrower

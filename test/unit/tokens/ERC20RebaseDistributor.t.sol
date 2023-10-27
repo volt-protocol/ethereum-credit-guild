@@ -76,6 +76,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // distribute
         token.mint(address(this), 100);
         token.distribute(100);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         assertEq(token.balanceOf(alice), 200);
 
@@ -102,6 +103,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), 100);
         token.approve(address(token), 100);
         token.distribute(100);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         // check new balances and supply
         assertEq(token.balanceOf(alice), 150);
@@ -115,6 +117,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), 100);
         token.approve(address(token), 100);
         token.distribute(100);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         // check new balances and supply
         assertEq(token.balanceOf(alice), 200);
@@ -154,6 +157,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), 300);
         token.approve(address(token), 300);
         token.distribute(300);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         // check new balances and supply
         assertEq(token.balanceOf(alice), 400);
@@ -181,6 +185,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // is equivalent to just burning the tokens
         token.mint(address(this), 100);
         token.distribute(100);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
         assertEq(token.totalSupply(), 800);
         assertEq(token.nonRebasingSupply(), 800);
         assertEq(token.rebasingSupply(), 0);
@@ -208,6 +213,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // distribute
         token.mint(address(this), 100);
         token.distribute(100);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         assertEq(token.balanceOf(alice), 200);
         assertEq(token.balanceOf(bobby), 100);
@@ -248,6 +254,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // distribute
         token.mint(address(this), 100);
         token.distribute(100);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         assertEq(token.balanceOf(alice), 200);
 
@@ -298,6 +305,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // distribute
         token.mint(address(this), 150);
         token.distribute(150);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         assertEq(token.balanceOf(alice), 300);
         assertEq(token.balanceOf(bobby), 50);
@@ -312,6 +320,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // distribute
         token.mint(address(this), 150);
         token.distribute(150);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         assertEq(token.balanceOf(alice), 300);
         assertEq(token.balanceOf(bobby), 200);
@@ -361,6 +370,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // distribute
         token.mint(address(this), 50);
         token.distribute(50);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         assertEq(token.balanceOf(alice), 100);
         assertEq(token.balanceOf(bobby), 150);
@@ -376,6 +386,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // distribute
         token.mint(address(this), 50);
         token.distribute(50);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         assertEq(token.balanceOf(alice), 100);
         assertEq(token.balanceOf(bobby), 200);
@@ -408,6 +419,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), 100);
         token.approve(address(token), 100);
         token.distribute(100);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         // check balances
         assertEq(token.balanceOf(alice), 200);
@@ -444,6 +456,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), 300);
         token.approve(address(token), 300);
         token.distribute(300);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         // check balances
         assertEq(token.balanceOf(alice), 500);
@@ -478,6 +491,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), 500);
         token.approve(address(token), 500);
         token.distribute(500);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         // check balances
         assertEq(token.balanceOf(alice), 1000);
@@ -552,6 +566,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
             vm.expectRevert("ERC20RebaseDistributor: cannot distribute zero");
         }
         token.distribute(distributionAmount);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
         if (rebasingSupplyBefore == 0 || distributionAmount == 0) {
             return;
         }
@@ -572,6 +587,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
             token.mint(address(this), distributionAmount);
             token.approve(address(token), distributionAmount);
             token.distribute(distributionAmount);
+            vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
             maxError++; // each distribute can add up to 1 wei of error
 
@@ -600,6 +616,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), distributionAmount);
         token.approve(address(token), distributionAmount);
         token.distribute(distributionAmount);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         vm.prank(alice);
         token.enterRebase();
@@ -627,6 +644,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), distributionAmount);
         token.approve(address(token), distributionAmount);
         token.distribute(distributionAmount);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         vm.prank(alice);
         token.enterRebase();
@@ -655,6 +673,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), distributionAmount);
         token.approve(address(token), distributionAmount);
         token.distribute(distributionAmount);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         vm.prank(alice);
         token.enterRebase();
@@ -684,6 +703,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), distributionAmount);
         token.approve(address(token), distributionAmount);
         token.distribute(distributionAmount);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         vm.prank(alice);
         token.enterRebase();
@@ -714,6 +734,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), distributionAmount);
         token.approve(address(token), distributionAmount);
         token.distribute(distributionAmount);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         vm.prank(alice);
         token.enterRebase();
@@ -746,6 +767,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), distributionAmount);
         token.approve(address(token), distributionAmount);
         token.distribute(distributionAmount);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         vm.prank(alice);
         token.enterRebase();
@@ -778,6 +800,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(address(this), distributionAmount);
         token.approve(address(token), distributionAmount);
         token.distribute(distributionAmount);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         vm.prank(alice);
         token.enterRebase();
@@ -791,5 +814,284 @@ contract ERC20RebaseDistributorUnitTest is Test {
 
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(token.balanceOf(alice), 0);
+    }
+
+    function testRewardsInterpolation() public {
+        // initial state: 2 addresses rebasing, 1 not rebasing, all addresses have 100 tokens
+        vm.prank(alice);
+        token.enterRebase();
+        vm.prank(bobby);
+        token.enterRebase();
+        token.mint(alice, 100);
+        token.mint(bobby, 100);
+        token.mint(carol, 100);
+        assertEq(token.totalSupply(), 300);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 200);
+
+        // distribute 100 profits
+        token.mint(address(this), 100);
+        token.approve(address(token), 100);
+        token.distribute(100);
+
+        // check new supply after half of DISTRIBUTION_PERIOD
+        // half of the 100 distribution has been passed through
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
+        assertEq(token.totalSupply(), 350);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 250);
+        assertEq(token.balanceOf(alice), 125);
+        assertEq(token.balanceOf(bobby), 125);
+        assertEq(token.balanceOf(carol), 100);
+
+        // carol enters rebase (will update target share price)
+        vm.prank(carol);
+        token.enterRebase();
+        // mint 100 additional tokens to alice (will materialize 50 rewards)
+        token.mint(alice, 100);
+        assertEq(token.totalSupply(), 450);
+        assertEq(token.nonRebasingSupply(), 0);
+        assertEq(token.rebasingSupply(), 450);
+        assertEq(token.balanceOf(alice), 225);
+        assertEq(token.balanceOf(bobby), 125);
+        assertEq(token.balanceOf(carol), 100);
+
+        // check new supply after DISTRIBUTION_PERIOD is over
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
+
+        assertEq(token.totalSupply(), 500);
+        assertEq(token.nonRebasingSupply(), 1); // round down on rebasing supply
+        assertEq(token.rebasingSupply(), 450 + 49); // round down
+        assertEq(token.balanceOf(alice), 225 + 24); // round down
+        assertEq(token.balanceOf(bobby), 125 + 13); // round down
+        assertEq(token.balanceOf(carol), 100 + 11); // round down
+    }
+
+    function testDistributeDuringInterpolation() public {
+        // initial state: 2 addresses rebasing, 1 not rebasing, all addresses have 100 tokens
+        vm.prank(alice);
+        token.enterRebase();
+        vm.prank(bobby);
+        token.enterRebase();
+        token.mint(alice, 100);
+        token.mint(bobby, 100);
+        token.mint(carol, 100);
+        assertEq(token.totalSupply(), 300);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 200);
+
+        // distribute 100 profits
+        token.mint(address(this), 100);
+        token.approve(address(token), 100);
+        token.distribute(100);
+
+        // check new supply after half of DISTRIBUTION_PERIOD
+        // half of the 100 distribution has been passed through
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
+        assertEq(token.totalSupply(), 350);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 250);
+        assertEq(token.balanceOf(alice), 125);
+        assertEq(token.balanceOf(bobby), 125);
+        assertEq(token.balanceOf(carol), 100);
+
+        // distribute 100 profits
+        token.mint(address(this), 100);
+        token.approve(address(token), 100);
+        token.distribute(100);
+        // new distribution is 100 (new) + 50 (leftovers) = 150
+        // balances & supply shouldn't change instantly
+        assertEq(token.totalSupply(), 350);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 250);
+        assertEq(token.balanceOf(alice), 125);
+        assertEq(token.balanceOf(bobby), 125);
+        assertEq(token.balanceOf(carol), 100);
+
+        // check new supply after half of DISTRIBUTION_PERIOD
+        // half of the 150 distribution has been passed through
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
+        assertEq(token.totalSupply(), 350 + 75);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 250 + 75);
+        assertEq(token.balanceOf(alice), 162); // round down
+        assertEq(token.balanceOf(bobby), 162); // round down
+        assertEq(token.balanceOf(carol), 100);
+
+        // check new supply after DISTRIBUTION_PERIOD is over
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
+
+        assertEq(token.totalSupply(), 500);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 400);
+        assertEq(token.balanceOf(alice), 200);
+        assertEq(token.balanceOf(bobby), 200);
+        assertEq(token.balanceOf(carol), 100);
+    }
+
+    function testRewardsInterpolationFuzz(uint8 seed) public {
+        // initial state: 2 addresses rebasing, 1 not rebasing, all addresses have 100 tokens
+        vm.prank(alice);
+        token.enterRebase();
+        vm.prank(bobby);
+        token.enterRebase();
+        token.mint(alice, 100);
+        token.mint(bobby, 100);
+        token.mint(carol, 100);
+        assertEq(token.totalSupply(), 300);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 200);
+
+        // distribute 100 profits
+        token.mint(address(this), 100);
+        token.approve(address(token), 100);
+        token.distribute(100);
+
+        // check new balances and supply after half of DISTRIBUTION_PERIOD
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
+        assertEq(token.balanceOf(alice), 125);
+        assertEq(token.balanceOf(bobby), 125);
+        assertEq(token.balanceOf(carol), 100);
+        assertEq(token.totalSupply(), 350);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 250);
+
+        // bobby stops rebasing, 50 rewards still pending distribution
+        int256 expectedAliceBalanceChange = 0;
+        int256 expectedBobbyBalanceChange = 0;
+        int256 expectedCarolBalanceChange = 0;
+        int256 expectedTotalSupplyChange = 0;
+        int256 expectedNonRebasingSupplyChange = 0;
+        int256 expectedRebasingSupplyChange = 0;
+
+        // Do a random action that will revise the target share price (number
+        // of rebasing shares change) and/or the pending rewards amount.
+        // case 1) enterRebase
+        if (seed % 8 == 0) {
+            token.mint(carol, 275);
+            vm.prank(carol);
+            token.enterRebase();
+            // carol enter rebase with 375 tokens to get 60% (30) of rewards
+            // alice and bobby will both get 20% (10) of rewards, because they
+            // have 3x less tokens than carol
+            expectedAliceBalanceChange = 10;
+            expectedBobbyBalanceChange = 10;
+            expectedCarolBalanceChange = 275 + 30;
+            expectedTotalSupplyChange = 50 + 275;
+            expectedNonRebasingSupplyChange = -100;
+            expectedRebasingSupplyChange = 100 + 50 + 275;
+        }
+        // case 2) burn from a rebasing address
+        else if (seed % 8 == 1) {
+            vm.prank(bobby);
+            token.burn(100);
+            // burn 100 tokens from bobby, so he has 25 tokens left.
+            // alice has 125 tokens, rebasing supply is 150, and
+            // the distribution of 50 will go 8.33 for bobby and
+            // 41.67 to alice.
+            expectedAliceBalanceChange = 41;
+            expectedBobbyBalanceChange = -100 + 8;
+            expectedCarolBalanceChange = 0;
+            expectedTotalSupplyChange = -100 + 50;
+            expectedNonRebasingSupplyChange = 1; // round down on rebasing balances
+            expectedRebasingSupplyChange = -100 + 49;
+        }
+        // case 3) mint to a rebasing address
+        else if (seed % 8 == 2) {
+            token.mint(alice, 375);
+            // mint 375 tokens to alice, so she has 500 tokens
+            // bob has 125 tokens, so rebasing supply is 625,
+            // and the distribution of 50 will go 40 to alice
+            // and 10 to bob.
+            expectedAliceBalanceChange = 375 + 40;
+            expectedBobbyBalanceChange = 10;
+            expectedCarolBalanceChange = 0;
+            expectedTotalSupplyChange = 375 + 50;
+            expectedNonRebasingSupplyChange = 0;
+            expectedRebasingSupplyChange = 375 + 50;
+        }
+        // case 4) transfer from a rebasing address
+        else if (seed % 8 == 3) {
+            vm.prank(alice);
+            token.transfer(carol, 50);
+            // alice has 75 tokens, bob has 125 tokens,
+            // rebasing supply is 200, so distribution of 50
+            // will go 18 to alice and 31 to bob.
+            expectedAliceBalanceChange = -50 + 18;
+            expectedBobbyBalanceChange = 31;
+            expectedCarolBalanceChange = 50;
+            expectedTotalSupplyChange = 50;
+            expectedNonRebasingSupplyChange = 50;
+            expectedRebasingSupplyChange = 50 - 50;
+        }
+        // case 5) transfer to a rebasing address
+        else if (seed % 8 == 4) {
+            vm.prank(carol);
+            token.transfer(alice, 50);
+            // alice has 175 tokens, bob has 125 tokens,
+            // rebasing supply is 300, so distribution of 50
+            // will go 29 to alice and 21 to bob.
+            expectedAliceBalanceChange = 50 + 29;
+            expectedBobbyBalanceChange = 20;
+            expectedCarolBalanceChange = -50;
+            expectedTotalSupplyChange = 50;
+            expectedNonRebasingSupplyChange = -50 + 1; // round down on rebasing balances
+            expectedRebasingSupplyChange = 50 + 49;
+        }
+        // case 6) transferFrom from a rebasing address
+        else if (seed % 8 == 5) {
+            vm.prank(alice);
+            token.approve(carol, 50);
+            vm.prank(carol);
+            token.transferFrom(alice, carol, 50);
+            // alice has 75 tokens, bob has 125 tokens,
+            // rebasing supply is 200, so distribution of 50
+            // will go 18 to alice and 31 to bob.
+            expectedAliceBalanceChange = -50 + 18;
+            expectedBobbyBalanceChange = 31;
+            expectedCarolBalanceChange = 50;
+            expectedTotalSupplyChange = 50;
+            expectedNonRebasingSupplyChange = 50;
+            expectedRebasingSupplyChange = 50 - 50;
+        }
+        // case 7) transferFrom to a rebasing address
+        else if (seed % 8 == 6) {
+            vm.prank(carol);
+            token.approve(alice, 50);
+            vm.prank(alice);
+            token.transferFrom(carol, alice, 50);
+            // alice has 175 tokens, bob has 125 tokens,
+            // rebasing supply is 300, so distribution of 50
+            // will go 29 to alice and 21 to bob.
+            expectedAliceBalanceChange = 50 + 29;
+            expectedBobbyBalanceChange = 20;
+            expectedCarolBalanceChange = -50;
+            expectedTotalSupplyChange = 50;
+            expectedNonRebasingSupplyChange = -50 + 1; // round down on rebasing balances
+            expectedRebasingSupplyChange = 50 + 49;
+        }
+        // case 8) exitRebase
+        else {
+            vm.prank(bobby);
+            token.exitRebase();
+            // bobby exit rebase with 125 tokens and all the remaining
+            // 50 rebasing rewards will go to alice
+            expectedAliceBalanceChange = 50;
+            expectedBobbyBalanceChange = 0;
+            expectedCarolBalanceChange = 0;
+            expectedTotalSupplyChange = 50;
+            expectedNonRebasingSupplyChange = 125;
+            expectedRebasingSupplyChange = -125 + 50;
+        }
+
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
+
+        // check new balances and supply
+        assertEq(token.balanceOf(alice), uint256(125 + expectedAliceBalanceChange));
+        assertEq(token.balanceOf(bobby), uint256(125 + expectedBobbyBalanceChange));
+        assertEq(token.balanceOf(carol), uint256(100 + expectedCarolBalanceChange));
+        assertEq(token.totalSupply(), uint256(350 + expectedTotalSupplyChange));
+        assertEq(token.nonRebasingSupply(), uint256(100 + expectedNonRebasingSupplyChange));
+        assertEq(token.rebasingSupply(), uint256(250 + expectedRebasingSupplyChange));
     }
 }
