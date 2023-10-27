@@ -361,7 +361,7 @@ contract LendingTermOnboardingUnitTest is Test {
         // do a borrow
         collateral.mint(address(this), 1e24);
         collateral.approve(address(term), 1e24);
-        term.borrow(1e24, 1e24);
+        term.borrow(address(this), 1e24, 1e24);
         assertEq(collateral.balanceOf(address(this)), 0);
         assertEq(collateral.balanceOf(address(term)), 1e24);
         assertEq(credit.balanceOf(address(this)), 1e24);

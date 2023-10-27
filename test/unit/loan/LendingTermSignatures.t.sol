@@ -141,6 +141,7 @@ contract LendingTermSignaturesUnitTest is Test {
         vm.expectRevert("ERC20Permit: expired deadline");
         vm.prank(alice);
         term.borrowWithPermit(
+            alice,
             borrowAmount,
             collateralAmount,
             block.timestamp - 10,
@@ -151,6 +152,7 @@ contract LendingTermSignaturesUnitTest is Test {
         // borrow
         vm.prank(alice);
         bytes32 loanId = term.borrowWithPermit(
+            alice,
             borrowAmount,
             collateralAmount,
             block.timestamp + 10,
@@ -171,6 +173,7 @@ contract LendingTermSignaturesUnitTest is Test {
         vm.expectRevert("ERC20Permit: invalid signature");
         vm.prank(alice);
         term.borrowWithPermit(
+            alice,
             borrowAmount,
             collateralAmount,
             block.timestamp + 10,
@@ -182,18 +185,18 @@ contract LendingTermSignaturesUnitTest is Test {
         // prepare
         uint256 borrowAmount = 20_000e18;
         uint256 collateralAmount = 12e18;
-        collateral.mint(alice, collateralAmount);
+        collateral.mint(address(this), collateralAmount);
 
         // manual approve
-        vm.prank(alice);
         collateral.approve(address(term), collateralAmount);
 
         // borrow
-        vm.prank(alice);
         bytes32 loanId = term.borrow(
+            alice,
             borrowAmount,
             collateralAmount
         );
+        credit.transfer(alice, borrowAmount);
 
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 13);

@@ -254,6 +254,7 @@ contract LendingTerm is CoreRef {
 
     /// @notice initiate a new loan
     function _borrow(
+        address collateralOwner,
         address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount
@@ -328,12 +329,12 @@ contract LendingTerm is CoreRef {
             lastPartialRepay[loanId] = block.timestamp;
         }
 
-        // mint debt to the borrower
-        RateLimitedMinter(refs.creditMinter).mint(borrower, borrowAmount);
+        // mint debt to the collateralOwner
+        RateLimitedMinter(refs.creditMinter).mint(collateralOwner, borrowAmount);
 
-        // pull the collateral from the borrower
+        // pull the collateral from the collateralOwner
         IERC20(params.collateralToken).safeTransferFrom(
-            borrower,
+            collateralOwner,
             address(this),
             collateralAmount
         );
@@ -350,14 +351,16 @@ contract LendingTerm is CoreRef {
 
     /// @notice initiate a new loan
     function borrow(
+        address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount
     ) external whenNotPaused returns (bytes32 loanId) {
-        loanId = _borrow(msg.sender, borrowAmount, collateralAmount);
+        loanId = _borrow(msg.sender, borrower, borrowAmount, collateralAmount);
     }
 
     /// @notice borrow with a permit on collateral token
     function borrowWithPermit(
+        address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount,
         uint256 deadline,
@@ -372,7 +375,7 @@ contract LendingTerm is CoreRef {
             sig.r,
             sig.s
         );
-        return _borrow(msg.sender, borrowAmount, collateralAmount);
+        return _borrow(msg.sender, borrower, borrowAmount, collateralAmount);
     }
 
     /// @notice add collateral on an open loan.
