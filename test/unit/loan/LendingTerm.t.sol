@@ -198,8 +198,6 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 12e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term2), collateralAmount);
-        credit.mint(address(this), 1_000e18);
-        credit.approve(address(term2), 1_000e18);
 
         // borrow
         bytes32 loanId = term2.borrow(borrowAmount, collateralAmount);
@@ -210,6 +208,8 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.balanceOf(address(this)), borrowAmount);
         assertEq(credit.balanceOf(address(term2)), 0);
         assertEq(term2.getLoan(loanId).borrower, address(this));
+        assertEq(term2.getLoan(loanId).borrowAmount, borrowAmount);
+        assertEq(term2.getLoanDebt(loanId), borrowAmount + 1_000e18 /*openingFee*/);
     }
 
     // borrow fail because 0 collateral
