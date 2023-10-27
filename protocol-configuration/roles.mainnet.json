@@ -3,6 +3,11 @@
     "LENDING_TERM_OFFBOARDING",
     "TIMELOCK"
   ],
+  "TIMELOCK_CANCELLER": [
+    "GOVERNOR",
+    "TEAM_MULTISIG",
+    "VETO_GOVERNOR"
+  ],
   "GUARDIAN": [
     "TEAM_MULTISIG"
   ],
