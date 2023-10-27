@@ -171,29 +171,12 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         assertEq(creditAsked, 0, "incorrect credit asked");
         assertEq(auctionHouse.nAuctionsInProgress(), 1);
 
-        uint256 startingSdaiBalance = sdai.balanceOf(address(this));
-        
         rateLimitedCreditMinter.buffer();
 
-        auctionHouse.bid(loanId); /// get collateral for free, TODO check that forgive could be called at this point as well
+        vm.expectRevert("AuctionHouse: cannot bid 0");
+        auctionHouse.bid(loanId);
 
-        uint256 endingSdaiBalance = sdai.balanceOf(address(this));
-
-        assertEq(auctionHouse.nAuctionsInProgress(), 0);
-        assertEq(
-            endingSdaiBalance - startingSdaiBalance,
-            supplyAmount,
-            "incorrect sdai balance after liquidation"
-        );
-
-        /// ensure credit reprices
-        assertEq(
-            profitManager.creditMultiplier() < 1e18,
-            true,
-            "credit multiplier should be less than 1"
-        );
-
-        rateLimitedCreditMinter.buffer();
+        assertEq(auctionHouse.nAuctionsInProgress(), 1);
     }
 
     function testBadDebtRepricesCreditForgive() public {
