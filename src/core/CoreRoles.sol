@@ -69,8 +69,10 @@ library CoreRoles {
 
     /// @notice can propose new actions in timelocks
     bytes32 internal constant TIMELOCK_PROPOSER = keccak256("PROPOSER_ROLE");
+
     /// @notice can execute actions in timelocks after their delay
     bytes32 internal constant TIMELOCK_EXECUTOR = keccak256("EXECUTOR_ROLE");
+
     /// @notice can cancel actions in timelocks
     bytes32 internal constant TIMELOCK_CANCELLER = keccak256("CANCELLER_ROLE");
 }
