@@ -57,6 +57,12 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
     }
 
     function testOnboarding() public {
+        (
+            address[] memory targets,
+            uint256[] memory values,
+            bytes[] memory calldatas,
+            string memory description
+        ) = onboarder.getOnboardProposeArgs(address(term));
         uint256 proposalId = onboarder.proposeOnboard(address(term));
 
         assertEq(
@@ -80,12 +86,6 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         vm.roll(block.number + constants.VOTING_PERIOD + 1);
         vm.warp(block.timestamp + 13);
 
-        (
-            address[] memory targets,
-            uint256[] memory values,
-            bytes[] memory calldatas,
-            string memory description
-        ) = onboarder.getOnboardProposeArgs(address(term));
         onboarder.queue(
             targets,
             values,
