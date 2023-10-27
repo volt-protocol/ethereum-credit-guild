@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import {Governor, IGovernor} from "@openzeppelin/contracts/governance/Governor.sol";
+import {IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import "@forge-std/Test.sol";
@@ -93,7 +94,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             uint8(IGovernor.ProposalState.Pending)
         );
 
-        vm.roll(block.number + constants.VOTING_PERIOD - 1);
+        vm.roll(block.number + governor.votingPeriod() - 1);
         vm.warp(block.timestamp + governor.proposalDeadline(proposalId) - 1);
 
         assertEq(
@@ -106,7 +107,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             uint8(GovernorCountingSimple.VoteType.For)
         );
 
-        vm.roll(block.number + constants.VOTING_PERIOD + 1);
+        vm.roll(block.number + governor.votingPeriod() + 1);
         vm.warp(block.timestamp + 13);
 
         governor.queue(
@@ -134,7 +135,8 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
 
         // execute
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + constants.TIMELOCK_DELAY + 13);
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+
         assertEq(
             uint8(governor.state(proposalId)),
             uint8(IGovernor.ProposalState.Queued)
@@ -261,8 +263,6 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         );
     }
 
-    /// todo add team multisig cancelling
-
     function testTeamMultisigCancels() public {
         (
             uint256 proposalId,
@@ -329,6 +329,485 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             values,
             calldatas,
             keccak256(bytes(description))
+        );
+    }
+
+    /// ----------------- Governor DAO Actions -------------------
+    function testUpdateVotingDelay() public {
+        uint256 newVotingDelay = 1 days;
+
+        address[] memory targets = new address[](1);
+        targets[0] = address(governor);
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+
+        bytes[] memory calldatas = new bytes[](1);
+        calldatas[0] = abi.encodeWithSelector(
+            governor.setVotingDelay.selector,
+            newVotingDelay
+        );
+
+        string memory description = "Update voting delay to 1 day";
+
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Active)
+        );
+
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.For)
+        );
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + 13);
+
+        governor.queue(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Queued),
+            "proposal not queued"
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+
+        governor.execute(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Executed),
+            "proposal not executed"
+        );
+
+        assertEq(governor.votingDelay(), newVotingDelay);
+    }
+
+    function testSetVotingPeriod() public {
+        uint256 newVotingPeriod = 1 days;
+
+        address[] memory targets = new address[](1);
+        targets[0] = address(governor);
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+
+        bytes[] memory calldatas = new bytes[](1);
+        calldatas[0] = abi.encodeWithSelector(
+            governor.setVotingPeriod.selector,
+            newVotingPeriod
+        );
+
+        string memory description = "Update voting period to 1 day";
+
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Active)
+        );
+
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.For)
+        );
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + 13);
+
+        governor.queue(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Queued),
+            "proposal not queued"
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+
+        governor.execute(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Executed),
+            "proposal not executed"
+        );
+
+        assertEq(governor.votingPeriod(), newVotingPeriod);
+    }
+
+    function testSetProposalThreshold() public {
+        uint256 newProposalThreshold = 1_000_000 * 1e18;
+
+        address[] memory targets = new address[](1);
+        targets[0] = address(governor);
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+
+        bytes[] memory calldatas = new bytes[](1);
+        calldatas[0] = abi.encodeWithSelector(
+            governor.setProposalThreshold.selector,
+            newProposalThreshold
+        );
+
+        string memory description = "Update voting period to 1 day";
+
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Active)
+        );
+
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.For)
+        );
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + 13);
+
+        governor.queue(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Queued),
+            "proposal not queued"
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+
+        governor.execute(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Executed),
+            "proposal not executed"
+        );
+
+        assertEq(governor.proposalThreshold(), newProposalThreshold);
+
+        vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
+        rateLimitedGuildMinter.mint(userOne, newProposalThreshold); /// mint quorum amount to user one
+
+        vm.startPrank(userOne);
+        guild.delegate(userOne);
+
+        vm.roll(block.number + 1);
+        description = "Can now propose with just 1m guild tokens";
+
+        proposalId = governor.propose(targets, values, calldatas, description);
+        vm.stopPrank();
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Active)
+        );
+    }
+
+    function testSetQuorum() public {
+        uint256 newQuorum = 100_000_000 * 1e18;
+
+        address[] memory targets = new address[](1);
+        targets[0] = address(governor);
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+
+        bytes[] memory calldatas = new bytes[](1);
+        calldatas[0] = abi.encodeWithSelector(
+            governor.setQuorum.selector,
+            newQuorum
+        );
+
+        string memory description = "Update quourum to 100m guild";
+
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Active)
+        );
+
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.For)
+        );
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + 13);
+
+        governor.queue(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Queued),
+            "proposal not queued"
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+
+        governor.execute(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Executed),
+            "proposal not executed"
+        );
+
+        assertEq(governor.quorum(0), newQuorum, "new quorum not set");
+
+        vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
+        rateLimitedGuildMinter.mint(userOne, newQuorum); /// mint new quorum amount to user one
+
+        vm.startPrank(userOne);
+        guild.delegate(userOne);
+
+        vm.roll(block.number + 1);
+        description = "Can now pass with 100m guild tokens";
+
+        proposalId = governor.propose(targets, values, calldatas, description);
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Active)
+        );
+
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.For)
+        );
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + 13);
+
+        governor.queue(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Queued),
+            "proposal not queued"
+        );
+
+        vm.stopPrank();
+    }
+
+    function testCreateNewCoreRole() public {
+        bytes32 newRole = keccak256("NEW_ROLE");
+
+        address[] memory targets = new address[](2);
+        targets[0] = address(core);
+        targets[1] = address(core);
+
+        uint256[] memory values = new uint256[](2); /// leave empty to no value is sent
+
+        bytes[] memory calldatas = new bytes[](2);
+        calldatas[0] = abi.encodeWithSelector(
+            core.createRole.selector,
+            newRole,
+            roles.GOVERNOR
+        );
+        calldatas[1] = abi.encodeWithSelector(
+            core.grantRole.selector,
+            newRole,
+            address(this)
+        );
+
+        string
+            memory description = "Create NEW_ROLE that governor can grant and revoke, grant to this address";
+
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Active)
+        );
+
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.For)
+        );
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + 13);
+
+        governor.queue(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Queued),
+            "proposal not queued"
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+
+        governor.execute(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Executed),
+            "proposal not executed"
+        );
+
+        assertEq(
+            core.getRoleAdmin(newRole),
+            roles.GOVERNOR,
+            "new role not created"
+        );
+
+        assertTrue(
+            core.hasRole(newRole, address(this)),
+            "new role not granted properly"
+        );
+    }
+
+    function testMultisigCannotSetQuorum() public {
+        uint256 newQuorum = 20_000_000 * 1e18;
+        vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
+        vm.expectRevert("UNAUTHORIZED");
+        governor.setQuorum(newQuorum);
+    }
+
+    function testMultisigCannotSetProposalThreshold() public {
+        uint256 newProposalThreshold = 2_000_000 * 1e18;
+
+        vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
+        vm.expectRevert("UNAUTHORIZED");
+        governor.setProposalThreshold(newProposalThreshold);
+    }
+
+    function testMultisigCannotSetVotingDelay() public {
+        uint256 newVotingDelay = 2 days / 12; /// convert time to block numbers
+
+        vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
+        vm.expectRevert("UNAUTHORIZED");
+        governor.setVotingDelay(newVotingDelay);
+    }
+
+    function testMultisigCannotSetVotingPeriod() public {
+        uint256 newVotingPeriod = 8 days / 12; /// convert time to block numbers
+
+        vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
+        vm.expectRevert("UNAUTHORIZED");
+        governor.setVotingPeriod(newVotingPeriod);
+    }
+
+    function testSupportsCancelOrProposalSelctor() public {
+        assertTrue(
+            governor.supportsInterface(
+                governor.cancel.selector ^ governor.proposalProposer.selector
+            ),
+            "governor does not support cancel/proposer selectors"
+        );
+        assertTrue(
+            governor.supportsInterface(type(IERC1155Receiver).interfaceId),
+            "governor does not support ERC1155 receiver selectors"
         );
     }
 }
