@@ -26,9 +26,8 @@ contract IntegrationTestRoles is PostProposalCheckFixture {
 
         string[] memory roles = vm.parseJsonKeys(json, "$");
 
-        assertEq(roles.length, 17);
+        assertEq(roles.length, 17, "incorrect role count");
 
-        Core core = Core(addresses.mainnet("CORE"));
         for (uint256 i = 0; i < roles.length; i++) {
             bytes32 role = keccak256(bytes(string.concat(roles[i], "_ROLE")));
             
