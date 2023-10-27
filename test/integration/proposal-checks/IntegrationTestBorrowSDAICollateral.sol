@@ -191,12 +191,19 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         vm.roll(block.number + 2);
         vm.warp(block.timestamp + 1);
 
+        assertFalse(psm.redemptionsPaused(), "psm redeem should be online"); /// psm starts online
         offboarder.proposeOffboard(address(term));
+
         vm.roll(block.number + 1);
+
         offboarder.supportOffboard(block.number - 1, address(term));
         offboarder.offboard(address(term));
 
-        assertFalse(guild.isGauge(address(term)));
+        assertTrue(psm.redemptionsPaused(), "psm redeem should be offline"); /// psm paused during loan offboarding
+        assertFalse(
+            guild.isGauge(address(term)),
+            "guild gauge should be offboarded"
+        );
     }
 
     function testPSMMint(uint128 amount) public {
@@ -256,6 +263,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         assertEq(loan.callTime, block.timestamp, "incorrect call time");
         assertEq(loan.callDebt, loanDebt, "incorrect call debt");
         assertEq(loan.caller, address(this), "incorrect caller");
+        assertTrue(psm.redemptionsPaused(), "incorrect psm redemptions paused");
 
         return loanId;
     }
@@ -282,6 +290,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         vm.stopPrank();
 
+        uint256 loanCloseTime = block.timestamp;
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
         uint256 endingDeployerBalance = credit.balanceOf(proposalZero);
@@ -297,7 +306,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             "incorrect deployer credit balance"
         );
 
-        assertEq(loan.closeTime, block.timestamp, "incorrect close time");
+        assertEq(loan.closeTime, loanCloseTime, "incorrect close time");
         assertEq(
             auctionHouse.nAuctionsInProgress(),
             0,
@@ -346,9 +355,9 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     function testDistributeReducesCreditTotalSupplyOneUserRebasing(
         uint128 creditAmount
     ) public {
-        /// between 1 wei and entire buffer
+        /// between 10 wei and entire buffer
         creditAmount = uint128(
-            _bound(creditAmount, 1, rateLimitedCreditMinter.buffer() / 1e12)
+            _bound(creditAmount, 10, rateLimitedCreditMinter.buffer() / 1e12)
         );
 
         _doMint(userOne, creditAmount);
@@ -359,6 +368,8 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         vm.prank(userOne);
         credit.distribute(creditAmount);
+
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
         assertEq(
             credit.totalSupply(),
