@@ -52,6 +52,12 @@ contract IntegrationTestRoles is PostProposalCheckFixture {
                     true,
                     string.concat("Expected ", addressNames[j], " to have role ", roles[i])
                 );
+                /// assert timelock forwards all calls on to core
+                assertEq(
+                    timelock.hasRole(role, addresses.mainnet(addressNames[j])),
+                    true,
+                    string.concat("Expected ", addressNames[j], " to have role ", roles[i], " in timelock")
+                );
             }
         }
     }
