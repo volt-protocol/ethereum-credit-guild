@@ -63,6 +63,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
     /// Minting
     RateLimitedMinter public rateLimitedCreditMinter;
     RateLimitedMinter public rateLimitedGuildMinter;
+    SurplusGuildMinter public surplusGuildMinter;
 
     function setUp() public virtual override {
         super.setUp();
@@ -85,6 +86,9 @@ contract PostProposalCheckFixture is PostProposalCheck {
         );
         rateLimitedGuildMinter = RateLimitedMinter(
             addresses.mainnet(strings.RATE_LIMITED_GUILD_MINTER)
+        );
+        surplusGuildMinter = SurplusGuildMinter(
+            addresses.mainnet(strings.SURPLUS_GUILD_MINTER)
         );
 
         profitManager = ProfitManager(
