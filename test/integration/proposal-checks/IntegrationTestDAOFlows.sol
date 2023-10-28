@@ -810,4 +810,156 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             "governor does not support ERC1155 receiver selectors"
         );
     }
+
+    /// Offboarding setting quorum
+
+    function testSetOffboardingQuorum() public {
+        uint256 newQuorum = 100_000_000 * 1e18;
+
+        address[] memory targets = new address[](1);
+        targets[0] = address(offboarder);
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+
+        bytes[] memory calldatas = new bytes[](1);
+        calldatas[0] = abi.encodeWithSelector(
+            offboarder.setQuorum.selector,
+            newQuorum
+        );
+
+        string memory description = "Update offboarding quourum to 100m guild";
+
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Active)
+        );
+
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.For)
+        );
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + 13);
+
+        governor.queue(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Queued),
+            "proposal not queued"
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+
+        governor.execute(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Executed),
+            "proposal not executed"
+        );
+
+        assertEq(
+            offboarder.quorum(),
+            newQuorum,
+            "new quorum not set in offboarder"
+        );
+    }
+
+    function testSetVetoGovernorQuorum() public {
+        uint256 newQuorum = 100_000_000 * 1e18;
+
+        address[] memory targets = new address[](1);
+        targets[0] = address(vetoGovernor);
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+
+        bytes[] memory calldatas = new bytes[](1);
+        calldatas[0] = abi.encodeWithSelector(
+            vetoGovernor.setQuorum.selector,
+            newQuorum
+        );
+
+        string memory description = "Update veto governor quourum to 100m credit";
+
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Active)
+        );
+
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.For)
+        );
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + 13);
+
+        governor.queue(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Queued),
+            "proposal not queued"
+        );
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+
+        governor.execute(
+            targets,
+            values,
+            calldatas,
+            keccak256(bytes(description))
+        );
+        assertEq(
+            uint8(governor.state(proposalId)),
+            uint8(IGovernor.ProposalState.Executed),
+            "proposal not executed"
+        );
+
+        assertEq(
+            vetoGovernor.quorum(0),
+            newQuorum,
+            "new quorum not set in offboarder"
+        );
+    }
 }
