@@ -40,6 +40,14 @@ contract Proposal_0 is Proposal {
     /// later if new tokens are minted
     uint256 internal constant GUILD_SUPPLY = 1_000_000_000 * 1e18;
 
+    /// @notice guild mint ratio is 5e18, meaning for 1 credit 5 guild tokens are
+    /// minted in SurplusGuildMinter
+    uint256 internal constant GUILD_MINT_RATIO = 5e18;
+
+    /// @notice ratio of guild tokens received per Credit earned in
+    /// the Surplus Guild Minter
+    uint256 internal constant GUILD_CREDIT_REWARD_RATIO = 0.1e18;
+
     /// @notice initial credit supply is 100 tokens after USDC PSM mint
     uint256 internal constant CREDIT_SUPPLY = 100 * 1e18;
 
@@ -152,8 +160,8 @@ contract Proposal_0 is Proposal {
                 address(credit),
                 address(guild),
                 address(rateLimitedGuildMinter),
-                5e18, // ratio of GUILD minted per CREDIT staked
-                0.1e18 // negative interest rate of GUILD borrowed
+                GUILD_MINT_RATIO, // ratio of GUILD minted per CREDIT staked
+                GUILD_CREDIT_REWARD_RATIO // negative interest rate of GUILD borrowed
             );
 
             addresses.addMainnet("CREDIT_TOKEN", address(credit));
@@ -614,6 +622,11 @@ contract Proposal_0 is Proposal {
                 addresses.mainnet("RATE_LIMITED_CREDIT_MINTER")
             );
             assertEq(
+                rateLimitedCreditMinter.MAX_RATE_LIMIT_PER_SECOND(),
+                0,
+                "credit max rate limit per second"
+            );
+            assertEq(
                 rateLimitedCreditMinter.token(),
                 addresses.mainnet("CREDIT_TOKEN"),
                 "credit token incorrect"
@@ -642,6 +655,11 @@ contract Proposal_0 is Proposal {
         {
             RateLimitedMinter rateLimitedGuildMinter = RateLimitedMinter(
                 addresses.mainnet("RATE_LIMITED_GUILD_MINTER")
+            );
+            assertEq(
+                rateLimitedGuildMinter.MAX_RATE_LIMIT_PER_SECOND(),
+                0,
+                "guild max rate limit per second"
             );
             assertEq(
                 rateLimitedGuildMinter.token(),
