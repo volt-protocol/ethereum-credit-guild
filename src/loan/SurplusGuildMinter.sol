@@ -172,11 +172,15 @@ contract SurplusGuildMinter is CoreRef {
         );
 
         // update stake
-        uint256 userMintRatio = (userStake.guild * 1e18) / userStake.credit;
+        uint256 userMintRatio = (uint256(userStake.guild) * 1e18) /
+            userStake.credit; /// upcast guild to prevent overflow
         uint256 guildAmount = (userMintRatio * amount) / 1e18;
+
         if (amount == userStake.credit) guildAmount = userStake.guild;
+
         userStake.credit -= SafeCastLib.safeCastTo128(amount);
         userStake.guild -= SafeCastLib.safeCastTo128(guildAmount);
+
         if (userStake.credit == 0) {
             userStake.stakeTime = 0;
             userStake.lastGaugeLoss = 0;
@@ -184,7 +188,10 @@ contract SurplusGuildMinter is CoreRef {
         } else {
             // if not unstaking all, make sure the stake remains
             // greater than the minimum stake
-            require(userStake.credit >= MIN_STAKE, "SurplusGuildMinter: remaining stake below min");
+            require(
+                userStake.credit >= MIN_STAKE,
+                "SurplusGuildMinter: remaining stake below min"
+            );
         }
         _stakes[msg.sender][term] = userStake;
 
@@ -233,9 +240,12 @@ contract SurplusGuildMinter is CoreRef {
         uint256 _profitIndex = ProfitManager(profitManager)
             .userGaugeProfitIndex(address(this), term);
         uint256 _userProfitIndex = uint256(userStake.profitIndex);
+
         if (_profitIndex == 0) _profitIndex = 1e18;
         if (_userProfitIndex == 0) _userProfitIndex = 1e18;
+
         uint256 deltaIndex = _profitIndex - _userProfitIndex;
+
         if (deltaIndex != 0) {
             uint256 creditReward = (uint256(userStake.guild) * deltaIndex) /
                 1e18;
