@@ -39,8 +39,9 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         vm.prank(addresses.mainnet(strings.TIMELOCK));
         guild.enableTransfer();
 
+        uint256 mintAmount = onboarder.quorum(0);
         vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
-        rateLimitedGuildMinter.mint(address(this), constants.GUILD_SUPPLY); /// mint all of the guild to this contract
+        rateLimitedGuildMinter.mint(address(this), mintAmount); /// mint all of the guild to this contract
         guild.delegate(address(this));
         vm.roll(block.number + 1); /// ensure user votes register
     }
