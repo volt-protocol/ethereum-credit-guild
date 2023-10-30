@@ -136,22 +136,24 @@ contract LendingTermUnitTest is Test {
     // borrow success
     function testBorrowSuccess() public {
         // prepare
+        address borrower = address(2465498798462498798);
         uint256 borrowAmount = 20_000e18;
         uint256 collateralAmount = 12e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
 
         // borrow
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(borrower, borrowAmount, collateralAmount);
 
         // check loan creation
         assertEq(collateral.balanceOf(address(this)), 0);
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
         assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(credit.balanceOf(borrower), 0);
         assertEq(credit.balanceOf(address(term)), 0);
         assertEq(credit.totalSupply(), borrowAmount);
 
-        assertEq(term.getLoan(loanId).borrower, address(this));
+        assertEq(term.getLoan(loanId).borrower, borrower);
         assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
         assertEq(term.getLoan(loanId).borrowAmount, borrowAmount);
         assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
@@ -198,11 +200,9 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 12e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term2), collateralAmount);
-        credit.mint(address(this), 1_000e18);
-        credit.approve(address(term2), 1_000e18);
 
         // borrow
-        bytes32 loanId = term2.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term2.borrow(address(this), borrowAmount, collateralAmount);
 
         // check borrow success
         assertEq(collateral.balanceOf(address(this)), 0);
@@ -210,6 +210,8 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.balanceOf(address(this)), borrowAmount);
         assertEq(credit.balanceOf(address(term2)), 0);
         assertEq(term2.getLoan(loanId).borrower, address(this));
+        assertEq(term2.getLoan(loanId).borrowAmount, borrowAmount);
+        assertEq(term2.getLoanDebt(loanId), borrowAmount + 1_000e18 /*openingFee*/);
     }
 
     // borrow fail because 0 collateral
@@ -217,7 +219,7 @@ contract LendingTermUnitTest is Test {
         uint256 borrowAmount = 1e18;
         uint256 collateralAmount = 0;
         vm.expectRevert("LendingTerm: cannot stake 0");
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     }
 
     // borrow fail because not enough borrowed
@@ -225,7 +227,7 @@ contract LendingTermUnitTest is Test {
         uint256 borrowAmount = 1e18;
         uint256 collateralAmount = 1e18;
         vm.expectRevert("LendingTerm: borrow amount too low");
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     }
 
     // borrow fail because 0 debt
@@ -233,7 +235,7 @@ contract LendingTermUnitTest is Test {
         uint256 borrowAmount = 0;
         uint256 collateralAmount = 1e18;
         vm.expectRevert("LendingTerm: cannot borrow 0");
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     } 
 
     // borrow fail because loan exists
@@ -245,12 +247,12 @@ contract LendingTermUnitTest is Test {
         collateral.approve(address(term), collateralAmount);
 
         // borrow
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
         assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
 
         // borrow again in same block (same loanId)
         vm.expectRevert("LendingTerm: loan exists");
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     }
 
     // borrow fail because not enough collateral
@@ -263,7 +265,7 @@ contract LendingTermUnitTest is Test {
 
         // borrow
         vm.expectRevert("LendingTerm: not enough collateral");
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     }
 
     // borrow fail because gauge killed
@@ -279,7 +281,7 @@ contract LendingTermUnitTest is Test {
 
         // borrow
         vm.expectRevert("LendingTerm: debt ceiling reached");
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     }
 
     // borrow fail because rate-limited minter role revoked
@@ -296,7 +298,7 @@ contract LendingTermUnitTest is Test {
 
         // borrow
         vm.expectRevert("UNAUTHORIZED"); // failed because the terms can't mint CREDIT
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     }
 
     // borrow fail because debt ceiling is reached
@@ -313,13 +315,13 @@ contract LendingTermUnitTest is Test {
         collateral.approve(address(term), collateralAmount * 2);
 
         // first borrow works
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
         vm.warp(block.timestamp + 10);
         vm.roll(block.number + 1);
 
         // second borrow fails because of relative debt ceilings
         vm.expectRevert("LendingTerm: debt ceiling reached");
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     }
 
     // borrow fail because hardcap is reached
@@ -332,7 +334,7 @@ contract LendingTermUnitTest is Test {
 
         // borrow
         vm.expectRevert("LendingTerm: hardcap reached");
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     }
 
     // borrow fail because paused
@@ -349,7 +351,7 @@ contract LendingTermUnitTest is Test {
 
         // borrow
         vm.expectRevert("Pausable: paused");
-        term.borrow(borrowAmount, collateralAmount);
+        term.borrow(address(this), borrowAmount, collateralAmount);
     }
 
     // borrow fuzz for extreme borrowAmount & collateralAmount
@@ -371,7 +373,7 @@ contract LendingTermUnitTest is Test {
         term.setHardCap(type(uint256).max);
 
         // borrow
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
         assertEq(term.getLoanDebt(loanId), borrowAmount);
 
         // check interest accrued over time
@@ -388,7 +390,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
         assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
 
         // addCollateral
@@ -411,7 +413,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // repay
         vm.warp(block.timestamp + 13);
@@ -437,7 +439,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
         assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
 
         // partialRepay
@@ -461,7 +463,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // partialRepay
         vm.expectRevert("LendingTerm: loan opened in same block");
@@ -510,7 +512,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // repay
         vm.warp(block.timestamp + time);
@@ -538,7 +540,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // repay
         credit.approve(address(term), borrowAmount);
@@ -553,7 +555,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // repay
         vm.warp(block.timestamp + 13);
@@ -575,7 +577,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // revoke role so buffer of CREDIT cannot replenish
         vm.prank(governor);
@@ -598,7 +600,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // offboard term
         vm.warp(block.timestamp + 13);
@@ -624,7 +626,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
         bytes32[] memory loanIds = new bytes32[](1);
         loanIds[0] = loanId;
 
@@ -647,7 +649,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // call
         vm.expectRevert("LendingTerm: cannot call");
@@ -667,7 +669,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // offboard term
         guild.removeGauge(address(term));
@@ -684,7 +686,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // offboard term
         vm.warp(block.timestamp + 13);
@@ -706,7 +708,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // repay
         vm.warp(block.timestamp + 13);
@@ -733,7 +735,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // wait partialRepay delay
         assertEq(term.partialRepayDelayPassed(loanId), false);
@@ -804,7 +806,7 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), 0);
 
         // borrow
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         assertEq(credit.balanceOf(address(this)), borrowAmount);
         assertEq(credit.balanceOf(address(term)), 0);
@@ -847,7 +849,7 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), 0);
 
         // borrow
-        bytes32 loanIdReturned = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanIdReturned = term.borrow(address(this), borrowAmount, collateralAmount);
         assertEq(loanId, loanIdReturned);
 
         assertEq(credit.balanceOf(address(this)), borrowAmount);
@@ -932,7 +934,7 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), 0);
 
         // borrow
-        bytes32 loanIdReturned = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanIdReturned = term.borrow(address(this), borrowAmount, collateralAmount);
         assertEq(loanId, loanIdReturned);
 
         assertEq(credit.balanceOf(address(this)), borrowAmount);
@@ -998,7 +1000,7 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), 0);
 
         // borrow
-        bytes32 loanIdReturned = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanIdReturned = term.borrow(address(this), borrowAmount, collateralAmount);
         assertEq(loanId, loanIdReturned);
 
         assertEq(credit.balanceOf(address(this)), borrowAmount);
@@ -1047,7 +1049,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // 1 year later, interest accrued
         vm.warp(block.timestamp + term.YEAR());
@@ -1094,7 +1096,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // 1 year later, interest accrued
         vm.warp(block.timestamp + term.YEAR());
@@ -1126,7 +1128,7 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), 0);
 
         // borrow
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         assertEq(credit.balanceOf(address(this)), borrowAmount);
         assertEq(credit.balanceOf(address(term)), 0);
@@ -1160,7 +1162,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // 1 year later, interest accrued
         vm.warp(block.timestamp + term.YEAR());
@@ -1201,7 +1203,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // 1 year later, interest accrued
         vm.warp(block.timestamp + term.YEAR());
@@ -1244,7 +1246,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // 1 year later, interest accrued
         vm.warp(block.timestamp + term.YEAR());
@@ -1292,7 +1294,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // 1 year later, interest accrued
         vm.warp(block.timestamp + term.YEAR());
@@ -1337,7 +1339,7 @@ contract LendingTermUnitTest is Test {
         // the MIN_BORROW, but CREDIT value went up 2x.
         uint256 MIN_BORROW = term.MIN_BORROW();
         vm.expectRevert("LendingTerm: borrow amount too low");
-        term.borrow(MIN_BORROW * 175 / 100, 10000000000e18);
+        term.borrow(address(this), MIN_BORROW * 175 / 100, 10000000000e18);
     }
 
     // MIN_BORROW increases when creditMultiplier decreases - partialRepay()
@@ -1347,7 +1349,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 15e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
-        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        bytes32 loanId = term.borrow(address(this), borrowAmount, collateralAmount);
 
         // 1 year later, interest accrued
         vm.warp(block.timestamp + term.YEAR());

@@ -141,6 +141,7 @@ contract LendingTermSignaturesUnitTest is Test {
         vm.expectRevert("ERC20Permit: expired deadline");
         vm.prank(alice);
         term.borrowWithPermit(
+            alice,
             borrowAmount,
             collateralAmount,
             block.timestamp - 10,
@@ -151,6 +152,7 @@ contract LendingTermSignaturesUnitTest is Test {
         // borrow
         vm.prank(alice);
         bytes32 loanId = term.borrowWithPermit(
+            alice,
             borrowAmount,
             collateralAmount,
             block.timestamp + 10,
@@ -171,153 +173,11 @@ contract LendingTermSignaturesUnitTest is Test {
         vm.expectRevert("ERC20Permit: invalid signature");
         vm.prank(alice);
         term.borrowWithPermit(
-            borrowAmount,
-            collateralAmount,
-            block.timestamp + 10,
-            LendingTerm.Signature({ v: v, r: r, s: s })
-        );
-    }
-
-    function testBorrowWithCreditPermit() public {
-        // prepare
-        uint256 borrowAmount = 20_000e18;
-        uint256 collateralAmount = 12e18;
-        collateral.mint(alice, collateralAmount);
-        credit.mint(alice, 400e18);
-        vm.prank(alice);
-        collateral.approve(address(term), collateralAmount);
-
-        // sign permit message valid for 10s
-        bytes32 structHash = keccak256(abi.encode(
-            keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
             alice,
-            address(term),
-            400e18,
-            credit.nonces(alice),
-            block.timestamp + 10
-        ));
-        bytes32 digest = ECDSA.toTypedDataHash(credit.DOMAIN_SEPARATOR(), structHash);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePrivateKey, digest);
-        assertEq(ECDSA.recover(digest, v, r, s), alice);
-
-        // if deadline is passed, cannot broadcast
-        vm.warp(block.timestamp + 20);
-        vm.expectRevert("ERC20Permit: expired deadline");
-        vm.prank(alice);
-        term.borrowWithCreditPermit(
-            borrowAmount,
-            collateralAmount,
-            block.timestamp - 10,
-            LendingTerm.Signature({ v: v, r: r, s: s })
-        );
-        vm.warp(block.timestamp - 20);
-
-        // borrow
-        vm.prank(alice);
-        bytes32 loanId = term.borrowWithCreditPermit(
             borrowAmount,
             collateralAmount,
             block.timestamp + 10,
             LendingTerm.Signature({ v: v, r: r, s: s })
-        );
-
-        // check loan creation
-        assertEq(term.getLoan(loanId).borrower, alice);
-        assertEq(term.getLoan(loanId).borrowAmount, borrowAmount);
-        assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
-        assertEq(term.getLoan(loanId).caller, address(0));
-        assertEq(term.getLoan(loanId).callTime, 0);
-        assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
-        assertEq(term.getLoan(loanId).closeTime, 0);
-
-        // nonce is consumed, cannot broadcast again
-        assertEq(credit.nonces(alice), 1);
-        vm.expectRevert("ERC20Permit: invalid signature");
-        vm.prank(alice);
-        term.borrowWithCreditPermit(
-            borrowAmount,
-            collateralAmount,
-            block.timestamp + 10,
-            LendingTerm.Signature({ v: v, r: r, s: s })
-        );
-    }
-
-    function testBorrowWithPermits() public {
-        // prepare
-        uint256 borrowAmount = 20_000e18;
-        uint256 collateralAmount = 12e18;
-        collateral.mint(alice, collateralAmount);
-        credit.mint(alice, 400e18);
-
-        // sign credit permit message valid for 10s
-        bytes32 structHash = keccak256(abi.encode(
-            keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
-            alice,
-            address(term),
-            400e18,
-            credit.nonces(alice),
-            block.timestamp + 10
-        ));
-        bytes32 digest = ECDSA.toTypedDataHash(credit.DOMAIN_SEPARATOR(), structHash);
-        (uint8 vCredit, bytes32 rCredit, bytes32 sCredit) = vm.sign(alicePrivateKey, digest);
-        assertEq(ECDSA.recover(digest, vCredit, rCredit, sCredit), alice);
-
-        // sign collateral permit message valid for 10s
-        structHash = keccak256(abi.encode(
-            keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
-            alice,
-            address(term),
-            collateralAmount,
-            collateral.nonces(alice),
-            block.timestamp + 10
-        ));
-        digest = ECDSA.toTypedDataHash(collateral.DOMAIN_SEPARATOR(), structHash);
-        (uint8 vCollateral, bytes32 rCollateral, bytes32 sCollateral) = vm.sign(alicePrivateKey, digest);
-        assertEq(ECDSA.recover(digest, vCollateral, rCollateral, sCollateral), alice);
-
-        // if deadline is passed, cannot broadcast
-        vm.warp(block.timestamp + 20);
-        vm.expectRevert("ERC20Permit: expired deadline");
-        vm.prank(alice);
-        term.borrowWithPermits(
-            borrowAmount,
-            collateralAmount,
-            block.timestamp - 10,
-            LendingTerm.Signature({ v: vCollateral, r: rCollateral, s: sCollateral }),
-            LendingTerm.Signature({ v: vCredit, r: rCredit, s: sCredit })
-        );
-        vm.warp(block.timestamp - 20);
-
-        // borrow
-        vm.prank(alice);
-        bytes32 loanId = term.borrowWithPermits(
-            borrowAmount,
-            collateralAmount,
-            block.timestamp + 10,
-            LendingTerm.Signature({ v: vCollateral, r: rCollateral, s: sCollateral }),
-            LendingTerm.Signature({ v: vCredit, r: rCredit, s: sCredit })
-        );
-
-        // check loan creation
-        assertEq(term.getLoan(loanId).borrower, alice);
-        assertEq(term.getLoan(loanId).borrowAmount, borrowAmount);
-        assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
-        assertEq(term.getLoan(loanId).caller, address(0));
-        assertEq(term.getLoan(loanId).callTime, 0);
-        assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
-        assertEq(term.getLoan(loanId).closeTime, 0);
-
-        // nonce is consumed, cannot broadcast again
-        assertEq(credit.nonces(alice), 1);
-        assertEq(collateral.nonces(alice), 1);
-        vm.expectRevert("ERC20Permit: invalid signature");
-        vm.prank(alice);
-        term.borrowWithPermits(
-            borrowAmount,
-            collateralAmount,
-            block.timestamp + 10,
-            LendingTerm.Signature({ v: vCollateral, r: rCollateral, s: sCollateral }),
-            LendingTerm.Signature({ v: vCredit, r: rCredit, s: sCredit })
         );
     }
 
@@ -325,21 +185,18 @@ contract LendingTermSignaturesUnitTest is Test {
         // prepare
         uint256 borrowAmount = 20_000e18;
         uint256 collateralAmount = 12e18;
-        collateral.mint(alice, collateralAmount);
+        collateral.mint(address(this), collateralAmount);
 
         // manual approve
-        vm.prank(alice);
         collateral.approve(address(term), collateralAmount);
 
         // borrow
-        credit.mint(alice, 400e18);
-        vm.prank(alice);
-        credit.approve(address(term), 400e18);
-        vm.prank(alice);
         bytes32 loanId = term.borrow(
+            alice,
             borrowAmount,
             collateralAmount
         );
+        credit.transfer(alice, borrowAmount);
 
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 13);

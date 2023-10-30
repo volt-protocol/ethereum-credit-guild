@@ -135,10 +135,12 @@ contract LendingTerm is CoreRef {
         /// repay during partial debt repayments.
         /// percentage is expressed with 18 decimals, e.g. 0.05e18 = 5% debt.
         uint256 minPartialRepayPercent;
-        /// @notice the opening fee is a small amount of CREDIT provided by the borrower
+        /// @notice the opening fee is a percent of interest that instantly accrues
         /// when the loan is opened.
         /// The opening fee is expressed as a percentage of the borrowAmount, with 18
         /// decimals, e.g. 0.05e18 = 5% of the borrowed amount.
+        /// A loan with 2% openingFee and 3% interestRate will owe 102% of the borrowed
+        /// amount just after being open, and after 1 year will owe 105%.
         uint256 openingFee;
         /// @notice the absolute maximum amount of debt this lending term can issue
         /// at any given time, regardless of the gauge allocations.
@@ -219,6 +221,10 @@ contract LendingTerm is CoreRef {
             YEAR /
             1e18;
         uint256 loanDebt = borrowAmount + interest;
+        uint256 _openingFee = params.openingFee;
+        if (_openingFee != 0) {
+            loanDebt += (borrowAmount * _openingFee) / 1e18;
+        }
         uint256 creditMultiplier = ProfitManager(refs.profitManager)
             .creditMultiplier();
         loanDebt = (loanDebt * loan.borrowCreditMultiplier) / creditMultiplier;
@@ -248,6 +254,7 @@ contract LendingTerm is CoreRef {
 
     /// @notice initiate a new loan
     function _borrow(
+        address collateralOwner,
         address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount
@@ -322,27 +329,12 @@ contract LendingTerm is CoreRef {
             lastPartialRepay[loanId] = block.timestamp;
         }
 
-        // mint debt to the borrower
-        RateLimitedMinter(refs.creditMinter).mint(borrower, borrowAmount);
+        // mint debt to the collateralOwner
+        RateLimitedMinter(refs.creditMinter).mint(collateralOwner, borrowAmount);
 
-        // pull opening fee from the borrower, if any
-        if (params.openingFee != 0) {
-            uint256 _openingFee = (borrowAmount * params.openingFee) / 1e18;
-            // transfer from borrower to ProfitManager & report profit
-            CreditToken(refs.creditToken).transferFrom(
-                borrower,
-                refs.profitManager,
-                _openingFee
-            );
-            ProfitManager(refs.profitManager).notifyPnL(
-                address(this),
-                int256(_openingFee)
-            );
-        }
-
-        // pull the collateral from the borrower
+        // pull the collateral from the collateralOwner
         IERC20(params.collateralToken).safeTransferFrom(
-            borrower,
+            collateralOwner,
             address(this),
             collateralAmount
         );
@@ -359,14 +351,16 @@ contract LendingTerm is CoreRef {
 
     /// @notice initiate a new loan
     function borrow(
+        address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount
     ) external whenNotPaused returns (bytes32 loanId) {
-        loanId = _borrow(msg.sender, borrowAmount, collateralAmount);
+        loanId = _borrow(msg.sender, borrower, borrowAmount, collateralAmount);
     }
 
     /// @notice borrow with a permit on collateral token
     function borrowWithPermit(
+        address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount,
         uint256 deadline,
@@ -381,57 +375,7 @@ contract LendingTerm is CoreRef {
             sig.r,
             sig.s
         );
-        return _borrow(msg.sender, borrowAmount, collateralAmount);
-    }
-
-    /// @notice borrow with a permit on credit token
-    function borrowWithCreditPermit(
-        uint256 borrowAmount,
-        uint256 collateralAmount,
-        uint256 deadline,
-        Signature calldata sig
-    ) external whenNotPaused returns (bytes32 loanId) {
-        IERC20Permit(refs.creditToken).permit(
-            msg.sender,
-            address(this),
-            (borrowAmount * params.openingFee) / 1e18,
-            deadline,
-            sig.v,
-            sig.r,
-            sig.s
-        );
-        return _borrow(msg.sender, borrowAmount, collateralAmount);
-    }
-
-    /// @notice borrow with a permit on collateral token + credit token
-    function borrowWithPermits(
-        uint256 borrowAmount,
-        uint256 collateralAmount,
-        uint256 deadline,
-        Signature calldata collateralPermitSig,
-        Signature calldata creditPermitSig
-    ) external whenNotPaused returns (bytes32 loanId) {
-        IERC20Permit(refs.creditToken).permit(
-            msg.sender,
-            address(this),
-            (borrowAmount * params.openingFee) / 1e18,
-            deadline,
-            creditPermitSig.v,
-            creditPermitSig.r,
-            creditPermitSig.s
-        );
-
-        IERC20Permit(params.collateralToken).permit(
-            msg.sender,
-            address(this),
-            collateralAmount,
-            deadline,
-            collateralPermitSig.v,
-            collateralPermitSig.r,
-            collateralPermitSig.s
-        );
-
-        return _borrow(msg.sender, borrowAmount, collateralAmount);
+        return _borrow(msg.sender, borrower, borrowAmount, collateralAmount);
     }
 
     /// @notice add collateral on an open loan.

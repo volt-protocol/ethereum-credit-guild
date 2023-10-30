@@ -131,7 +131,7 @@ contract AuctionHouseUnitTest is Test {
         // borrow
         vm.startPrank(borrower);
         collateral.approve(address(term), collateralAmount);
-        loanId = term.borrow(borrowAmount, collateralAmount);
+        loanId = term.borrow(borrower, borrowAmount, collateralAmount);
         vm.stopPrank();
 
         // 1 year later, interest accrued
