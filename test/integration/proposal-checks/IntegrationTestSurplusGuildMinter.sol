@@ -27,6 +27,27 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     ///    repay loan
     ///    bid on a loan and cause bad debt
 
+    function _voteForSDAIGauge() private {
+        uint256 mintAmount = governor.quorum(0);
+        /// setup
+        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        rateLimitedGuildMinter.mint(address(this), mintAmount);
+        guild.delegate(address(this));
+
+        assertTrue(guild.isGauge(address(term)));
+        assertEq(guild.numGauges(), 1);
+        assertEq(guild.numLiveGauges(), 1);
+    }
+
+    function _allocateGaugeToSDAI() private {
+        _voteForSDAIGauge();
+
+        guild.incrementGauge(address(term), guild.balanceOf(address(this)));
+
+        assertEq(guild.totalWeight(), guild.balanceOf(address(this)));
+        assertTrue(guild.isUserGauge(address(this), address(term)));
+    }
+
     function testStake(uint256 stakeAmount) public {
         stakeAmount = _bound(
             stakeAmount,
@@ -106,7 +127,18 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     }
 
     /// TODO
-    function testCreditStakerGainsOnLoanRepayWithInterest() public {}
+    function testCreditStakerGainsOnLoanRepayWithInterest() public {
+        _voteForSDAIGauge();
+
+        uint256 warpTime = 365 days;
+        /// create loan
+        (bytes32 loanId, uint256 supplyAmount) = _supplyCollateralUserOne(1000e18); /// supply 1000 SDAI Collateral and receive 1000 credit as user one
+        /// stake credit in surplus guild minter on that term
+        _testStake(supplyAmount);
+        /// warp forward, repay loan with interest
+        /// check unclaimed rewards in surplus guild minter
+        /// unstake from surplus guild minter and ensure that user receives correct amount of credit back + guild rewards
+    }
 
     /// TODO
     function testCreditStakerSlashOnBadDebtLossEvent() public {}
@@ -136,6 +168,8 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         );
     }
 
+    /// stake credit and assert that the correct amount of guild is minted
+    /// @param stakeAmount the amount of credit to stake
     function _testStake(uint256 stakeAmount) private {
         // mint credit
         deal(address(credit), userOne, stakeAmount, true);
@@ -190,5 +224,133 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
             0,
             "incorrect profit index"
         );
+    }
+
+    function _supplyCollateralUserOne(
+        uint128 supplyAmount
+    ) private returns (bytes32 loanId, uint128 suppliedAmount) {
+        supplyAmount = uint128(
+            _bound(
+                uint256(supplyAmount),
+                term.MIN_BORROW(),
+                rateLimitedCreditMinter.buffer()
+            )
+        );
+        suppliedAmount = supplyAmount;
+
+        _allocateGaugeToSDAI();
+
+        deal(address(sdai), userOne, supplyAmount);
+
+        uint256 startingTotalSupply = credit.totalSupply();
+
+        vm.startPrank(userOne);
+        sdai.approve(address(term), supplyAmount);
+        loanId = term.borrow(userOne, supplyAmount, supplyAmount);
+        vm.stopPrank();
+
+        assertEq(term.getLoanDebt(loanId), supplyAmount, "incorrect loan debt");
+        assertEq(
+            sdai.balanceOf(address(term)),
+            supplyAmount,
+            "sdai balance of term incorrect"
+        );
+        assertEq(
+            credit.totalSupply(),
+            supplyAmount + startingTotalSupply,
+            "incorrect credit supply"
+        );
+        assertEq(
+            credit.balanceOf(userOne),
+            supplyAmount,
+            "incorrect credit balance"
+        );
+        assertEq(
+            rateLimitedCreditMinter.buffer(),
+            rateLimitedCreditMinter.bufferCap() -
+                startingTotalSupply -
+                supplyAmount,
+            "incorrect buffer"
+        );
+        assertEq(
+            rateLimitedCreditMinter.lastBufferUsedTime(),
+            block.timestamp,
+            "incorrect last buffer used time"
+        );
+        assertEq(term.issuance(), supplyAmount, "incorrect supply issuance");
+    }
+
+    function _repayLoan(uint128 supplyAmount) public {
+        uint256 startingCreditSupply = credit.totalSupply(); /// start off at 100
+        (bytes32 loanId, uint128 suppliedAmount) = _supplyCollateralUserOne(
+            supplyAmount
+        ); /// borrow 100
+
+        /// total supply is 200
+
+        vm.warp(block.timestamp + 1);
+
+        /// account for accrued interest, adjust total supply of credit
+        uint256 loanDebt = term.getLoanDebt(loanId);
+        uint256 interest = loanDebt - suppliedAmount;
+
+        deal(address(credit), userTwo, loanDebt, true); /// mint 101 CREDIT to userOne to repay debt
+        /// total supply is 301
+
+        credit.totalSupply();
+
+        vm.startPrank(userTwo);
+        credit.approve(address(term), term.getLoanDebt(loanId));
+        term.repay(loanId);
+        vm.stopPrank();
+
+        {
+            (uint256 surplusSplit, , , , ) = profitManager
+                .getProfitSharingConfig();
+            assertEq(
+                credit.totalSupply(),
+                ((interest * surplusSplit) / 1e18) + /// 10% of interest goes into total supply,
+                    startingCreditSupply + /// the rest goes to profit, which is interpolated over the period
+                    suppliedAmount,
+                "incorrect credit supply before interpolating"
+            );
+        }
+
+        uint256 repayTime = block.timestamp;
+
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
+
+        /// total supply is 201
+
+        assertEq(term.getLoanDebt(loanId), 0, "incorrect loan debt");
+
+        assertEq(
+            sdai.balanceOf(address(term)),
+            0,
+            "sdai balance of term incorrect"
+        );
+        assertEq(
+            credit.totalSupply(),
+            interest + startingCreditSupply + suppliedAmount,
+            "incorrect credit supply"
+        );
+        assertEq(
+            credit.balanceOf(userOne),
+            suppliedAmount,
+            "incorrect credit balance"
+        );
+
+        console.log("startingCreditSupply: ", startingCreditSupply);
+        assertEq(
+            rateLimitedCreditMinter.buffer(),
+            rateLimitedCreditMinter.bufferCap() - startingCreditSupply,
+            "incorrect buffer"
+        );
+        assertEq(
+            rateLimitedCreditMinter.lastBufferUsedTime(),
+            repayTime,
+            "incorrect last buffer used time"
+        );
+        assertEq(term.issuance(), 0, "incorrect issuance, should be 0");
     }
 }
