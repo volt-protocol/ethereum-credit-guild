@@ -69,7 +69,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
             uint8(IGovernor.ProposalState.Pending)
         );
 
-        vm.roll(block.number + VOTING_PERIOD - 1);
+        vm.roll(block.number + onboarder.votingPeriod() - 1);
         vm.warp(block.timestamp + onboarder.proposalDeadline(proposalId) - 1);
 
         assertEq(
@@ -82,7 +82,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
             uint8(GovernorCountingSimple.VoteType.For)
         );
 
-        vm.roll(block.number + VOTING_PERIOD + 1);
+        vm.roll(block.number + onboarder.votingPeriod() + 1);
         vm.warp(block.timestamp + 13);
 
         onboarder.queue(
@@ -98,7 +98,8 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
 
         // execute
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + TIMELOCK_DELAY + 13);
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+
         assertEq(
             uint8(onboarder.state(proposalId)),
             uint8(IGovernor.ProposalState.Queued)
