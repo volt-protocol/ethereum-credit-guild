@@ -38,7 +38,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
 
         vm.startPrank(userOne);
         sdai.approve(address(term), supplyAmount);
-        loanId = term.borrow(userOne, borrowAmount, supplyAmount);
+        loanId = term.borrow(borrowAmount, supplyAmount);
         vm.stopPrank();
 
         assertEq(term.getLoanDebt(loanId), borrowAmount, "incorrect loan debt");

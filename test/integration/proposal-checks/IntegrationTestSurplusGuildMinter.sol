@@ -319,7 +319,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
 
         vm.startPrank(userOne);
         sdai.approve(address(term), supplyAmount);
-        loanId = term.borrow(userOne, supplyAmount, supplyAmount);
+        loanId = term.borrow(supplyAmount, supplyAmount);
         vm.stopPrank();
 
         assertEq(term.getLoanDebt(loanId), supplyAmount, "incorrect loan debt");
