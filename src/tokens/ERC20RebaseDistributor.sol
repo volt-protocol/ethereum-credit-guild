@@ -177,18 +177,20 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         } else {
             uint256 shareDecrease = uint256(-sharesDelta);
             if (shareDecrease < sharesBefore) {
-                sharesAfter = sharesBefore - shareDecrease;
+                unchecked {
+                    sharesAfter = sharesBefore - shareDecrease;
+                }
             }
             // else sharesAfter stays 0
         }
         totalRebasingShares = sharesAfter;
 
-        // reset interpolation if going to or coming from 0 rebasing supply
-        if (sharesBefore == 0 || sharesAfter == 0) {
+        // reset interpolation & share price if going to 0 rebasing supply
+        if (sharesAfter == 0) {
             __rebasingSharePrice = InterpolatedValue({
-                lastTimestamp: SafeCastLib.safeCastTo32(block.timestamp),
+                lastTimestamp: SafeCastLib.safeCastTo32(block.timestamp), // now
                 lastValue: uint224(START_REBASING_SHARE_PRICE), // safe initial value
-                targetTimestamp: SafeCastLib.safeCastTo32(block.timestamp),
+                targetTimestamp: SafeCastLib.safeCastTo32(block.timestamp), // now
                 targetValue: uint224(START_REBASING_SHARE_PRICE) // safe initial value
             });
             return;
@@ -354,11 +356,10 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         if (_rebasingSupply != 0) {
             // update rebasingSharePrice interpolation
             uint256 endTimestamp = block.timestamp + DISTRIBUTION_PERIOD;
-            uint256 endRebasingSupplyValue = amount +
-                (__rebasingSharePrice.targetValue * _totalRebasingShares) /
-                START_REBASING_SHARE_PRICE;
-            uint256 newTargetSharePrice = (endRebasingSupplyValue *
-                START_REBASING_SHARE_PRICE) / _totalRebasingShares;
+            uint256 newTargetSharePrice = (amount *
+                START_REBASING_SHARE_PRICE +
+                __rebasingSharePrice.targetValue *
+                _totalRebasingShares) / _totalRebasingShares;
             __rebasingSharePrice = InterpolatedValue({
                 lastTimestamp: SafeCastLib.safeCastTo32(block.timestamp),
                 lastValue: SafeCastLib.safeCastTo224(_rebasingSharePrice),
