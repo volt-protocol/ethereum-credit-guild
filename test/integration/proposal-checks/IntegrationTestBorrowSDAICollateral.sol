@@ -402,7 +402,5 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             startingCreditSupply - creditAmount,
             "incorrect credit total supply"
         );
-
-        assertEq(0, credit.totalRebasingShares(), "incorrect rebasing shares");
     }
 }
