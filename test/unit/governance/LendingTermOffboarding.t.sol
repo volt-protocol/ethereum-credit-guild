@@ -128,7 +128,7 @@ contract LendingTermOffboardingUnitTest is Test {
         collateral.mint(alice, aliceLoanSize);
         vm.startPrank(alice);
         collateral.approve(address(term), aliceLoanSize);
-        aliceLoanId = term.borrow(alice, aliceLoanSize, aliceLoanSize);
+        aliceLoanId = term.borrow(aliceLoanSize, aliceLoanSize);
         vm.stopPrank();
 
         // labels
@@ -279,7 +279,7 @@ contract LendingTermOffboardingUnitTest is Test {
         // cannot open new loans
         collateral.approve(address(term), aliceLoanSize);
         vm.expectRevert("LendingTerm: debt ceiling reached");
-        aliceLoanId = term.borrow(alice, aliceLoanSize, aliceLoanSize);
+        aliceLoanId = term.borrow(aliceLoanSize, aliceLoanSize);
         vm.stopPrank();
     }
 
