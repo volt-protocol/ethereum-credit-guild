@@ -184,7 +184,10 @@ contract SurplusGuildMinter is CoreRef {
         } else {
             // if not unstaking all, make sure the stake remains
             // greater than the minimum stake
-            require(userStake.credit >= MIN_STAKE, "SurplusGuildMinter: remaining stake below min");
+            require(
+                userStake.credit >= MIN_STAKE,
+                "SurplusGuildMinter: remaining stake below min"
+            );
         }
         _stakes[msg.sender][term] = userStake;
 

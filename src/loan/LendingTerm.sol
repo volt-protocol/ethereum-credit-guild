@@ -295,10 +295,11 @@ contract LendingTerm is CoreRef {
 
         // check the debt ceiling
         uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
-        uint256 debtCeiling = GuildToken(refs.guildToken).calculateGaugeAllocation(
-            address(this),
-            _totalSupply + borrowAmount
-        );
+        uint256 debtCeiling = GuildToken(refs.guildToken)
+            .calculateGaugeAllocation(
+                address(this),
+                _totalSupply + borrowAmount
+            );
         if (_totalSupply == 0) {
             // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
             // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
@@ -775,7 +776,7 @@ contract LendingTerm is CoreRef {
         // burn credit principal, replenish buffer
         if (principal != 0) {
             CreditToken(refs.creditToken).burn(principal);
-        RateLimitedMinter(refs.creditMinter).replenishBuffer(principal);
+            RateLimitedMinter(refs.creditMinter).replenishBuffer(principal);
         }
 
         // handle profit & losses
