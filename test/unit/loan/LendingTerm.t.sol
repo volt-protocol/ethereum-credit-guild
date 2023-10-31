@@ -198,8 +198,6 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 12e18;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term2), collateralAmount);
-        credit.mint(address(this), 1_000e18);
-        credit.approve(address(term2), 1_000e18);
 
         // borrow
         bytes32 loanId = term2.borrow(borrowAmount, collateralAmount);
@@ -210,6 +208,8 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.balanceOf(address(this)), borrowAmount);
         assertEq(credit.balanceOf(address(term2)), 0);
         assertEq(term2.getLoan(loanId).borrower, address(this));
+        assertEq(term2.getLoan(loanId).borrowAmount, borrowAmount);
+        assertEq(term2.getLoanDebt(loanId), borrowAmount + 1_000e18 /*openingFee*/);
     }
 
     // borrow fail because 0 collateral
@@ -909,6 +909,9 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), 0);
         assertEq(credit.balanceOf(address(term)), 0);
         assertEq(credit.balanceOf(bidder), 0);
+        assertEq(credit.balanceOf(saver), 100); // profit interpolated over time
+        assertEq(credit.totalSupply(), 100);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(credit.balanceOf(saver), 2_000e18 + 100); // profit distributed to saver
         assertEq(credit.totalSupply(), 2_000e18 + 100);
     }
@@ -1187,6 +1190,8 @@ contract LendingTermUnitTest is Test {
 
         // loan is closed, profit is distributed
         assertEq(term.getLoanDebt(loanId), 0);
+        assertEq(credit.balanceOf(address(this)), 100);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(credit.balanceOf(address(this)), 100 + 4_000e18);
     }
 
@@ -1228,6 +1233,8 @@ contract LendingTermUnitTest is Test {
         assertEq(term.issuance(), 10_000e18);
         assertEq(term.getLoan(loanId).borrowAmount, 10_000e18);
         assertEq(term.getLoanDebt(loanId), 22_000e18);
+        assertEq(credit.balanceOf(address(this)), 100);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(credit.balanceOf(address(this)), 100 + 2_000e18);
     }
 
@@ -1274,6 +1281,8 @@ contract LendingTermUnitTest is Test {
         // loan is repaid, profit is distributed
         assertEq(term.issuance(), 0);
         assertEq(term.getLoanDebt(loanId), 0);
+        assertEq(credit.balanceOf(address(this)), 100);
+        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(credit.balanceOf(address(this)), 100 + 4_000e18);
     }
 
@@ -1359,7 +1368,6 @@ contract LendingTermUnitTest is Test {
         assertEq(term.getLoanDebt(loanId), 44_000e18);
 
         // attempt to partialRepay with a resulting loan below MIN_BORROW
-        uint256 MIN_BORROW = term.MIN_BORROW();
         credit.mint(address(this), 4_000e18);
         assertEq(credit.balanceOf(address(this)), 44_000e18);
         credit.approve(address(term), 41_000e18);

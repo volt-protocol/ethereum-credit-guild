@@ -165,6 +165,7 @@ contract CreditTokenUnitTest is Test {
         token.mint(address(this), 1000e18);
         token.approve(address(token), 1000e18);
         token.distribute(1000e18);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         // after distribute (1)
         assertEq(token.totalSupply(), 3000e18);
@@ -180,6 +181,7 @@ contract CreditTokenUnitTest is Test {
         token.mint(address(this), 3000e18);
         token.approve(address(token), 3000e18);
         token.distribute(3000e18);
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
 
         // after distribute (2)
         assertEq(token.totalSupply(), 6000e18);

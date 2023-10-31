@@ -197,8 +197,11 @@ contract LendingTermOnboarding is VoltGovernor {
         values = new uint256[](3);
         calldatas = new bytes[](3);
         description = string.concat(
-            "Enable term ",
-            Strings.toHexString(uint160(term), 20)
+            "[",
+            Strings.toString(block.number),
+            "]",
+            " Enable term ",
+            Strings.toHexString(term)
         );
 
         // 1st call: guild.addGauge(term)

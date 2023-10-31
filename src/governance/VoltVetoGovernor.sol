@@ -23,8 +23,6 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 /// executed, the veto vote is considered failed and the action cannot be cancelled anymore.
 /// @author eswak
 contract VoltVetoGovernor is CoreRef, Governor, GovernorVotes {
-    mapping(uint256 => ProposalCore) private _proposals;
-
     /// @notice Private storage variable for quorum (the minimum number of votes needed for a vote to pass).
     uint256 private _quorum;
 

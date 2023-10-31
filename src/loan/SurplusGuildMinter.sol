@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
+import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
+
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
@@ -10,11 +12,15 @@ import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 /// @notice SurplusGuildMinter allows GUILD to be minted from CREDIT collateral.
 /// In this contract, CREDIT tokens can be provided as first-loss capital to
-/// the surplus buffer, and in exchange, users can participate in the gauge
-/// voting system at a reduced capital cost & without exposure to GUILD
+/// the surplus buffer of chosen terms, and in exchange, users can participate in the
+/// gauge voting system at a reduced capital cost & without exposure to GUILD
 /// token's price fluctuations. GUILD minted through this contract can only
 /// participate in the gauge system to increase debt ceiling and earn fees
 /// from selected lending terms.
+/// @dev note that any update to the `rewardRatio` (through `setRewardRatio`) will
+/// change the rewards of all pending unclaimed rewards. Before a proposal to update
+/// the reward ratio execute, this contract should be pinged with `getRewards` for
+/// all users that have pending rewards.
 contract SurplusGuildMinter is CoreRef {
     /// @notice minimum number of CREDIT to stake
     uint256 public constant MIN_STAKE = 1e18;
@@ -32,9 +38,7 @@ contract SurplusGuildMinter is CoreRef {
     event Unstake(
         uint256 indexed timestamp,
         address indexed term,
-        uint256 amount,
-        uint256 reward,
-        int256 pnl
+        uint256 amount
     );
     /// @notice emitted when a user is rewarded GUILD from non-zero interest
     /// rate and closing their position without loss.
@@ -43,6 +47,10 @@ contract SurplusGuildMinter is CoreRef {
         address indexed user,
         uint256 amount
     );
+    /// @notice emitted when the mintRatio is updated
+    event MintRatioUpdate(uint256 indexed timestamp, uint256 ratio);
+    /// @notice emitted when the rewardRatio is updated
+    event RewardRatioUpdate(uint256 indexed timestamp, uint256 ratio);
 
     /// @notice reference to the ProfitManager
     address public immutable profitManager;
@@ -59,31 +67,23 @@ contract SurplusGuildMinter is CoreRef {
     /// @notice ratio of GUILD tokens minted per CREDIT tokens staked.
     /// expressed with 18 decimals, e.g. a ratio of 2e18 would provide 2e18
     /// GUILD tokens to a user that stakes 1e18 CREDIT tokens.
-    uint256 public ratio;
+    uint256 public mintRatio;
 
-    /// @notice Negative interest rate of GUILD tokens borrowed, expressed
-    /// as a percentage with 18 decimals. e.g. 0.1e18 interest rate for a user
-    /// that borrow GUILD for 1 year would mint the user 10% of the GUILD they
-    /// provided first-loss capital for 1 year when they unstake.
-    uint256 public interestRate;
+    /// @notice ratio of GUILD tokens earned per CREDIT tokens earned.
+    /// expressed with 18 decimals, e.g. a ratio of 2e18 would provide 2e18
+    /// GUILD tokens to a user that stakes earned 1e18 CREDIT tokens.
+    uint256 public rewardRatio;
 
-    /// @notice list of user stakes (stakes[user][term]=stake)
-    mapping(address => mapping(address => uint256)) public stakes;
+    struct UserStake {
+        uint48 stakeTime;
+        uint48 lastGaugeLoss;
+        uint160 profitIndex;
+        uint128 credit;
+        uint128 guild;
+    }
 
-    /// @notice list of user stake timestamps (stakeTimestamp[user][term]=timestamp)
-    mapping(address => mapping(address => uint256)) public stakeTimestamp;
-
-    /// @notice list of ratio when users staked (stakeRatio[user][term]=ratio)
-    mapping(address => mapping(address => uint256)) public stakeRatio;
-
-    /// @notice list of interest rates when users staked (stakeInterestRate[user][term]=interestRate)
-    mapping(address => mapping(address => uint256)) public stakeInterestRate;
-
-    /// @notice list of lastGaugeLoss when users entered gauges (lastGaugeLoss[user][term]=timestamp)
-    mapping(address => mapping(address => uint256)) internal lastGaugeLoss;
-
-    /// @notice list of profitIndex when users entered gauges (profitIndex[user][term]=index)
-    mapping(address => mapping(address => uint256)) internal profitIndex;
+    /// @notice list of user stakes (stakes[user][term]=UserStake)
+    mapping(address => mapping(address => UserStake)) internal _stakes;
 
     constructor(
         address _core,
@@ -91,243 +91,237 @@ contract SurplusGuildMinter is CoreRef {
         address _credit,
         address _guild,
         address _rlgm,
-        uint256 _ratio,
-        uint256 _interestRate
+        uint256 _mintRatio,
+        uint256 _rewardRatio
     ) CoreRef(_core) {
         profitManager = _profitManager;
         credit = _credit;
         guild = _guild;
         rlgm = _rlgm;
-        ratio = _ratio;
-        interestRate = _interestRate;
+        mintRatio = _mintRatio;
+        rewardRatio = _rewardRatio;
+    }
+
+    /// @notice get a given user stake
+    function getUserStake(
+        address user,
+        address term
+    ) external view returns (UserStake memory) {
+        return _stakes[user][term];
     }
 
     /// @notice stake CREDIT tokens to start voting in a gauge.
     function stake(address term, uint256 amount) external whenNotPaused {
+        // apply pending rewards
+        (uint256 lastGaugeLoss, UserStake memory userStake, ) = getRewards(
+            msg.sender,
+            term
+        );
+
+        require(
+            lastGaugeLoss != block.timestamp,
+            "SurplusGuildMinter: loss in block"
+        );
         require(amount >= MIN_STAKE, "SurplusGuildMinter: min stake");
 
         // pull CREDIT from user & transfer it to surplus buffer
         CreditToken(credit).transferFrom(msg.sender, address(this), amount);
         CreditToken(credit).approve(address(profitManager), amount);
-        ProfitManager(profitManager).donateToSurplusBuffer(amount);
+        ProfitManager(profitManager).donateToTermSurplusBuffer(term, amount);
 
         // self-mint GUILD tokens
-        uint256 _ratio = ratio;
-        uint256 guildAmount = (_ratio * amount) / 1e18;
+        uint256 _mintRatio = mintRatio;
+        uint256 guildAmount = (_mintRatio * amount) / 1e18;
         RateLimitedMinter(rlgm).mint(address(this), guildAmount);
         GuildToken(guild).incrementGauge(term, guildAmount);
 
         // update state
-        require(
-            stakes[msg.sender][term] == 0,
-            "SurplusGuildMinter: already staking"
-        );
-        stakes[msg.sender][term] = amount;
-        lastGaugeLoss[msg.sender][term] = GuildToken(guild).lastGaugeLoss(term);
-        profitIndex[msg.sender][term] = ProfitManager(profitManager)
-            .userGaugeProfitIndex(address(this), term);
-        stakeRatio[msg.sender][term] = _ratio;
-        stakeInterestRate[msg.sender][term] = interestRate;
-        stakeTimestamp[msg.sender][term] = block.timestamp;
+        userStake = UserStake({
+            stakeTime: SafeCastLib.safeCastTo48(block.timestamp),
+            lastGaugeLoss: SafeCastLib.safeCastTo48(lastGaugeLoss),
+            profitIndex: SafeCastLib.safeCastTo160(
+                ProfitManager(profitManager).userGaugeProfitIndex(
+                    address(this),
+                    term
+                )
+            ),
+            credit: userStake.credit + SafeCastLib.safeCastTo128(amount),
+            guild: userStake.guild + SafeCastLib.safeCastTo128(guildAmount)
+        });
+        _stakes[msg.sender][term] = userStake;
 
         // emit event
         emit Stake(block.timestamp, term, amount);
     }
 
     /// @notice unstake CREDIT tokens and stop voting in a gauge.
-    /// user must have been staking for at least one block.
-    function unstake(address term) external {
-        // check that the user is staking
-        uint256 creditStaked = stakes[msg.sender][term];
-        require(creditStaked != 0, "SurplusGuildMinter: not staking");
+    function unstake(address term, uint256 amount) external {
+        // apply pending rewards
+        (, UserStake memory userStake, bool slashed) = getRewards(
+            msg.sender,
+            term
+        );
 
-        // check if losses (slashing) occurred since user joined
-        uint256 _lastGaugeLoss = GuildToken(guild).lastGaugeLoss(term);
-        uint256 _userLastGaugeLoss = lastGaugeLoss[msg.sender][term];
+        // if the user has been slashed, there is nothing to do
+        if (slashed) return;
+
+        // check that the user is at least staking `amount` CREDIT
+        require(
+            amount != 0 && userStake.credit >= amount,
+            "SurplusGuildMinter: invalid amount"
+        );
+
+        // update stake
+        uint256 userMintRatio = (userStake.guild * 1e18) / userStake.credit;
+        uint256 guildAmount = (userMintRatio * amount) / 1e18;
+        if (amount == userStake.credit) guildAmount = userStake.guild;
+        userStake.credit -= SafeCastLib.safeCastTo128(amount);
+        userStake.guild -= SafeCastLib.safeCastTo128(guildAmount);
+        if (userStake.credit == 0) {
+            userStake.stakeTime = 0;
+            userStake.lastGaugeLoss = 0;
+            userStake.profitIndex = 0;
+        } else {
+            // if not unstaking all, make sure the stake remains
+            // greater than the minimum stake
+            require(
+                userStake.credit >= MIN_STAKE,
+                "SurplusGuildMinter: remaining stake below min"
+            );
+        }
+        _stakes[msg.sender][term] = userStake;
+
+        // withdraw & transfer CREDIT
+        ProfitManager(profitManager).withdrawFromTermSurplusBuffer(
+            term,
+            msg.sender,
+            amount
+        );
+
+        // burn GUILD
+        GuildToken(guild).decrementGauge(term, guildAmount);
+        RateLimitedMinter(rlgm).replenishBuffer(guildAmount);
+        GuildToken(guild).burn(guildAmount);
+
+        // emit event
+        emit Unstake(block.timestamp, term, amount);
+    }
+
+    /// @notice get rewards from a staking position without unstaking.
+    /// This can be used to slash users that have an outstanding unapplied loss.
+    function getRewards(
+        address user,
+        address term
+    )
+        public
+        returns (
+            uint256 lastGaugeLoss, // GuildToken.lastGaugeLoss(term)
+            UserStake memory userStake, // stake state after execution of getRewards()
+            bool slashed // true if the user has been slashed
+        )
+    {
+        bool updateState;
+        lastGaugeLoss = GuildToken(guild).lastGaugeLoss(term);
+        if (lastGaugeLoss > uint256(userStake.lastGaugeLoss)) {
+            slashed = true;
+        }
+
+        // if the user is not staking, do nothing
+        userStake = _stakes[user][term];
+        if (userStake.stakeTime == 0)
+            return (lastGaugeLoss, userStake, slashed);
 
         // compute CREDIT rewards
         ProfitManager(profitManager).claimRewards(address(this)); // this will update profit indexes
         uint256 _profitIndex = ProfitManager(profitManager)
             .userGaugeProfitIndex(address(this), term);
-        uint256 _userProfitIndex = profitIndex[msg.sender][term];
+        uint256 _userProfitIndex = uint256(userStake.profitIndex);
         if (_profitIndex == 0) _profitIndex = 1e18;
         if (_userProfitIndex == 0) _userProfitIndex = 1e18;
         uint256 deltaIndex = _profitIndex - _userProfitIndex;
-        uint256 guildAmount = (stakeRatio[msg.sender][term] * creditStaked) /
-            1e18;
-        uint256 guildReward;
-        uint256 creditToUser;
         if (deltaIndex != 0) {
-            creditToUser += (guildAmount * deltaIndex) / 1e18;
-        }
-
-        // if a loss occurred while the user was staking, the GuildToken.applyGaugeLoss(address(this))
-        // can be called by anyone to slash address(this) and decrement gauge weight etc. The contribution
-        // to the surplus buffer is also forfeited.
-        // if no loss occurred while the user was staking :
-        if (
-            _lastGaugeLoss == 0 ||
-            (_lastGaugeLoss == _userLastGaugeLoss &&
-                _lastGaugeLoss != block.timestamp)
-        ) {
-            // decrement GUILD voting weight
-            GuildToken(guild).decrementGauge(term, guildAmount);
-
-            // pull CREDIT from surplus buffer
-            ProfitManager(profitManager).withdrawFromSurplusBuffer(
-                creditStaked
-            );
-            creditToUser += creditStaked;
-
-            // replenish GUILD minter buffer
-            GuildToken(guild).burn(guildAmount);
-            RateLimitedMinter(rlgm).replenishBuffer(guildAmount);
-
-            // mint interest rates to users
-            guildReward =
-                (((guildAmount * stakeInterestRate[msg.sender][term]) / 1e18) *
-                    (block.timestamp - stakeTimestamp[msg.sender][term])) /
-                YEAR;
-            if (guildReward != 0) {
-                RateLimitedMinter(rlgm).mint(msg.sender, guildReward);
-                emit GuildReward(block.timestamp, msg.sender, guildReward);
-            }
-        }
-
-        // forward CREDIT principal + rewards to user
-        if (creditToUser != 0) {
-            CreditToken(credit).transfer(msg.sender, creditToUser);
-        }
-
-        // update state
-        stakes[msg.sender][term] = 0;
-
-        // emit event
-        emit Unstake(
-            block.timestamp,
-            term,
-            creditStaked,
-            guildReward,
-            int256(creditToUser) - int256(creditStaked)
-        );
-    }
-
-    /// @notice downgrade a position that has been opened with a higher ratio than
-    /// what is currently set, or an interest rate higher than what is currently set.
-    /// positions that did not realize slashing can also be downgraded to be closed,
-    /// equivalent as if the user called unstake().
-    function downgrade(address user, address term) external {
-        // check that the user is staking
-        uint256 creditStaked = stakes[user][term];
-        require(creditStaked != 0, "SurplusGuildMinter: not staking");
-
-        // check that the position can be downgraded
-        uint256 _ratio = ratio;
-        uint256 _interestRate = interestRate;
-        require(
-            stakeRatio[user][term] > _ratio ||
-                stakeInterestRate[user][term] > _interestRate,
-            "SurplusGuildMinter: cannot downgrade"
-        );
-
-        // check if losses (slashing) occurred since user joined
-        uint256 _lastGaugeLoss = GuildToken(guild).lastGaugeLoss(term);
-        uint256 _userLastGaugeLoss = lastGaugeLoss[user][term];
-
-        // compute CREDIT rewards
-        ProfitManager(profitManager).claimRewards(address(this)); // this will update profit indexes
-        uint256 _profitIndex = ProfitManager(profitManager)
-            .userGaugeProfitIndex(address(this), term);
-        if (_profitIndex == 0) _profitIndex = 1e18;
-        uint256 guildAmount = (stakeRatio[user][term] * creditStaked) / 1e18;
-        uint256 creditToUser;
-        {
-            uint256 _userProfitIndex = profitIndex[user][term];
-            if (_userProfitIndex == 0) _userProfitIndex = 1e18;
-            uint256 deltaIndex = _profitIndex - _userProfitIndex;
-            if (deltaIndex != 0) {
-                creditToUser = (guildAmount * deltaIndex) / 1e18;
-            }
-        }
-
-        // if a loss occurred while the user was staking, the GuildToken.applyGaugeLoss(address(this))
-        // can be called by anyone to slash address(this) and decrement gauge weight etc. The contribution
-        // to the surplus buffer is also forfeited.
-        // if no loss occurred while the user was staking :
-        if (
-            _lastGaugeLoss == 0 ||
-            (_lastGaugeLoss == _userLastGaugeLoss &&
-                _lastGaugeLoss != block.timestamp)
-        ) {
-            {
-                uint256 guildDecrement = guildAmount -
-                    ((_ratio * creditStaked) / 1e18);
-                if (guildDecrement != 0) {
-                    // decrement GUILD voting weight
-                    GuildToken(guild).decrementGauge(term, guildDecrement);
-
-                    // replenish GUILD minter buffer
-                    GuildToken(guild).burn(guildDecrement);
-                    RateLimitedMinter(rlgm).replenishBuffer(guildDecrement);
-                }
+            uint256 creditReward = (uint256(userStake.guild) * deltaIndex) /
+                1e18;
+            uint256 guildReward = (creditReward * rewardRatio) / 1e18;
+            if (slashed) {
+                guildReward = 0;
             }
 
-            // mint interest rates to users
-            uint256 guildReward = (((guildAmount *
-                stakeInterestRate[user][term]) / 1e18) *
-                (block.timestamp - stakeTimestamp[user][term])) / YEAR;
+            // forward rewards to user
             if (guildReward != 0) {
                 RateLimitedMinter(rlgm).mint(user, guildReward);
                 emit GuildReward(block.timestamp, user, guildReward);
             }
+            if (creditReward != 0) {
+                CreditToken(credit).transfer(user, creditReward);
+            }
 
-            // update state
-            profitIndex[user][term] = _profitIndex;
-            stakeRatio[user][term] = _ratio;
-            stakeInterestRate[user][term] = _interestRate;
-            stakeTimestamp[user][term] = block.timestamp;
-
-            // emit events
-            emit Unstake(
-                block.timestamp,
-                term,
-                creditStaked,
-                guildReward,
-                int256(creditToUser)
-            );
-            emit Stake(block.timestamp, term, creditStaked);
-        } else {
-            // loss happened, set staking position to 0
-            emit Unstake(
-                block.timestamp,
-                term,
-                creditStaked,
-                0, // no guildReward
-                int256(creditToUser) - int256(creditStaked)
-            );
-
-            stakes[msg.sender][term] = 0;
+            // save the updated profitIndex
+            userStake.profitIndex = SafeCastLib.safeCastTo160(_profitIndex);
+            updateState = true;
         }
 
-        // forward CREDIT rewards to user
-        if (creditToUser != 0) {
-            CreditToken(credit).transfer(user, creditToUser);
+        // if a loss occurred while the user was staking, the GuildToken.applyGaugeLoss(address(this))
+        // can be called by anyone to slash address(this) and decrement gauge weight etc.
+        // The contribution to the surplus buffer is also forfeited.
+        if (slashed) {
+            emit Unstake(block.timestamp, term, uint256(userStake.credit));
+            userStake = UserStake({
+                stakeTime: uint48(0),
+                lastGaugeLoss: uint48(0),
+                profitIndex: uint160(0),
+                credit: uint128(0),
+                guild: uint128(0)
+            });
+            updateState = true;
+        }
+
+        // store the updated stake, if needed
+        if (updateState) {
+            _stakes[user][term] = userStake;
+        }
+    }
+
+    /// @notice update the mint ratio for a given user.
+    function updateMintRatio(address user, address term) external {
+        // apply pending rewards
+        (, UserStake memory userStake, bool slashed) = getRewards(user, term);
+
+        // if the user has been slashed or isnt staking, there is nothing to do
+        if (userStake.stakeTime == 0 || slashed) return;
+
+        // update amount of GUILD tokens staked
+        uint256 guildBefore = uint256(userStake.guild);
+        uint256 guildAfter = (mintRatio * uint256(userStake.credit)) / 1e18;
+        if (guildAfter > guildBefore) {
+            uint256 guildAmount = guildAfter - guildBefore;
+            RateLimitedMinter(rlgm).mint(address(this), guildAmount);
+            GuildToken(guild).incrementGauge(term, guildAmount);
+            _stakes[user][term].guild = SafeCastLib.safeCastTo128(guildAfter);
+        } else if (guildAfter < guildBefore) {
+            uint256 guildAmount = guildBefore - guildAfter;
+            GuildToken(guild).decrementGauge(term, guildAmount);
+            RateLimitedMinter(rlgm).replenishBuffer(guildAmount);
+            GuildToken(guild).burn(guildAmount);
+            _stakes[user][term].guild = SafeCastLib.safeCastTo128(guildAfter);
         }
     }
 
     /// @notice governor-only function to set the ratio of GUILD tokens minted
     /// per CREDIT tokens contributed to the surplus buffer.
-    function setRatio(
-        uint256 _ratio
+    function setMintRatio(
+        uint256 _mintRatio
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
-        ratio = _ratio;
+        mintRatio = _mintRatio;
+        emit MintRatioUpdate(block.timestamp, _mintRatio);
     }
 
-    /// @notice governor-only function to set the interest rate of GUILD tokens
-    /// borrowed through the SurplusGuildMinter.
-    function setInterestRate(
-        uint256 _interestRate
+    /// @notice governor-only function to set the ratio of GUILD tokens rewarded
+    /// per CREDIT tokens earned from GUILD staking.
+    function setRewardRatio(
+        uint256 _rewardRatio
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
-        interestRate = _interestRate;
+        rewardRatio = _rewardRatio;
+        emit RewardRatioUpdate(block.timestamp, _rewardRatio);
     }
 }

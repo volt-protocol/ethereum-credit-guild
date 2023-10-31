@@ -178,4 +178,25 @@ contract SimplePSMUnitTest is Test {
         // max error of 1 wei for doing a round trip
         assertLt(mintIn - redeemOut, 2);
     }
+
+    // test governor setter for redemptionsPaused
+    function testPauseRedemptions() public {
+        assertEq(psm.redemptionsPaused(), false);
+
+        vm.expectRevert("UNAUTHORIZED");
+        psm.setRedemptionsPaused(true);
+
+        vm.prank(governor);
+        psm.setRedemptionsPaused(true);
+        assertEq(psm.redemptionsPaused(), true);
+
+        // mint
+        token.mint(address(this), 100e18);
+        token.approve(address(psm), 100e18);
+        psm.mint(address(this), 100e18);
+
+        // cannot redeem (paused)
+        vm.expectRevert("SimplePSM: redemptions paused");
+        psm.redeem(address(this), 100e18);
+    }
 }

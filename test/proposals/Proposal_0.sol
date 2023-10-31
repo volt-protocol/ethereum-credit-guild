@@ -79,7 +79,7 @@ contract Proposal_0 is Proposal {
             addresses.addMainnet("SURPLUS_GUILD_MINTER", address(guildMinter));
         }
 
-        // Auction House & LendingTerm Implementation V1
+        // Auction House & LendingTerm Implementation V1 & PSM
         {
             AuctionHouse auctionHouse = new AuctionHouse(
                 addresses.mainnet("CORE"),
@@ -89,8 +89,17 @@ contract Proposal_0 is Proposal {
 
             LendingTerm termV1 = new LendingTerm();
 
+            SimplePSM psm = new SimplePSM(
+                addresses.mainnet("CORE"),
+                addresses.mainnet("PROFIT_MANAGER"),
+                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
+                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_USDC")
+            );
+
             addresses.addMainnet("AUCTION_HOUSE_1", address(auctionHouse));
             addresses.addMainnet("LENDING_TERM_V1", address(termV1));
+            addresses.addMainnet("PSM_USDC", address(psm));
         }
 
         // Governance
@@ -117,6 +126,7 @@ contract Proposal_0 is Proposal {
             LendingTermOffboarding termOffboarding = new LendingTermOffboarding(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("ERC20_GUILD"),
+                addresses.mainnet("PSM_USDC"),
                 5_000_000e18 // quorum
             );
             LendingTermOnboarding termOnboarding = new LendingTermOnboarding(
@@ -130,7 +140,7 @@ contract Proposal_0 is Proposal {
                 }), /// _lendingTermReferences
                 1, // _gaugeType
                 addresses.mainnet("CORE"), // _core
-                addresses.mainnet("TIMELOCK"), // _timelock
+                address(timelock), // _timelock
                 0, // initialVotingDelay
                 7000 * 3, // initialVotingPeriod (~7000 blocks/day)
                 2_500_000e18, // initialProposalThreshold
@@ -144,16 +154,8 @@ contract Proposal_0 is Proposal {
             addresses.addMainnet("LENDING_TERM_ONBOARDING", address(termOnboarding));
         }
 
-        // Terms & PSM
+        // Terms
         {
-            SimplePSM psm = new SimplePSM(
-                addresses.mainnet("CORE"),
-                addresses.mainnet("PROFIT_MANAGER"),
-                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
-                addresses.mainnet("ERC20_CREDIT"),
-                addresses.mainnet("ERC20_USDC")
-            );
-
             LendingTermOnboarding termOnboarding = LendingTermOnboarding(
                 payable(addresses.mainnet("LENDING_TERM_ONBOARDING"))
             );
@@ -176,7 +178,6 @@ contract Proposal_0 is Proposal {
                 hardCap: 2_000_000e18 // max 2M CREDIT issued
             }));
 
-            addresses.addMainnet("PSM_USDC", address(psm));
             addresses.addMainnet("TERM_USDC_1", termUSDC1);
             addresses.addMainnet("TERM_SDAI_1", termSDAI1);
         }
