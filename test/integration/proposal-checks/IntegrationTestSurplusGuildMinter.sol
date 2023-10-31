@@ -163,7 +163,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         /// this means that Guild stakers receive no rewards in either CREDIT or GUILD
         ///
         uint256 creditRewards = (interest * guildSplit) / 1e18; /// should be 0
-        uint256 unclaimedRewards = (interest *
+        uint256 unclaimedRewards = (creditRewards *
             surplusGuildMinter.rewardRatio()) / 1e18;
 
         uint256 guildStaked = (supplyAmount * surplusGuildMinter.mintRatio()) /
