@@ -83,7 +83,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
     mapping(address => RebasingState) internal rebasingState;
 
     /// @notice For internal accounting. Total number of rebasing shares
-    uint256 public totalRebasingShares;
+    uint256 internal totalRebasingShares;
 
     /// @notice The starting share price for rebasing addresses.
     /// @dev rounding errors start to appear when balances of users are near `rebasingSharePrice()`,
