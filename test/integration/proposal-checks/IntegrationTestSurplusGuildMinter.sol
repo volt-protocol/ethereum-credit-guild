@@ -170,7 +170,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
             1e18;
 
         /// unstake from surplus guild minter and ensure that user receives correct amount of credit back + guild rewards
-        /// TODO figure out how much CREDIT userOne should get as a reward for staking
+        /// userOne should get 0 CREDIT as a reward for staking because the GUILD split is 0, meaning no CREDIT is sent to the GUILD stakers
         uint256 startingCreditBalance = credit.balanceOf(userOne);
         uint256 startingGuildBalance = guild.balanceOf(userOne);
         uint256 startingGuildBalanceSurplusGuildMinter = guild.balanceOf(

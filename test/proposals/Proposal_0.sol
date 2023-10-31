@@ -102,14 +102,14 @@ contract Proposal_0 is Proposal {
     /// @notice profit sharing configuration parameters for the Profit Manager
     /// ------------------------------------------------------------------------
 
-    /// @notice 10% of profits go to the surplus buffer
-    uint256 internal constant SURPLUS_BUFFER_SPLIT = 0.1e18;
+    /// @notice 9% of profits go to the surplus buffer
+    uint256 internal constant SURPLUS_BUFFER_SPLIT = 0.09e18;
 
     /// @notice 90% of profits go to credit holders that opt into rebasing
     uint256 internal constant CREDIT_SPLIT = 0.9e18;
 
-    /// @notice 0% of profits go to guild holders staked in gauges
-    uint256 internal constant GUILD_SPLIT = 0;
+    /// @notice 1% of profits go to guild holders staked in gauges
+    uint256 internal constant GUILD_SPLIT = 0.01e18;
 
     /// @notice 0% of profits go to other
     uint256 internal constant OTHER_SPLIT = 0;
@@ -160,7 +160,7 @@ contract Proposal_0 is Proposal {
                 address(guild),
                 address(rateLimitedGuildMinter),
                 GUILD_MINT_RATIO, // ratio of GUILD minted per CREDIT staked
-                GUILD_CREDIT_REWARD_RATIO // negative interest rate of GUILD borrowed
+                GUILD_CREDIT_REWARD_RATIO // amount of GUILD received per CREDIT earned from staking in Gauges
             );
 
             addresses.addMainnet("CREDIT_TOKEN", address(credit));
@@ -324,9 +324,6 @@ contract Proposal_0 is Proposal {
             addresses.mainnet("SURPLUS_GUILD_MINTER")
         );
 
-        // RATE_LIMITED_GUILD_MINTER
-        core.grantRole(CoreRoles.GUILD_MINTER, deployer);
-
         /// Grant Multisig Guild Rate Limited Minter
         core.grantRole(
             CoreRoles.RATE_LIMITED_GUILD_MINTER,
@@ -421,9 +418,9 @@ contract Proposal_0 is Proposal {
         );
         ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
             .setProfitSharingConfig(
-                SURPLUS_BUFFER_SPLIT, // 10% surplusBufferSplit
+                SURPLUS_BUFFER_SPLIT, // 9% surplusBufferSplit
                 CREDIT_SPLIT, // 90% creditSplit
-                GUILD_SPLIT, // guildSplit
+                GUILD_SPLIT, // 1% guildSplit
                 OTHER_SPLIT, // otherSplit
                 address(0) // otherRecipient
             );
@@ -466,8 +463,6 @@ contract Proposal_0 is Proposal {
         core.renounceRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, deployer);
         core.renounceRole(CoreRoles.GAUGE_PARAMETERS, deployer);
         core.renounceRole(CoreRoles.GAUGE_ADD, deployer);
-        /// deployer renounces guild minter role used to create supply
-        core.renounceRole(CoreRoles.GUILD_MINTER, deployer);
     }
 
     function run(Addresses addresses, address deployer) public pure {}
@@ -848,11 +843,11 @@ contract Proposal_0 is Proposal {
             ) = profitManager.getProfitSharingConfig();
             assertEq(
                 surplusBufferSplit,
-                0.1e18,
+                0.09e18,
                 "incorrect surplus buffer split"
             );
             assertEq(creditSplit, 0.9e18, "incorrect credit split");
-            assertEq(guildSplit, 0, "incorrect guild split");
+            assertEq(guildSplit, 0.01e18, "incorrect guild split");
             assertEq(otherSplit, 0, "incorrect other split");
             assertEq(otherRecipient, address(0), "incorrect other recipient");
         }
