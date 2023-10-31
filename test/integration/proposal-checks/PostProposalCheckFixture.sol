@@ -20,12 +20,10 @@ import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
-import {NameLib as strings} from "@test/utils/NameLib.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
-import {DeploymentConstants as constants} from "@test/utils/DeploymentConstants.sol";
 
 contract PostProposalCheckFixture is PostProposalCheck {
     /// Users
@@ -65,6 +63,87 @@ contract PostProposalCheckFixture is PostProposalCheck {
     RateLimitedMinter public rateLimitedGuildMinter;
     SurplusGuildMinter public surplusGuildMinter;
 
+
+    /// @notice maximum guild supply is 1b tokens, however this number can change
+    /// later if new tokens are minted
+    uint256 internal constant GUILD_SUPPLY = 1_000_000_000 * 1e18;
+
+    /// @notice guild mint ratio is 5e18, meaning for 1 credit 5 guild tokens are
+    /// minted in SurplusGuildMinter
+    uint256 internal constant GUILD_MINT_RATIO = 5e18;
+
+    /// @notice ratio of guild tokens received per Credit earned in
+    /// the Surplus Guild Minter
+    uint256 internal constant GUILD_CREDIT_REWARD_RATIO = 0.1e18;
+
+    /// @notice initial credit supply is 100 tokens after USDC PSM mint
+    uint256 internal constant CREDIT_SUPPLY = 100 * 1e18;
+
+    /// @notice initial amount of USDC to mint with is 100
+    uint256 internal constant INITIAL_USDC_MINT_AMOUNT = 100 * 1e6;
+
+    /// @notice maximum delegates for both credit and guild token
+    uint256 internal constant MAX_DELEGATES = 12;
+
+    /// @notice for each SDAI collateral, up to 1 credit can be borrowed
+    uint256 internal constant MAX_SDAI_CREDIT_RATIO = 1e18;
+
+    /// @notice credit hardcap at launch
+    uint256 internal constant CREDIT_HARDCAP = 2_000_000 * 1e18;
+
+    /// @notice SDAI credit hardcap at launch
+    uint256 internal constant SDAI_CREDIT_HARDCAP = 2_000_000 * 1e18;
+
+    /// ------------------------------------------------------------------------
+    /// @notice Interest Rate Parameters
+    /// ------------------------------------------------------------------------
+
+    /// @notice rate to borrow against SDAI collateral
+    uint256 internal constant SDAI_RATE = 0.04e18;
+
+    /// ------------------------------------------------------------------------
+    /// @notice Governance Parameters
+    /// ------------------------------------------------------------------------
+
+    /// @notice voting period in the DAO
+    uint256 internal constant VOTING_PERIOD = 7000 * 3;
+
+    /// @notice timelock delay for all governance actions
+    uint256 internal constant TIMELOCK_DELAY = 3 days;
+
+    /// @notice voting delay for the DAO
+    uint256 internal constant VOTING_DELAY = 0;
+
+    /// @notice proposal threshold for proposing governance actions to the DAO
+    uint256 internal constant PROPOSAL_THRESHOLD = 2_500_000 * 1e18;
+
+    /// @notice initial quorum for a proposal to pass on the DAO
+    uint256 internal constant INITIAL_QUORUM = 10_000_000 * 1e18;
+
+    /// @notice initial quorum for a proposal to be vetoed on the Veto DAO is 500k CREDIT
+    uint256 internal constant INITIAL_QUORUM_VETO_DAO = 500_000 * 1e18;
+
+    /// @notice initial quorum for a proposal to be offboarded on the Offboarding contract is 5m GUILD
+    uint256 internal constant LENDING_TERM_OFFBOARDING_QUORUM =
+        5_000_000 * 1e18;
+
+    /// ------------------------------------------------------------------------
+    /// @notice profit sharing configuration parameters for the Profit Manager
+    /// ------------------------------------------------------------------------
+
+    /// @notice 10% of profits go to the surplus buffer
+    uint256 internal constant SURPLUS_BUFFER_SPLIT = 0.1e18;
+
+    /// @notice 90% of profits go to credit holders that opt into rebasing
+    uint256 internal constant CREDIT_SPLIT = 0.9e18;
+
+    /// @notice 0% of profits go to guild holders staked in gauges
+    uint256 internal constant GUILD_SPLIT = 0;
+
+    /// @notice 0% of profits go to other
+    uint256 internal constant OTHER_SPLIT = 0;
+
+
     function setUp() public virtual override {
         super.setUp();
 
@@ -73,47 +152,47 @@ contract PostProposalCheckFixture is PostProposalCheck {
         /// --------------------------------------- ///
 
         /// core
-        core = Core(addresses.mainnet(strings.CORE));
+        core = Core(addresses.mainnet("CORE"));
 
-        usdc = ERC20(addresses.mainnet(strings.ERC20_USDC));
-        sdai = ERC20(addresses.mainnet(strings.ERC20_SDAI));
-        guild = GuildToken(addresses.mainnet(strings.GUILD_TOKEN));
-        credit = CreditToken(addresses.mainnet(strings.CREDIT_TOKEN));
+        usdc = ERC20(addresses.mainnet("ERC20_USDC"));
+        sdai = ERC20(addresses.mainnet("ERC20_SDAI"));
+        guild = GuildToken(addresses.mainnet("GUILD_TOKEN"));
+        credit = CreditToken(addresses.mainnet("CREDIT_TOKEN"));
 
         /// rate limited minters
         rateLimitedCreditMinter = RateLimitedMinter(
-            addresses.mainnet(strings.RATE_LIMITED_CREDIT_MINTER)
+            addresses.mainnet("RATE_LIMITED_CREDIT_MINTER")
         );
         rateLimitedGuildMinter = RateLimitedMinter(
-            addresses.mainnet(strings.RATE_LIMITED_GUILD_MINTER)
+            addresses.mainnet("RATE_LIMITED_GUILD_MINTER")
         );
         surplusGuildMinter = SurplusGuildMinter(
-            addresses.mainnet(strings.SURPLUS_GUILD_MINTER)
+            addresses.mainnet("SURPLUS_GUILD_MINTER")
         );
 
         profitManager = ProfitManager(
-            addresses.mainnet(strings.PROFIT_MANAGER)
+            addresses.mainnet("PROFIT_MANAGER")
         );
-        auctionHouse = AuctionHouse(addresses.mainnet(strings.AUCTION_HOUSE));
-        psm = SimplePSM(addresses.mainnet(strings.PSM_USDC));
+        auctionHouse = AuctionHouse(addresses.mainnet("AUCTION_HOUSE"));
+        psm = SimplePSM(addresses.mainnet("PSM_USDC"));
         collateral = new MockERC20();
 
-        governor = VoltGovernor(payable(addresses.mainnet(strings.GOVERNOR)));
+        governor = VoltGovernor(payable(addresses.mainnet("GOVERNOR")));
         vetoGovernor = VoltVetoGovernor(
-            payable(addresses.mainnet(strings.VETO_GOVERNOR))
+            payable(addresses.mainnet("VETO_GOVERNOR"))
         );
         timelock = VoltTimelockController(
-            payable(addresses.mainnet(strings.TIMELOCK))
+            payable(addresses.mainnet("TIMELOCK"))
         );
 
         /// lending terms
         onboarder = LendingTermOnboarding(
-            payable(addresses.mainnet(strings.LENDING_TERM_ONBOARDING))
+            payable(addresses.mainnet("LENDING_TERM_ONBOARDING"))
         );
         offboarder = LendingTermOffboarding(
-            addresses.mainnet(strings.LENDING_TERM_OFFBOARDING)
+            addresses.mainnet("LENDING_TERM_OFFBOARDING")
         );
 
-        term = LendingTerm(addresses.mainnet(strings.TERM_SDAI_1));
+        term = LendingTerm(addresses.mainnet("TERM_SDAI_1"));
     }
 }

@@ -5,7 +5,6 @@ import "@forge-std/Test.sol";
 
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
-import {DeploymentConstants as constants} from "@test/utils/DeploymentConstants.sol";
 
 contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     function testTermParamSetup() public {
@@ -14,12 +13,12 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             LendingTerm.LendingTermParams memory params = term.getParameters();
             assertEq(params.collateralToken, address(sdai));
             assertEq(params.openingFee, 0);
-            assertEq(params.interestRate, constants.SDAI_RATE);
+            assertEq(params.interestRate, SDAI_RATE);
             assertEq(params.minPartialRepayPercent, 0);
             assertEq(params.maxDelayBetweenPartialRepay, 0);
             assertEq(
                 params.maxDebtPerCollateralToken,
-                constants.MAX_SDAI_CREDIT_RATIO
+                MAX_SDAI_CREDIT_RATIO
             );
         }
         {

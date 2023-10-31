@@ -12,12 +12,10 @@ import {MockERC20} from "@test/mock/MockERC20.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
-import {NameLib as strings} from "@test/utils/NameLib.sol";
 import {CoreRoles as roles} from "@src/core/CoreRoles.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
-import {DeploymentConstants as constants} from "@test/utils/DeploymentConstants.sol";
 
 contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
     function setUp() public override {
@@ -25,22 +23,22 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         term = LendingTerm(
             onboarder.createTerm(
                 LendingTerm.LendingTermParams({
-                    collateralToken: addresses.mainnet(strings.ERC20_SDAI),
-                    maxDebtPerCollateralToken: constants.MAX_SDAI_CREDIT_RATIO,
-                    interestRate: constants.SDAI_RATE,
+                    collateralToken: addresses.mainnet("ERC20_SDAI"),
+                    maxDebtPerCollateralToken: MAX_SDAI_CREDIT_RATIO,
+                    interestRate: SDAI_RATE,
                     maxDelayBetweenPartialRepay: 0,
                     minPartialRepayPercent: 0,
                     openingFee: 0,
-                    hardCap: constants.SDAI_CREDIT_HARDCAP
+                    hardCap: SDAI_CREDIT_HARDCAP
                 })
             )
         );
 
-        vm.prank(addresses.mainnet(strings.TIMELOCK));
+        vm.prank(addresses.mainnet("TIMELOCK"));
         guild.enableTransfer();
 
         uint256 mintAmount = onboarder.quorum(0);
-        vm.prank(addresses.mainnet(strings.TEAM_MULTISIG));
+        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
         rateLimitedGuildMinter.mint(address(this), mintAmount); /// mint all of the guild to this contract
         guild.delegate(address(this));
         vm.roll(block.number + 1); /// ensure user votes register
@@ -71,7 +69,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
             uint8(IGovernor.ProposalState.Pending)
         );
 
-        vm.roll(block.number + constants.VOTING_PERIOD - 1);
+        vm.roll(block.number + VOTING_PERIOD - 1);
         vm.warp(block.timestamp + onboarder.proposalDeadline(proposalId) - 1);
 
         assertEq(
@@ -84,7 +82,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
             uint8(GovernorCountingSimple.VoteType.For)
         );
 
-        vm.roll(block.number + constants.VOTING_PERIOD + 1);
+        vm.roll(block.number + VOTING_PERIOD + 1);
         vm.warp(block.timestamp + 13);
 
         onboarder.queue(
@@ -100,7 +98,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
 
         // execute
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + constants.TIMELOCK_DELAY + 13);
+        vm.warp(block.timestamp + TIMELOCK_DELAY + 13);
         assertEq(
             uint8(onboarder.state(proposalId)),
             uint8(IGovernor.ProposalState.Queued)

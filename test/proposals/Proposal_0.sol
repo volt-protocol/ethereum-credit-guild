@@ -20,7 +20,6 @@ import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
-import {NameLib as strings} from "@test/utils/NameLib.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
