@@ -127,32 +127,42 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     }
 
     function testCreditStakerGainsOnLoanRepayWithInterest() public {
-        /// add gauge weight to SDAI gauge
-        _voteForSDAIGauge();
+        /// setup scenario with user borrowing, then staking CREDIT in Surplus Guild Minter
+        uint256 supplyAmount = 1000e18;
+        {
+            uint256 warpTime = 365 days;
 
-        uint256 warpTime = 365 days;
-        /// create loan
-        /// supply 1000 SDAI Collateral and receive 1000 credit as user one
-        (bytes32 loanId, uint256 supplyAmount) = _supplyCollateralUserOne(
-            1000e18
+            /// create loan
+            /// supply 1000 SDAI Collateral and receive 1000 credit as user one
+            bytes32 loanId = _supplyCollateralUserOne(uint128(supplyAmount));
+
+            /// stake credit in surplus guild minter on that term before interest accrues
+            _testStake(supplyAmount);
+
+            /// warp forward
+            vm.warp(block.timestamp + warpTime);
+
+            /// repay loan with interest
+            uint256 interest = _repayLoan(loanId, supplyAmount);
+            interest; /// shhhhhhh
+        }
+
+        /// Run scenario, calculate profits, Credit and Guild amounts, and ensure buffers are properly updated
+        /// claim rewards from surplus guild minter and ensure that user receives correct amount of credit and guild rewards
+        /// userOne should get CREDIT as a reward for staking because the GUILD split is 1%, meaning 1% of all earnings of
+        /// CREDIT is sent to the GUILD stakers
+        uint256 startingCreditBalance = credit.balanceOf(userOne);
+        uint256 startingGuildBalanceSurplusGuildMinter = guild.balanceOf(
+            address(surplusGuildMinter)
         );
+        uint256 startingCreditMinterBuffer = rateLimitedCreditMinter.buffer(); /// ensure no change
+        uint256 startingGuildMinterBuffer = rateLimitedGuildMinter.buffer(); /// ensure depletion
+        uint256 startingGuildBalance = guild.balanceOf(userOne);
+        uint256 startingGuildTotalSupply = guild.totalSupply();
 
-        /// warp forward
-        vm.warp(block.timestamp + warpTime);
-
-        /// rewards are paid when interest accrues,
-        /// interest only accrues when a user repays,
-        /// so do not stake before then
-
-        /// stake credit in surplus guild minter on that term before interest accrues
-        _testStake(supplyAmount);
-
-        /// repay loan with interest
-        uint256 interest = _repayLoan(loanId, supplyAmount);
-
-        (, , uint256 guildSplit, , ) = profitManager.getProfitSharingConfig();
-
-        assertEq(guildSplit, 0, "Guild split not 0");
+        /// update rewards for user one, this will update the profit index for the user and mint GUILD rewards
+        (, SurplusGuildMinter.UserStake memory stake, ) = surplusGuildMinter
+            .getRewards(address(userOne), address(term));
 
         /// calculate unclaimed rewards in surplus guild minter
         /// equation:
@@ -162,22 +172,13 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         /// Because the GUILD_SPLIT is set to 0 in the system creation, no CREDIT Rewards go to GUILD stakers
         /// this means that Guild stakers receive no rewards in either CREDIT or GUILD
         ///
-        uint256 creditRewards = (interest * guildSplit) / 1e18; /// should be 0
-        uint256 unclaimedRewards = (creditRewards *
-            surplusGuildMinter.rewardRatio()) / 1e18;
-
         uint256 guildStaked = (supplyAmount * surplusGuildMinter.mintRatio()) /
             1e18;
+        assertEq(guildStaked, stake.guild, "incorrect guild staked");
 
-        /// unstake from surplus guild minter and ensure that user receives correct amount of credit back + guild rewards
-        /// userOne should get 0 CREDIT as a reward for staking because the GUILD split is 0, meaning no CREDIT is sent to the GUILD stakers
-        uint256 startingCreditBalance = credit.balanceOf(userOne);
-        uint256 startingGuildBalance = guild.balanceOf(userOne);
-        uint256 startingGuildBalanceSurplusGuildMinter = guild.balanceOf(
-            address(surplusGuildMinter)
-        );
-        uint256 startingGuildTotalSupply = guild.totalSupply();
-        uint256 startingGuildMinterBuffer = rateLimitedGuildMinter.buffer();
+        /// had to throw out my old way of calculating things because it was too accurate,
+        /// the indexes automatically round down and lose the last few bits of precision,
+        /// due to the index math which loses precision (this is by design and completely fine)
 
         /// supply amount * mint ratio should be added to the guild minter buffer after unstaking
         /// unclaimed rewards should be added to guild total supply after unstaking
@@ -185,17 +186,51 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         vm.prank(userOne);
         surplusGuildMinter.unstake(address(term), supplyAmount);
 
-        assertEq(guild.totalSupply(), startingGuildTotalSupply - guildStaked);
-        assertEq(creditRewards, 0, "incorrect credit rewards");
-        assertEq(unclaimedRewards, 0, "incorrect unclaimed rewards");
+        uint256 guildRewards;
+        {
+            uint256 _profitIndex = profitManager.userGaugeProfitIndex(
+                address(surplusGuildMinter),
+                address(term)
+            );
+
+            /// user profit index starts at 1e18, but it gets set to the current index when getRewards is called
+            /// set it to 1e18 to simulate the user not having called getRewards yet to figure out what the values should be
+            uint256 _userProfitIndex = 1e18;
+
+            uint256 deltaIndex = _profitIndex - _userProfitIndex;
+            assertEq(
+                credit.balanceOf(userOne) - startingCreditBalance,
+                supplyAmount + ((guildStaked * deltaIndex) / 1e18),
+                "incorrect credit balance user one after unstaking credit from surplus guild minter"
+            );
+            guildRewards =
+                (((guildStaked * deltaIndex) / 1e18) *
+                    surplusGuildMinter.rewardRatio()) /
+                1e18;
+        }
+
+        stake = surplusGuildMinter.getUserStake(userOne, address(term));
+        assertEq(0, stake.stakeTime, "incorrect last stake time");
+        assertEq(0, stake.profitIndex, "incorrect profit index");
         assertEq(
-            credit.balanceOf(userOne) - startingCreditBalance,
-            supplyAmount + unclaimedRewards,
-            "incorrect credit balance"
+            stake.credit,
+            0,
+            "incorrect credit amount after unstaking credit from surplus guild minter"
         );
         assertEq(
-            startingGuildBalance,
-            guild.balanceOf(userOne),
+            stake.guild,
+            0,
+            "incorrect guild amount after unstaking credit from surplus guild minter"
+        );
+
+        assertEq(
+            guild.totalSupply(),
+            startingGuildTotalSupply - guildStaked + guildRewards,
+            "incorrect guild total supply"
+        );
+        assertEq(
+            guild.balanceOf(userOne) - startingGuildBalance,
+            guildRewards,
             "incorrect guild balance user one"
         );
         assertEq(
@@ -208,8 +243,13 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         /// buffer increased by guild staked amount as guild staked was burned
         assertEq(
             rateLimitedGuildMinter.buffer() - startingGuildMinterBuffer,
-            guildStaked,
+            guildStaked - guildRewards,
             "incorrect rate limited guild minter buffer"
+        );
+        assertEq(
+            rateLimitedCreditMinter.buffer(),
+            startingCreditMinterBuffer,
+            "incorrect rate limited credit minter buffer"
         );
     }
 
@@ -301,16 +341,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
 
     function _supplyCollateralUserOne(
         uint128 supplyAmount
-    ) private returns (bytes32 loanId, uint128 suppliedAmount) {
-        supplyAmount = uint128(
-            _bound(
-                uint256(supplyAmount),
-                term.MIN_BORROW(),
-                rateLimitedCreditMinter.buffer()
-            )
-        );
-        suppliedAmount = supplyAmount;
-
+    ) private returns (bytes32 loanId) {
         _allocateGaugeToSDAI();
 
         deal(address(sdai), userOne, supplyAmount);
@@ -358,10 +389,6 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         uint256 suppliedAmount
     ) private returns (uint256 interest) {
         uint256 startingCreditSupply = credit.totalSupply(); /// start off at 100
-        // (bytes32 loanId, uint128 suppliedAmount) = _supplyCollateralUserOne(
-        //     supplyAmount
-        // ); /// borrow 100
-
         /// total supply is 200
 
         vm.warp(block.timestamp + 1);
@@ -373,21 +400,36 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         deal(address(credit), userTwo, loanDebt, true); /// mint 101 CREDIT to userOne to repay debt
         /// total supply is 301
 
-        credit.totalSupply();
+        uint256 startingIssuance = term.issuance();
 
+        uint256 startingRateLimitedCreditMinterBuffer = rateLimitedCreditMinter
+            .buffer();
         vm.startPrank(userTwo);
         credit.approve(address(term), term.getLoanDebt(loanId));
         term.repay(loanId);
         vm.stopPrank();
 
         {
-            (uint256 surplusSplit, , , , ) = profitManager
-                .getProfitSharingConfig();
+            /// only creditSplit does not go into the total supply
+            (
+                uint256 surplusSplit,
+                ,
+                uint256 guildSplit,
+                uint256 otherSplit,
+
+            ) = profitManager.getProfitSharingConfig();
+
+            uint256 expectedInterestAddedToSupply = (
+                ((interest * (surplusSplit / 1e9)) /
+                    1e9 +
+                    ((interest * (guildSplit / 1e9)) / 1e9) +
+                    (interest * (otherSplit / 1e9)) /
+                    1e9)
+            );
+
             assertEq(
-                credit.totalSupply(),
-                ((interest * surplusSplit) / 1e18) + /// 10% of interest goes into total supply,
-                    startingCreditSupply + /// the rest goes to profit, which is interpolated over the period
-                    suppliedAmount,
+                credit.totalSupply() - startingCreditSupply,
+                expectedInterestAddedToSupply, /// only interest for surplus, guild and other split should have been added to the supply
                 "incorrect credit supply before interpolating"
             );
         }
@@ -407,26 +449,25 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         );
         assertEq(
             credit.totalSupply(),
-            interest + startingCreditSupply + suppliedAmount,
-            "incorrect credit supply"
-        );
-        assertEq(
-            credit.balanceOf(userOne),
-            suppliedAmount,
-            "incorrect credit balance"
+            interest + startingCreditSupply,
+            "incorrect credit supply after repaying loan"
         );
 
-        console.log("startingCreditSupply: ", startingCreditSupply);
         assertEq(
-            rateLimitedCreditMinter.buffer(),
-            rateLimitedCreditMinter.bufferCap() - startingCreditSupply,
-            "incorrect buffer after repay"
+            rateLimitedCreditMinter.buffer() -
+                startingRateLimitedCreditMinterBuffer,
+            suppliedAmount,
+            "incorrect buffer delta after repay"
         );
         assertEq(
             rateLimitedCreditMinter.lastBufferUsedTime(),
             repayTime,
             "incorrect last buffer used time"
         );
-        assertEq(term.issuance(), 0, "incorrect issuance, should be 0");
+        assertEq(
+            startingIssuance - term.issuance(),
+            suppliedAmount,
+            "incorrect issuance delta"
+        );
     }
 }
