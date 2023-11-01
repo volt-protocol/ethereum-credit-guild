@@ -143,5 +143,9 @@ contract PostProposalCheckFixture is PostProposalCheck {
         );
 
         term = LendingTerm(addresses.mainnet("TERM_SDAI_1"));
+
+        vm.label(userOne, "user one");
+        vm.label(userTwo, "user two");
+        vm.label(userThree, "user three");
     }
 }
