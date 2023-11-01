@@ -226,7 +226,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
 
         uint256 startingSdaiBalance = sdai.balanceOf(address(this));
 
-        auctionHouse.forgive(loanId); /// get collateral for free, TODO check that forgive could be called at this point as well
+        auctionHouse.forgive(loanId);
 
         uint256 endingSdaiBalance = sdai.balanceOf(address(this));
 
@@ -243,5 +243,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
             true,
             "credit multiplier should be less than 1"
         );
+
+        /// TODO add more assertions around this to ensure that credit reprices to the right price
     }
 }
