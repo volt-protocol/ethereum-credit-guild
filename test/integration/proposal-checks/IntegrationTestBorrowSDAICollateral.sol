@@ -16,10 +16,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             assertEq(params.interestRate, SDAI_RATE);
             assertEq(params.minPartialRepayPercent, 0);
             assertEq(params.maxDelayBetweenPartialRepay, 0);
-            assertEq(
-                params.maxDebtPerCollateralToken,
-                MAX_SDAI_CREDIT_RATIO
-            );
+            assertEq(params.maxDebtPerCollateralToken, MAX_SDAI_CREDIT_RATIO);
         }
         {
             LendingTerm.LendingTermReferences memory params = term
@@ -109,12 +106,14 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     }
 
     function testRepayLoan(uint128 seed) public {
-        uint256 startingCreditSupply = credit.totalSupply(); /// start off at 100
+        uint256 startingCreditSupplyBeforeSupplyingCollateral = credit
+            .totalSupply(); /// start off at 100
         (bytes32 loanId, uint128 suppliedAmount) = testSupplyCollateralUserOne(
             seed
         ); /// borrow 100
+        uint256 startingCreditSupply = credit.totalSupply(); /// start off at 100
 
-        /// total supply is 200
+        /// total supply is 100
 
         vm.warp(block.timestamp + 1);
 
@@ -123,23 +122,40 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         uint256 interest = loanDebt - suppliedAmount;
 
         deal(address(credit), userTwo, loanDebt, true); /// mint 101 CREDIT to userOne to repay debt
-        /// total supply is 301
+        /// total supply is 201
 
-        credit.totalSupply();
+        uint256 startingIssuance = term.issuance();
 
         vm.startPrank(userTwo);
         credit.approve(address(term), term.getLoanDebt(loanId));
         term.repay(loanId);
         vm.stopPrank();
 
+        /// total supply is 101
+
         {
-            (uint256 surplusSplit, , , , ) = profitManager
-                .getProfitSharingConfig();
+            /// only creditSplit does not go into the total supply
+            (
+                uint256 surplusSplit,
+                ,
+                uint256 guildSplit,
+                uint256 otherSplit,
+
+            ) = profitManager.getProfitSharingConfig();
+
+            uint256 expectedInterestAddedToSupply = (
+                ((interest * (surplusSplit / 1e9)) /
+                    1e9 +
+                    ((interest * (guildSplit / 1e9)) / 1e9) +
+                    (interest * (otherSplit / 1e9)) /
+                    1e9)
+            );
+
+            /// minted 100 credit tokens to start, then 101 to repay, this means supplied amount is doubled
+            /// in terms of total supply
             assertEq(
-                credit.totalSupply(),
-                ((interest * surplusSplit) / 1e18) + /// 10% of interest goes into total supply,
-                    startingCreditSupply + /// the rest goes to profit, which is interpolated over the period
-                    suppliedAmount,
+                credit.totalSupply() - startingCreditSupply,
+                expectedInterestAddedToSupply, /// only interest for surplus, guild and other split should have been added to the supply
                 "incorrect credit supply before interpolating"
             );
         }
@@ -159,7 +175,9 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         );
         assertEq(
             credit.totalSupply(),
-            interest + startingCreditSupply + suppliedAmount,
+            interest +
+                startingCreditSupplyBeforeSupplyingCollateral +
+                suppliedAmount,
             "incorrect credit supply"
         );
         assertEq(
@@ -168,10 +186,10 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             "incorrect credit balance"
         );
 
-        console.log("startingCreditSupply: ", startingCreditSupply);
         assertEq(
             rateLimitedCreditMinter.buffer(),
-            rateLimitedCreditMinter.bufferCap() - startingCreditSupply,
+            rateLimitedCreditMinter.bufferCap() -
+                startingCreditSupplyBeforeSupplyingCollateral,
             "incorrect buffer"
         );
         assertEq(
@@ -179,7 +197,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             repayTime,
             "incorrect last buffer used time"
         );
-        assertEq(term.issuance(), 0, "incorrect issuance, should be 0");
+        assertEq(startingIssuance - term.issuance(), suppliedAmount, "incorrect issuance delta");
     }
 
     function testTermOffboarding() public {
@@ -286,24 +304,42 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         credit.approve(address(term), creditRepayAmount);
         auctionHouse.bid(loanId);
+        uint256 loanCloseTime = block.timestamp;
 
         vm.stopPrank();
 
-        uint256 loanCloseTime = block.timestamp;
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
         uint256 endingDeployerBalance = credit.balanceOf(proposalZero);
         LendingTerm.Loan memory loan = term.getLoan(loanId);
 
-        uint256 userProfit = (profit * 9) / 10; /// credit holders only receive 9/10th's of interest
+        {
+            /// credit holders receive 9/10th's of interest
+            (
+                uint256 surplusSplit,
+                ,
+                uint256 guildSplit,
+                uint256 otherSplit,
 
-        /// profit is correctly distributed to deployer
-        /// profit manager rounds down for all other items and rounds up in favor of credit holders when distributing profits
-        assertEq(
-            endingDeployerBalance,
-            startingDeployerBalance + userProfit + 1,
-            "incorrect deployer credit balance"
-        );
+            ) = profitManager.getProfitSharingConfig();
+
+            uint256 nonCreditInterest = (
+                ((profit * (surplusSplit / 1e9)) /
+                    1e9 +
+                    ((profit * (guildSplit / 1e9)) / 1e9) +
+                    (profit * (otherSplit / 1e9)) /
+                    1e9)
+            );
+
+            // uint256 userProfit = profit - nonCreditInterest; /// calculate profits exactly how the profit manager does
+            /// profit is correctly distributed to deployer
+            /// profit manager rounds down for all other items and rounds up in favor of credit holders when distributing profits
+            assertEq(
+                endingDeployerBalance,
+                startingDeployerBalance + (profit - nonCreditInterest), /// user profit = profit - nonCreditInterest
+                "incorrect deployer credit balance"
+            );
+        }
 
         assertEq(loan.closeTime, loanCloseTime, "incorrect close time");
         assertEq(
@@ -333,22 +369,41 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             "incorrect number of auctions completed"
         );
         assertEq(term.issuance(), 0, "incorrect issuance");
-
-        assertEq(
-            profitManager.surplusBuffer(),
-            profit / 10,
-            "incorrect surplus buffer"
-        );
-        assertEq(
-            profitManager.surplusBuffer(),
-            credit.balanceOf(address(profitManager)),
-            "incorrect credit amount in profit manager"
-        );
         assertEq(
             startingCreditSupply - loanAmount, /// creditRepayAmount and burned amount got taken out of supply
             credit.totalSupply(),
             "incorrect credit token amount burned"
         ); /// burned 9/10ths of profit
+
+        uint256 expectedSurplusBuffer;
+        uint256 expectedOtherAmount;
+        uint256 expectedGuildAmount;
+        {
+            (
+                uint256 surplusSplit,
+                ,
+                uint256 guildSplit,
+                uint256 otherSplit,
+
+            ) = profitManager.getProfitSharingConfig();
+
+            expectedSurplusBuffer = (profit * (surplusSplit / 1e9)) / 1e9;
+            expectedOtherAmount = (profit * (otherSplit / 1e9)) / 1e9;
+            expectedGuildAmount = (profit * (guildSplit / 1e9)) / 1e9;
+        }
+
+        assertEq(
+            profitManager.surplusBuffer(),
+            expectedSurplusBuffer,
+            "incorrect surplus buffer"
+        );
+        /// credit balance in profit manager is sum of surplus, other and guild amount
+        /// credit amount gets burned in the Credit Token by calling distribute
+        assertEq(
+            expectedSurplusBuffer + expectedOtherAmount + expectedGuildAmount,
+            credit.balanceOf(address(profitManager)),
+            "incorrect credit amount in profit manager"
+        );
     }
 
     function testDistributeReducesCreditTotalSupplyOneUserRebasing(
