@@ -79,22 +79,6 @@ contract PostProposalCheckFixture is PostProposalCheck {
     /// @notice rate to borrow against SDAI collateral
     uint256 internal constant SDAI_RATE = 0.04e18;
 
-    /// ------------------------------------------------------------------------
-    /// @notice profit sharing configuration parameters for the Profit Manager
-    /// ------------------------------------------------------------------------
-
-    /// @notice 10% of profits go to the surplus buffer
-    uint256 internal constant SURPLUS_BUFFER_SPLIT = 0.1e18;
-
-    /// @notice 90% of profits go to credit holders that opt into rebasing
-    uint256 internal constant CREDIT_SPLIT = 0.9e18;
-
-    /// @notice 0% of profits go to guild holders staked in gauges
-    uint256 internal constant GUILD_SPLIT = 0;
-
-    /// @notice 0% of profits go to other
-    uint256 internal constant OTHER_SPLIT = 0;
-
     function setUp() public virtual override {
         super.setUp();
 
