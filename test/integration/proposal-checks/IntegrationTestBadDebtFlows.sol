@@ -14,8 +14,6 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         guild.delegate(address(this));
 
         assertTrue(guild.isGauge(address(term)));
-        assertEq(guild.numGauges(), 1);
-        assertEq(guild.numLiveGauges(), 1);
         assertEq(guild.balanceOf(address(this)), mintAmount);
     }
 
@@ -31,7 +29,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
     function _supplyCollateralUserOne(
         uint256 borrowAmount,
         uint128 supplyAmount
-    ) public returns (bytes32 loanId) {
+    ) private returns (bytes32 loanId) {
         deal(address(sdai), userOne, supplyAmount);
 
         uint256 startingCreditSupply = credit.totalSupply();

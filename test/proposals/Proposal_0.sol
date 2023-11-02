@@ -888,5 +888,29 @@ contract Proposal_0 is Proposal {
                 "veto governor token incorrect"
             );
         }
+        {
+            LendingTerm term = LendingTerm(addresses.mainnet("TERM_SDAI_1"));
+            {
+                
+                LendingTerm.LendingTermParams memory params = term.getParameters();
+                assertEq(term.collateralToken(), addresses.mainnet("ERC20_SDAI"), "SDAI token incorrect");
+                assertEq(params.collateralToken, addresses.mainnet("ERC20_SDAI"), "SDAI token incorrect from params");
+                assertEq(params.openingFee, 0, "Opening fee not 0");
+                assertEq(params.interestRate, SDAI_RATE, "interest rate incorrect");
+                assertEq(params.minPartialRepayPercent, 0, "min partial repay percent incorrect");
+                assertEq(params.maxDelayBetweenPartialRepay, 0, "max delay between partial repay incorrect");
+                assertEq(params.maxDebtPerCollateralToken, MAX_SDAI_CREDIT_RATIO, "max debt per collateral token incorrect");
+            }
+            {
+                LendingTerm.LendingTermReferences memory params = term
+                    .getReferences();
+    
+                assertEq(params.profitManager, addresses.mainnet("PROFIT_MANAGER"), "Profit Manager address incorrect");
+                assertEq(params.guildToken, addresses.mainnet("GUILD_TOKEN"), "Guild Token address incorrect");
+                assertEq(params.auctionHouse, addresses.mainnet("AUCTION_HOUSE"), "Auction House address incorrect");
+                assertEq(params.creditMinter, addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"), "Credit Minter address incorrect");
+                assertEq(params.creditToken, addresses.mainnet("CREDIT_TOKEN"), "Credit Token address incorrect");
+            }
+        }
     }
 }

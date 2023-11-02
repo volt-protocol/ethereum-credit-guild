@@ -7,29 +7,6 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
 
 contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
-    function testTermParamSetup() public {
-        assertEq(term.collateralToken(), address(sdai));
-        {
-            LendingTerm.LendingTermParams memory params = term.getParameters();
-            assertEq(params.collateralToken, address(sdai));
-            assertEq(params.openingFee, 0);
-            assertEq(params.interestRate, SDAI_RATE);
-            assertEq(params.minPartialRepayPercent, 0);
-            assertEq(params.maxDelayBetweenPartialRepay, 0);
-            assertEq(params.maxDebtPerCollateralToken, MAX_SDAI_CREDIT_RATIO);
-        }
-        {
-            LendingTerm.LendingTermReferences memory params = term
-                .getReferences();
-
-            assertEq(params.profitManager, addresses.mainnet("PROFIT_MANAGER"));
-            assertEq(params.guildToken, address(guild));
-            assertEq(params.auctionHouse, addresses.mainnet("AUCTION_HOUSE"));
-            assertEq(params.creditMinter, address(rateLimitedCreditMinter));
-            assertEq(params.creditToken, address(credit));
-        }
-    }
-
     function testVoteForSDAIGauge() public {
         uint256 mintAmount = governor.quorum(0);
         /// setup
@@ -38,16 +15,18 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         guild.delegate(address(this));
 
         assertTrue(guild.isGauge(address(term)));
-        assertEq(guild.numGauges(), 1);
-        assertEq(guild.numLiveGauges(), 1);
     }
 
     function testAllocateGaugeToSDAI() public {
         testVoteForSDAIGauge();
 
+        uint256 startingTotalWeight = guild.totalWeight();
         guild.incrementGauge(address(term), guild.balanceOf(address(this)));
 
-        assertEq(guild.totalWeight(), guild.balanceOf(address(this)));
+        assertEq(
+            guild.totalWeight() - startingTotalWeight,
+            guild.balanceOf(address(this))
+        );
         assertTrue(guild.isUserGauge(address(this), address(term)));
     }
 
@@ -197,7 +176,11 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             repayTime,
             "incorrect last buffer used time"
         );
-        assertEq(startingIssuance - term.issuance(), suppliedAmount, "incorrect issuance delta");
+        assertEq(
+            startingIssuance - term.issuance(),
+            suppliedAmount,
+            "incorrect issuance delta"
+        );
     }
 
     function testTermOffboarding() public {

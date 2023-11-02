@@ -64,7 +64,7 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
             newQuorum
         );
 
-        string memory description = "Update offboarding quourum to 100m guild";
+        string memory description = "Update veto governor quourum to 100m guild";
 
         uint256 proposalId = governor.propose(
             targets,
