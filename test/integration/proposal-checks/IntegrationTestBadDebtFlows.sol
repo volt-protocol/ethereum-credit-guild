@@ -223,6 +223,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         uint256 startingCreditSupply = credit.totalSupply();
         uint256 startingCreditMultiplier = profitManager.creditMultiplier();
         uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();
+        uint256 startingIssuance = term.issuance();
 
         auctionHouse.forgive(loanId);
 
@@ -264,6 +265,107 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
             profitManager.creditMultiplier(),
             expectedCreditMultiplier,
             "credit multiplier should expected value"
+        );
+        assertEq(
+            startingIssuance - term.issuance(),
+            borrowAmount,
+            "issuance delta incorrect"
+        );
+    }
+    
+    function testBadDebtRepricesCreditForgive(uint256 borrowAmount, uint128 supplyAmount) public {
+        testAllocateGaugeToSDAI();
+
+        supplyAmount = uint128(_bound(supplyAmount, term.MIN_BORROW(), rateLimitedCreditMinter.buffer()));
+        borrowAmount = _bound(borrowAmount, term.MIN_BORROW(), supplyAmount);
+
+        /// supply collateral and borrow
+
+        bytes32 loanId = _supplyCollateralUserOne(borrowAmount, supplyAmount);
+
+        /// offboard term
+
+        testTermOffboarding();
+
+        /// test cannot redeem in PSM once that feature merges
+
+        /// call loans
+
+        term.call(loanId);
+
+        /// wait for auction to allow seizing of collateral for 0 credit
+
+        vm.warp(block.timestamp + auctionHouse.auctionDuration() + 1);
+
+        /// seize, check collateral balance of liquidator
+
+        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+            .getBidDetail(loanId);
+
+        assertEq(
+            collateralReceived,
+            supplyAmount,
+            "incorrect collateral received"
+        );
+        assertEq(creditAsked, 0, "incorrect credit asked");
+        assertEq(auctionHouse.nAuctionsInProgress(), 1);
+
+        uint256 startingSdaiBalance = sdai.balanceOf(address(this));
+        uint256 startingCreditSupply = credit.totalSupply();
+        uint256 startingCreditMultiplier = profitManager.creditMultiplier();
+        uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();
+        uint256 startingIssuance = term.issuance();
+
+        auctionHouse.forgive(loanId);
+
+        uint256 endingSdaiBalance = sdai.balanceOf(address(this));
+
+        assertEq(auctionHouse.nAuctionsInProgress(), 0);
+        assertEq(
+            endingSdaiBalance,
+            startingSdaiBalance,
+            "incorrect sdai balance after liquidation"
+        );
+
+        /// ensure credit reprices
+        /// total loss, no principal repaid
+        /// - credit multiplier reprices downwards
+        /// - credit supply stays the same
+        /// - surplus buffer gets slashed to 0
+        /// - issuance from term decreases by principal amount
+
+        uint256 expectedCreditMultiplier = (startingCreditMultiplier *
+            (startingCreditSupply - borrowAmount)) / startingCreditSupply;
+
+        assertEq(
+            startingCreditBuffer,
+            rateLimitedCreditMinter.buffer(),
+            "incorrect buffer, should not change on total loss as 0 principal is repaid"
+        );
+        assertEq(
+            profitManager.termSurplusBuffer(address(term)),
+            0,
+            "term surplus buffer should be 0"
+        );
+        assertEq(
+            profitManager.surplusBuffer(),
+            0,
+            "surplus buffer should be 0"
+        );
+        assertEq(
+            profitManager.creditMultiplier() < 1e18,
+            true,
+            "credit multiplier should be less than 1"
+        );
+        assertEq(
+            profitManager.creditMultiplier(),
+            expectedCreditMultiplier,
+            "credit multiplier should expected value"
+        );
+        assertEq(
+            startingIssuance - term.issuance(),
+            borrowAmount,
+            "issuance delta incorrect"
         );
     }
 }
