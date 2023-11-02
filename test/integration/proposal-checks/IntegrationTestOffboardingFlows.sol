@@ -41,7 +41,7 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
                     maxDelayBetweenPartialRepay: 0,
                     minPartialRepayPercent: 0,
                     openingFee: 0,
-                    hardCap: SDAI_CREDIT_HARDCAP
+                    hardCap: rateLimitedCreditMinter.buffer()
                 })
             )
         );

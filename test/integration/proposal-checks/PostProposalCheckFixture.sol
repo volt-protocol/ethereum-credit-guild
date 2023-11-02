@@ -63,15 +63,6 @@ contract PostProposalCheckFixture is PostProposalCheck {
     RateLimitedMinter public rateLimitedGuildMinter;
     SurplusGuildMinter public surplusGuildMinter;
 
-    /// @notice credit hardcap at launch
-    uint256 internal constant CREDIT_HARDCAP = 2_000_000 * 1e18;
-
-    /// @notice SDAI credit hardcap at launch
-    uint256 internal constant SDAI_CREDIT_HARDCAP = 2_000_000 * 1e18;
-
-    /// @notice USDC mint amount
-    uint256 internal constant INITIAL_USDC_MINT_AMOUNT = 100 * 1e6;
-
     function setUp() public virtual override {
         super.setUp();
 
@@ -129,6 +120,8 @@ contract PostProposalCheckFixture is PostProposalCheck {
         // Doing this with a non-dust balance ensures the share price internally
         // to the CreditToken has a reasonable size.
         {
+            /// @notice USDC mint amount
+            uint256 INITIAL_USDC_MINT_AMOUNT = 100 * 1e6;
             deal(address(usdc), userThree, INITIAL_USDC_MINT_AMOUNT);
 
             vm.startPrank(userThree);
