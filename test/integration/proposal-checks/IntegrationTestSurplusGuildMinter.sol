@@ -253,10 +253,200 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         );
     }
 
-    /// TODO
-    function testCreditStakerSlashOnBadDebtLossEvent() public {}
+    function testCreditStakerSlashOnBadDebtLossEvent() public {
+        /// setup scenario with user borrowing, then staking CREDIT in Surplus Guild Minter
+        uint256 supplyAmount = 1000e18;
+        uint256 computedCreditAsked;
+        bytes32 loanId;
+        {
+            uint256 warpTime = 365 days;
+
+            /// create loan
+            /// supply 1000 SDAI Collateral and receive 1000 credit as user one
+            loanId = _supplyCollateralUserOne(uint128(supplyAmount));
+
+            /// stake credit in surplus guild minter on that term before interest accrues
+            _testStake(supplyAmount);
+
+            /// warp forward
+            vm.warp(block.timestamp + warpTime);
+
+            /// enable collateral to be called
+            _termOffboarding(); /// this warps time and block number
+
+            uint256 currentDebtAmount = term.getLoanDebt(loanId);
+
+            uint256 callTime = block.timestamp;
+            uint256 midPoint = auctionHouse.midPoint();
+            uint256 duration = auctionHouse.auctionDuration();
+            term.call(loanId);
+
+            assertEq(
+                (auctionHouse.getAuction(loanId)).callDebt,
+                currentDebtAmount,
+                "incorrect call debt"
+            );
+
+            vm.warp(callTime + midPoint);
+
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
+
+            uint256 elapsed = block.timestamp -
+                (auctionHouse.getAuction(loanId)).startTime -
+                midPoint;
+
+            computedCreditAsked =
+                currentDebtAmount -
+                (currentDebtAmount * elapsed) /
+                (duration - midPoint);
+
+            assertEq(elapsed, 0, "incorrect elapsed time");
+            assertEq(
+                creditAsked,
+                computedCreditAsked,
+                "incorrect credit asked"
+            );
+            assertEq(
+                collateralReceived,
+                supplyAmount,
+                "incorrect collateral received"
+            );
+
+            {
+                uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() -
+                    auctionHouse.midPoint();
+
+                vm.warp(callTime + midPoint + PHASE_2_DURATION / 2); /// warp exactly to phase 2 midPoint
+            }
+            elapsed =
+                block.timestamp -
+                (auctionHouse.getAuction(loanId)).startTime -
+                midPoint; /// should be 0
+
+            computedCreditAsked =
+                currentDebtAmount -
+                (currentDebtAmount * elapsed) /
+                (duration - midPoint);
+
+            {
+                uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() -
+                    auctionHouse.midPoint();
+                assertEq(
+                    elapsed,
+                    PHASE_2_DURATION / 2,
+                    "incorrect elapsed time 2"
+                );
+            }
+        }
+
+        /// now we have a bad debt loss event, repay assert the following:
+        /// - user one is slashed and cannot pull credit out of the Surplus Guild Minter
+        /// - guild minter buffer is increased by the amount of guild slashed --- interestingly this does not happen
+        /// - surplus guild minter balance decreased by the amount of guild slashed
+        /// - credit minter buffer is increased by the amount of credit repaid
+        /// - credit total supply is decreased by the amount of credit repaid
+        /// - figure out how much we should adjust the credit multiplier by
+        /// - slashed user receives still their credit reward
+
+        deal(address(credit), address(this), computedCreditAsked, true);
+        credit.approve(address(term), computedCreditAsked);
+
+        SurplusGuildMinter.UserStake memory stake = surplusGuildMinter
+            .getUserStake(userOne, address(term));
+
+        // uint256 startingSurplusBuffer = profitManager.surplusBuffer();
+        uint256 startingCreditTotalSupply = credit.totalSupply();
+        uint256 startingGuildTotalSupply = guild.totalSupply();
+        uint256 startingCreditBalance = credit.balanceOf(address(this));
+        uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();
+        uint256 startingGuildBuffer = rateLimitedGuildMinter.buffer();
+        uint256 lossAmount = supplyAmount - computedCreditAsked;
+
+        /// repay the loan
+        /// this is when the loss is applied, and repay amount + surplus buffer loss is burned
+        {
+            uint256 startingCreditMultiplier = profitManager.creditMultiplier();
+            uint256 startingIssuance = term.issuance();
+            auctionHouse.bid(loanId);
+            guild.applyGaugeLoss(address(term), address(surplusGuildMinter));
+            assertEq(
+                startingCreditMultiplier,
+                profitManager.creditMultiplier(),
+                "profit multiplier incorrectly changed"
+            );
+            assertEq(
+                startingIssuance - term.issuance(),
+                supplyAmount,
+                "issuance not properly decremented"
+            );
+        }
+
+        assertEq(
+            profitManager.termSurplusBuffer(address(term)),
+            0,
+            "term surplus buffer not zero after loss event"
+        );
+        assertEq(
+            credit.totalSupply(),
+            startingCreditTotalSupply - computedCreditAsked - lossAmount,
+            "incorrect credit total supply"
+        );
+        assertEq(
+            credit.balanceOf(address(this)),
+            startingCreditBalance - computedCreditAsked,
+            "incorrect credit balance"
+        );
+
+        assertEq(
+            startingGuildTotalSupply - stake.guild,
+            guild.totalSupply(),
+            "incorrect guild total supply"
+        );
+
+        assertEq(
+            rateLimitedCreditMinter.buffer(),
+            startingCreditBuffer + computedCreditAsked,
+            "incorrect rate limited credit minter buffer"
+        );
+
+        assertEq(
+            rateLimitedGuildMinter.buffer(),
+            startingGuildBuffer,
+            "incorrect rate limited guild minter buffer"
+        );
+
+        /// slash the user
+        (
+            uint256 lastGaugeLoss,
+            SurplusGuildMinter.UserStake memory newStake,
+            bool slashed
+        ) = surplusGuildMinter.getRewards(userOne, address(term));
+
+        assertTrue(slashed, "user not slashed");
+        assertTrue(lastGaugeLoss != 0, "last gauge loss is 0");
+        assertEq(newStake.guild, 0, "incorrect guild stake after slashing");
+        assertEq(newStake.credit, 0, "incorrect credit stake after slashing");
+    }
 
     //// Helper functions
+
+    function _termOffboarding() public {
+        if (guild.balanceOf(address(this)) == 0) {
+            _voteForSDAIGauge();
+        }
+
+        vm.roll(block.number + 2);
+        vm.warp(block.timestamp + 1);
+
+        offboarder.proposeOffboard(address(term));
+        vm.roll(block.number + 1);
+        offboarder.supportOffboard(block.number - 1, address(term));
+        offboarder.offboard(address(term));
+
+        assertFalse(guild.isGauge(address(term)));
+        assertTrue(guild.isDeprecatedGauge(address(term)));
+    }
 
     function _testSetMintRatio(uint256 mintRatio) private {
         vm.prank(addresses.mainnet("TIMELOCK"));
