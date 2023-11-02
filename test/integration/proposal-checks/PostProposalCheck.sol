@@ -8,7 +8,6 @@ import {TestProposals} from "@test/proposals/TestProposals.sol";
 
 contract PostProposalCheck is Test {
     Addresses addresses;
-    address public proposalZero;
     TestProposals public proposals;
 
     uint256 preProposalsSnapshot;
@@ -23,7 +22,6 @@ contract PostProposalCheck is Test {
         proposals.setDebug(false);
         proposals.testProposals();
         addresses = proposals.addresses();
-        proposalZero = address(proposals.proposals(0));
 
         postProposalsSnapshot = vm.snapshot();
     }

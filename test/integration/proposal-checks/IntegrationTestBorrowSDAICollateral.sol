@@ -291,7 +291,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         uint256 loanAmount = 10_000e18;
         uint256 profit = creditRepayAmount - loanAmount;
         uint256 usdcMintAmount = creditRepayAmount / 1e12 + 1;
-        uint256 startingDeployerBalance = credit.balanceOf(proposalZero);
+        uint256 startingDeployerBalance = credit.balanceOf(userThree);
 
         _doMint(userTwo, uint128(usdcMintAmount)); /// round amount of credit up
 
@@ -310,7 +310,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
-        uint256 endingDeployerBalance = credit.balanceOf(proposalZero);
+        uint256 endingDeployerBalance = credit.balanceOf(userThree);
         LendingTerm.Loan memory loan = term.getLoan(loanId);
 
         {
@@ -435,7 +435,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     function testDistributeReducesCreditTotalSupply(
         uint128 creditAmount
     ) public {
-        vm.prank(address(proposalZero));
+        vm.prank(userThree);
         credit.exitRebase();
 
         /// between 1 wei and entire buffer

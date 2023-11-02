@@ -72,6 +72,9 @@ contract PostProposalCheckFixture is PostProposalCheck {
     /// @notice SDAI credit hardcap at launch
     uint256 internal constant SDAI_CREDIT_HARDCAP = 2_000_000 * 1e18;
 
+    /// @notice USDC mint amount
+    uint256 internal constant INITIAL_USDC_MINT_AMOUNT = 100 * 1e6;
+
     /// ------------------------------------------------------------------------
     /// @notice Interest Rate Parameters
     /// ------------------------------------------------------------------------
@@ -131,5 +134,18 @@ contract PostProposalCheckFixture is PostProposalCheck {
         vm.label(userOne, "user one");
         vm.label(userTwo, "user two");
         vm.label(userThree, "user three");
+
+        // Mint the first CREDIT tokens and enter rebase
+        // Doing this with a non-dust balance ensures the share price internally
+        // to the CreditToken has a reasonable size.
+        {
+            deal(address(usdc), userThree, INITIAL_USDC_MINT_AMOUNT);
+
+            vm.startPrank(userThree);
+            usdc.approve(address(psm), INITIAL_USDC_MINT_AMOUNT);
+            psm.mint(userThree, INITIAL_USDC_MINT_AMOUNT);
+            credit.enterRebase();
+            vm.stopPrank();
+        }
     }
 }

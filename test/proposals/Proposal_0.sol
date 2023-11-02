@@ -440,23 +440,6 @@ contract Proposal_0 is Proposal {
             MAX_DELEGATES
         );
 
-        // Mint the first CREDIT tokens and enter rebase
-        // Doing this with a non-dust balance ensures the share price internally
-        // to the CreditToken has a reasonable size.
-        {
-            ERC20 usdc = ERC20(addresses.mainnet("ERC20_USDC"));
-            SimplePSM psm = SimplePSM(addresses.mainnet("PSM_USDC"));
-            CreditToken credit = CreditToken(addresses.mainnet("CREDIT_TOKEN"));
-
-            if (usdc.balanceOf(deployer) < INITIAL_USDC_MINT_AMOUNT) {
-                deal(address(usdc), deployer, INITIAL_USDC_MINT_AMOUNT);
-            }
-
-            usdc.approve(address(psm), INITIAL_USDC_MINT_AMOUNT);
-            psm.mint(deployer, INITIAL_USDC_MINT_AMOUNT);
-            credit.enterRebase();
-        }
-
         // deployer renounces governor role
         core.renounceRole(CoreRoles.GOVERNOR, deployer);
         core.renounceRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, deployer);
@@ -642,8 +625,8 @@ contract Proposal_0 is Proposal {
             );
             assertEq(
                 rateLimitedCreditMinter.buffer(),
-                rateLimitedCreditMinter.bufferCap() - CREDIT_SUPPLY,
-                "credit buffer incorrect"
+                rateLimitedCreditMinter.bufferCap(),
+                "credit buffer incorrect, should eq buffer cap"
             );
         }
         {
@@ -687,37 +670,44 @@ contract Proposal_0 is Proposal {
             assertEq(
                 ERC20MultiVotes(addresses.mainnet("CREDIT_TOKEN"))
                     .maxDelegates(),
-                MAX_DELEGATES
+                MAX_DELEGATES,
+                "max delegates incorrect"
             );
             /// guild token starts non-transferrable
             assertFalse(
-                GuildToken(addresses.mainnet("GUILD_TOKEN")).transferable()
+                GuildToken(addresses.mainnet("GUILD_TOKEN")).transferable(),
+                "guild token should not be transferable"
             );
             assertEq(
                 ERC20MultiVotes(addresses.mainnet("GUILD_TOKEN"))
                     .maxDelegates(),
-                MAX_DELEGATES
+                MAX_DELEGATES,
+                "max delegates incorrect"
             );
             assertEq(
                 ERC20MultiVotes(addresses.mainnet("GUILD_TOKEN")).totalSupply(),
-                0
+                0,
+                "guild total supply not 0 after deployment"
             );
             assertEq(
                 ERC20MultiVotes(addresses.mainnet("GUILD_TOKEN")).balanceOf(
                     addresses.mainnet("TEAM_MULTISIG")
                 ),
-                0
+                0,
+                "balance of team multisig not 0 after deployment"
             );
             assertEq(
                 ERC20MultiVotes(addresses.mainnet("CREDIT_TOKEN"))
                     .totalSupply(),
-                CREDIT_SUPPLY
+                0,
+                "credit total supply not 0 after deployment"
             );
             assertEq(
                 ERC20MultiVotes(addresses.mainnet("CREDIT_TOKEN")).balanceOf(
                     deployer
                 ),
-                CREDIT_SUPPLY
+                0,
+                "balance of deployer not 0 after deployment"
             );
         }
         /// PROFIT MANAGER Verification
