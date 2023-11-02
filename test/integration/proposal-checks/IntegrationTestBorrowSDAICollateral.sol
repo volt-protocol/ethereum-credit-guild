@@ -47,6 +47,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         deal(address(collateralToken), userOne, supplyAmount);
 
         uint256 startingTotalSupply = credit.totalSupply();
+        uint256 startingSDaiBalance = sdai.balanceOf(address(term));
 
         vm.startPrank(userOne);
         sdai.approve(address(term), supplyAmount);
@@ -55,7 +56,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         assertEq(term.getLoanDebt(loanId), supplyAmount, "incorrect loan debt");
         assertEq(
-            sdai.balanceOf(address(term)),
+            sdai.balanceOf(address(term)) - startingSDaiBalance,
             supplyAmount,
             "sdai balance of term incorrect"
         );
