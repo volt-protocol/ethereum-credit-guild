@@ -44,7 +44,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         testAllocateGaugeToSDAI();
 
-        deal(address(sdai), userOne, supplyAmount);
+        deal(address(collateralToken), userOne, supplyAmount);
 
         uint256 startingTotalSupply = credit.totalSupply();
 

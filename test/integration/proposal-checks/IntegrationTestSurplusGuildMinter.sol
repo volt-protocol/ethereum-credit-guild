@@ -549,14 +549,19 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         {
             uint256 startingCreditMultiplier = profitManager.creditMultiplier();
             uint256 startingIssuance = term.issuance();
-            uint256 startingTermSurplusBuffer = profitManager.termSurplusBuffer(address(term));
+            uint256 startingTermSurplusBuffer = profitManager.termSurplusBuffer(
+                address(term)
+            );
             uint256 startingGlobalSurplusBuffer = profitManager.surplusBuffer();
 
             auctionHouse.bid(loanId);
             guild.applyGaugeLoss(address(term), address(surplusGuildMinter));
 
             if (lossAmount > startingTermSurplusBuffer) {
-                if (lossAmount > startingTermSurplusBuffer + startingGlobalSurplusBuffer) {
+                if (
+                    lossAmount >
+                    startingTermSurplusBuffer + startingGlobalSurplusBuffer
+                ) {
                     assertEq(
                         profitManager.surplusBuffer(),
                         0,
@@ -566,7 +571,9 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
                     /// loss over term surplus buffer, but not over term surplus buffer + global surplus buffer
                     assertEq(
                         profitManager.surplusBuffer(),
-                        startingTermSurplusBuffer + startingGlobalSurplusBuffer - lossAmount,
+                        startingTermSurplusBuffer +
+                            startingGlobalSurplusBuffer -
+                            lossAmount,
                         "loss amount incorrect when term surplus buffer exceeded but not global buffer"
                     );
                 }
@@ -737,7 +744,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     ) private returns (bytes32 loanId) {
         _allocateGaugeToSDAI();
 
-        deal(address(sdai), userOne, supplyAmount);
+        deal(address(collateralToken), userOne, supplyAmount);
 
         uint256 startingTotalSupply = credit.totalSupply();
 

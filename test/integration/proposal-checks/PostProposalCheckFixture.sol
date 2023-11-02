@@ -39,7 +39,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
     LendingTermOnboarding public onboarder;
     LendingTermOffboarding public offboarder;
 
-    MockERC20 public collateral;
+    ERC20 public collateralToken;
 
     AuctionHouse public auctionHouse;
 
@@ -63,9 +63,6 @@ contract PostProposalCheckFixture is PostProposalCheck {
     RateLimitedMinter public rateLimitedGuildMinter;
     SurplusGuildMinter public surplusGuildMinter;
 
-    /// @notice for each SDAI collateral, up to 1 credit can be borrowed
-    uint256 internal constant MAX_SDAI_CREDIT_RATIO = 1e18;
-
     /// @notice credit hardcap at launch
     uint256 internal constant CREDIT_HARDCAP = 2_000_000 * 1e18;
 
@@ -74,13 +71,6 @@ contract PostProposalCheckFixture is PostProposalCheck {
 
     /// @notice USDC mint amount
     uint256 internal constant INITIAL_USDC_MINT_AMOUNT = 100 * 1e6;
-
-    /// ------------------------------------------------------------------------
-    /// @notice Interest Rate Parameters
-    /// ------------------------------------------------------------------------
-
-    /// @notice rate to borrow against SDAI collateral
-    uint256 internal constant SDAI_RATE = 0.04e18;
 
     function setUp() public virtual override {
         super.setUp();
@@ -111,7 +101,6 @@ contract PostProposalCheckFixture is PostProposalCheck {
         profitManager = ProfitManager(addresses.mainnet("PROFIT_MANAGER"));
         auctionHouse = AuctionHouse(addresses.mainnet("AUCTION_HOUSE"));
         psm = SimplePSM(addresses.mainnet("PSM_USDC"));
-        collateral = new MockERC20();
 
         governor = VoltGovernor(payable(addresses.mainnet("GOVERNOR")));
         vetoGovernor = VoltVetoGovernor(
@@ -130,6 +119,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
         );
 
         term = LendingTerm(addresses.mainnet("TERM_SDAI_1"));
+        collateralToken = ERC20(term.getParameters().collateralToken);
 
         vm.label(userOne, "user one");
         vm.label(userTwo, "user two");

@@ -36,8 +36,8 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
             onboarder.createTerm(
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet("ERC20_SDAI"),
-                    maxDebtPerCollateralToken: MAX_SDAI_CREDIT_RATIO,
-                    interestRate: SDAI_RATE,
+                    maxDebtPerCollateralToken: 1e18,
+                    interestRate: 0.04e18,
                     maxDelayBetweenPartialRepay: 0,
                     minPartialRepayPercent: 0,
                     openingFee: 0,
