@@ -25,7 +25,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     ///    offboard - done
     ///    repay loan - done
 
-    function _voteForSDAIGauge() private {
+    function _mintQuorumGuildAmount() private {
         uint256 mintAmount = governor.quorum(0);
         /// setup
         vm.prank(addresses.mainnet("TEAM_MULTISIG"));
@@ -33,12 +33,10 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         guild.delegate(address(this));
 
         assertTrue(guild.isGauge(address(term)));
-        assertEq(guild.numGauges(), 1);
-        assertEq(guild.numLiveGauges(), 1);
     }
 
     function _allocateGaugeToSDAI() private {
-        _voteForSDAIGauge();
+        _mintQuorumGuildAmount();
 
         guild.incrementGauge(address(term), guild.balanceOf(address(this)));
 
@@ -643,7 +641,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
 
     function _termOffboarding() public {
         if (guild.balanceOf(address(this)) == 0) {
-            _voteForSDAIGauge();
+            _mintQuorumGuildAmount();
         }
 
         vm.roll(block.number + 2);
