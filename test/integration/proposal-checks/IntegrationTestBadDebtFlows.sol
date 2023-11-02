@@ -83,10 +83,21 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         offboarder.proposeOffboard(address(term));
         vm.roll(block.number + 1);
         offboarder.supportOffboard(block.number - 1, address(term));
+        assertFalse(
+            psm.redemptionsPaused(),
+            "PSM redemptions should not be paused"
+        );
         offboarder.offboard(address(term));
 
-        assertFalse(guild.isGauge(address(term)));
-        assertTrue(guild.isDeprecatedGauge(address(term)));
+        assertTrue(psm.redemptionsPaused(), "PSM redemptions not paused");
+        assertFalse(
+            guild.isGauge(address(term)),
+            "term still a non-deprecated gauge"
+        );
+        assertTrue(
+            guild.isDeprecatedGauge(address(term)),
+            "term not deprecated"
+        );
     }
 
     function _psmMint(uint128 amount) public {
@@ -127,14 +138,6 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
     }
 
     function testBadDebtRepricesCreditBid() public {
-        /// TODO uncomment once changes around pausing PSM when term is offboarded come online
-        /// user two purchases credit in PSM
-        // deal(address(usdc), userTwo, 100e6);
-        // vm.startPrank(userTwo);
-        // usdc.approve(address(psm), 100e6);
-        // psm.mint(userTwo, 100e6);
-        // vm.stopPrank();
-
         testAllocateGaugeToSDAI();
 
         uint256 borrowAmount = 100e18;
@@ -180,14 +183,6 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
     }
 
     function testBadDebtRepricesCreditForgive() public {
-        /// TODO uncomment once changes around pausing PSM when term is offboarded come online
-        /// user two purchases credit in PSM
-        // deal(address(usdc), userTwo, 100e6);
-        // vm.startPrank(userTwo);
-        // usdc.approve(address(psm), 100e6);
-        // psm.mint(userTwo, 100e6);
-        // vm.stopPrank();
-
         testAllocateGaugeToSDAI();
 
         uint256 borrowAmount = 100e18;
@@ -225,6 +220,9 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         assertEq(auctionHouse.nAuctionsInProgress(), 1);
 
         uint256 startingSdaiBalance = sdai.balanceOf(address(this));
+        uint256 startingCreditSupply = credit.totalSupply();
+        uint256 startingCreditMultiplier = profitManager.creditMultiplier();
+        uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();
 
         auctionHouse.forgive(loanId);
 
@@ -238,12 +236,34 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         );
 
         /// ensure credit reprices
+
+        uint256 expectedCreditMultiplier = (startingCreditMultiplier *
+            (startingCreditSupply - borrowAmount)) / startingCreditSupply;
+
+        assertEq(
+            startingCreditBuffer,
+            rateLimitedCreditMinter.buffer(),
+            "incorrect buffer, should not change on total loss as 0 principal is repaid"
+        );
+        assertEq(
+            profitManager.termSurplusBuffer(address(term)),
+            0,
+            "term surplus buffer should be 0"
+        );
+        assertEq(
+            profitManager.surplusBuffer(),
+            0,
+            "surplus buffer should be 0"
+        );
         assertEq(
             profitManager.creditMultiplier() < 1e18,
             true,
             "credit multiplier should be less than 1"
         );
-
-        /// TODO add more assertions around this to ensure that credit reprices to the right price
+        assertEq(
+            profitManager.creditMultiplier(),
+            expectedCreditMultiplier,
+            "credit multiplier should expected value"
+        );
     }
 }
