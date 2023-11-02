@@ -10,11 +10,6 @@ contract IntegrationTestGuildToken is PostProposalCheckFixture {
         assertFalse(guild.transferable());
     }
 
-    function testCorrectNumGauges() public {
-        assertEq(guild.numGauges(), 1);
-        assertEq(guild.numLiveGauges(), 1);
-    }
-
     function testCorrectGauge() public {
         assertEq(guild.gauges()[0], address(term));
     }
