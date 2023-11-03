@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
 import "@forge-std/Test.sol";
 
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
@@ -19,30 +21,44 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
     function testAllocateGaugeToSDAI() public {
         testVoteForSDAIGauge();
-
+        uint256 mintAmount = governor.quorum(0);
         uint256 startingTotalWeight = guild.totalWeight();
-        guild.incrementGauge(address(term), guild.balanceOf(address(this)));
+
+        guild.incrementGauge(address(term), mintAmount);
 
         assertEq(
             guild.totalWeight() - startingTotalWeight,
-            guild.balanceOf(address(this))
+            mintAmount,
+            "incorrect gauge weight post increment"
         );
-        assertTrue(guild.isUserGauge(address(this), address(term)));
+        assertTrue(
+            guild.isUserGauge(address(this), address(term)),
+            "is user gauge false"
+        );
     }
 
     function testSupplyCollateralUserOne(
         uint128 supplyAmount
     ) public returns (bytes32 loanId, uint128 suppliedAmount) {
+        testAllocateGaugeToSDAI();
         supplyAmount = uint128(
             _bound(
                 uint256(supplyAmount),
                 term.MIN_BORROW(),
-                rateLimitedCreditMinter.buffer()
+                Math.min(term.debtCeiling(), rateLimitedCreditMinter.buffer())
             )
         );
         suppliedAmount = supplyAmount;
 
+        return _supplyCollateralUserOne(suppliedAmount);
+    }
+
+    function _supplyCollateralUserOne(
+        uint128 supplyAmount
+    ) private returns (bytes32 loanId, uint128 suppliedAmount) {
         testAllocateGaugeToSDAI();
+
+        suppliedAmount = supplyAmount;
 
         deal(address(collateralToken), userOne, supplyAmount);
 
@@ -244,7 +260,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
     function testCallLoan() public returns (bytes32) {
         uint256 supplyAmount = 10_000e18;
-        (bytes32 loanId, ) = testSupplyCollateralUserOne(uint128(supplyAmount));
+        (bytes32 loanId, ) = _supplyCollateralUserOne(uint128(supplyAmount));
 
         testTermOffboarding();
 
@@ -273,7 +289,9 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         bytes32 loanId = testCallLoan();
         uint256 creditRepayAmount = term.getLoanDebt(loanId);
         uint256 loanAmount = 10_000e18;
+
         uint256 profit = creditRepayAmount - loanAmount;
+
         uint256 usdcMintAmount = creditRepayAmount / 1e12 + 1;
         uint256 startingDeployerBalance = credit.balanceOf(userThree);
 
