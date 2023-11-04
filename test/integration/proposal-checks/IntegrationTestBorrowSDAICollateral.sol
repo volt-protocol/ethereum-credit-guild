@@ -41,12 +41,21 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         uint128 supplyAmount
     ) public returns (bytes32 loanId, uint128 suppliedAmount) {
         testAllocateGaugeToSDAI();
+        uint256 debtCeiling = Math.min(
+            guild.calculateGaugeAllocation(
+                address(this),
+                credit.totalSupply()
+            ) < term.MIN_BORROW()
+                ? term.MIN_BORROW()
+                : guild.calculateGaugeAllocation(
+                    address(this),
+                    credit.totalSupply()
+                ),
+            rateLimitedCreditMinter.buffer()
+        );
+
         supplyAmount = uint128(
-            _bound(
-                uint256(supplyAmount),
-                term.MIN_BORROW(),
-                Math.min(term.debtCeiling(), rateLimitedCreditMinter.buffer())
-            )
+            _bound(uint256(supplyAmount), term.MIN_BORROW(), debtCeiling)
         );
         suppliedAmount = supplyAmount;
 

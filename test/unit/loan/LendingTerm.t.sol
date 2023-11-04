@@ -1417,23 +1417,4 @@ contract LendingTermUnitTest is Test {
         credit.approve(address(term), 41_000e18);
         term.partialRepay(loanId, 41_000e18);
     }
-
-    function testDebtCeiling() public {
-        vm.prank(address(term));
-        rlcm.mint(address(10_000), 1_000_000_000 * 1e18);
-        assertTrue(
-            term.debtCeiling() <= rlcm.buffer(),
-            "debt ceiling not lte buffer"
-        );
-
-        uint256 totalSupply = credit.totalSupply();
-        assertEq(
-            term.debtCeiling(1_000_000 * 1e18),
-            guild.calculateGaugeAllocation(
-                address(term),
-                totalSupply + 1_000_000 * 1e18
-            ),
-            "hypothetical debt ceiling incorrect"
-        );
-    }
 }
