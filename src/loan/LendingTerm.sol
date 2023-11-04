@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
@@ -196,28 +196,6 @@ contract LendingTerm is CoreRef {
         return loans[loanId];
     }
 
-    /// @notice return the debt ceiling after borrowing `borrowAmount`
-    /// @param borrowAmount hypothetical amount of CREDIT to borrow
-    /// @return new debt ceiling for this term after borrowing `borrowAmount`
-    function debtCeiling(uint256 borrowAmount) public view returns (uint256) {
-        uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
-        return
-            GuildToken(refs.guildToken).calculateGaugeAllocation(
-                address(this),
-                _totalSupply + borrowAmount
-            );
-    }
-
-    /// @notice return the current debt ceiling
-    /// @return current debt ceiling for this term
-    function debtCeiling() public view returns (uint256) {
-        return
-            GuildToken(refs.guildToken).calculateGaugeAllocation(
-                address(this),
-                CreditToken(refs.creditToken).totalSupply()
-            );
-    }
-
     /// @notice outstanding borrowed amount of a loan, including interests
     function getLoanDebt(bytes32 loanId) public view returns (uint256) {
         Loan storage loan = loans[loanId];
@@ -317,15 +295,19 @@ contract LendingTerm is CoreRef {
 
         // check the debt ceiling
         uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
-        uint256 _debtCeiling = debtCeiling(borrowAmount);
+        uint256 debtCeiling = GuildToken(refs.guildToken)
+            .calculateGaugeAllocation(
+                address(this),
+                _totalSupply + borrowAmount
+            );
         if (_totalSupply == 0) {
             // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
             // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
             // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
-            require(_debtCeiling != 0, "LendingTerm: debt ceiling reached");
+            require(debtCeiling != 0, "LendingTerm: debt ceiling reached");
         } else {
             require(
-                _postBorrowIssuance <= _debtCeiling,
+                _postBorrowIssuance <= debtCeiling,
                 "LendingTerm: debt ceiling reached"
             );
         }
@@ -762,14 +744,14 @@ contract LendingTerm is CoreRef {
         // compute pnl
         uint256 creditMultiplier = ProfitManager(refs.profitManager)
             .creditMultiplier();
-        uint256 borrowAmount = loans[loanId].borrowAmount; /// this is the amount borrowed
+        uint256 borrowAmount = loans[loanId].borrowAmount;
         uint256 principal = (borrowAmount *
             loans[loanId].borrowCreditMultiplier) / creditMultiplier;
         int256 pnl;
         uint256 interest;
         if (creditFromBidder >= principal) {
             interest = creditFromBidder - principal;
-            pnl = int256(interest); /// any amount of interest paid at this point is profit due to pessimistic accounting
+            pnl = int256(interest);
         } else {
             pnl = int256(creditFromBidder) - int256(principal);
             principal = creditFromBidder;

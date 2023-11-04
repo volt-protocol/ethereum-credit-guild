@@ -279,12 +279,16 @@ contract ProfitManager is CoreRef {
         else if (amount > 0) {
             ProfitSharingConfig
                 memory _profitSharingConfig = profitSharingConfig;
+
             uint256 amountForSurplusBuffer = (uint256(amount) *
                 uint256(_profitSharingConfig.surplusBufferSplit)) / 1e9;
+
             uint256 amountForGuild = (uint256(amount) *
                 uint256(_profitSharingConfig.guildSplit)) / 1e9;
+
             uint256 amountForOther = (uint256(amount) *
                 uint256(_profitSharingConfig.otherSplit)) / 1e9;
+
             uint256 amountForCredit = uint256(amount) -
                 amountForSurplusBuffer -
                 amountForGuild -
