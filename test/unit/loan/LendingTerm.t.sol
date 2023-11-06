@@ -301,9 +301,18 @@ contract LendingTermUnitTest is Test {
 
     // borrow fail because debt ceiling is reached
     function testBorrowFailDebtCeilingReached() public {
-        // debt ceiling = MAX_UINT if there is only one term
-        assertEq(term.debtCeiling(), type(uint256).max);
         uint256 _weight = guild.getGaugeWeight(address(term));
+        // debt ceiling = min(_HARDCAP, buffer) if there is only one term
+        assertEq(term.debtCeiling(), _HARDCAP);
+        vm.prank(governor);
+        rlcm.setBufferCap(uint128(_HARDCAP / 2));
+        assertEq(term.debtCeiling(), _HARDCAP / 2);
+        vm.prank(governor);
+        rlcm.setBufferCap(type(uint128).max);
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 3 days);
+        assertEq(term.debtCeiling(), _HARDCAP);
+
         // if no weight is given to the term, debt ceiling is 0
         guild.decrementGauge(address(term), _weight);
         assertEq(term.debtCeiling(), 0);
@@ -314,9 +323,9 @@ contract LendingTermUnitTest is Test {
         guild.mint(address(this), _weight);
         guild.incrementGauge(address(this), _weight);
 
-        // debt ceiling still MAX_UINT because credit totalSupply is 0
-        // and first-ever mint does not check debt ceiling
-        assertEq(term.debtCeiling(), type(uint256).max);
+        // debt ceiling is _HARDCAP because credit totalSupply is 0
+        // and first-ever mint does not check relative debt ceilings
+        assertEq(term.debtCeiling(), _HARDCAP);
 
         // prepare
         uint256 borrowAmount = 20_000e18;
@@ -342,6 +351,21 @@ contract LendingTermUnitTest is Test {
         credit.mint(address(this), 80_000e18);
         // if someone borrows 60_000e18, new totalSupply is 160_000e18, and debt ceiling
         // of this term is 50% of the new totalSupply, i.e. 80_000e18.
+        assertEq(term.debtCeiling(), 80_000e18);
+
+        vm.prank(governor);
+        rlcm.setBufferCap(uint128(70_000e18));
+        assertEq(term.debtCeiling(), 70_000e18);
+        vm.prank(governor);
+        rlcm.setBufferCap(type(uint128).max);
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 3 days);
+        assertEq(term.debtCeiling(), 80_000e18);
+        vm.prank(governor);
+        term.setHardCap(60_000e18);
+        assertEq(term.debtCeiling(), 60_000e18);
+        vm.prank(governor);
+        term.setHardCap(_HARDCAP);
         assertEq(term.debtCeiling(), 80_000e18);
 
         // borrow max
