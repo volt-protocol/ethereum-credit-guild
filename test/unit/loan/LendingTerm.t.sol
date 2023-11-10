@@ -301,10 +301,31 @@ contract LendingTermUnitTest is Test {
 
     // borrow fail because debt ceiling is reached
     function testBorrowFailDebtCeilingReached() public {
+        uint256 _weight = guild.getGaugeWeight(address(term));
+        // debt ceiling = min(_HARDCAP, buffer) if there is only one term
+        assertEq(term.debtCeiling(), _HARDCAP);
+        vm.prank(governor);
+        rlcm.setBufferCap(uint128(_HARDCAP / 2));
+        assertEq(term.debtCeiling(), _HARDCAP / 2);
+        vm.prank(governor);
+        rlcm.setBufferCap(type(uint128).max);
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 3 days);
+        assertEq(term.debtCeiling(), _HARDCAP);
+
+        // if no weight is given to the term, debt ceiling is 0
+        guild.decrementGauge(address(term), _weight);
+        assertEq(term.debtCeiling(), 0);
+        guild.incrementGauge(address(term), _weight);
+
         // add another gauge, equal voting weight for the 2nd gauge
         guild.addGauge(1, address(this));
-        guild.mint(address(this), guild.getGaugeWeight(address(term)));
-        guild.incrementGauge(address(this), uint256(guild.getGaugeWeight(address(term))));
+        guild.mint(address(this), _weight);
+        guild.incrementGauge(address(this), _weight);
+
+        // debt ceiling is _HARDCAP because credit totalSupply is 0
+        // and first-ever mint does not check relative debt ceilings
+        assertEq(term.debtCeiling(), _HARDCAP);
 
         // prepare
         uint256 borrowAmount = 20_000e18;
@@ -317,9 +338,54 @@ contract LendingTermUnitTest is Test {
         vm.warp(block.timestamp + 10);
         vm.roll(block.number + 1);
 
+        // debt ceiling is 50% of totalSupply (10_000e18), so we
+        // are at 200% utilization
+        assertEq(term.debtCeiling(), 10_000e18);
+
         // second borrow fails because of relative debt ceilings
         vm.expectRevert("LendingTerm: debt ceiling reached");
         term.borrow(borrowAmount, collateralAmount);
+
+        // mint more CREDIT, so that debt ceiling of all terms is increased
+        // new totalSupply is 100_000e18, with 20_000e18 already borrowed on this term.
+        credit.mint(address(this), 80_000e18);
+        // if someone borrows 60_000e18, new totalSupply is 160_000e18, and debt ceiling
+        // of this term is 50% of the new totalSupply, i.e. 80_000e18.
+        assertEq(term.debtCeiling(), 80_000e18);
+
+        vm.prank(governor);
+        rlcm.setBufferCap(uint128(70_000e18));
+        assertEq(term.debtCeiling(), 70_000e18);
+        vm.prank(governor);
+        rlcm.setBufferCap(type(uint128).max);
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 3 days);
+        assertEq(term.debtCeiling(), 80_000e18);
+        vm.prank(governor);
+        term.setHardCap(60_000e18);
+        assertEq(term.debtCeiling(), 60_000e18);
+        vm.prank(governor);
+        term.setHardCap(_HARDCAP);
+        assertEq(term.debtCeiling(), 80_000e18);
+
+        // borrow max
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        collateral.mint(address(this), 30e18);
+        collateral.approve(address(term), 30e18);
+        uint256 maxBorrow = term.debtCeiling() - term.issuance();
+        term.borrow(maxBorrow, 30e18);
+        assertEq(term.issuance(), term.debtCeiling());
+
+        // borrowing even the minimum amount will revert
+        // because debt ceiling is reached
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        collateral.mint(address(this), 9999e18);
+        collateral.approve(address(term), 9999e18);
+        uint256 _minBorrow = term.MIN_BORROW();
+        vm.expectRevert("LendingTerm: debt ceiling reached");
+        term.borrow(_minBorrow, 30e18);
     }
 
     // borrow fail because hardcap is reached
