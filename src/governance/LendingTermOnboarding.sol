@@ -46,6 +46,13 @@ contract LendingTermOnboarding is VoltGovernor {
     /// @notice reference to creditToken to set in created lending terms
     address public immutable creditToken;
 
+    /// @notice emitted when a term is created
+    event TermCreated(
+        uint256 indexed when,
+        address indexed term,
+        LendingTerm.LendingTermParams params
+    );
+
     constructor(
         address _lendingTermImplementation,
         LendingTerm.LendingTermReferences memory _lendingTermReferences,
@@ -133,6 +140,7 @@ contract LendingTermOnboarding is VoltGovernor {
             params
         );
         created[term] = block.timestamp;
+        emit TermCreated(block.timestamp, term, params);
         return term;
     }
 
