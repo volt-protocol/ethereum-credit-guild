@@ -252,6 +252,67 @@ contract LendingTerm is CoreRef {
             block.timestamp - params.maxDelayBetweenPartialRepay;
     }
 
+    /// @notice returns the maximum amount of debt that can be issued by this term
+    /// according to the current gauge allocations.
+    /// Note that the debt ceiling can be lower than the current issuance under 4 conditions :
+    /// - params.hardCap is lower than since last borrow happened
+    /// - gauge votes are fewer than when last borrow happened
+    /// - credit.totalSupply() decreased since last borrow
+    /// - creditMinter.buffer() is close to being depleted
+    /// @dev this solves the following equation :
+    /// borrowAmount + issuance <= (totalSupply + borrowAmount) * gaugeWeight / totalWeight
+    /// which is the formula to check debt ceiling in the borrow function.
+    /// This gives the maximum borrowable amount to achieve 100% utilization of the debt
+    /// ceiling, and if we add the current issuance to it, we get the current debt ceiling.
+    function debtCeiling() external view returns (uint256) {
+        address _guildToken = refs.guildToken; // cached SLOAD
+        uint256 gaugeWeight = GuildToken(_guildToken).getGaugeWeight(
+            address(this)
+        );
+        uint256 gaugeType = GuildToken(_guildToken).gaugeType(address(this));
+        uint256 totalWeight = GuildToken(_guildToken).totalTypeWeight(
+            gaugeType
+        );
+        uint256 creditMinterBuffer = RateLimitedMinter(refs.creditMinter)
+            .buffer();
+        uint256 _hardCap = params.hardCap; // cached SLOAD
+        if (gaugeWeight == 0) {
+            return 0; // no gauge vote, 0 debt ceiling
+        } else if (gaugeWeight == totalWeight) {
+            // one gauge, unlimited debt ceiling
+            // returns min(hardCap, creditMinterBuffer)
+            return
+                _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
+        }
+        uint256 _issuance = issuance; // cached SLOAD
+        uint256 creditTotalSupply = CreditToken(refs.creditToken).totalSupply();
+        if (creditTotalSupply == 0 && gaugeWeight != 0) {
+            // first-ever CREDIT mint on a non-zero gauge weight term
+            // does not check the relative debt ceilings
+            // returns min(hardCap, creditMinterBuffer)
+            return
+                _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
+        }
+        uint256 debtCeilingBefore = (creditTotalSupply * gaugeWeight) /
+            totalWeight;
+        if (_issuance >= debtCeilingBefore) {
+            return debtCeilingBefore; // no more borrows allowed
+        }
+        uint256 remainingDebtCeiling = debtCeilingBefore - _issuance; // always >0
+        uint256 otherGaugesWeight = totalWeight - gaugeWeight;
+        uint256 maxBorrow = (remainingDebtCeiling * totalWeight) /
+            otherGaugesWeight;
+        uint256 _debtCeiling = _issuance + maxBorrow;
+        // return min(creditMinterBuffer, hardCap, debtCeiling)
+        if (creditMinterBuffer < _debtCeiling) {
+            return creditMinterBuffer;
+        }
+        if (_hardCap < _debtCeiling) {
+            return _hardCap;
+        }
+        return _debtCeiling;
+    }
+
     /// @notice initiate a new loan
     function _borrow(
         address borrower,
@@ -269,11 +330,10 @@ contract LendingTerm is CoreRef {
         require(loans[loanId].borrowTime == 0, "LendingTerm: loan exists");
 
         // check that enough collateral is provided
-        uint256 maxBorrow = (collateralAmount *
-            params.maxDebtPerCollateralToken) / 1e18;
         uint256 creditMultiplier = ProfitManager(refs.profitManager)
             .creditMultiplier();
-        maxBorrow = (maxBorrow * 1e18) / creditMultiplier;
+        uint256 maxBorrow = (collateralAmount *
+            params.maxDebtPerCollateralToken) / creditMultiplier;
         require(
             borrowAmount <= maxBorrow,
             "LendingTerm: not enough collateral"
@@ -295,7 +355,7 @@ contract LendingTerm is CoreRef {
 
         // check the debt ceiling
         uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
-        uint256 debtCeiling = GuildToken(refs.guildToken)
+        uint256 _debtCeiling = GuildToken(refs.guildToken)
             .calculateGaugeAllocation(
                 address(this),
                 _totalSupply + borrowAmount
@@ -304,10 +364,10 @@ contract LendingTerm is CoreRef {
             // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
             // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
             // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
-            require(debtCeiling != 0, "LendingTerm: debt ceiling reached");
+            require(_debtCeiling != 0, "LendingTerm: debt ceiling reached");
         } else {
             require(
-                _postBorrowIssuance <= debtCeiling,
+                _postBorrowIssuance <= _debtCeiling,
                 "LendingTerm: debt ceiling reached"
             );
         }
