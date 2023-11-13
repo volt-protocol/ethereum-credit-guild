@@ -274,7 +274,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
     function testBadDebtRepricesCreditForgive(uint256 borrowAmount, uint128 supplyAmount) public {
         testAllocateGaugeToSDAI();
 
-        supplyAmount = uint128(_bound(supplyAmount, term.MIN_BORROW(), rateLimitedCreditMinter.buffer()));
+        supplyAmount = uint128(_bound(supplyAmount, term.MIN_BORROW(), term.debtCeiling()));
         borrowAmount = _bound(borrowAmount, term.MIN_BORROW(), supplyAmount);
 
         /// supply collateral and borrow
