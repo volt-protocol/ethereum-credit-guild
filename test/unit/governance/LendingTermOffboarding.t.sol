@@ -169,6 +169,10 @@ contract LendingTermOffboardingUnitTest is Test {
         assertEq(offboarder.polls(block.number, address(term)), 1);
         assertEq(offboarder.lastPollBlock(address(term)), block.number);
 
+        // cannot ask to offboard an address that is not an active term
+        vm.expectRevert("LendingTermOffboarding: not an active term");
+        offboarder.proposeOffboard(address(this));
+
         // cannot ask in the same block because the poll exists
         vm.expectRevert("LendingTermOffboarding: poll exists");
         offboarder.proposeOffboard(address(term));
