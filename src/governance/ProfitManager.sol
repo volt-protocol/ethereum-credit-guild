@@ -128,14 +128,11 @@ contract ProfitManager is CoreRef {
     );
 
     /// @notice emitted when minBorrow is updated
-    event MinBorrowUpdate(
-        uint256 indexed when,
-        uint256 newValue
-    );
+    event MinBorrowUpdate(uint256 indexed when, uint256 newValue);
 
     /// @notice get the minimum borrow amount
     function minBorrow() external view returns (uint256) {
-        return _minBorrow * 1e18 / creditMultiplier;
+        return (_minBorrow * 1e18) / creditMultiplier;
     }
 
     /// @notice initialize references to GUILD & CREDIT tokens.

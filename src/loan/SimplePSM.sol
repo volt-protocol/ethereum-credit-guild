@@ -106,7 +106,10 @@ contract SimplePSM is CoreRef {
     function mintAndEnterRebase(
         uint256 amountIn
     ) external whenNotPaused returns (uint256 amountOut) {
-        require(!CreditToken(credit).isRebasing(msg.sender), "SimplePSM: already rebasing");
+        require(
+            !CreditToken(credit).isRebasing(msg.sender),
+            "SimplePSM: already rebasing"
+        );
         amountOut = getMintAmountOut(amountIn);
         ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
         CreditToken(credit).mint(msg.sender, amountOut);
