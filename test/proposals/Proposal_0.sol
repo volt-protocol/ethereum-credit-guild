@@ -25,6 +25,25 @@ import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol
 contract Proposal_0 is Proposal {
     string public name = "Proposal_0";
 
+    uint256 public constant BLOCKS_PER_DAY = 7164;
+
+    // governance params
+    uint256 public constant DAO_TIMELOCK_DELAY = 7 days;
+    uint256 public constant ONBOARD_TIMELOCK_DELAY = 1 days;
+    uint256 public constant DAO_GOVERNOR_GUILD_VOTING_DELAY = 0 * BLOCKS_PER_DAY;
+    uint256 public constant DAO_GOVERNOR_GUILD_VOTING_PERIOD = 3 * BLOCKS_PER_DAY;
+    uint256 public constant DAO_GOVERNOR_GUILD_PROPOSAL_THRESHOLD = 2_500_000e18;
+    uint256 public constant DAO_GOVERNOR_GUILD_QUORUM = 25_000_000e18;
+    uint256 public constant DAO_VETO_CREDIT_QUORUM = 5_000_000e18;
+    uint256 public constant DAO_VETO_GUILD_QUORUM = 15_000_000e18;
+    uint256 public constant ONBOARD_GOVERNOR_GUILD_VOTING_DELAY = 0 * BLOCKS_PER_DAY;
+    uint256 public constant ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD = 2 * BLOCKS_PER_DAY;
+    uint256 public constant ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD = 1_000_000e18;
+    uint256 public constant ONBOARD_GOVERNOR_GUILD_QUORUM = 10_000_000e18;
+    uint256 public constant ONBOARD_VETO_CREDIT_QUORUM = 5_000_000e18;
+    uint256 public constant ONBOARD_VETO_GUILD_QUORUM = 10_000_000e18;
+    uint256 public constant OFFBOARD_QUORUM = 10_000_000e18;
+
     function deploy(Addresses addresses) public {
         // Core
         {
@@ -103,32 +122,37 @@ contract Proposal_0 is Proposal {
 
         // Governance
         {
-            VoltTimelockController timelock = new VoltTimelockController(
+            VoltTimelockController daoTimelock = new VoltTimelockController(
                 addresses.mainnet("CORE"),
-                3 days
+                DAO_TIMELOCK_DELAY
             );
-            VoltGovernor governor = new VoltGovernor(
+            VoltGovernor daoGovernorGuild = new VoltGovernor(
                 addresses.mainnet("CORE"),
-                address(timelock),
+                address(daoTimelock),
                 addresses.mainnet("ERC20_GUILD"),
-                0, // initialVotingDelay
-                7000 * 3, // initialVotingPeriod (~7000 blocks/day)
-                2_500_000e18, // initialProposalThreshold
-                10_000_000e18 // initialQuorum
+                DAO_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
+                DAO_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
+                DAO_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
+                DAO_GOVERNOR_GUILD_QUORUM // initialQuorum
             );
-            VoltVetoGovernor vetoGovernor = new VoltVetoGovernor(
+            VoltVetoGovernor daoVetoCredit = new VoltVetoGovernor(
                 addresses.mainnet("CORE"),
-                address(timelock),
+                address(daoTimelock),
                 addresses.mainnet("ERC20_CREDIT"),
-                2_500_000e18 // initialQuorum
+                DAO_VETO_CREDIT_QUORUM // initialQuorum
             );
-            LendingTermOffboarding termOffboarding = new LendingTermOffboarding(
+            VoltVetoGovernor daoVetoGuild = new VoltVetoGovernor(
                 addresses.mainnet("CORE"),
+                address(daoTimelock),
                 addresses.mainnet("ERC20_GUILD"),
-                addresses.mainnet("PSM_USDC"),
-                5_000_000e18 // quorum
+                DAO_VETO_GUILD_QUORUM // initialQuorum
             );
-            LendingTermOnboarding termOnboarding = new LendingTermOnboarding(
+
+            VoltTimelockController onboardTimelock = new VoltTimelockController(
+                addresses.mainnet("CORE"),
+                ONBOARD_TIMELOCK_DELAY
+            );
+            LendingTermOnboarding onboardGovernorGuild = new LendingTermOnboarding(
                 addresses.mainnet("LENDING_TERM_V1"), // _lendingTermImplementation
                 LendingTerm.LendingTermReferences({
                     profitManager: addresses.mainnet("PROFIT_MANAGER"),
@@ -139,24 +163,47 @@ contract Proposal_0 is Proposal {
                 }), /// _lendingTermReferences
                 1, // _gaugeType
                 addresses.mainnet("CORE"), // _core
-                address(timelock), // _timelock
-                0, // initialVotingDelay
-                7000 * 3, // initialVotingPeriod (~7000 blocks/day)
-                2_500_000e18, // initialProposalThreshold
-                10_000_000e18 // initialQuorum
+                address(onboardTimelock), // _timelock
+                ONBOARD_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
+                ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
+                ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
+                ONBOARD_GOVERNOR_GUILD_QUORUM // initialQuorum
+            );
+            VoltVetoGovernor onboardVetoCredit = new VoltVetoGovernor(
+                addresses.mainnet("CORE"),
+                address(onboardTimelock),
+                addresses.mainnet("ERC20_CREDIT"),
+                ONBOARD_VETO_CREDIT_QUORUM // initialQuorum
+            );
+            VoltVetoGovernor onboardVetoGuild = new VoltVetoGovernor(
+                addresses.mainnet("CORE"),
+                address(onboardTimelock),
+                addresses.mainnet("ERC20_GUILD"),
+                ONBOARD_VETO_GUILD_QUORUM // initialQuorum
             );
 
-            addresses.addMainnet("TIMELOCK", address(timelock));
-            addresses.addMainnet("GOVERNOR", address(governor));
-            addresses.addMainnet("VETO_GOVERNOR", address(vetoGovernor));
-            addresses.addMainnet("LENDING_TERM_OFFBOARDING", address(termOffboarding));
-            addresses.addMainnet("LENDING_TERM_ONBOARDING", address(termOnboarding));
+            LendingTermOffboarding termOffboarding = new LendingTermOffboarding(
+                addresses.mainnet("CORE"),
+                addresses.mainnet("ERC20_GUILD"),
+                addresses.mainnet("PSM_USDC"),
+                OFFBOARD_QUORUM // quorum
+            );
+
+            addresses.addMainnet("DAO_GOVERNOR_GUILD", address(daoGovernorGuild));
+            addresses.addMainnet("DAO_TIMELOCK", address(daoTimelock));
+            addresses.addMainnet("DAO_VETO_CREDIT", address(daoVetoCredit));
+            addresses.addMainnet("DAO_VETO_GUILD", address(daoVetoGuild));
+            addresses.addMainnet("ONBOARD_GOVERNOR_GUILD", address(onboardGovernorGuild));
+            addresses.addMainnet("ONBOARD_TIMELOCK", address(onboardTimelock));
+            addresses.addMainnet("ONBOARD_VETO_CREDIT", address(onboardVetoCredit));
+            addresses.addMainnet("ONBOARD_VETO_GUILD", address(onboardVetoGuild));
+            addresses.addMainnet("OFFBOARD_GOVERNOR_GUILD", address(termOffboarding));
         }
 
         // Terms
         {
             LendingTermOnboarding termOnboarding = LendingTermOnboarding(
-                payable(addresses.mainnet("LENDING_TERM_ONBOARDING"))
+                payable(addresses.mainnet("ONBOARD_GOVERNOR_GUILD"))
             );
             address termUSDC1 = termOnboarding.createTerm(LendingTerm.LendingTermParams({
                 collateralToken: addresses.mainnet("ERC20_USDC"),
@@ -187,8 +234,9 @@ contract Proposal_0 is Proposal {
 
         // grant roles to smart contracts
         // GOVERNOR
-        core.grantRole(CoreRoles.GOVERNOR, addresses.mainnet("TIMELOCK"));
-        core.grantRole(CoreRoles.GOVERNOR, addresses.mainnet("LENDING_TERM_OFFBOARDING"));
+        core.grantRole(CoreRoles.GOVERNOR, addresses.mainnet("DAO_TIMELOCK"));
+        core.grantRole(CoreRoles.GOVERNOR, addresses.mainnet("ONBOARD_TIMELOCK"));
+        core.grantRole(CoreRoles.GOVERNOR, addresses.mainnet("OFFBOARD_GOVERNOR_GUILD"));
 
         // GUARDIAN
         core.grantRole(CoreRoles.GUARDIAN, addresses.mainnet("TEAM_MULTISIG"));
@@ -208,15 +256,16 @@ contract Proposal_0 is Proposal {
         core.grantRole(CoreRoles.RATE_LIMITED_GUILD_MINTER, addresses.mainnet("SURPLUS_GUILD_MINTER"));
 
         // GAUGE_ADD
-        core.grantRole(CoreRoles.GAUGE_ADD, addresses.mainnet("TIMELOCK"));
+        core.grantRole(CoreRoles.GAUGE_ADD, addresses.mainnet("DAO_TIMELOCK"));
+        core.grantRole(CoreRoles.GAUGE_ADD, addresses.mainnet("ONBOARD_TIMELOCK"));
         core.grantRole(CoreRoles.GAUGE_ADD, deployer);
 
         // GAUGE_REMOVE
-        core.grantRole(CoreRoles.GAUGE_REMOVE, addresses.mainnet("TIMELOCK"));
-        core.grantRole(CoreRoles.GAUGE_REMOVE, addresses.mainnet("LENDING_TERM_OFFBOARDING"));
+        core.grantRole(CoreRoles.GAUGE_REMOVE, addresses.mainnet("DAO_TIMELOCK"));
+        core.grantRole(CoreRoles.GAUGE_REMOVE, addresses.mainnet("OFFBOARD_GOVERNOR_GUILD"));
 
         // GAUGE_PARAMETERS
-        core.grantRole(CoreRoles.GAUGE_PARAMETERS, addresses.mainnet("TIMELOCK"));
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, addresses.mainnet("DAO_TIMELOCK"));
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, deployer);
 
         // GAUGE_PNL_NOTIFIER
@@ -224,31 +273,32 @@ contract Proposal_0 is Proposal {
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, addresses.mainnet("TERM_SDAI_1"));
 
         // GUILD_GOVERNANCE_PARAMETERS
-        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, addresses.mainnet("TIMELOCK"));
+        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, addresses.mainnet("DAO_TIMELOCK"));
         core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, deployer);
 
         // GUILD_SURPLUS_BUFFER_WITHDRAW
         core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, addresses.mainnet("SURPLUS_GUILD_MINTER"));
 
         // CREDIT_GOVERNANCE_PARAMETERS
-        core.grantRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, addresses.mainnet("TIMELOCK"));
+        core.grantRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, addresses.mainnet("DAO_TIMELOCK"));
         core.grantRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, deployer);
 
         // CREDIT_REBASE_PARAMETERS
-        core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, addresses.mainnet("TIMELOCK"));
+        core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, addresses.mainnet("DAO_TIMELOCK"));
         core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, addresses.mainnet("PSM_USDC"));
 
         // TIMELOCK_PROPOSER
-        core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("GOVERNOR"));
-        core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("LENDING_TERM_ONBOARDING"));
-        core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("TEAM_MULTISIG"));
+        core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("DAO_GOVERNOR_GUILD"));
+        core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("ONBOARD_GOVERNOR_GUILD"));
 
         // TIMELOCK_EXECUTOR
         core.grantRole(CoreRoles.TIMELOCK_EXECUTOR, address(0)); // anyone can execute
 
         // TIMELOCK_CANCELLER
-        core.grantRole(CoreRoles.TIMELOCK_CANCELLER, addresses.mainnet("VETO_GOVERNOR"));
-        core.grantRole(CoreRoles.TIMELOCK_CANCELLER, addresses.mainnet("TEAM_MULTISIG"));
+        core.grantRole(CoreRoles.TIMELOCK_CANCELLER, addresses.mainnet("DAO_VETO_CREDIT"));
+        core.grantRole(CoreRoles.TIMELOCK_CANCELLER, addresses.mainnet("DAO_VETO_GUILD"));
+        core.grantRole(CoreRoles.TIMELOCK_CANCELLER, addresses.mainnet("ONBOARD_VETO_CREDIT"));
+        core.grantRole(CoreRoles.TIMELOCK_CANCELLER, addresses.mainnet("ONBOARD_VETO_GUILD"));
 
         // Configuration
         ProfitManager(addresses.mainnet("PROFIT_MANAGER")).initializeReferences(
