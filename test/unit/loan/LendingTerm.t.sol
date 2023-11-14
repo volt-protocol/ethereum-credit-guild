@@ -383,7 +383,7 @@ contract LendingTermUnitTest is Test {
         vm.warp(block.timestamp + 13);
         collateral.mint(address(this), 9999e18);
         collateral.approve(address(term), 9999e18);
-        uint256 _minBorrow = term.MIN_BORROW();
+        uint256 _minBorrow = profitManager.minBorrow();
         vm.expectRevert("LendingTerm: debt ceiling reached");
         term.borrow(_minBorrow, 30e18);
     }
@@ -426,7 +426,7 @@ contract LendingTermUnitTest is Test {
         interestTime = bound(interestTime, 1, 10 * 365 * 24 * 3600);
 
         // do not fuzz reverting conditions (below MIN_BORROW or above maxBorrow)
-        borrowAmount += term.MIN_BORROW();
+        borrowAmount += profitManager.minBorrow();
         uint256 maxBorrow = collateralAmount * _CREDIT_PER_COLLATERAL_TOKEN / 1e18;
         vm.assume(borrowAmount <= maxBorrow);
 
@@ -557,7 +557,7 @@ contract LendingTermUnitTest is Test {
         vm.expectRevert("LendingTerm: repay below min");
         term.partialRepay(loanId, 2_100e18); // min would be 20% = 2_200e18
 
-        uint256 MIN_BORROW = term.MIN_BORROW();
+        uint256 MIN_BORROW = profitManager.minBorrow();
         vm.expectRevert("LendingTerm: below min borrow");
         term.partialRepay(loanId, 11_000e18 - MIN_BORROW + 1);
 
@@ -1387,27 +1387,8 @@ contract LendingTermUnitTest is Test {
         assertEq(profitManager.creditMultiplier(), 0);
     }
 
-    // MIN_BORROW increases when creditMultiplier decreases - borrow()
-    function testMinBorrowAfterCreditLoseValue1() public {
-        // prank the term to report a loss in another loan
-        // this should discount CREDIT value by 50%, marking up
-        // all loans by 2x.
-        credit.mint(address(this), 100e18);
-        assertEq(profitManager.creditMultiplier(), 1e18);
-        vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-50e18));
-        assertEq(profitManager.creditMultiplier(), 0.5e18);
-        credit.burn(100e18);
-
-        // borrow should fail because we try to borrow 1.75x
-        // the MIN_BORROW, but CREDIT value went up 2x.
-        uint256 MIN_BORROW = term.MIN_BORROW();
-        vm.expectRevert("LendingTerm: borrow amount too low");
-        term.borrow(MIN_BORROW * 175 / 100, 10000000000e18);
-    }
-
     // MIN_BORROW increases when creditMultiplier decreases - partialRepay()
-    function testMinBorrowAfterCreditLoseValue2() public {
+    function testMinBorrowAfterCreditLoseValue() public {
         // prepare
         uint256 borrowAmount = 20_000e18;
         uint256 collateralAmount = 15e18;

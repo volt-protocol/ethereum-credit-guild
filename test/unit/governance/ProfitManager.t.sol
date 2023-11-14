@@ -125,6 +125,25 @@ contract ProfitManagerUnitTest is Test {
         assertEq(profitManager.creditMultiplier(), 0.28e18); // half of previous value because half the supply defaulted
     }
 
+    function testMinBorrow() public {
+        // grant roles to test contract
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        vm.stopPrank();
+
+        // initial minBorrow()
+        assertEq(profitManager.minBorrow(), 100e18);
+
+        // apply a loss
+        // 50 CREDIT of loans completely default (50 USD loss)
+        profitManager.notifyPnL(address(this), -50e18);
+        assertEq(profitManager.creditMultiplier(), 0.5e18); // 50% discounted
+        
+        // minBorrow() should 2x
+        assertEq(profitManager.minBorrow(), 200e18);
+    }
+
     function testSetProfitSharingConfig() public {
         (
             uint256 surplusBufferSplit,
@@ -204,6 +223,22 @@ contract ProfitManagerUnitTest is Test {
         assertEq(guildSplit, 0.05e18);
         assertEq(otherSplit, 0.1e18);
         assertEq(otherRecipient, address(this));
+    }
+
+    function testSetMinBorrow() public {
+        assertEq(profitManager.minBorrow(), 100e18);
+
+        // revert if not governor
+        vm.expectRevert("UNAUTHORIZED");
+        profitManager.setMinBorrow(1000e18);
+
+        assertEq(profitManager.minBorrow(), 100e18);
+
+        // ok
+        vm.prank(governor);
+        profitManager.setMinBorrow(1000e18);
+
+        assertEq(profitManager.minBorrow(), 1000e18);
     }
 
     function testProfitDistribution() public {

@@ -82,7 +82,16 @@ contract ProfitManager is CoreRef {
     /// shall be redistributed to holders through a savings rate or another mechanism.
     uint256 public creditMultiplier = 1e18;
 
-    constructor(address _core) CoreRef(_core) {}
+    /// @notice minimum size of CREDIT loans.
+    /// this parameter is here to ensure that the gas costs of liquidation do not
+    /// outsize minimum overcollateralization (which could result in bad debt
+    /// on otherwise sound loans).
+    /// This value is adjusted up when the creditMultiplier goes down.
+    uint256 public _minBorrow = 100e18;
+
+    constructor(address _core) CoreRef(_core) {
+        emit MinBorrowUpdate(block.timestamp, 100e18);
+    }
 
     /// @notice emitted when a profit or loss in a gauge is notified.
     event GaugePnL(address indexed gauge, uint256 indexed when, int256 pnl);
@@ -118,6 +127,17 @@ contract ProfitManager is CoreRef {
         uint256 amount
     );
 
+    /// @notice emitted when minBorrow is updated
+    event MinBorrowUpdate(
+        uint256 indexed when,
+        uint256 newValue
+    );
+
+    /// @notice get the minimum borrow amount
+    function minBorrow() external view returns (uint256) {
+        return _minBorrow * 1e18 / creditMultiplier;
+    }
+
     /// @notice initialize references to GUILD & CREDIT tokens.
     function initializeReferences(
         address _credit,
@@ -126,6 +146,14 @@ contract ProfitManager is CoreRef {
         assert(credit == address(0) && guild == address(0));
         credit = _credit;
         guild = _guild;
+    }
+
+    /// @notice set the minimum borrow amount
+    function setMinBorrow(
+        uint256 newValue
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        _minBorrow = newValue;
+        emit MinBorrowUpdate(block.timestamp, newValue);
     }
 
     /// @notice set the profit sharing config.

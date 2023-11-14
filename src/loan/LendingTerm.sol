@@ -67,9 +67,6 @@ contract LendingTerm is CoreRef {
     /// @notice reference number of seconds in 1 year
     uint256 public constant YEAR = 31557600;
 
-    /// @notice minimum number of CREDIT to borrow when opening a new loan
-    uint256 public constant MIN_BORROW = 100e18;
-
     /// @notice timestamp of last partial repayment for a given loanId.
     /// during borrow(), this is initialized to the borrow timestamp, if
     /// maxDelayBetweenPartialRepay is != 0
@@ -341,7 +338,7 @@ contract LendingTerm is CoreRef {
 
         // check that enough CREDIT is borrowed
         require(
-            borrowAmount >= (MIN_BORROW * 1e18) / creditMultiplier,
+            borrowAmount >= ProfitManager(refs.profitManager).minBorrow(),
             "LendingTerm: borrow amount too low"
         );
 
@@ -501,7 +498,7 @@ contract LendingTerm is CoreRef {
         );
         require(
             borrowAmount - issuanceDecrease >
-                (MIN_BORROW * 1e18) / creditMultiplier,
+                ProfitManager(refs.profitManager).minBorrow(),
             "LendingTerm: below min borrow"
         );
 
