@@ -417,25 +417,6 @@ contract LendingTerm is CoreRef {
         loanId = _borrow(msg.sender, borrowAmount, collateralAmount);
     }
 
-    /// @notice borrow with a permit on collateral token
-    function borrowWithPermit(
-        uint256 borrowAmount,
-        uint256 collateralAmount,
-        uint256 deadline,
-        Signature calldata sig
-    ) external whenNotPaused returns (bytes32 loanId) {
-        IERC20Permit(params.collateralToken).permit(
-            msg.sender,
-            address(this),
-            collateralAmount,
-            deadline,
-            sig.v,
-            sig.r,
-            sig.s
-        );
-        return _borrow(msg.sender, borrowAmount, collateralAmount);
-    }
-
     /// @notice add collateral on an open loan.
     /// a borrower might want to add collateral so that his position does not go underwater due to
     /// interests growing up over time.
@@ -474,26 +455,6 @@ contract LendingTerm is CoreRef {
 
     /// @notice add collateral on an open loan.
     function addCollateral(bytes32 loanId, uint256 collateralToAdd) external {
-        _addCollateral(msg.sender, loanId, collateralToAdd);
-    }
-
-    /// @notice add collateral on an open loan with a permit on collateral token
-    function addCollateralWithPermit(
-        bytes32 loanId,
-        uint256 collateralToAdd,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        IERC20Permit(params.collateralToken).permit(
-            msg.sender,
-            address(this),
-            collateralToAdd,
-            deadline,
-            sig.v,
-            sig.r,
-            sig.s
-        );
-
         _addCollateral(msg.sender, loanId, collateralToAdd);
     }
 
@@ -577,26 +538,6 @@ contract LendingTerm is CoreRef {
         _partialRepay(msg.sender, loanId, debtToRepay);
     }
 
-    /// @notice partially repay an open loan with a permit on CREDIT token
-    function partialRepayWithPermit(
-        bytes32 loanId,
-        uint256 debtToRepay,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        IERC20Permit(refs.creditToken).permit(
-            msg.sender,
-            address(this),
-            debtToRepay,
-            deadline,
-            sig.v,
-            sig.r,
-            sig.s
-        );
-
-        _partialRepay(msg.sender, loanId, debtToRepay);
-    }
-
     /// @notice repay an open loan
     function _repay(address repayer, bytes32 loanId) internal {
         Loan storage loan = loans[loanId];
@@ -660,26 +601,6 @@ contract LendingTerm is CoreRef {
 
     /// @notice repay an open loan
     function repay(bytes32 loanId) external {
-        _repay(msg.sender, loanId);
-    }
-
-    /// @notice repay an open loan with a permit on CREDIT token
-    function repayWithPermit(
-        bytes32 loanId,
-        uint256 maxDebt,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        IERC20Permit(refs.creditToken).permit(
-            msg.sender,
-            address(this),
-            maxDebt,
-            deadline,
-            sig.v,
-            sig.r,
-            sig.s
-        );
-
         _repay(msg.sender, loanId);
     }
 
