@@ -153,7 +153,6 @@ contract Proposal_0 is Proposal {
                 ONBOARD_TIMELOCK_DELAY
             );
             LendingTermOnboarding onboardGovernorGuild = new LendingTermOnboarding(
-                addresses.mainnet("LENDING_TERM_V1"), // _lendingTermImplementation
                 LendingTerm.LendingTermReferences({
                     profitManager: addresses.mainnet("PROFIT_MANAGER"),
                     guildToken: addresses.mainnet("ERC20_GUILD"),
@@ -205,24 +204,33 @@ contract Proposal_0 is Proposal {
             LendingTermOnboarding termOnboarding = LendingTermOnboarding(
                 payable(addresses.mainnet("ONBOARD_GOVERNOR_GUILD"))
             );
-            address termUSDC1 = termOnboarding.createTerm(LendingTerm.LendingTermParams({
-                collateralToken: addresses.mainnet("ERC20_USDC"),
-                maxDebtPerCollateralToken: 1e30, // 1 CREDIT per USDC collateral + 12 decimals correction
-                interestRate: 0, // 0%
-                maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
-                minPartialRepayPercent: 0, // no minimum size for partial repay
-                openingFee: 0, // 0%
-                hardCap: 2_000_000e18 // max 2M CREDIT issued
-            }));
-            address termSDAI1 = termOnboarding.createTerm(LendingTerm.LendingTermParams({
-                collateralToken: addresses.mainnet("ERC20_SDAI"),
-                maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
-                interestRate: 0.03e18, // 3%
-                maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
-                minPartialRepayPercent: 0, // no minimum size for partial repay
-                openingFee: 0, // 0%
-                hardCap: 2_000_000e18 // max 2M CREDIT issued
-            }));
+            address _lendingTermV1 = addresses.mainnet("LENDING_TERM_V1");
+            termOnboarding.allowImplementation(_lendingTermV1, true);
+
+            address termUSDC1 = termOnboarding.createTerm(
+                _lendingTermV1,
+                LendingTerm.LendingTermParams({
+                    collateralToken: addresses.mainnet("ERC20_USDC"),
+                    maxDebtPerCollateralToken: 1e30, // 1 CREDIT per USDC collateral + 12 decimals correction
+                    interestRate: 0, // 0%
+                    maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
+                    minPartialRepayPercent: 0, // no minimum size for partial repay
+                    openingFee: 0, // 0%
+                    hardCap: 2_000_000e18 // max 2M CREDIT issued
+                })
+            );
+            address termSDAI1 = termOnboarding.createTerm(
+                _lendingTermV1,
+                LendingTerm.LendingTermParams({
+                    collateralToken: addresses.mainnet("ERC20_SDAI"),
+                    maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
+                    interestRate: 0.03e18, // 3%
+                    maxDelayBetweenPartialRepay: 0,// no periodic partial repay needed
+                    minPartialRepayPercent: 0, // no minimum size for partial repay
+                    openingFee: 0, // 0%
+                    hardCap: 2_000_000e18 // max 2M CREDIT issued
+                })
+            );
 
             addresses.addMainnet("TERM_USDC_1", termUSDC1);
             addresses.addMainnet("TERM_SDAI_1", termSDAI1);
