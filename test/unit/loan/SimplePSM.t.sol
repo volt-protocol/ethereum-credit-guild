@@ -20,7 +20,6 @@ contract SimplePSMUnitTest is Test {
     CreditToken credit;
     GuildToken guild;
     MockERC20 token;
-    RateLimitedMinter rlcm;
     SimplePSM psm;
 
     function setUp() public {
@@ -33,19 +32,10 @@ contract SimplePSMUnitTest is Test {
         token.setDecimals(6);
         credit = new CreditToken(address(core));
         guild = new GuildToken(address(core), address(profitManager), address(credit));
-        rlcm = new RateLimitedMinter(
-            address(core), /*_core*/
-            address(credit), /*_token*/
-            CoreRoles.RATE_LIMITED_CREDIT_MINTER, /*_role*/
-            type(uint256).max, /*_maxRateLimitPerSecond*/
-            type(uint128).max, /*_rateLimitPerSecond*/
-            type(uint128).max /*_bufferCap*/
-        );
         profitManager.initializeReferences(address(credit), address(guild));
         psm = new SimplePSM(
             address(core),
             address(profitManager),
-            address(rlcm),
             address(credit),
             address(token)
         );
@@ -59,8 +49,8 @@ contract SimplePSMUnitTest is Test {
         core.grantRole(CoreRoles.GAUGE_REMOVE, address(this));
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
-        core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
-        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(psm));
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(psm));
+        core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, address(psm));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         // add gauge and vote for it
@@ -75,7 +65,6 @@ contract SimplePSMUnitTest is Test {
         vm.label(address(token), "token");
         vm.label(address(credit), "credit");
         vm.label(address(guild), "guild");
-        vm.label(address(rlcm), "rlcm");
         vm.label(address(psm), "psm");
         vm.label(address(this), "test");
     }
@@ -84,7 +73,6 @@ contract SimplePSMUnitTest is Test {
     function testInitialState() public {
         assertEq(address(psm.core()), address(core));
         assertEq(psm.profitManager(), address(profitManager));
-        assertEq(psm.rlcm(), address(rlcm));
         assertEq(psm.credit(), address(credit));
         assertEq(psm.pegToken(), address(token));
         assertEq(psm.decimalCorrection(), 1e12);
@@ -131,7 +119,6 @@ contract SimplePSMUnitTest is Test {
     // enforce that:
     // - mint moves a number of tokens equal to getMintAmountOut() i/o
     // - redeem moves a number of token equal to getRedeemAmountOut() i/o
-    // - rlcm buffer is depleted & replenished
     // - rounding errors are within 1 wei for a mint/redeem round-trip
     function testMintRedeem(uint256 input) public {
         uint256 mintIn = input % 1e15 + 1; // [1, 1_000_000_000e6]
@@ -146,7 +133,6 @@ contract SimplePSMUnitTest is Test {
         assertGt(profitManager.creditMultiplier(), 0.1e18 - 1);
         credit.burn(100e18);
 
-        assertEq(rlcm.buffer(), type(uint128).max);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(credit.balanceOf(address(this)), 0);
         assertEq(token.balanceOf(address(psm)), 0);
@@ -158,7 +144,6 @@ contract SimplePSMUnitTest is Test {
         psm.mint(address(this), mintIn);
 
         uint256 mintOut = psm.getMintAmountOut(mintIn);
-        assertEq(rlcm.buffer(), type(uint128).max - mintOut);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(credit.balanceOf(address(this)), mintOut);
         assertEq(token.balanceOf(address(psm)), mintIn);
@@ -169,7 +154,6 @@ contract SimplePSMUnitTest is Test {
         psm.redeem(address(this), mintOut);
 
         uint256 redeemOut = psm.getRedeemAmountOut(mintOut);
-        assertEq(rlcm.buffer(), type(uint128).max);
         assertEq(token.balanceOf(address(this)), redeemOut);
         assertEq(credit.balanceOf(address(this)), 0);
         assertEq(token.balanceOf(address(psm)), mintIn - redeemOut);
@@ -198,5 +182,34 @@ contract SimplePSMUnitTest is Test {
         // cannot redeem (paused)
         vm.expectRevert("SimplePSM: redemptions paused");
         psm.redeem(address(this), 100e18);
+    }
+
+    // test mintAndEnterRebase
+    function testMintAndEnterRebase() public {
+        uint256 mintIn = 20_000e6;
+
+        assertEq(token.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(token.balanceOf(address(psm)), 0);
+        assertEq(credit.balanceOf(address(psm)), 0);
+        assertEq(credit.isRebasing(address(this)), false);
+
+        // mint
+        token.mint(address(this), mintIn);
+        token.approve(address(psm), mintIn);
+        psm.mintAndEnterRebase(mintIn);
+
+        uint256 mintOut = 20_000e18;
+        assertEq(token.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(this)), mintOut);
+        assertEq(token.balanceOf(address(psm)), mintIn);
+        assertEq(credit.balanceOf(address(psm)), 0);
+        assertEq(credit.isRebasing(address(this)), true);
+
+        // cannot enter mintAndEnterRebase twice
+        token.mint(address(this), mintIn);
+        token.approve(address(psm), mintIn);
+        vm.expectRevert("SimplePSM: already rebasing");
+        psm.mintAndEnterRebase(mintIn);
     }
 }

@@ -64,7 +64,6 @@ contract LendingTermOffboardingUnitTest is Test {
         psm = new SimplePSM(
             address(core),
             address(profitManager),
-            address(rlcm),
             address(credit),
             address(collateral)
         );

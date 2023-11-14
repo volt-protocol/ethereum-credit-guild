@@ -28,9 +28,6 @@ contract SimplePSM is CoreRef {
     /// @notice reference to the ProfitManager contract
     address public immutable profitManager;
 
-    /// @notice reference to the RateLimitedMinter contract to mint CREDIT
-    address public immutable rlcm;
-
     /// @notice reference to the CreditToken contract
     address public immutable credit;
 
@@ -64,12 +61,10 @@ contract SimplePSM is CoreRef {
     constructor(
         address _core,
         address _profitManager,
-        address _rlcm,
         address _credit,
         address _pegToken
     ) CoreRef(_core) {
         profitManager = _profitManager;
-        rlcm = _rlcm;
         credit = _credit;
         pegToken = _pegToken;
 
@@ -101,8 +96,22 @@ contract SimplePSM is CoreRef {
     ) external whenNotPaused returns (uint256 amountOut) {
         amountOut = getMintAmountOut(amountIn);
         ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
-        RateLimitedMinter(rlcm).mint(to, amountOut);
+        CreditToken(credit).mint(to, amountOut);
         emit Mint(block.timestamp, to, amountIn, amountOut);
+    }
+
+    /// @notice mint `amountOut` CREDIT to `msg.sender` for `amountIn` underlying tokens
+    /// and enter rebase to earn the savings rate.
+    /// @dev see getMintAmountOut() to pre-calculate amount out
+    function mintAndEnterRebase(
+        uint256 amountIn
+    ) external whenNotPaused returns (uint256 amountOut) {
+        require(!CreditToken(credit).isRebasing(msg.sender), "SimplePSM: already rebasing");
+        amountOut = getMintAmountOut(amountIn);
+        ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
+        CreditToken(credit).mint(msg.sender, amountOut);
+        CreditToken(credit).forceEnterRebase(msg.sender);
+        emit Mint(block.timestamp, msg.sender, amountIn, amountOut);
     }
 
     /// @notice redeem `amountIn` CREDIT for `amountOut` underlying tokens and send to address `to`
@@ -114,7 +123,6 @@ contract SimplePSM is CoreRef {
         require(!redemptionsPaused, "SimplePSM: redemptions paused");
         amountOut = getRedeemAmountOut(amountIn);
         CreditToken(credit).burnFrom(msg.sender, amountIn);
-        RateLimitedMinter(rlcm).replenishBuffer(amountIn);
         ERC20(pegToken).safeTransfer(to, amountOut);
         emit Redeem(block.timestamp, to, amountIn, amountOut);
     }

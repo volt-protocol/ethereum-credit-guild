@@ -92,7 +92,6 @@ contract Proposal_0 is Proposal {
             SimplePSM psm = new SimplePSM(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("PROFIT_MANAGER"),
-                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
                 addresses.mainnet("ERC20_CREDIT"),
                 addresses.mainnet("ERC20_USDC")
             );
@@ -196,9 +195,9 @@ contract Proposal_0 is Proposal {
 
         // CREDIT_MINTER
         core.grantRole(CoreRoles.CREDIT_MINTER, addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"));
+        core.grantRole(CoreRoles.CREDIT_MINTER, addresses.mainnet("PSM_USDC"));
 
         // RATE_LIMITED_CREDIT_MINTER
-        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, addresses.mainnet("PSM_USDC"));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, addresses.mainnet("TERM_USDC_1"));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, addresses.mainnet("TERM_SDAI_1"));
 
@@ -237,6 +236,7 @@ contract Proposal_0 is Proposal {
 
         // CREDIT_REBASE_PARAMETERS
         core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, addresses.mainnet("TIMELOCK"));
+        core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, addresses.mainnet("PSM_USDC"));
 
         // TIMELOCK_PROPOSER
         core.grantRole(CoreRoles.TIMELOCK_PROPOSER, addresses.mainnet("GOVERNOR"));
