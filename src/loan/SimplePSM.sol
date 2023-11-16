@@ -34,6 +34,9 @@ contract SimplePSM is CoreRef {
     /// @notice reference to the peg token contract
     address public immutable pegToken;
 
+    /// @notice peg token balance, used to track sum of i/o and exclude donations.
+    uint256 public pegTokenBalance;
+
     /// @notice multiplier for decimals correction, e.g. 1e12 for a pegToken
     /// with 6 decimals (because CREDIT has 18 decimals)
     uint256 public immutable decimalCorrection;
@@ -88,6 +91,12 @@ contract SimplePSM is CoreRef {
         return (amountIn * creditMultiplier) / 1e18 / decimalCorrection;
     }
 
+    /// @notice calculate the total number of CREDIT that can be redeemed
+    /// at the moment, based on the pegTokenBalance.
+    function redeemableCredit() public view returns (uint256) {
+        return getMintAmountOut(pegTokenBalance);
+    }
+
     /// @notice mint `amountOut` CREDIT to address `to` for `amountIn` underlying tokens
     /// @dev see getMintAmountOut() to pre-calculate amount out
     function mint(
@@ -95,6 +104,7 @@ contract SimplePSM is CoreRef {
         uint256 amountIn
     ) external whenNotPaused returns (uint256 amountOut) {
         amountOut = getMintAmountOut(amountIn);
+        pegTokenBalance += amountIn;
         ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
         CreditToken(credit).mint(to, amountOut);
         emit Mint(block.timestamp, to, amountIn, amountOut);
@@ -111,6 +121,7 @@ contract SimplePSM is CoreRef {
             "SimplePSM: already rebasing"
         );
         amountOut = getMintAmountOut(amountIn);
+        pegTokenBalance += amountIn;
         ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
         CreditToken(credit).mint(msg.sender, amountOut);
         CreditToken(credit).forceEnterRebase(msg.sender);
@@ -126,6 +137,7 @@ contract SimplePSM is CoreRef {
         require(!redemptionsPaused, "SimplePSM: redemptions paused");
         amountOut = getRedeemAmountOut(amountIn);
         CreditToken(credit).burnFrom(msg.sender, amountIn);
+        pegTokenBalance -= amountOut;
         ERC20(pegToken).safeTransfer(to, amountOut);
         emit Redeem(block.timestamp, to, amountIn, amountOut);
     }

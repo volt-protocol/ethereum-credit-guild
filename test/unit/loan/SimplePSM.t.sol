@@ -137,6 +137,7 @@ contract SimplePSMUnitTest is Test {
         assertEq(credit.balanceOf(address(this)), 0);
         assertEq(token.balanceOf(address(psm)), 0);
         assertEq(credit.balanceOf(address(psm)), 0);
+        assertEq(psm.pegTokenBalance(), 0);
 
         // mint
         token.mint(address(this), mintIn);
@@ -148,6 +149,7 @@ contract SimplePSMUnitTest is Test {
         assertEq(credit.balanceOf(address(this)), mintOut);
         assertEq(token.balanceOf(address(psm)), mintIn);
         assertEq(credit.balanceOf(address(psm)), 0);
+        assertEq(psm.pegTokenBalance(), mintIn);
 
         // redeem
         credit.approve(address(psm), mintOut);
@@ -158,9 +160,45 @@ contract SimplePSMUnitTest is Test {
         assertEq(credit.balanceOf(address(this)), 0);
         assertEq(token.balanceOf(address(psm)), mintIn - redeemOut);
         assertEq(credit.balanceOf(address(psm)), 0);
+        assertEq(psm.pegTokenBalance(), mintIn - redeemOut);
 
         // max error of 1 wei for doing a round trip
         assertLt(mintIn - redeemOut, 2);
+    }
+
+    // test psm donations to not interefere with accounting
+    function testDonationResistanceRedeemableCredit() public {
+        assertEq(psm.pegTokenBalance(), 0);
+        assertEq(psm.redeemableCredit(), 0);
+        assertEq(token.balanceOf(address(psm)), 0);
+
+        token.mint(address(psm), 100e6);
+
+        assertEq(psm.pegTokenBalance(), 0);
+        assertEq(psm.redeemableCredit(), 0);
+        assertEq(token.balanceOf(address(psm)), 100e6);
+        token.mint(address(this), 50e6);
+        token.approve(address(psm), 50e6);
+        psm.mint(address(this), 50e6);
+
+        assertEq(psm.pegTokenBalance(), 50e6);
+        assertEq(psm.redeemableCredit(), 50e18);
+        assertEq(token.balanceOf(address(psm)), 150e6);
+
+        vm.prank(address(psm));
+        token.burn(100e6);
+
+        assertEq(psm.pegTokenBalance(), 50e6);
+        assertEq(psm.redeemableCredit(), 50e18);
+        assertEq(token.balanceOf(address(psm)), 50e6);
+
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        profitManager.notifyPnL(address(this), -int256(25e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+
+        assertEq(psm.pegTokenBalance(), 50e6);
+        assertEq(psm.redeemableCredit(), 100e18);
+        assertEq(token.balanceOf(address(psm)), 50e6);
     }
 
     // test governor setter for redemptionsPaused
