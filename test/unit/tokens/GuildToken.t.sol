@@ -30,7 +30,7 @@ contract GuildTokenUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
         token = new GuildToken(address(core), address(profitManager), address(credit));
-        profitManager.initializeReferences(address(credit), address(token));
+        profitManager.initializeReferences(address(credit), address(token), address(0));
         gauge1 = address(new MockLendingTerm(address(core)));
         gauge2 = address(new MockLendingTerm(address(core)));
         gauge3 = address(new MockLendingTerm(address(core)));

@@ -311,7 +311,8 @@ contract Proposal_0 is Proposal {
         // Configuration
         ProfitManager(addresses.mainnet("PROFIT_MANAGER")).initializeReferences(
             addresses.mainnet("ERC20_CREDIT"),
-            addresses.mainnet("ERC20_GUILD")
+            addresses.mainnet("ERC20_GUILD"),
+            addresses.mainnet("PSM_USDC")
         );
         ProfitManager(addresses.mainnet("PROFIT_MANAGER")).setProfitSharingConfig(
             0.1e18, // 10% surplusBufferSplit

@@ -32,13 +32,13 @@ contract SimplePSMUnitTest is Test {
         token.setDecimals(6);
         credit = new CreditToken(address(core));
         guild = new GuildToken(address(core), address(profitManager), address(credit));
-        profitManager.initializeReferences(address(credit), address(guild));
         psm = new SimplePSM(
             address(core),
             address(profitManager),
             address(credit),
             address(token)
         );
+        profitManager.initializeReferences(address(credit), address(guild), address(psm));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);

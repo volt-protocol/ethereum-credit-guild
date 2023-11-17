@@ -75,7 +75,7 @@ contract LendingTermUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        profitManager.initializeReferences(address(credit), address(guild));
+        profitManager.initializeReferences(address(credit), address(guild), address(0));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);

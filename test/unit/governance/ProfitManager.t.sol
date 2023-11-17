@@ -4,8 +4,11 @@ pragma solidity 0.8.13;
 import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {MockERC20} from "@test/mock/MockERC20.sol";
+import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {MockLendingTerm} from "@test/mock/MockLendingTerm.sol";
 
@@ -15,11 +18,13 @@ contract ProfitManagerUnitTest is Test {
     ProfitManager private profitManager;
     CreditToken credit;
     GuildToken guild;
+    MockERC20 private pegToken;
     address constant alice = address(0x616c696365);
     address constant bob = address(0xB0B);
     address private gauge1;
     address private gauge2;
     address private gauge3;
+    SimplePSM private psm;
 
     uint256 public issuance; // for mocked behavior
 
@@ -30,22 +35,33 @@ contract ProfitManagerUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
         guild = new GuildToken(address(core), address(profitManager), address(credit));
+        pegToken = new MockERC20();
+        pegToken.setDecimals(6);
         gauge1 = address(new MockLendingTerm(address(core)));
         gauge2 = address(new MockLendingTerm(address(core)));
         gauge3 = address(new MockLendingTerm(address(core)));
+        psm = new SimplePSM(
+            address(core),
+            address(profitManager),
+            address(credit),
+            address(pegToken)
+        );
 
         // labels
         vm.label(address(core), "core");
         vm.label(address(profitManager), "profitManager");
+        vm.label(address(credit), "credit");
         vm.label(address(guild), "guild");
         vm.label(alice, "alice");
         vm.label(bob, "bob");
         vm.label(gauge1, "gauge1");
         vm.label(gauge2, "gauge2");
         vm.label(gauge3, "gauge3");
+        vm.label(address(psm), "psm");
 
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(psm));
 
         // non-zero CREDIT circulating (for notify gauge losses)
         credit.mint(address(this), 100e18);
@@ -54,7 +70,8 @@ contract ProfitManagerUnitTest is Test {
         // initialize profitManager
         assertEq(profitManager.credit(), address(0));
         assertEq(profitManager.guild(), address(0));
-        profitManager.initializeReferences(address(credit), address(guild));
+        assertEq(profitManager.psm(), address(0));
+        profitManager.initializeReferences(address(credit), address(guild), address(psm));
 
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
     }
@@ -67,6 +84,7 @@ contract ProfitManagerUnitTest is Test {
         assertEq(address(profitManager.core()), address(core));
         assertEq(profitManager.credit(), address(credit));
         assertEq(profitManager.guild(), address(guild));
+        assertEq(profitManager.psm(), address(psm));
         assertEq(profitManager.surplusBuffer(), 0);
         assertEq(profitManager.creditMultiplier(), 1e18);
     }
@@ -76,14 +94,14 @@ contract ProfitManagerUnitTest is Test {
         assertEq(pm2.credit(), address(0));
         assertEq(pm2.guild(), address(0));
         vm.expectRevert("UNAUTHORIZED");
-        pm2.initializeReferences(address(credit), address(guild));
+        pm2.initializeReferences(address(credit), address(guild), address(psm));
         vm.prank(governor);
-        pm2.initializeReferences(address(credit), address(guild));
+        pm2.initializeReferences(address(credit), address(guild), address(psm));
         assertEq(pm2.credit(), address(credit));
         assertEq(pm2.guild(), address(guild));
         vm.expectRevert();
         vm.prank(governor);
-        pm2.initializeReferences(address(credit), address(guild));
+        pm2.initializeReferences(address(credit), address(guild), address(psm));
     }
 
     function testCreditMultiplier() public {
@@ -123,6 +141,32 @@ contract ProfitManagerUnitTest is Test {
         // 500 CREDIT of loans completely default
         profitManager.notifyPnL(address(this), -500e18);
         assertEq(profitManager.creditMultiplier(), 0.28e18); // half of previous value because half the supply defaulted
+    }
+
+    function testTotalBorrowedCredit() public {
+        assertEq(profitManager.totalBorrowedCredit(), 100e18);
+
+        // psm mint 100 CREDIT
+        pegToken.mint(address(this), 100e6);
+        pegToken.approve(address(psm), 100e6);
+        psm.mint(address(this), 100e6);
+
+        assertEq(pegToken.balanceOf(address(this)), 0);
+        assertEq(pegToken.balanceOf(address(psm)), 100e6);
+        assertEq(credit.balanceOf(address(this)), 200e18);
+        assertEq(profitManager.totalBorrowedCredit(), 100e18);
+
+        // simulate a borrow & redeem in PSM
+        credit.mint(address(this), 50e18);
+        assertEq(profitManager.totalBorrowedCredit(), 150e18);
+        assertEq(credit.balanceOf(address(this)), 250e18);
+        credit.approve(address(psm), 50e18);
+        psm.redeem(address(this), 50e18);
+
+        assertEq(pegToken.balanceOf(address(this)), 50e6);
+        assertEq(pegToken.balanceOf(address(psm)), 50e6);
+        assertEq(credit.balanceOf(address(this)), 200e18);
+        assertEq(profitManager.totalBorrowedCredit(), 150e18);
     }
 
     function testMinBorrow() public {
