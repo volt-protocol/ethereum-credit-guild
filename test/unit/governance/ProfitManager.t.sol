@@ -285,6 +285,22 @@ contract ProfitManagerUnitTest is Test {
         assertEq(profitManager.minBorrow(), 1000e18);
     }
 
+    function testSetGaugeWeightTolerance() public {
+        assertEq(profitManager.gaugeWeightTolerance(), 1.2e18);
+
+        // revert if not governor
+        vm.expectRevert("UNAUTHORIZED");
+        profitManager.setGaugeWeightTolerance(1.5e18);
+
+        assertEq(profitManager.gaugeWeightTolerance(), 1.2e18);
+
+        // ok
+        vm.prank(governor);
+        profitManager.setGaugeWeightTolerance(1.5e18);
+
+        assertEq(profitManager.gaugeWeightTolerance(), 1.5e18);
+    }
+
     function testProfitDistribution() public {
         // grant roles to test contract
         vm.startPrank(governor);

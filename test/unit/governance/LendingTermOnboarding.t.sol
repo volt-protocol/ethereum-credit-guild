@@ -8,6 +8,7 @@ import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
+import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
@@ -25,6 +26,7 @@ contract LendingTermOnboardingUnitTest is Test {
     GuildToken private guild;
     CreditToken private credit;
     MockERC20 private collateral;
+    SimplePSM private psm;
     LendingTerm private termImplementation;
     AuctionHouse auctionHouse;
     RateLimitedMinter rlcm;
@@ -56,7 +58,6 @@ contract LendingTermOnboardingUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
         guild = new GuildToken(address(core), address(profitManager), address(credit));
-        profitManager.initializeReferences(address(credit), address(guild), address(0));
         collateral = new MockERC20();
         rlcm = new RateLimitedMinter(
             address(core), /*_core*/
@@ -65,6 +66,12 @@ contract LendingTermOnboardingUnitTest is Test {
             type(uint256).max, /*_maxRateLimitPerSecond*/
             type(uint128).max, /*_rateLimitPerSecond*/
             type(uint128).max /*_bufferCap*/
+        );
+        psm = new SimplePSM(
+            address(core),
+            address(profitManager),
+            address(credit),
+            address(collateral)
         );
         auctionHouse = new AuctionHouse(
             address(core),
@@ -96,7 +103,9 @@ contract LendingTermOnboardingUnitTest is Test {
             address(termImplementation),
             true
         );
-        
+
+        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+
         // permissions
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.GUARDIAN, guardian);

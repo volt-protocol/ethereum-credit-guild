@@ -91,7 +91,17 @@ contract ProfitManager is CoreRef {
     /// outsize minimum overcollateralization (which could result in bad debt
     /// on otherwise sound loans).
     /// This value is adjusted up when the creditMultiplier goes down.
-    uint256 public _minBorrow = 100e18;
+    uint256 internal _minBorrow = 100e18;
+
+    /// @notice tolerance on new borrows regarding gauge weights.
+    /// For a total supply or 100 credit, and 2 gauges each at 50% weight,
+    /// the ideal borrow amount for each gauge is 50 credit. To facilitate
+    /// growth of the protocol, a tolerance is allowed compared to the ideal
+    /// gauge weights.
+    /// This tolerance is expressed as a percentage with 18 decimals.
+    /// A tolerance of 1e18 (100% - or 0% deviation compared to ideal weights)
+    /// can result in a deadlock situation where no new borrows are allowed.
+    uint256 public gaugeWeightTolerance = 1.2e18; // 120%
 
     constructor(address _core) CoreRef(_core) {
         emit MinBorrowUpdate(block.timestamp, 100e18);
@@ -134,6 +144,9 @@ contract ProfitManager is CoreRef {
     /// @notice emitted when minBorrow is updated
     event MinBorrowUpdate(uint256 indexed when, uint256 newValue);
 
+    /// @notice emitted when gaugeWeightTolerance is updated
+    event GaugeWeightToleranceUpdate(uint256 indexed when, uint256 newValue);
+
     /// @notice get the minimum borrow amount
     function minBorrow() external view returns (uint256) {
         return (_minBorrow * 1e18) / creditMultiplier;
@@ -164,6 +177,14 @@ contract ProfitManager is CoreRef {
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         _minBorrow = newValue;
         emit MinBorrowUpdate(block.timestamp, newValue);
+    }
+
+    /// @notice set the gauge weight tolerance
+    function setGaugeWeightTolerance(
+        uint256 newValue
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        gaugeWeightTolerance = newValue;
+        emit GaugeWeightToleranceUpdate(block.timestamp, newValue);
     }
 
     /// @notice set the profit sharing config.

@@ -7,6 +7,7 @@ import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
+import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
@@ -22,6 +23,7 @@ contract LendingTermUnitTest is Test {
     CreditToken credit;
     GuildToken guild;
     MockERC20 collateral;
+    SimplePSM private psm;
     RateLimitedMinter rlcm;
     AuctionHouse auctionHouse;
     LendingTerm term;
@@ -75,7 +77,13 @@ contract LendingTermUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        profitManager.initializeReferences(address(credit), address(guild), address(0));
+        psm = new SimplePSM(
+            address(core),
+            address(profitManager),
+            address(credit),
+            address(collateral)
+        );
+        profitManager.initializeReferences(address(credit), address(guild), address(psm));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
