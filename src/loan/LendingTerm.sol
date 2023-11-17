@@ -89,6 +89,9 @@ contract LendingTerm is CoreRef {
     mapping(bytes32 => Loan) internal loans;
 
     /// @notice current number of CREDIT issued in active loans on this term
+    /// @dev this can be lower than the sum of all loan's CREDIT debts because
+    /// interests accrue and some loans might have been opened before the creditMultiplier
+    /// was last updated, resulting in higher CREDIT debt than what was originally borrowed.
     uint256 public issuance;
 
     struct LendingTermReferences {
@@ -254,10 +257,11 @@ contract LendingTerm is CoreRef {
     /// Note that the debt ceiling can be lower than the current issuance under 4 conditions :
     /// - params.hardCap is lower than since last borrow happened
     /// - gauge votes are fewer than when last borrow happened
-    /// - credit.totalSupply() decreased since last borrow
+    /// - profitManager.totalBorrowedCredit() decreased since last borrow
     /// - creditMinter.buffer() is close to being depleted
     /// @dev this solves the following equation :
-    /// borrowAmount + issuance <= (totalSupply + borrowAmount) * gaugeWeight / totalWeight
+    /// borrowAmount + issuance <=
+    /// (totalBorrowedCredit + borrowAmount) * gaugeWeight * gaugeWeightTolerance / totalWeight / 1e18
     /// which is the formula to check debt ceiling in the borrow function.
     /// This gives the maximum borrowable amount to achieve 100% utilization of the debt
     /// ceiling, and if we add the current issuance to it, we get the current debt ceiling.
@@ -282,21 +286,32 @@ contract LendingTerm is CoreRef {
                 _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
         }
         uint256 _issuance = issuance; // cached SLOAD
-        uint256 creditTotalSupply = CreditToken(refs.creditToken).totalSupply();
-        if (creditTotalSupply == 0 && gaugeWeight != 0) {
+        uint256 totalBorrowedCredit = ProfitManager(refs.profitManager)
+            .totalBorrowedCredit();
+        uint256 gaugeWeightTolerance = ProfitManager(refs.profitManager)
+            .gaugeWeightTolerance();
+        if (totalBorrowedCredit == 0 && gaugeWeight != 0) {
             // first-ever CREDIT mint on a non-zero gauge weight term
             // does not check the relative debt ceilings
             // returns min(hardCap, creditMinterBuffer)
             return
                 _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
         }
-        uint256 debtCeilingBefore = (creditTotalSupply * gaugeWeight) /
-            totalWeight;
+        uint256 toleratedGaugeWeight = (gaugeWeight * gaugeWeightTolerance) /
+            1e18;
+        uint256 debtCeilingBefore = (totalBorrowedCredit *
+            toleratedGaugeWeight) / totalWeight;
         if (_issuance >= debtCeilingBefore) {
             return debtCeilingBefore; // no more borrows allowed
         }
         uint256 remainingDebtCeiling = debtCeilingBefore - _issuance; // always >0
-        uint256 otherGaugesWeight = totalWeight - gaugeWeight;
+        if (toleratedGaugeWeight >= totalWeight) {
+            // if the gauge weight is above 100% when we include tolerance,
+            // the gauge relative debt ceilings are not constraining.
+            return
+                _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
+        }
+        uint256 otherGaugesWeight = totalWeight - toleratedGaugeWeight; // always >0
         uint256 maxBorrow = (remainingDebtCeiling * totalWeight) /
             otherGaugesWeight;
         uint256 _debtCeiling = _issuance + maxBorrow;
@@ -351,13 +366,16 @@ contract LendingTerm is CoreRef {
         );
 
         // check the debt ceiling
-        uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
-        uint256 _debtCeiling = GuildToken(refs.guildToken)
+        uint256 totalBorrowedCredit = ProfitManager(refs.profitManager)
+            .totalBorrowedCredit();
+        uint256 gaugeWeightTolerance = ProfitManager(refs.profitManager)
+            .gaugeWeightTolerance();
+        uint256 _debtCeiling = (GuildToken(refs.guildToken)
             .calculateGaugeAllocation(
                 address(this),
-                _totalSupply + borrowAmount
-            );
-        if (_totalSupply == 0) {
+                totalBorrowedCredit + borrowAmount
+            ) * gaugeWeightTolerance) / 1e18;
+        if (totalBorrowedCredit == 0) {
             // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
             // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
             // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.

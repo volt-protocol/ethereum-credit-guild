@@ -168,7 +168,9 @@ contract ProfitManager is CoreRef {
 
     /// @notice returns the sum of all outstanding CREDIT debts
     function totalBorrowedCredit() external view returns (uint256) {
-        return CreditToken(credit).targetTotalSupply() - SimplePSM(psm).redeemableCredit();
+        return
+            CreditToken(credit).targetTotalSupply() -
+            SimplePSM(psm).redeemableCredit();
     }
 
     /// @notice set the minimum borrow amount
