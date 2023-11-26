@@ -73,32 +73,6 @@ contract Proposal_0 is Proposal {
     uint256 internal constant SDAI_RATE = 0.03e18;
 
     /// ------------------------------------------------------------------------
-    /// @notice Governance Parameters
-    /// ------------------------------------------------------------------------
-
-    /// @notice voting period in the DAO
-    uint256 internal constant VOTING_PERIOD = 7000 * 3;
-
-    /// @notice timelock delay for all governance actions
-    uint256 internal constant TIMELOCK_DELAY = 3 days;
-
-    /// @notice voting delay for the DAO
-    uint256 internal constant VOTING_DELAY = 0;
-
-    /// @notice proposal threshold for proposing governance actions to the DAO
-    uint256 internal constant PROPOSAL_THRESHOLD = 2_500_000 * 1e18;
-
-    /// @notice initial quorum for a proposal to pass on the DAO
-    uint256 internal constant INITIAL_QUORUM = 10_000_000 * 1e18;
-
-    /// @notice initial quorum for a proposal to be vetoed on the Veto DAO is 500k CREDIT
-    uint256 internal constant INITIAL_QUORUM_VETO_DAO = 500_000 * 1e18;
-
-    /// @notice initial quorum for a proposal to be offboarded on the Offboarding contract is 5m GUILD
-    uint256 internal constant LENDING_TERM_OFFBOARDING_QUORUM =
-        5_000_000 * 1e18;
-
-    /// ------------------------------------------------------------------------
     /// @notice profit sharing configuration parameters for the Profit Manager
     /// ------------------------------------------------------------------------
 
@@ -189,7 +163,6 @@ contract Proposal_0 is Proposal {
             );
 
             addresses.addMainnet("ERC20_CREDIT", address(credit));
-            addresses.addMainnet("CREDIT_TOKEN", address(credit));
             addresses.addMainnet("ERC20_GUILD", address(guild));
             addresses.addMainnet(
                 "RATE_LIMITED_CREDIT_MINTER",
@@ -264,7 +237,7 @@ contract Proposal_0 is Proposal {
                         creditMinter: addresses.mainnet(
                             "RATE_LIMITED_CREDIT_MINTER"
                         ),
-                        creditToken: addresses.mainnet("CREDIT_TOKEN")
+                        creditToken: addresses.mainnet("ERC20_CREDIT")
                     }), /// _lendingTermReferences
                     1, // _gaugeType
                     addresses.mainnet("CORE"), // _core
@@ -545,7 +518,7 @@ contract Proposal_0 is Proposal {
         GuildToken(addresses.mainnet("ERC20_GUILD")).setMaxDelegates(
             MAX_DELEGATES
         );
-        CreditToken(addresses.mainnet("CREDIT_TOKEN")).setMaxDelegates(
+        CreditToken(addresses.mainnet("ERC20_CREDIT")).setMaxDelegates(
             MAX_DELEGATES
         );
 
@@ -565,500 +538,579 @@ contract Proposal_0 is Proposal {
         /// CORE Verification
         Core core = Core(addresses.mainnet("CORE"));
         {
-            // assertEq(
-            //     address(core),
-            //     address(SimplePSM(addresses.mainnet("PSM_USDC")).core()),
-            //     "USDC PSM Incorrect Core Address"
-            // );
-            // assertEq(
-            //     address(core),
-            //     address(LendingTerm(addresses.mainnet("TERM_SDAI_1")).core()),
-            //     "sDAI Term Incorrect Core Address"
-            // );
+            assertEq(
+                address(core),
+                address(SimplePSM(addresses.mainnet("PSM_USDC")).core()),
+                "USDC PSM Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(LendingTerm(addresses.mainnet("TERM_SDAI_1")).core()),
+                "sDAI Term Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(
+                    LendingTerm(addresses.mainnet("ONBOARD_VETO_GUILD")).core()
+                ),
+                "ONBOARD_VETO_GUILD Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(
+                    LendingTerm(addresses.mainnet("OFFBOARD_GOVERNOR_GUILD"))
+                        .core()
+                ),
+                "OFFBOARD_GOVERNOR_GUILD Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(
+                    LendingTerm(addresses.mainnet("ONBOARD_TIMELOCK")).core()
+                ),
+                "ONBOARD_TIMELOCK Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(
+                    LendingTerm(addresses.mainnet("ONBOARD_GOVERNOR_GUILD"))
+                        .core()
+                ),
+                "ONBOARD_GOVERNOR_GUILD Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(
+                    LendingTerm(addresses.mainnet("DAO_VETO_GUILD")).core()
+                ),
+                "DAO_VETO_GUILD Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(
+                    LendingTerm(addresses.mainnet("DAO_VETO_CREDIT")).core()
+                ),
+                "DAO_VETO_CREDIT Incorrect Core Address"
+            );
 
-        //     CreditToken credit = CreditToken(addresses.mainnet("CREDIT_TOKEN"));
-        //     GuildToken guild = GuildToken(addresses.mainnet("ERC20_GUILD"));
-        //     LendingTermOnboarding onboarder = LendingTermOnboarding(
-        //         payable(addresses.mainnet("ONBOARD_GOVERNOR_GUILD"))
-        //     );
-        //     LendingTermOffboarding offboarding = LendingTermOffboarding(
-        //         payable(addresses.mainnet("OFFBOARD_GOVERNOR_GUILD"))
-        //     );
-        //     VoltTimelockController timelock = VoltTimelockController(
-        //         payable(addresses.mainnet("DAO_TIMELOCK"))
-        //     );
-        //     SurplusGuildMinter sgm = SurplusGuildMinter(
-        //         addresses.mainnet("SURPLUS_GUILD_MINTER")
-        //     );
-        //     ProfitManager profitManager = ProfitManager(
-        //         addresses.mainnet("PROFIT_MANAGER")
-        //     );
-        //     RateLimitedMinter rateLimitedCreditMinter = RateLimitedMinter(
-        //         addresses.mainnet("RATE_LIMITED_CREDIT_MINTER")
-        //     );
-        //     RateLimitedMinter rateLimitedGuildMinter = RateLimitedMinter(
-        //         addresses.mainnet("RATE_LIMITED_GUILD_MINTER")
-        //     );
-        //     AuctionHouse auctionHouse = AuctionHouse(
-        //         addresses.mainnet("AUCTION_HOUSE")
-        //     );
-        //     VoltGovernor governor = VoltGovernor(
-        //         payable(addresses.mainnet("DAO_GOVERNOR_GUILD"))
-        //     );
-        //     VoltVetoGovernor vetoGovernor = VoltVetoGovernor(
-        //         payable(addresses.mainnet("VETO_GOVERNOR"))
-        //     );
+            CreditToken credit = CreditToken(addresses.mainnet("ERC20_CREDIT"));
+            GuildToken guild = GuildToken(addresses.mainnet("ERC20_GUILD"));
+            LendingTermOnboarding onboarder = LendingTermOnboarding(
+                payable(addresses.mainnet("ONBOARD_GOVERNOR_GUILD"))
+            );
+            LendingTermOffboarding offboarding = LendingTermOffboarding(
+                payable(addresses.mainnet("OFFBOARD_GOVERNOR_GUILD"))
+            );
+            VoltTimelockController timelock = VoltTimelockController(
+                payable(addresses.mainnet("DAO_TIMELOCK"))
+            );
+            SurplusGuildMinter sgm = SurplusGuildMinter(
+                addresses.mainnet("SURPLUS_GUILD_MINTER")
+            );
+            ProfitManager profitManager = ProfitManager(
+                addresses.mainnet("PROFIT_MANAGER")
+            );
+            RateLimitedMinter rateLimitedCreditMinter = RateLimitedMinter(
+                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER")
+            );
+            RateLimitedMinter rateLimitedGuildMinter = RateLimitedMinter(
+                addresses.mainnet("RATE_LIMITED_GUILD_MINTER")
+            );
+            AuctionHouse auctionHouse = AuctionHouse(
+                addresses.mainnet("AUCTION_HOUSE")
+            );
+            VoltGovernor governor = VoltGovernor(
+                payable(addresses.mainnet("DAO_GOVERNOR_GUILD"))
+            );
+            VoltVetoGovernor vetoGovernorCredit = VoltVetoGovernor(
+                payable(addresses.mainnet("ONBOARD_VETO_CREDIT"))
+            );
 
-        //     assertEq(
-        //         address(core),
-        //         address(profitManager.core()),
-        //         "Profit Manager Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(sgm.core()),
-        //         "Surplus Guild Minter Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(guild.core()),
-        //         "Guild Token Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(credit.core()),
-        //         "Credit Token Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(timelock.core()),
-        //         "Timelock Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(governor.core()),
-        //         "Governor Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(onboarder.core()),
-        //         "Onboarder Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(offboarding.core()),
-        //         "Offboarding Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(auctionHouse.core()),
-        //         "Auction House Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(vetoGovernor.core()),
-        //         "Veto Governor Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(rateLimitedGuildMinter.core()),
-        //         "Rate Limited Guild Minter Incorrect Core Address"
-        //     );
-        //     assertEq(
-        //         address(core),
-        //         address(rateLimitedCreditMinter.core()),
-        //         "Rate Limited Credit Minter Incorrect Core Address"
-        //     );
-        // }
+            assertEq(
+                address(core),
+                address(profitManager.core()),
+                "Profit Manager Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(sgm.core()),
+                "Surplus Guild Minter Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(guild.core()),
+                "Guild Token Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(credit.core()),
+                "Credit Token Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(timelock.core()),
+                "Timelock Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(governor.core()),
+                "Governor Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(onboarder.core()),
+                "Onboarder Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(offboarding.core()),
+                "Offboarding Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(auctionHouse.core()),
+                "Auction House Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(vetoGovernorCredit.core()),
+                "Veto Governor Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(rateLimitedGuildMinter.core()),
+                "Rate Limited Guild Minter Incorrect Core Address"
+            );
+            assertEq(
+                address(core),
+                address(rateLimitedCreditMinter.core()),
+                "Rate Limited Credit Minter Incorrect Core Address"
+            );
+        }
 
-        // /// PSM Verification
-        // {
-        //     SimplePSM psm = SimplePSM(addresses.mainnet("PSM_USDC"));
+        /// PSM Verification
+        {
+            SimplePSM psm = SimplePSM(addresses.mainnet("PSM_USDC"));
 
-        //     assertEq(
-        //         psm.pegToken(),
-        //         addresses.mainnet("ERC20_USDC"),
-        //         "USDC PSM Incorrect Peg Token Address"
-        //     );
-        //     assertEq(
-        //         psm.decimalCorrection(),
-        //         1e12,
-        //         "USDC PSM Incorrect Decimal Correction"
-        //     );
-        //     assertEq(
-        //         psm.credit(),
-        //         addresses.mainnet("CREDIT_TOKEN"),
-        //         "USDC PSM Incorrect Credit Token Address"
-        //     );
-        //     assertEq(
-        //         psm.profitManager(),
-        //         addresses.mainnet("PROFIT_MANAGER"),
-        //         "USDC PSM Incorrect Profit Manager Address"
-        //     );
-        // }
+            assertEq(
+                psm.pegToken(),
+                addresses.mainnet("ERC20_USDC"),
+                "USDC PSM Incorrect Peg Token Address"
+            );
+            assertEq(
+                psm.decimalCorrection(),
+                1e12,
+                "USDC PSM Incorrect Decimal Correction"
+            );
+            assertEq(
+                psm.credit(),
+                addresses.mainnet("ERC20_CREDIT"),
+                "USDC PSM Incorrect Credit Token Address"
+            );
+            assertEq(
+                psm.profitManager(),
+                addresses.mainnet("PROFIT_MANAGER"),
+                "USDC PSM Incorrect Profit Manager Address"
+            );
+        }
 
-        // /// Rate Limited Minter Verification
-        // {
-        //     RateLimitedMinter rateLimitedCreditMinter = RateLimitedMinter(
-        //         addresses.mainnet("RATE_LIMITED_CREDIT_MINTER")
-        //     );
-        //     assertEq(
-        //         rateLimitedCreditMinter.MAX_RATE_LIMIT_PER_SECOND(),
-        //         0,
-        //         "credit max rate limit per second"
-        //     );
-        //     assertEq(
-        //         rateLimitedCreditMinter.token(),
-        //         addresses.mainnet("CREDIT_TOKEN"),
-        //         "credit token incorrect"
-        //     );
-        //     assertEq(
-        //         rateLimitedCreditMinter.role(),
-        //         CoreRoles.RATE_LIMITED_CREDIT_MINTER,
-        //         "credit minter role incorrect"
-        //     );
-        //     assertEq(
-        //         rateLimitedCreditMinter.rateLimitPerSecond(),
-        //         0,
-        //         "rate limit per second credit incorrect"
-        //     );
-        //     assertEq(
-        //         CREDIT_HARDCAP,
-        //         rateLimitedCreditMinter.bufferCap(),
-        //         "credit buffercap incorrect"
-        //     );
-        //     assertEq(
-        //         rateLimitedCreditMinter.buffer(),
-        //         rateLimitedCreditMinter.bufferCap(),
-        //         "credit buffer incorrect, should eq buffer cap"
-        //     );
-        // }
-        // {
-        //     RateLimitedMinter rateLimitedGuildMinter = RateLimitedMinter(
-        //         addresses.mainnet("RATE_LIMITED_GUILD_MINTER")
-        //     );
-        //     assertEq(
-        //         rateLimitedGuildMinter.MAX_RATE_LIMIT_PER_SECOND(),
-        //         0,
-        //         "guild max rate limit per second"
-        //     );
-        //     assertEq(
-        //         rateLimitedGuildMinter.token(),
-        //         addresses.mainnet("ERC20_GUILD"),
-        //         "guild token incorrect address rl guild minter"
-        //     );
-        //     assertEq(
-        //         rateLimitedGuildMinter.role(),
-        //         CoreRoles.RATE_LIMITED_GUILD_MINTER,
-        //         "guild minter role incorrect rl guild minter"
-        //     );
-        //     assertEq(
-        //         rateLimitedGuildMinter.rateLimitPerSecond(),
-        //         0,
-        //         "rate limit per second guild incorrect"
-        //     );
-        //     assertEq(
-        //         rateLimitedGuildMinter.bufferCap(),
-        //         GUILD_SUPPLY,
-        //         "guild buffercap incorrect"
-        //     );
-        //     assertEq(
-        //         rateLimitedGuildMinter.buffer(),
-        //         GUILD_SUPPLY,
-        //         "guild buffer incorrect"
-        //     );
-        // }
+        /// Rate Limited Minter Verification
+        {
+            RateLimitedMinter rateLimitedCreditMinter = RateLimitedMinter(
+                addresses.mainnet("RATE_LIMITED_CREDIT_MINTER")
+            );
+            assertEq(
+                rateLimitedCreditMinter.MAX_RATE_LIMIT_PER_SECOND(),
+                0,
+                "credit max rate limit per second"
+            );
+            assertEq(
+                rateLimitedCreditMinter.token(),
+                addresses.mainnet("ERC20_CREDIT"),
+                "credit token incorrect"
+            );
+            assertEq(
+                rateLimitedCreditMinter.role(),
+                CoreRoles.RATE_LIMITED_CREDIT_MINTER,
+                "credit minter role incorrect"
+            );
+            assertEq(
+                rateLimitedCreditMinter.rateLimitPerSecond(),
+                0,
+                "rate limit per second credit incorrect"
+            );
+            assertEq(
+                CREDIT_HARDCAP,
+                rateLimitedCreditMinter.bufferCap(),
+                "credit buffercap incorrect"
+            );
+            assertEq(
+                rateLimitedCreditMinter.buffer(),
+                rateLimitedCreditMinter.bufferCap(),
+                "credit buffer incorrect, should eq buffer cap"
+            );
+        }
+        {
+            RateLimitedMinter rateLimitedGuildMinter = RateLimitedMinter(
+                addresses.mainnet("RATE_LIMITED_GUILD_MINTER")
+            );
+            assertEq(
+                rateLimitedGuildMinter.MAX_RATE_LIMIT_PER_SECOND(),
+                0,
+                "guild max rate limit per second"
+            );
+            assertEq(
+                rateLimitedGuildMinter.token(),
+                addresses.mainnet("ERC20_GUILD"),
+                "guild token incorrect address rl guild minter"
+            );
+            assertEq(
+                rateLimitedGuildMinter.role(),
+                CoreRoles.RATE_LIMITED_GUILD_MINTER,
+                "guild minter role incorrect rl guild minter"
+            );
+            assertEq(
+                rateLimitedGuildMinter.rateLimitPerSecond(),
+                0,
+                "rate limit per second guild incorrect"
+            );
+            assertEq(
+                rateLimitedGuildMinter.bufferCap(),
+                GUILD_SUPPLY,
+                "guild buffercap incorrect"
+            );
+            assertEq(
+                rateLimitedGuildMinter.buffer(),
+                GUILD_SUPPLY,
+                "guild buffer incorrect"
+            );
+        }
 
-        // /// GUILD and CREDIT Token Total Supply and balances
-        // {
-        //     assertEq(
-        //         ERC20MultiVotes(addresses.mainnet("CREDIT_TOKEN"))
-        //             .maxDelegates(),
-        //         MAX_DELEGATES,
-        //         "max delegates incorrect"
-        //     );
-        //     /// guild token starts non-transferrable
-        //     assertFalse(
-        //         GuildToken(addresses.mainnet("ERC20_GUILD")).transferable(),
-        //         "guild token should not be transferable"
-        //     );
-        //     assertEq(
-        //         ERC20MultiVotes(addresses.mainnet("ERC20_GUILD"))
-        //             .maxDelegates(),
-        //         MAX_DELEGATES,
-        //         "max delegates incorrect"
-        //     );
-        //     assertEq(
-        //         ERC20MultiVotes(addresses.mainnet("ERC20_GUILD")).totalSupply(),
-        //         0,
-        //         "guild total supply not 0 after deployment"
-        //     );
-        //     assertEq(
-        //         ERC20MultiVotes(addresses.mainnet("ERC20_GUILD")).balanceOf(
-        //             addresses.mainnet("TEAM_MULTISIG")
-        //         ),
-        //         0,
-        //         "balance of team multisig not 0 after deployment"
-        //     );
-        //     assertEq(
-        //         ERC20MultiVotes(addresses.mainnet("CREDIT_TOKEN"))
-        //             .totalSupply(),
-        //         0,
-        //         "credit total supply not 0 after deployment"
-        //     );
-        //     assertEq(
-        //         ERC20MultiVotes(addresses.mainnet("CREDIT_TOKEN")).balanceOf(
-        //             deployer
-        //         ),
-        //         0,
-        //         "balance of deployer not 0 after deployment"
-        //     );
-        // }
-        // /// PROFIT MANAGER Verification
-        // {
-        //     assertEq(
-        //         ProfitManager(addresses.mainnet("PROFIT_MANAGER")).credit(),
-        //         addresses.mainnet("CREDIT_TOKEN"),
-        //         "Profit Manager credit token incorrect"
-        //     );
-        //     assertEq(
-        //         ProfitManager(addresses.mainnet("PROFIT_MANAGER")).guild(),
-        //         addresses.mainnet("ERC20_GUILD"),
-        //         "Profit Manager guild token incorrect"
-        //     );
-        //     assertEq(
-        //         ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
-        //             .surplusBuffer(),
-        //         0,
-        //         "Profit Manager surplus buffer incorrect"
-        //     );
+        /// GUILD and CREDIT Token Total Supply and balances
+        {
+            assertEq(
+                ERC20MultiVotes(addresses.mainnet("ERC20_CREDIT"))
+                    .maxDelegates(),
+                MAX_DELEGATES,
+                "max delegates incorrect"
+            );
+            /// guild token starts non-transferrable
+            assertFalse(
+                GuildToken(addresses.mainnet("ERC20_GUILD")).transferable(),
+                "guild token should not be transferable"
+            );
+            assertEq(
+                ERC20MultiVotes(addresses.mainnet("ERC20_GUILD"))
+                    .maxDelegates(),
+                MAX_DELEGATES,
+                "max delegates incorrect"
+            );
+            assertEq(
+                ERC20MultiVotes(addresses.mainnet("ERC20_GUILD")).totalSupply(),
+                0,
+                "guild total supply not 0 after deployment"
+            );
+            assertEq(
+                ERC20MultiVotes(addresses.mainnet("ERC20_GUILD")).balanceOf(
+                    addresses.mainnet("TEAM_MULTISIG")
+                ),
+                0,
+                "balance of team multisig not 0 after deployment"
+            );
+            assertEq(
+                ERC20MultiVotes(addresses.mainnet("ERC20_CREDIT"))
+                    .totalSupply(),
+                0,
+                "credit total supply not 0 after deployment"
+            );
+            assertEq(
+                ERC20MultiVotes(addresses.mainnet("ERC20_CREDIT")).balanceOf(
+                    deployer
+                ),
+                0,
+                "balance of deployer not 0 after deployment"
+            );
+        }
+        /// PROFIT MANAGER Verification
+        {
+            assertEq(
+                ProfitManager(addresses.mainnet("PROFIT_MANAGER")).credit(),
+                addresses.mainnet("ERC20_CREDIT"),
+                "Profit Manager credit token incorrect"
+            );
+            assertEq(
+                ProfitManager(addresses.mainnet("PROFIT_MANAGER")).guild(),
+                addresses.mainnet("ERC20_GUILD"),
+                "Profit Manager guild token incorrect"
+            );
+            assertEq(
+                ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
+                    .surplusBuffer(),
+                0,
+                "Profit Manager surplus buffer incorrect"
+            );
 
-        //     (
-        //         uint256 surplusBufferSplit,
-        //         uint256 creditSplit,
-        //         uint256 guildSplit,
-        //         uint256 otherSplit,
-        //         address otherRecipient
-        //     ) = ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
-        //             .getProfitSharingConfig();
+            (
+                uint256 surplusBufferSplit,
+                uint256 creditSplit,
+                uint256 guildSplit,
+                uint256 otherSplit,
+                address otherRecipient
+            ) = ProfitManager(addresses.mainnet("PROFIT_MANAGER"))
+                    .getProfitSharingConfig();
 
-        //     assertEq(
-        //         surplusBufferSplit,
-        //         SURPLUS_BUFFER_SPLIT,
-        //         "Profit Manager surplus buffer split incorrect"
-        //     );
-        //     assertEq(
-        //         creditSplit,
-        //         CREDIT_SPLIT,
-        //         "Profit Manager credit split incorrect"
-        //     );
-        //     assertEq(
-        //         guildSplit,
-        //         GUILD_SPLIT,
-        //         "Profit Manager guild split incorrect"
-        //     );
-        //     assertEq(
-        //         otherSplit,
-        //         OTHER_SPLIT,
-        //         "Profit Manager other split incorrect"
-        //     );
-        //     assertEq(
-        //         otherRecipient,
-        //         address(0),
-        //         "Profit Manager other recipient incorrect"
-        //     );
-        // }
-        // /// TIMELOCK Verification
-        // {
-        //     VoltTimelockController timelock = VoltTimelockController(
-        //         payable(addresses.mainnet("DAO_TIMELOCK"))
-        //     );
+            assertEq(
+                surplusBufferSplit,
+                SURPLUS_BUFFER_SPLIT,
+                "Profit Manager surplus buffer split incorrect"
+            );
+            assertEq(
+                creditSplit,
+                CREDIT_SPLIT,
+                "Profit Manager credit split incorrect"
+            );
+            assertEq(
+                guildSplit,
+                GUILD_SPLIT,
+                "Profit Manager guild split incorrect"
+            );
+            assertEq(
+                otherSplit,
+                OTHER_SPLIT,
+                "Profit Manager other split incorrect"
+            );
+            assertEq(
+                otherRecipient,
+                address(0),
+                "Profit Manager other recipient incorrect"
+            );
+        }
+        /// TIMELOCK Verification
+        {
+            VoltTimelockController timelock = VoltTimelockController(
+                payable(addresses.mainnet("DAO_TIMELOCK"))
+            );
 
-        //     assertEq(
-        //         timelock.getMinDelay(),
-        //         TIMELOCK_DELAY,
-        //         "Timelock delay incorrect"
-        //     );
-        // }
-        // /// Auction House Verification
-        // {
-        //     AuctionHouse auctionHouse = AuctionHouse(
-        //         addresses.mainnet("AUCTION_HOUSE")
-        //     );
+            assertEq(
+                timelock.getMinDelay(),
+                DAO_TIMELOCK_DELAY,
+                "DAO Timelock delay incorrect"
+            );
 
-        //     assertEq(
-        //         auctionHouse.midPoint(),
-        //         650,
-        //         "Auction House mid point incorrect"
-        //     );
-        //     assertEq(
-        //         auctionHouse.auctionDuration(),
-        //         30 minutes,
-        //         "Auction House duration incorrect"
-        //     );
-        //     assertEq(
-        //         auctionHouse.nAuctionsInProgress(),
-        //         0,
-        //         "Auction House n auctions in progress incorrect"
-        //     );
-        // }
+            VoltTimelockController onboardingTimelock = VoltTimelockController(
+                payable(addresses.mainnet("ONBOARD_TIMELOCK"))
+            );
 
-        // {
-        //     ProfitManager profitManager = ProfitManager(
-        //         addresses.mainnet("PROFIT_MANAGER")
-        //     );
-        //     assertEq(
-        //         profitManager.surplusBuffer(),
-        //         0,
-        //         "starting surplus not 0"
-        //     );
-        //     assertEq(
-        //         profitManager.credit(),
-        //         addresses.mainnet("CREDIT_TOKEN"),
-        //         "credit address incorrect"
-        //     );
-        //     assertEq(
-        //         profitManager.guild(),
-        //         addresses.mainnet("ERC20_GUILD"),
-        //         "guild address incorrect"
-        //     );
-        //     assertEq(
-        //         profitManager.creditMultiplier(),
-        //         1e18,
-        //         "credit multiplier incorrect"
-        //     );
+            assertEq(
+                onboardingTimelock.getMinDelay(),
+                ONBOARD_TIMELOCK_DELAY,
+                "Onboarding Timelock delay incorrect"
+            );
+        }
+        /// Auction House Verification
+        {
+            AuctionHouse auctionHouse = AuctionHouse(
+                addresses.mainnet("AUCTION_HOUSE")
+            );
 
-        //     (
-        //         uint256 surplusBufferSplit,
-        //         uint256 creditSplit,
-        //         uint256 guildSplit,
-        //         uint256 otherSplit,
-        //         address otherRecipient
-        //     ) = profitManager.getProfitSharingConfig();
-        //     assertEq(
-        //         surplusBufferSplit,
-        //         0.09e18,
-        //         "incorrect surplus buffer split"
-        //     );
-        //     assertEq(creditSplit, 0.9e18, "incorrect credit split");
-        //     assertEq(guildSplit, 0.01e18, "incorrect guild split");
-        //     assertEq(otherSplit, 0, "incorrect other split");
-        //     assertEq(otherRecipient, address(0), "incorrect other recipient");
-        // }
+            assertEq(
+                auctionHouse.midPoint(),
+                650,
+                "Auction House mid point incorrect"
+            );
+            assertEq(
+                auctionHouse.auctionDuration(),
+                30 minutes,
+                "Auction House duration incorrect"
+            );
+            assertEq(
+                auctionHouse.nAuctionsInProgress(),
+                0,
+                "Auction House n auctions in progress incorrect"
+            );
+        }
 
-        // /// Governor Verification
-        // {
-        //     VoltGovernor governor = VoltGovernor(
-        //         payable(addresses.mainnet("DAO_GOVERNOR_GUILD"))
-        //     );
-        //     VoltVetoGovernor vetoGovernor = VoltVetoGovernor(
-        //         payable(addresses.mainnet("VETO_GOVERNOR"))
-        //     );
+        {
+            ProfitManager profitManager = ProfitManager(
+                addresses.mainnet("PROFIT_MANAGER")
+            );
+            assertEq(
+                profitManager.surplusBuffer(),
+                0,
+                "starting surplus not 0"
+            );
+            assertEq(
+                profitManager.credit(),
+                addresses.mainnet("ERC20_CREDIT"),
+                "credit address incorrect"
+            );
+            assertEq(
+                profitManager.guild(),
+                addresses.mainnet("ERC20_GUILD"),
+                "guild address incorrect"
+            );
+            assertEq(
+                profitManager.creditMultiplier(),
+                1e18,
+                "credit multiplier incorrect"
+            );
 
-        //     assertEq(governor.quorum(0), INITIAL_QUORUM, "governor quorum");
-        //     assertEq(
-        //         governor.votingDelay(),
-        //         VOTING_DELAY,
-        //         "governor voting delay"
-        //     );
-        //     assertEq(
-        //         governor.votingPeriod(),
-        //         VOTING_PERIOD,
-        //         "governor voting period"
-        //     );
-        //     assertEq(
-        //         governor.proposalThreshold(),
-        //         PROPOSAL_THRESHOLD,
-        //         "proposal threshold"
-        //     );
-        //     assertEq(
-        //         vetoGovernor.quorum(0),
-        //         INITIAL_QUORUM_VETO_DAO,
-        //         "veto governor quorum"
-        //     );
-        //     assertEq(
-        //         vetoGovernor.votingDelay(),
-        //         VOTING_DELAY,
-        //         "veto governor voting delay"
-        //     );
-        //     assertEq(
-        //         vetoGovernor.votingPeriod(),
-        //         2425847,
-        //         "veto governor voting period"
-        //     );
-        //     assertEq(
-        //         address(vetoGovernor.token()),
-        //         addresses.mainnet("CREDIT_TOKEN"),
-        //         "veto governor token incorrect"
-        //     );
-        // }
-        // {
-        //     LendingTerm term = LendingTerm(addresses.mainnet("TERM_SDAI_1"));
-        //     {
-        //         LendingTerm.LendingTermParams memory params = term
-        //             .getParameters();
-        //         assertEq(
-        //             term.collateralToken(),
-        //             addresses.mainnet("ERC20_SDAI"),
-        //             "SDAI token incorrect"
-        //         );
-        //         assertEq(
-        //             params.collateralToken,
-        //             addresses.mainnet("ERC20_SDAI"),
-        //             "SDAI token incorrect from params"
-        //         );
-        //         assertEq(params.openingFee, 0, "Opening fee not 0");
-        //         assertEq(
-        //             params.interestRate,
-        //             SDAI_RATE,
-        //             "interest rate incorrect"
-        //         );
-        //         assertEq(
-        //             params.minPartialRepayPercent,
-        //             0,
-        //             "min partial repay percent incorrect"
-        //         );
-        //         assertEq(
-        //             params.maxDelayBetweenPartialRepay,
-        //             0,
-        //             "max delay between partial repay incorrect"
-        //         );
-        //         assertEq(
-        //             params.maxDebtPerCollateralToken,
-        //             MAX_SDAI_CREDIT_RATIO,
-        //             "max debt per collateral token incorrect"
-        //         );
-        //     }
-        //     {
-        //         LendingTerm.LendingTermReferences memory params = term
-        //             .getReferences();
+            (
+                uint256 surplusBufferSplit,
+                uint256 creditSplit,
+                uint256 guildSplit,
+                uint256 otherSplit,
+                address otherRecipient
+            ) = profitManager.getProfitSharingConfig();
+            assertEq(
+                surplusBufferSplit,
+                0.09e18,
+                "incorrect surplus buffer split"
+            );
+            assertEq(creditSplit, 0.9e18, "incorrect credit split");
+            assertEq(guildSplit, 0.01e18, "incorrect guild split");
+            assertEq(otherSplit, 0, "incorrect other split");
+            assertEq(otherRecipient, address(0), "incorrect other recipient");
+        }
 
-        //         assertEq(
-        //             params.profitManager,
-        //             addresses.mainnet("PROFIT_MANAGER"),
-        //             "Profit Manager address incorrect"
-        //         );
-        //         assertEq(
-        //             params.guildToken,
-        //             addresses.mainnet("ERC20_GUILD"),
-        //             "Guild Token address incorrect"
-        //         );
-        //         assertEq(
-        //             params.auctionHouse,
-        //             addresses.mainnet("AUCTION_HOUSE"),
-        //             "Auction House address incorrect"
-        //         );
-        //         assertEq(
-        //             params.creditMinter,
-        //             addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
-        //             "Credit Minter address incorrect"
-        //         );
-        //         assertEq(
-        //             params.creditToken,
-        //             addresses.mainnet("CREDIT_TOKEN"),
-        //             "Credit Token address incorrect"
-        //         );
-        //     }
+        /// Governor Verification
+        {
+            VoltGovernor governor = VoltGovernor(
+                payable(addresses.mainnet("DAO_GOVERNOR_GUILD"))
+            );
+            assertEq(
+                governor.votingDelay(),
+                DAO_GOVERNOR_GUILD_VOTING_DELAY,
+                "governor voting delay"
+            );
+            assertEq(
+                governor.votingPeriod(),
+                DAO_GOVERNOR_GUILD_VOTING_PERIOD,
+                "governor voting period"
+            );
+            assertEq(
+                governor.proposalThreshold(),
+                DAO_GOVERNOR_GUILD_PROPOSAL_THRESHOLD,
+                "proposal threshold"
+            );
+            assertEq(governor.quorum(0), DAO_GOVERNOR_GUILD_QUORUM, "governor quorum");
+
+            VoltVetoGovernor vetoGovernorCredit = VoltVetoGovernor(
+                payable(addresses.mainnet("DAO_VETO_CREDIT"))
+            );
+            
+            assertEq(
+                vetoGovernorCredit.quorum(0),
+                DAO_VETO_CREDIT_QUORUM,
+                "veto governor quorum"
+            );
+            assertEq(
+                vetoGovernorCredit.votingDelay(),
+                0,
+                "veto governor voting delay"
+            );
+            assertEq(
+                vetoGovernorCredit.votingPeriod(),
+                2425847,
+                "veto governor voting period"
+            );
+            assertEq(
+                address(vetoGovernorCredit.token()),
+                addresses.mainnet("ERC20_CREDIT"),
+                "veto governor token incorrect"
+            );
+            
+            VoltVetoGovernor vetoGovernorGuild = VoltVetoGovernor(
+                payable(addresses.mainnet("DAO_VETO_GUILD"))
+            );
+            assertEq(
+                vetoGovernorGuild.quorum(0),
+                DAO_VETO_GUILD_QUORUM,
+                "veto governor quorum"
+            );
+            assertEq(
+                vetoGovernorGuild.votingDelay(),
+                0,
+                "veto governor voting delay"
+            );
+            assertEq(
+                vetoGovernorGuild.votingPeriod(),
+                2425847,
+                "veto governor voting period"
+            );
+            assertEq(
+                address(vetoGovernorGuild.token()),
+                addresses.mainnet("ERC20_GUILD"),
+                "veto governor token incorrect"
+            );
+        }
+        {
+            LendingTerm term = LendingTerm(addresses.mainnet("TERM_SDAI_1"));
+            {
+                LendingTerm.LendingTermParams memory params = term
+                    .getParameters();
+                assertEq(
+                    term.collateralToken(),
+                    addresses.mainnet("ERC20_SDAI"),
+                    "SDAI token incorrect"
+                );
+                assertEq(
+                    params.collateralToken,
+                    addresses.mainnet("ERC20_SDAI"),
+                    "SDAI token incorrect from params"
+                );
+                assertEq(params.openingFee, 0, "Opening fee not 0");
+                assertEq(
+                    params.interestRate,
+                    SDAI_RATE,
+                    "interest rate incorrect"
+                );
+                assertEq(
+                    params.minPartialRepayPercent,
+                    0,
+                    "min partial repay percent incorrect"
+                );
+                assertEq(
+                    params.maxDelayBetweenPartialRepay,
+                    0,
+                    "max delay between partial repay incorrect"
+                );
+                assertEq(
+                    params.maxDebtPerCollateralToken,
+                    MAX_SDAI_CREDIT_RATIO,
+                    "max debt per collateral token incorrect"
+                );
+            }
+            {
+                LendingTerm.LendingTermReferences memory params = term
+                    .getReferences();
+
+                assertEq(
+                    params.profitManager,
+                    addresses.mainnet("PROFIT_MANAGER"),
+                    "Profit Manager address incorrect"
+                );
+                assertEq(
+                    params.guildToken,
+                    addresses.mainnet("ERC20_GUILD"),
+                    "Guild Token address incorrect"
+                );
+                assertEq(
+                    params.auctionHouse,
+                    addresses.mainnet("AUCTION_HOUSE"),
+                    "Auction House address incorrect"
+                );
+                assertEq(
+                    params.creditMinter,
+                    addresses.mainnet("RATE_LIMITED_CREDIT_MINTER"),
+                    "Credit Minter address incorrect"
+                );
+                assertEq(
+                    params.creditToken,
+                    addresses.mainnet("ERC20_CREDIT"),
+                    "Credit Token address incorrect"
+                );
+            }
         }
     }
 }
