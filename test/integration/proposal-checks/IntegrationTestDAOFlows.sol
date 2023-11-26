@@ -13,6 +13,7 @@ import {MockERC20} from "@test/mock/MockERC20.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
+import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
 import {CoreRoles as roles} from "@src/core/CoreRoles.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
@@ -174,6 +175,15 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             string memory description
         ) = testCanCastVoteAndQueue();
 
+        VoltVetoGovernor veto = VoltVetoGovernor(
+            payable(addresses.mainnet("DAO_VETO_GUILD"))
+        );
+        assertEq(
+            address(veto.timelock()),
+            address(timelock),
+            "timelock mismatch"
+        );
+
         uint256 queueTime = block.timestamp;
         bytes32 timelockId = timelock.hashOperationBatch(
             targets,
@@ -183,11 +193,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             keccak256(bytes(description))
         );
 
-        deal(
-            address(credit),
-            address(this),
-            vetoGuildGovernor.quorum(0)
-        );
+        deal(address(credit), address(this), veto.quorum(0));
 
         credit.delegate(address(this)); /// delegate to self
 
@@ -196,7 +202,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         vm.warp(block.timestamp + 1);
 
         /// veto
-        uint256 vetoId = vetoGuildGovernor.createVeto(timelockId);
+        uint256 vetoId = veto.createVeto(timelockId);
 
         /// voting starts
         vm.roll(block.number + 1);
@@ -208,18 +214,15 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             "volt governor: proposal not queued"
         );
         assertEq(
-            uint8(vetoGuildGovernor.state(vetoId)),
+            uint8(veto.state(vetoId)),
             uint8(IGovernor.ProposalState.Active),
             "veto governor: proposal not active"
         );
 
-        vetoGuildGovernor.castVote(
-            vetoId,
-            uint8(GovernorCountingSimple.VoteType.Against)
-        );
+        veto.castVote(vetoId, uint8(GovernorCountingSimple.VoteType.Against));
 
         assertEq(
-            uint8(vetoGuildGovernor.state(vetoId)),
+            uint8(veto.state(vetoId)),
             uint8(IGovernor.ProposalState.Succeeded),
             "proposal not defeated"
         );
@@ -237,7 +240,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             "operation not pending"
         );
 
-        vetoGuildGovernor.executeVeto(timelockId);
+        veto.executeVeto(timelockId);
 
         /// validate timelock action is cancelled
 
@@ -902,7 +905,8 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             newQuorum
         );
 
-        string memory description = "Update veto governor quourum to 100m credit";
+        string
+            memory description = "Update veto governor quourum to 100m credit";
 
         uint256 proposalId = governor.propose(
             targets,
