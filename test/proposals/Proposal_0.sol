@@ -188,6 +188,7 @@ contract Proposal_0 is Proposal {
                 GUILD_CREDIT_REWARD_RATIO // amount of GUILD received per CREDIT earned from staking in Gauges
             );
 
+            addresses.addMainnet("ERC20_CREDIT", address(credit));
             addresses.addMainnet("CREDIT_TOKEN", address(credit));
             addresses.addMainnet("ERC20_GUILD", address(guild));
             addresses.addMainnet(
