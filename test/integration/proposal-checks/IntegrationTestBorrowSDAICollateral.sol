@@ -61,10 +61,11 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         uint256 startingTotalSupply = credit.totalSupply();
         uint256 startingSDaiBalance = sdai.balanceOf(address(term));
+        uint256 startingBuffer = rateLimitedCreditMinter.buffer();
 
         vm.startPrank(userOne);
         sdai.approve(address(term), supplyAmount);
-        loanId = term.borrow(supplyAmount, supplyAmount);
+        loanId = term.borrow(supplyAmount, supplyAmount); /// borrow amount equals supply amount
         vm.stopPrank();
 
         assertEq(term.getLoanDebt(loanId), supplyAmount, "incorrect loan debt");
@@ -85,11 +86,10 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         );
         assertEq(
             rateLimitedCreditMinter.buffer(),
-            rateLimitedCreditMinter.bufferCap() -
-                startingTotalSupply -
-                supplyAmount,
+            startingBuffer - supplyAmount,
             "incorrect buffer"
         );
+
         assertEq(
             rateLimitedCreditMinter.lastBufferUsedTime(),
             block.timestamp,
@@ -101,6 +101,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     function testRepayLoan(uint128 seed) public {
         uint256 startingCreditSupplyBeforeSupplyingCollateral = credit
             .totalSupply(); /// start off at 100
+            uint256 startingBuffer = rateLimitedCreditMinter.buffer();
         (bytes32 loanId, uint128 suppliedAmount) = testSupplyCollateralUserOne(
             seed
         ); /// borrow 100
@@ -181,10 +182,10 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         assertEq(
             rateLimitedCreditMinter.buffer(),
-            rateLimitedCreditMinter.bufferCap() -
-                startingCreditSupplyBeforeSupplyingCollateral,
+            startingBuffer,
             "incorrect buffer"
         );
+
         assertEq(
             rateLimitedCreditMinter.lastBufferUsedTime(),
             repayTime,
@@ -241,7 +242,6 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         vm.stopPrank();
 
         uint256 endingUsdcBalance = usdc.balanceOf(to);
-        console.log("credit address: ", address(credit));
         uint256 endingCreditBalance = credit.balanceOf(to);
 
         assertEq(
