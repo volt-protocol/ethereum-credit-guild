@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "@forge-std/Test.sol";
+import {Test} from "@forge-std/Test.sol";
 
 import {Core} from "@src/core/Core.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
@@ -114,9 +114,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
         );
 
         term = LendingTerm(addresses.mainnet("TERM_SDAI_1"));
-        console.log("assigned term");
         collateralToken = ERC20(term.getParameters().collateralToken);
-        console.log("assigned collateral token");
         
         vm.label(userOne, "user one");
         vm.label(userTwo, "user two");
@@ -132,9 +130,8 @@ contract PostProposalCheckFixture is PostProposalCheck {
             
             vm.startPrank(userThree);
             usdc.approve(address(psm), INITIAL_USDC_MINT_AMOUNT);
-            // psm.mint(userThree, INITIAL_USDC_MINT_AMOUNT);
-            // credit.enterRebase();
-            console.log("entered rebase");
+            psm.mint(userThree, INITIAL_USDC_MINT_AMOUNT);
+            credit.enterRebase();
             vm.stopPrank();
         }
     }
