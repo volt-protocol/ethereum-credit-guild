@@ -777,7 +777,6 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         assertEq(
             rateLimitedCreditMinter.buffer(),
             rateLimitedCreditMinter.bufferCap() -
-                startingTotalSupply -
                 supplyAmount,
             "incorrect buffer after supply"
         );
