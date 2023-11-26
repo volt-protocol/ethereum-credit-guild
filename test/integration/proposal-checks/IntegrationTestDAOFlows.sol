@@ -34,6 +34,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         /// new term so that onboard succeeds
         term = LendingTerm(
             onboarder.createTerm(
+                addresses.mainnet("TERM_IMPL"),
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,
@@ -185,7 +186,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         deal(
             addresses.mainnet("CREDIT_TOKEN"),
             address(this),
-            vetoGovernor.quorum(0)
+            vetoGuildGovernor.quorum(0)
         );
 
         credit.delegate(address(this)); /// delegate to self
@@ -195,7 +196,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         vm.warp(block.timestamp + 1);
 
         /// veto
-        uint256 vetoId = vetoGovernor.createVeto(timelockId);
+        uint256 vetoId = vetoGuildGovernor.createVeto(timelockId);
 
         /// voting starts
         vm.roll(block.number + 1);
@@ -207,18 +208,18 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             "volt governor: proposal not queued"
         );
         assertEq(
-            uint8(vetoGovernor.state(vetoId)),
+            uint8(vetoGuildGovernor.state(vetoId)),
             uint8(IGovernor.ProposalState.Active),
             "veto governor: proposal not active"
         );
 
-        vetoGovernor.castVote(
+        vetoGuildGovernor.castVote(
             vetoId,
             uint8(GovernorCountingSimple.VoteType.Against)
         );
 
         assertEq(
-            uint8(vetoGovernor.state(vetoId)),
+            uint8(vetoGuildGovernor.state(vetoId)),
             uint8(IGovernor.ProposalState.Succeeded),
             "proposal not defeated"
         );
@@ -236,7 +237,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             "operation not pending"
         );
 
-        vetoGovernor.executeVeto(timelockId);
+        vetoGuildGovernor.executeVeto(timelockId);
 
         /// validate timelock action is cancelled
 
@@ -886,18 +887,18 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         );
     }
 
-    function testSetVetoGovernorQuorum() public {
+    function testSetvetoGuildGovernorQuorum() public {
         uint256 newQuorum = 100_000_000 * 1e18;
 
         address[] memory targets = new address[](1);
-        targets[0] = address(vetoGovernor);
+        targets[0] = address(vetoGuildGovernor);
 
         uint256[] memory values = new uint256[](1);
         values[0] = 0;
 
         bytes[] memory calldatas = new bytes[](1);
         calldatas[0] = abi.encodeWithSelector(
-            vetoGovernor.setQuorum.selector,
+            vetoGuildGovernor.setQuorum.selector,
             newQuorum
         );
 
@@ -955,7 +956,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         );
 
         assertEq(
-            vetoGovernor.quorum(0),
+            vetoGuildGovernor.quorum(0),
             newQuorum,
             "new quorum not set in offboarder"
         );

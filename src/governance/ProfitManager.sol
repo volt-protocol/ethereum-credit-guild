@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 
@@ -32,6 +33,9 @@ contract ProfitManager is CoreRef {
 
     /// @notice reference to CREDIT token.
     address public credit;
+
+    /// @notice reference to CREDIT token PSM.
+    address public psm;
 
     /// @notice profit index of a given gauge
     mapping(address => uint256) public gaugeProfitIndex;
@@ -82,7 +86,26 @@ contract ProfitManager is CoreRef {
     /// shall be redistributed to holders through a savings rate or another mechanism.
     uint256 public creditMultiplier = 1e18;
 
-    constructor(address _core) CoreRef(_core) {}
+    /// @notice minimum size of CREDIT loans.
+    /// this parameter is here to ensure that the gas costs of liquidation do not
+    /// outsize minimum overcollateralization (which could result in bad debt
+    /// on otherwise sound loans).
+    /// This value is adjusted up when the creditMultiplier goes down.
+    uint256 internal _minBorrow = 100e18;
+
+    /// @notice tolerance on new borrows regarding gauge weights.
+    /// For a total supply or 100 credit, and 2 gauges each at 50% weight,
+    /// the ideal borrow amount for each gauge is 50 credit. To facilitate
+    /// growth of the protocol, a tolerance is allowed compared to the ideal
+    /// gauge weights.
+    /// This tolerance is expressed as a percentage with 18 decimals.
+    /// A tolerance of 1e18 (100% - or 0% deviation compared to ideal weights)
+    /// can result in a deadlock situation where no new borrows are allowed.
+    uint256 public gaugeWeightTolerance = 1.2e18; // 120%
+
+    constructor(address _core) CoreRef(_core) {
+        emit MinBorrowUpdate(block.timestamp, 100e18);
+    }
 
     /// @notice emitted when a profit or loss in a gauge is notified.
     event GaugePnL(address indexed gauge, uint256 indexed when, int256 pnl);
@@ -118,14 +141,52 @@ contract ProfitManager is CoreRef {
         uint256 amount
     );
 
+    /// @notice emitted when minBorrow is updated
+    event MinBorrowUpdate(uint256 indexed when, uint256 newValue);
+
+    /// @notice emitted when gaugeWeightTolerance is updated
+    event GaugeWeightToleranceUpdate(uint256 indexed when, uint256 newValue);
+
+    /// @notice get the minimum borrow amount
+    function minBorrow() external view returns (uint256) {
+        return (_minBorrow * 1e18) / creditMultiplier;
+    }
+
     /// @notice initialize references to GUILD & CREDIT tokens.
     function initializeReferences(
         address _credit,
-        address _guild
+        address _guild,
+        address _psm
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
-        assert(credit == address(0) && guild == address(0));
+        assert(
+            credit == address(0) && guild == address(0) && psm == address(0)
+        );
         credit = _credit;
         guild = _guild;
+        psm = _psm;
+    }
+
+    /// @notice returns the sum of all outstanding CREDIT debts
+    function totalBorrowedCredit() external view returns (uint256) {
+        return
+            CreditToken(credit).targetTotalSupply() -
+            SimplePSM(psm).redeemableCredit();
+    }
+
+    /// @notice set the minimum borrow amount
+    function setMinBorrow(
+        uint256 newValue
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        _minBorrow = newValue;
+        emit MinBorrowUpdate(block.timestamp, newValue);
+    }
+
+    /// @notice set the gauge weight tolerance
+    function setGaugeWeightTolerance(
+        uint256 newValue
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        gaugeWeightTolerance = newValue;
+        emit GaugeWeightToleranceUpdate(block.timestamp, newValue);
     }
 
     /// @notice set the profit sharing config.

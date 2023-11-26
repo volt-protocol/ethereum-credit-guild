@@ -26,8 +26,8 @@ contract LendingTermOnboarding is VoltGovernor {
     /// @notice time of last proposal of a given term
     mapping(address => uint256) public lastProposal;
 
-    /// @notice immutable reference to the lending term implementation to clone
-    address public immutable lendingTermImplementation;
+    /// @notice mapping of allowed LendingTerm implementations
+    mapping(address => bool) public implementations;
     /// @notice immutable reference to the guild token
     address public immutable guildToken;
     /// @notice immutable reference to the gauge type to use for the terms onboarded
@@ -47,14 +47,20 @@ contract LendingTermOnboarding is VoltGovernor {
     address public immutable creditToken;
 
     /// @notice emitted when a term is created
+    event ImplemenationAllowChanged(
+        uint256 indexed when,
+        address indexed implementation,
+        bool allowed
+    );
+    /// @notice emitted when a term is created
     event TermCreated(
         uint256 indexed when,
+        address indexed implementation,
         address indexed term,
         LendingTerm.LendingTermParams params
     );
 
     constructor(
-        address _lendingTermImplementation,
         LendingTerm.LendingTermReferences memory _lendingTermReferences,
         uint256 _gaugeType,
         address _core,
@@ -74,7 +80,6 @@ contract LendingTermOnboarding is VoltGovernor {
             initialQuorum
         )
     {
-        lendingTermImplementation = _lendingTermImplementation;
         guildToken = _lendingTermReferences.guildToken;
         gaugeType = _gaugeType;
         profitManager = _lendingTermReferences.profitManager;
@@ -83,10 +88,28 @@ contract LendingTermOnboarding is VoltGovernor {
         creditToken = _lendingTermReferences.creditToken;
     }
 
+    /// @notice Allow or disallow a given implemenation
+    function allowImplementation(
+        address implementation,
+        bool allowed
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        implementations[implementation] = allowed;
+        emit ImplemenationAllowChanged(
+            block.timestamp,
+            implementation,
+            allowed
+        );
+    }
+
     /// @notice Create a new LendingTerm and initialize it.
     function createTerm(
+        address implementation,
         LendingTerm.LendingTermParams calldata params
     ) external returns (address) {
+        require(
+            implementations[implementation],
+            "LendingTermOnboarding: invalid implementation"
+        );
         // must be an ERC20 (maybe, at least it prevents dumb input mistakes)
         (bool success, bytes memory returned) = params.collateralToken.call(
             abi.encodeWithSelector(IERC20.totalSupply.selector)
@@ -127,7 +150,7 @@ contract LendingTermOnboarding is VoltGovernor {
             "LendingTermOnboarding: invalid hardCap"
         );
 
-        address term = Clones.clone(lendingTermImplementation);
+        address term = Clones.clone(implementation);
         LendingTerm(term).initialize(
             address(core()),
             LendingTerm.LendingTermReferences({
@@ -140,7 +163,7 @@ contract LendingTermOnboarding is VoltGovernor {
             params
         );
         created[term] = block.timestamp;
-        emit TermCreated(block.timestamp, term, params);
+        emit TermCreated(block.timestamp, implementation, term, params);
         return term;
     }
 

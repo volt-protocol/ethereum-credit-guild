@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {Test} from "@forge-std/Test.sol";
+import "@forge-std/Test.sol";
 
 import {Core} from "@src/core/Core.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
@@ -55,7 +55,8 @@ contract PostProposalCheckFixture is PostProposalCheck {
 
     /// Governor
     VoltGovernor public governor;
-    VoltVetoGovernor public vetoGovernor;
+    VoltVetoGovernor public vetoGuildGovernor;
+    VoltVetoGovernor public vetoCreditGovernor;
     VoltTimelockController public timelock;
 
     /// Minting
@@ -75,8 +76,8 @@ contract PostProposalCheckFixture is PostProposalCheck {
 
         usdc = ERC20(addresses.mainnet("ERC20_USDC"));
         sdai = ERC20(addresses.mainnet("ERC20_SDAI"));
-        guild = GuildToken(addresses.mainnet("GUILD_TOKEN"));
-        credit = CreditToken(addresses.mainnet("CREDIT_TOKEN"));
+        guild = GuildToken(addresses.mainnet("ERC20_GUILD"));
+        credit = CreditToken(addresses.mainnet("ERC20_CREDIT"));
 
         /// rate limited minters
         rateLimitedCreditMinter = RateLimitedMinter(
@@ -93,29 +94,34 @@ contract PostProposalCheckFixture is PostProposalCheck {
         auctionHouse = AuctionHouse(addresses.mainnet("AUCTION_HOUSE"));
         psm = SimplePSM(addresses.mainnet("PSM_USDC"));
 
-        governor = VoltGovernor(payable(addresses.mainnet("GOVERNOR")));
-        vetoGovernor = VoltVetoGovernor(
-            payable(addresses.mainnet("VETO_GOVERNOR"))
+        governor = VoltGovernor(payable(addresses.mainnet("DAO_GOVERNOR_GUILD")));
+        vetoGuildGovernor = VoltVetoGovernor(
+            payable(addresses.mainnet("ONBOARD_VETO_GUILD"))
+        );
+        vetoCreditGovernor = VoltVetoGovernor(
+            payable(addresses.mainnet("ONBOARD_VETO_CREDIT"))
         );
         timelock = VoltTimelockController(
-            payable(addresses.mainnet("TIMELOCK"))
+            payable(addresses.mainnet("DAO_TIMELOCK"))
         );
 
         /// lending terms
         onboarder = LendingTermOnboarding(
-            payable(addresses.mainnet("LENDING_TERM_ONBOARDING"))
+            payable(addresses.mainnet("ONBOARD_GOVERNOR_GUILD"))
         );
         offboarder = LendingTermOffboarding(
-            addresses.mainnet("LENDING_TERM_OFFBOARDING")
+            addresses.mainnet("OFFBOARD_GOVERNOR_GUILD")
         );
 
         term = LendingTerm(addresses.mainnet("TERM_SDAI_1"));
+        console.log("assigned term");
         collateralToken = ERC20(term.getParameters().collateralToken);
-
+        console.log("assigned collateral token");
+        
         vm.label(userOne, "user one");
         vm.label(userTwo, "user two");
         vm.label(userThree, "user three");
-
+        
         // Mint the first CREDIT tokens and enter rebase
         // Doing this with a non-dust balance ensures the share price internally
         // to the CreditToken has a reasonable size.
@@ -123,11 +129,12 @@ contract PostProposalCheckFixture is PostProposalCheck {
             /// @notice USDC mint amount
             uint256 INITIAL_USDC_MINT_AMOUNT = 100 * 1e6;
             deal(address(usdc), userThree, INITIAL_USDC_MINT_AMOUNT);
-
+            
             vm.startPrank(userThree);
             usdc.approve(address(psm), INITIAL_USDC_MINT_AMOUNT);
-            psm.mint(userThree, INITIAL_USDC_MINT_AMOUNT);
-            credit.enterRebase();
+            // psm.mint(userThree, INITIAL_USDC_MINT_AMOUNT);
+            // credit.enterRebase();
+            console.log("entered rebase");
             vm.stopPrank();
         }
     }

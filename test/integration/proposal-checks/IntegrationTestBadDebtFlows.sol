@@ -270,12 +270,21 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
             "issuance delta incorrect"
         );
     }
-    
-    function testBadDebtRepricesCreditForgive(uint256 borrowAmount, uint128 supplyAmount) public {
+
+    function testBadDebtRepricesCreditForgive(
+        uint256 borrowAmount,
+        uint128 supplyAmount
+    ) public {
         testAllocateGaugeToSDAI();
 
-        supplyAmount = uint128(_bound(supplyAmount, term.MIN_BORROW(), term.debtCeiling()));
-        borrowAmount = _bound(borrowAmount, term.MIN_BORROW(), supplyAmount);
+        supplyAmount = uint128(
+            _bound(supplyAmount, profitManager.minBorrow(), term.debtCeiling())
+        );
+        borrowAmount = _bound(
+            borrowAmount,
+            profitManager.minBorrow(),
+            supplyAmount
+        );
 
         /// supply collateral and borrow
 
@@ -309,6 +318,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         assertEq(auctionHouse.nAuctionsInProgress(), 1);
 
         uint256 startingSdaiBalance = sdai.balanceOf(address(this));
+        console.log("credit address: ", address(credit));
         uint256 startingCreditSupply = credit.totalSupply();
         uint256 startingCreditMultiplier = profitManager.creditMultiplier();
         uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();

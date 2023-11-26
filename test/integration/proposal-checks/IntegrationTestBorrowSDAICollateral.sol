@@ -42,7 +42,9 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     ) public returns (bytes32 loanId, uint128 suppliedAmount) {
         testAllocateGaugeToSDAI();
 
-        supplyAmount = uint128(_bound(supplyAmount, term.MIN_BORROW(), term.debtCeiling()));
+        supplyAmount = uint128(
+            _bound(supplyAmount, profitManager.minBorrow(), term.debtCeiling())
+        );
         suppliedAmount = supplyAmount;
 
         return _supplyCollateralUserOne(suppliedAmount);
@@ -239,6 +241,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         vm.stopPrank();
 
         uint256 endingUsdcBalance = usdc.balanceOf(to);
+        console.log("credit address: ", address(credit));
         uint256 endingCreditBalance = credit.balanceOf(to);
 
         assertEq(

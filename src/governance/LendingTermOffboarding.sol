@@ -95,6 +95,11 @@ contract LendingTermOffboarding is CoreRef {
             block.number > lastPollBlock[term] + POLL_DURATION_BLOCKS,
             "LendingTermOffboarding: poll active"
         );
+        // Check that the term is an active gauge
+        require(
+            GuildToken(guildToken).isGauge(term),
+            "LendingTermOffboarding: not an active term"
+        );
 
         polls[block.number][term] = 1; // voting power
         lastPollBlock[term] = block.number;
@@ -149,6 +154,8 @@ contract LendingTermOffboarding is CoreRef {
         require(canOffboard[term], "LendingTermOffboarding: quorum not met");
 
         // update protocol config
+        // this will revert if the term has already been offboarded
+        // through another mean.
         GuildToken(guildToken).removeGauge(term);
 
         // pause psm redemptions

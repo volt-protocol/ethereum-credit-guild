@@ -34,6 +34,7 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
         /// new term so that onboard succeeds
         term = LendingTerm(
             onboarder.createTerm(
+                addresses.mainnet("TERM_IMPL"),
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,
@@ -53,14 +54,14 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
         uint256 newQuorum = 100_000_000 * 1e18;
 
         address[] memory targets = new address[](1);
-        targets[0] = address(vetoGovernor);
+        targets[0] = address(vetoGuildGovernor);
 
         uint256[] memory values = new uint256[](1);
         values[0] = 0;
 
         bytes[] memory calldatas = new bytes[](1);
         calldatas[0] = abi.encodeWithSelector(
-            vetoGovernor.setQuorum.selector,
+            vetoGuildGovernor.setQuorum.selector,
             newQuorum
         );
 
@@ -117,13 +118,13 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
             "proposal not executed"
         );
 
-        assertEq(vetoGovernor.quorum(0), newQuorum, "new quorum not set");
+        assertEq(vetoGuildGovernor.quorum(0), newQuorum, "new quorum not set");
     }
 
     function testSetOffboardingQuourumAsTimelock() public {
         uint256 newQuorum = 100_000_000 * 1e18;
 
-        vm.prank(addresses.mainnet("TIMELOCK"));
+        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
         offboarder.setQuorum(newQuorum);
 
         assertEq(offboarder.quorum(), newQuorum, "new quorum not set");

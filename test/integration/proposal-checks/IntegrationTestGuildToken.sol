@@ -11,6 +11,7 @@ contract IntegrationTestGuildToken is PostProposalCheckFixture {
     }
 
     function testCorrectGauge() public {
+        guild.gauges(); /// does this succeed?
         assertEq(guild.gauges()[0], address(term));
     }
 
@@ -99,7 +100,7 @@ contract IntegrationTestGuildToken is PostProposalCheckFixture {
         uint256 startingGaugeWeight = guild.getGaugeWeight(address(term));
         uint256 startingTotalWeight = guild.totalWeight();
 
-        vm.prank(addresses.mainnet("TIMELOCK"));
+        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
         guild.removeGauge(address(term));
 
         uint256 endingTotalWeight = guild.totalWeight();

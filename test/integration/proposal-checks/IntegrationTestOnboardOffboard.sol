@@ -22,6 +22,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         super.setUp();
         term = LendingTerm(
             onboarder.createTerm(
+                addresses.mainnet("TERM_IMPL"),
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,
@@ -34,7 +35,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
             )
         );
 
-        vm.prank(addresses.mainnet("TIMELOCK"));
+        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
         guild.enableTransfer();
 
         uint256 mintAmount = onboarder.quorum(0);
@@ -50,7 +51,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
 
     function testCoreCorrectlySetOnLendingTermLogic() public {
         assertEq(
-            address(LendingTerm(onboarder.lendingTermImplementation()).core()),
+            address(LendingTerm(addresses.mainnet("TERM_IMPL")).core()),
             address(1)
         );
     }

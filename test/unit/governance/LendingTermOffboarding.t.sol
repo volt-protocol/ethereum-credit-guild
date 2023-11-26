@@ -51,7 +51,6 @@ contract LendingTermOffboardingUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core));
         guild = new GuildToken(address(core), address(profitManager), address(credit));
-        profitManager.initializeReferences(address(credit), address(guild));
         collateral = new MockERC20();
         rlcm = new RateLimitedMinter(
             address(core), /*_core*/
@@ -64,10 +63,10 @@ contract LendingTermOffboardingUnitTest is Test {
         psm = new SimplePSM(
             address(core),
             address(profitManager),
-            address(rlcm),
             address(credit),
             address(collateral)
         );
+        profitManager.initializeReferences(address(credit), address(guild), address(psm));
         offboarder = new LendingTermOffboarding(
             address(core),
             address(guild),
@@ -169,6 +168,10 @@ contract LendingTermOffboardingUnitTest is Test {
         
         assertEq(offboarder.polls(block.number, address(term)), 1);
         assertEq(offboarder.lastPollBlock(address(term)), block.number);
+
+        // cannot ask to offboard an address that is not an active term
+        vm.expectRevert("LendingTermOffboarding: not an active term");
+        offboarder.proposeOffboard(address(this));
 
         // cannot ask in the same block because the poll exists
         vm.expectRevert("LendingTermOffboarding: poll exists");

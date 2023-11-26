@@ -25,6 +25,13 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     ///    offboard - done
     ///    repay loan - done
 
+    function setUp() public override {
+        super.setUp();
+
+        console.log("guild token address: ", address(guild));
+        console.log("credit token address: ", address(credit));
+    }
+
     function _mintQuorumGuildAmount() private {
         uint256 mintAmount = governor.quorum(0);
         /// setup
@@ -432,7 +439,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         /// setup scenario with user borrowing, then staking CREDIT in Surplus Guild Minter
         supplyAmount = _bound(
             supplyAmount,
-            term.MIN_BORROW(),
+            profitManager.minBorrow(),
             rateLimitedCreditMinter.buffer()
         );
         uint256 computedCreditAsked;
@@ -657,7 +664,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     }
 
     function _testSetMintRatio(uint256 mintRatio) private {
-        vm.prank(addresses.mainnet("TIMELOCK"));
+        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
 
         surplusGuildMinter.setMintRatio(mintRatio);
         assertEq(
@@ -668,7 +675,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     }
 
     function _testSetRewardRatio(uint256 rewardRatio) private {
-        vm.prank(addresses.mainnet("TIMELOCK"));
+        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
 
         surplusGuildMinter.setRewardRatio(rewardRatio);
 

@@ -18,7 +18,7 @@ contract IntegrationTestRateLimitedGuildMinter is PostProposalCheckFixture {
     function testGovernanceUpdatesBufferCap() public {
         uint128 newBufferCap = 100_000_000 * 1e18;
 
-        vm.prank(addresses.mainnet("TIMELOCK"));
+        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
         rateLimitedGuildMinter.setBufferCap(newBufferCap);
 
         assertEq(rateLimitedGuildMinter.bufferCap(), newBufferCap);
@@ -28,7 +28,7 @@ contract IntegrationTestRateLimitedGuildMinter is PostProposalCheckFixture {
     function testGovernanceUpdatesRateLimitPerSecond() public {
         uint128 newRateLimitPerSecond = 1;
 
-        vm.prank(addresses.mainnet("TIMELOCK"));
+        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
         vm.expectRevert("RateLimited: rateLimitPerSecond too high");
         rateLimitedGuildMinter.setRateLimitPerSecond(newRateLimitPerSecond);
     }

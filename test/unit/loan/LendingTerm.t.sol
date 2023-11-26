@@ -7,6 +7,7 @@ import {Test} from "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
+import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
@@ -22,6 +23,7 @@ contract LendingTermUnitTest is Test {
     CreditToken credit;
     GuildToken guild;
     MockERC20 collateral;
+    SimplePSM private psm;
     RateLimitedMinter rlcm;
     AuctionHouse auctionHouse;
     LendingTerm term;
@@ -32,6 +34,8 @@ contract LendingTermUnitTest is Test {
     uint256 constant _MAX_DELAY_BETWEEN_PARTIAL_REPAY = 63115200; // 2 years
     uint256 constant _MIN_PARTIAL_REPAY_PERCENT = 0.2e18; // 20%
     uint256 constant _HARDCAP = 20_000_000e18;
+
+    uint256 public issuance = 0;
 
     function setUp() public {
         vm.warp(1679067867);
@@ -75,7 +79,13 @@ contract LendingTermUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        profitManager.initializeReferences(address(credit), address(guild));
+        psm = new SimplePSM(
+            address(core),
+            address(profitManager),
+            address(credit),
+            address(collateral)
+        );
+        profitManager.initializeReferences(address(credit), address(guild), address(psm));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -350,9 +360,15 @@ contract LendingTermUnitTest is Test {
         vm.warp(block.timestamp + 10);
         vm.roll(block.number + 1);
 
-        // debt ceiling is 50% of totalSupply (10_000e18), so we
-        // are at 200% utilization
-        assertEq(term.debtCeiling(), 10_000e18);
+        // debt ceiling is 50% of totalSupply
+        // + 20% of tolerance (10_000e18 + 2_000e18)
+        assertEq(term.debtCeiling(), 12_000e18);
+
+        // if the term's weight is above 100% when we include tolerance,
+        // the debt ceiling is the hardCap
+        guild.decrementGauge(address(this), _weight * 9 / 10);
+        assertEq(term.debtCeiling(), _HARDCAP);
+        guild.incrementGauge(address(this), _weight * 9 / 10);
 
         // second borrow fails because of relative debt ceilings
         vm.expectRevert("LendingTerm: debt ceiling reached");
@@ -361,9 +377,10 @@ contract LendingTermUnitTest is Test {
         // mint more CREDIT, so that debt ceiling of all terms is increased
         // new totalSupply is 100_000e18, with 20_000e18 already borrowed on this term.
         credit.mint(address(this), 80_000e18);
-        // if someone borrows 60_000e18, new totalSupply is 160_000e18, and debt ceiling
-        // of this term is 50% of the new totalSupply, i.e. 80_000e18.
-        assertEq(term.debtCeiling(), 80_000e18);
+        // if someone borrows 100_000e18, new totalSupply is 200_000e18, and debt ceiling
+        // of this term is 50% of the new totalSupply, i.e. 100_000e18.
+        // add 20% of tolerance (20_000e18) => 120_000e18
+        assertEq(term.debtCeiling(), 120_000e18);
 
         vm.prank(governor);
         rlcm.setBufferCap(uint128(70_000e18));
@@ -372,21 +389,21 @@ contract LendingTermUnitTest is Test {
         rlcm.setBufferCap(type(uint128).max);
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 3 days);
-        assertEq(term.debtCeiling(), 80_000e18);
+        assertEq(term.debtCeiling(), 120_000e18);
         vm.prank(governor);
         term.setHardCap(60_000e18);
         assertEq(term.debtCeiling(), 60_000e18);
         vm.prank(governor);
         term.setHardCap(_HARDCAP);
-        assertEq(term.debtCeiling(), 80_000e18);
+        assertEq(term.debtCeiling(), 120_000e18);
 
         // borrow max
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 13);
-        collateral.mint(address(this), 30e18);
-        collateral.approve(address(term), 30e18);
+        collateral.mint(address(this), 9999e18);
+        collateral.approve(address(term), 9999e18);
         uint256 maxBorrow = term.debtCeiling() - term.issuance();
-        term.borrow(maxBorrow, 30e18);
+        term.borrow(maxBorrow, 9999e18);
         assertEq(term.issuance(), term.debtCeiling());
 
         // borrowing even the minimum amount will revert
@@ -395,9 +412,9 @@ contract LendingTermUnitTest is Test {
         vm.warp(block.timestamp + 13);
         collateral.mint(address(this), 9999e18);
         collateral.approve(address(term), 9999e18);
-        uint256 _minBorrow = term.MIN_BORROW();
+        uint256 _minBorrow = profitManager.minBorrow();
         vm.expectRevert("LendingTerm: debt ceiling reached");
-        term.borrow(_minBorrow, 30e18);
+        term.borrow(_minBorrow, 9999e18);
     }
 
     // borrow fail because hardcap is reached
@@ -443,9 +460,8 @@ contract LendingTermUnitTest is Test {
         interestTime = bound(interestTime, 1, 10 * 365 * 24 * 3600);
 
         // do not fuzz reverting conditions (below MIN_BORROW or above maxBorrow)
-        borrowAmount += term.MIN_BORROW();
-        uint256 maxBorrow = (collateralAmount * _CREDIT_PER_COLLATERAL_TOKEN) /
-            1e18;
+        borrowAmount += profitManager.minBorrow();
+        uint256 maxBorrow = collateralAmount * _CREDIT_PER_COLLATERAL_TOKEN / 1e18;
         vm.assume(borrowAmount <= maxBorrow);
 
         // prepare
@@ -593,7 +609,7 @@ contract LendingTermUnitTest is Test {
         vm.expectRevert("LendingTerm: repay below min");
         term.partialRepay(loanId, 2_100e18); // min would be 20% = 2_200e18
 
-        uint256 MIN_BORROW = term.MIN_BORROW();
+        uint256 MIN_BORROW = profitManager.minBorrow();
         vm.expectRevert("LendingTerm: below min borrow");
         term.partialRepay(loanId, 11_000e18 - MIN_BORROW + 1);
 
@@ -1443,13 +1459,13 @@ contract LendingTermUnitTest is Test {
 
         // borrow should fail because we try to borrow 1.75x
         // the MIN_BORROW, but CREDIT value went up 2x.
-        uint256 MIN_BORROW = term.MIN_BORROW();
+        uint256 MIN_BORROW = profitManager.minBorrow();
         vm.expectRevert("LendingTerm: borrow amount too low");
         term.borrow((MIN_BORROW * 175) / 100, 10000000000e18);
     }
 
     // MIN_BORROW increases when creditMultiplier decreases - partialRepay()
-    function testMinBorrowAfterCreditLoseValue2() public {
+    function testMinBorrowAfterCreditLoseValue() public {
         // prepare
         uint256 borrowAmount = 20_000e18;
         uint256 collateralAmount = 15e18;

@@ -34,6 +34,7 @@ contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
         /// new term so that onboard succeeds
         term = LendingTerm(
             onboarder.createTerm(
+                addresses.mainnet("TERM_IMPL"),
                 LendingTerm.LendingTermParams({
                     collateralToken: addresses.mainnet("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,
@@ -49,7 +50,7 @@ contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
 
     function testProposeFails() public {
         vm.expectRevert("VoltVetoGovernor: cannot propose arbitrary actions");
-        vetoGovernor.propose(
+        vetoGuildGovernor.propose(
             new address[](0),
             new uint256[](0),
             new bytes[](0),
@@ -58,20 +59,20 @@ contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
     }
 
     function testProposalThresholdZero() public {
-        assertEq(vetoGovernor.proposalThreshold(), 0); /// anyone can propose
+        assertEq(vetoGuildGovernor.proposalThreshold(), 0); /// anyone can propose
     }
 
     /// ----------------- Governor DAO Actions -------------------
     function testUpdateTimelockVetoDao() public {
         address[] memory targets = new address[](1);
-        targets[0] = address(vetoGovernor);
+        targets[0] = address(vetoGuildGovernor);
 
         uint256[] memory values = new uint256[](1);
         values[0] = 0;
 
         bytes[] memory calldatas = new bytes[](1);
         calldatas[0] = abi.encodeWithSelector(
-            vetoGovernor.updateTimelock.selector,
+            vetoGuildGovernor.updateTimelock.selector,
             address(this)
         );
 
@@ -128,6 +129,6 @@ contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
             "proposal not executed"
         );
 
-        assertEq(vetoGovernor.timelock(), address(this));
+        assertEq(vetoGuildGovernor.timelock(), address(this));
     }
 }
