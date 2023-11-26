@@ -184,7 +184,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         );
 
         deal(
-            addresses.mainnet("CREDIT_TOKEN"),
+            address(credit),
             address(this),
             vetoGuildGovernor.quorum(0)
         );
