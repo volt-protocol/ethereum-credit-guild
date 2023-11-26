@@ -25,13 +25,6 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     ///    offboard - done
     ///    repay loan - done
 
-    function setUp() public override {
-        super.setUp();
-
-        console.log("guild token address: ", address(guild));
-        console.log("credit token address: ", address(credit));
-    }
-
     function _mintQuorumGuildAmount() private {
         uint256 mintAmount = governor.quorum(0);
         /// setup
