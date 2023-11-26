@@ -33,6 +33,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         deal(address(collateralToken), userOne, supplyAmount);
 
         uint256 startingCreditSupply = credit.totalSupply();
+        uint256 startingBuffer = rateLimitedCreditMinter.buffer();
 
         vm.startPrank(userOne);
         sdai.approve(address(term), supplyAmount);
@@ -57,9 +58,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         );
         assertEq(
             rateLimitedCreditMinter.buffer(),
-            rateLimitedCreditMinter.bufferCap() -
-                startingCreditSupply -
-                borrowAmount,
+            startingBuffer - borrowAmount,
             "incorrect buffer"
         );
         assertEq(
@@ -318,7 +317,6 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         assertEq(auctionHouse.nAuctionsInProgress(), 1);
 
         uint256 startingSdaiBalance = sdai.balanceOf(address(this));
-        console.log("credit address: ", address(credit));
         uint256 startingCreditSupply = credit.totalSupply();
         uint256 startingCreditMultiplier = profitManager.creditMultiplier();
         uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();
