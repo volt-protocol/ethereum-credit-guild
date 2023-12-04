@@ -224,7 +224,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         }
     }
 
-    /// @notice decrease pending rebase rewards, when rewards are minted to users
+    /// @notice decrease unminted rebase rewards, when rewards are minted to users
     function decreaseUnmintedRebaseRewards(uint256 amount) internal {
         InterpolatedValue memory val = __unmintedRebaseRewards;
         uint256 _unmintedRebaseRewards = interpolatedValue(val);
@@ -298,7 +298,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         emit RebaseEnter(account, block.timestamp);
     }
 
-    /// @notice Exit rebasing supply. All pending rebasing rewards are physically minted to the user,
+    /// @notice Exit rebasing supply. All unminted rebasing rewards are physically minted to the user,
     /// and they won't be affected by rebases anymore.
     function exitRebase() external {
         require(
@@ -422,7 +422,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                             ERC20 OVERRIDE
     ///////////////////////////////////////////////////////////////*/
 
-    /// @notice Override of balanceOf() that takes into account the pending undistributed rebase rewards.
+    /// @notice Override of balanceOf() that takes into account the unminted rebase rewards.
     function balanceOf(
         address account
     ) public view virtual override returns (uint256) {
@@ -538,7 +538,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 int256(sharesReceived)
             );
 
-            // "realize" pending rebase rewards
+            // "realize" unminted rebase rewards
             uint256 mintAmount = rebasedBalance - rawBalance;
             if (mintAmount != 0) {
                 ERC20._mint(account, mintAmount);
@@ -622,7 +622,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 nShares: uint248(toSharesAfter)
             });
 
-            // "realize" pending rebase rewards
+            // "realize" unminted rebase rewards
             uint256 mintAmount = toBalanceAfter - rawToBalanceAfter;
             if (mintAmount != 0) {
                 ERC20._mint(to, mintAmount);
@@ -716,7 +716,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 nShares: uint248(toSharesAfter)
             });
 
-            // "realize" pending rebase rewards
+            // "realize" unminted rebase rewards
             uint256 mintAmount = toBalanceAfter - rawToBalanceAfter;
             if (mintAmount != 0) {
                 ERC20._mint(to, mintAmount);

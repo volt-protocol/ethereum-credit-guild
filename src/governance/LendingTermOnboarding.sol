@@ -46,8 +46,8 @@ contract LendingTermOnboarding is VoltGovernor {
     /// @notice reference to creditToken to set in created lending terms
     address public immutable creditToken;
 
-    /// @notice emitted when a term is created
-    event ImplemenationAllowChanged(
+    /// @notice emitted when a lending term implementation's "allowed" status changes
+    event ImplementationAllowChanged(
         uint256 indexed when,
         address indexed implementation,
         bool allowed
@@ -94,7 +94,7 @@ contract LendingTermOnboarding is VoltGovernor {
         bool allowed
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         implementations[implementation] = allowed;
-        emit ImplemenationAllowChanged(
+        emit ImplementationAllowChanged(
             block.timestamp,
             implementation,
             allowed

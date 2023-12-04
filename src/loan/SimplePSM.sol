@@ -35,6 +35,7 @@ contract SimplePSM is CoreRef {
     address public immutable pegToken;
 
     /// @notice peg token balance, used to track sum of i/o and exclude donations.
+    /// invariant: pegToken.balanceOf(this) >= pegTokenBalance
     uint256 public pegTokenBalance;
 
     /// @notice multiplier for decimals correction, e.g. 1e12 for a pegToken
