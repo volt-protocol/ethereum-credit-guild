@@ -67,9 +67,6 @@ contract LendingTerm is CoreRef {
     /// @notice reference number of seconds in 1 year
     uint256 public constant YEAR = 31557600;
 
-    /// @notice minimum number of CREDIT to borrow when opening a new loan
-    uint256 public constant MIN_BORROW = 100e18;
-
     /// @notice timestamp of last partial repayment for a given loanId.
     /// during borrow(), this is initialized to the borrow timestamp, if
     /// maxDelayBetweenPartialRepay is != 0
@@ -92,6 +89,9 @@ contract LendingTerm is CoreRef {
     mapping(bytes32 => Loan) internal loans;
 
     /// @notice current number of CREDIT issued in active loans on this term
+    /// @dev this can be lower than the sum of all loan's CREDIT debts because
+    /// interests accrue and some loans might have been opened before the creditMultiplier
+    /// was last updated, resulting in higher CREDIT debt than what was originally borrowed.
     uint256 public issuance;
 
     struct LendingTermReferences {
@@ -257,10 +257,11 @@ contract LendingTerm is CoreRef {
     /// Note that the debt ceiling can be lower than the current issuance under 4 conditions :
     /// - params.hardCap is lower than since last borrow happened
     /// - gauge votes are fewer than when last borrow happened
-    /// - credit.totalSupply() decreased since last borrow
+    /// - profitManager.totalBorrowedCredit() decreased since last borrow
     /// - creditMinter.buffer() is close to being depleted
     /// @dev this solves the following equation :
-    /// borrowAmount + issuance <= (totalSupply + borrowAmount) * gaugeWeight / totalWeight
+    /// borrowAmount + issuance <=
+    /// (totalBorrowedCredit + borrowAmount) * gaugeWeight * gaugeWeightTolerance / totalWeight / 1e18
     /// which is the formula to check debt ceiling in the borrow function.
     /// This gives the maximum borrowable amount to achieve 100% utilization of the debt
     /// ceiling, and if we add the current issuance to it, we get the current debt ceiling.
@@ -285,21 +286,32 @@ contract LendingTerm is CoreRef {
                 _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
         }
         uint256 _issuance = issuance; // cached SLOAD
-        uint256 creditTotalSupply = CreditToken(refs.creditToken).totalSupply();
-        if (creditTotalSupply == 0 && gaugeWeight != 0) {
+        uint256 totalBorrowedCredit = ProfitManager(refs.profitManager)
+            .totalBorrowedCredit();
+        uint256 gaugeWeightTolerance = ProfitManager(refs.profitManager)
+            .gaugeWeightTolerance();
+        if (totalBorrowedCredit == 0 && gaugeWeight != 0) {
             // first-ever CREDIT mint on a non-zero gauge weight term
             // does not check the relative debt ceilings
             // returns min(hardCap, creditMinterBuffer)
             return
                 _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
         }
-        uint256 debtCeilingBefore = (creditTotalSupply * gaugeWeight) /
-            totalWeight;
+        uint256 toleratedGaugeWeight = (gaugeWeight * gaugeWeightTolerance) /
+            1e18;
+        uint256 debtCeilingBefore = (totalBorrowedCredit *
+            toleratedGaugeWeight) / totalWeight;
         if (_issuance >= debtCeilingBefore) {
             return debtCeilingBefore; // no more borrows allowed
         }
         uint256 remainingDebtCeiling = debtCeilingBefore - _issuance; // always >0
-        uint256 otherGaugesWeight = totalWeight - gaugeWeight;
+        if (toleratedGaugeWeight >= totalWeight) {
+            // if the gauge weight is above 100% when we include tolerance,
+            // the gauge relative debt ceilings are not constraining.
+            return
+                _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
+        }
+        uint256 otherGaugesWeight = totalWeight - toleratedGaugeWeight; // always >0
         uint256 maxBorrow = (remainingDebtCeiling * totalWeight) /
             otherGaugesWeight;
         uint256 _debtCeiling = _issuance + maxBorrow;
@@ -341,7 +353,7 @@ contract LendingTerm is CoreRef {
 
         // check that enough CREDIT is borrowed
         require(
-            borrowAmount >= (MIN_BORROW * 1e18) / creditMultiplier,
+            borrowAmount >= ProfitManager(refs.profitManager).minBorrow(),
             "LendingTerm: borrow amount too low"
         );
 
@@ -354,13 +366,16 @@ contract LendingTerm is CoreRef {
         );
 
         // check the debt ceiling
-        uint256 _totalSupply = CreditToken(refs.creditToken).totalSupply();
-        uint256 _debtCeiling = GuildToken(refs.guildToken)
+        uint256 totalBorrowedCredit = ProfitManager(refs.profitManager)
+            .totalBorrowedCredit();
+        uint256 gaugeWeightTolerance = ProfitManager(refs.profitManager)
+            .gaugeWeightTolerance();
+        uint256 _debtCeiling = (GuildToken(refs.guildToken)
             .calculateGaugeAllocation(
                 address(this),
-                _totalSupply + borrowAmount
-            );
-        if (_totalSupply == 0) {
+                totalBorrowedCredit + borrowAmount
+            ) * gaugeWeightTolerance) / 1e18;
+        if (totalBorrowedCredit == 0) {
             // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
             // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
             // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
@@ -417,25 +432,6 @@ contract LendingTerm is CoreRef {
         loanId = _borrow(msg.sender, borrowAmount, collateralAmount);
     }
 
-    /// @notice borrow with a permit on collateral token
-    function borrowWithPermit(
-        uint256 borrowAmount,
-        uint256 collateralAmount,
-        uint256 deadline,
-        Signature calldata sig
-    ) external whenNotPaused returns (bytes32 loanId) {
-        IERC20Permit(params.collateralToken).permit(
-            msg.sender,
-            address(this),
-            collateralAmount,
-            deadline,
-            sig.v,
-            sig.r,
-            sig.s
-        );
-        return _borrow(msg.sender, borrowAmount, collateralAmount);
-    }
-
     /// @notice add collateral on an open loan.
     /// a borrower might want to add collateral so that his position does not go underwater due to
     /// interests growing up over time.
@@ -474,26 +470,6 @@ contract LendingTerm is CoreRef {
 
     /// @notice add collateral on an open loan.
     function addCollateral(bytes32 loanId, uint256 collateralToAdd) external {
-        _addCollateral(msg.sender, loanId, collateralToAdd);
-    }
-
-    /// @notice add collateral on an open loan with a permit on collateral token
-    function addCollateralWithPermit(
-        bytes32 loanId,
-        uint256 collateralToAdd,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        IERC20Permit(params.collateralToken).permit(
-            msg.sender,
-            address(this),
-            collateralToAdd,
-            deadline,
-            sig.v,
-            sig.r,
-            sig.s
-        );
-
         _addCollateral(msg.sender, loanId, collateralToAdd);
     }
 
@@ -540,7 +516,7 @@ contract LendingTerm is CoreRef {
         );
         require(
             borrowAmount - issuanceDecrease >
-                (MIN_BORROW * 1e18) / creditMultiplier,
+                ProfitManager(refs.profitManager).minBorrow(),
             "LendingTerm: below min borrow"
         );
 
@@ -574,26 +550,6 @@ contract LendingTerm is CoreRef {
 
     /// @notice partially repay an open loan.
     function partialRepay(bytes32 loanId, uint256 debtToRepay) external {
-        _partialRepay(msg.sender, loanId, debtToRepay);
-    }
-
-    /// @notice partially repay an open loan with a permit on CREDIT token
-    function partialRepayWithPermit(
-        bytes32 loanId,
-        uint256 debtToRepay,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        IERC20Permit(refs.creditToken).permit(
-            msg.sender,
-            address(this),
-            debtToRepay,
-            deadline,
-            sig.v,
-            sig.r,
-            sig.s
-        );
-
         _partialRepay(msg.sender, loanId, debtToRepay);
     }
 
@@ -660,26 +616,6 @@ contract LendingTerm is CoreRef {
 
     /// @notice repay an open loan
     function repay(bytes32 loanId) external {
-        _repay(msg.sender, loanId);
-    }
-
-    /// @notice repay an open loan with a permit on CREDIT token
-    function repayWithPermit(
-        bytes32 loanId,
-        uint256 maxDebt,
-        uint256 deadline,
-        Signature calldata sig
-    ) external {
-        IERC20Permit(refs.creditToken).permit(
-            msg.sender,
-            address(this),
-            maxDebt,
-            deadline,
-            sig.v,
-            sig.r,
-            sig.s
-        );
-
         _repay(msg.sender, loanId);
     }
 

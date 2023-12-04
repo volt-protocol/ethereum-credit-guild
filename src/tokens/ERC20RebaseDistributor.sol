@@ -115,7 +115,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
 
     /// @notice For internal accounting. Number of tokens distributed to rebasing addresses that have not
     /// yet been materialized by a movement in the rebasing addresses.
-    InterpolatedValue internal __pendingRebaseRewards =
+    InterpolatedValue internal __unmintedRebaseRewards =
         InterpolatedValue({
             lastTimestamp: SafeCastLib.safeCastTo32(block.timestamp),
             lastValue: 0,
@@ -193,6 +193,12 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 targetTimestamp: SafeCastLib.safeCastTo32(block.timestamp), // now
                 targetValue: uint224(START_REBASING_SHARE_PRICE) // safe initial value
             });
+            __unmintedRebaseRewards = InterpolatedValue({
+                lastTimestamp: SafeCastLib.safeCastTo32(block.timestamp),
+                lastValue: 0,
+                targetTimestamp: SafeCastLib.safeCastTo32(block.timestamp),
+                targetValue: 0
+            });
             return;
         }
 
@@ -218,14 +224,14 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         }
     }
 
-    /// @notice decrease pending rebase rewards, when rewards are minted to users
-    function decreasePendingRebaseRewards(uint256 amount) internal {
-        InterpolatedValue memory val = __pendingRebaseRewards;
-        uint256 _pendingRebaseRewards = interpolatedValue(val);
-        __pendingRebaseRewards = InterpolatedValue({
+    /// @notice decrease unminted rebase rewards, when rewards are minted to users
+    function decreaseUnmintedRebaseRewards(uint256 amount) internal {
+        InterpolatedValue memory val = __unmintedRebaseRewards;
+        uint256 _unmintedRebaseRewards = interpolatedValue(val);
+        __unmintedRebaseRewards = InterpolatedValue({
             lastTimestamp: SafeCastLib.safeCastTo32(block.timestamp), // now
             lastValue: SafeCastLib.safeCastTo224(
-                _pendingRebaseRewards - amount
+                _unmintedRebaseRewards - amount
             ), // adjusted current
             targetTimestamp: val.targetTimestamp, // unchanged
             targetValue: val.targetValue - SafeCastLib.safeCastTo224(amount) // adjusted target
@@ -237,9 +243,9 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         return interpolatedValue(__rebasingSharePrice);
     }
 
-    /// @notice get the current pending rebase rewards
-    function pendingRebaseRewards() internal view returns (uint256) {
-        return interpolatedValue(__pendingRebaseRewards);
+    /// @notice get the current unminted rebase rewards
+    function unmintedRebaseRewards() internal view returns (uint256) {
+        return interpolatedValue(__unmintedRebaseRewards);
     }
 
     /// @notice convert a balance to a number of shares
@@ -292,7 +298,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         emit RebaseEnter(account, block.timestamp);
     }
 
-    /// @notice Exit rebasing supply. All pending rebasing rewards are physically minted to the user,
+    /// @notice Exit rebasing supply. All unminted rebasing rewards are physically minted to the user,
     /// and they won't be affected by rebases anymore.
     function exitRebase() external {
         require(
@@ -316,7 +322,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         uint256 mintAmount = rebasedBalance - rawBalance;
         if (mintAmount != 0) {
             ERC20._mint(account, mintAmount);
-            decreasePendingRebaseRewards(mintAmount);
+            decreaseUnmintedRebaseRewards(mintAmount);
             emit RebaseReward(account, block.timestamp, mintAmount);
         }
 
@@ -367,13 +373,13 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 targetValue: SafeCastLib.safeCastTo224(newTargetSharePrice)
             });
 
-            // update pendingRebaseRewards interpolation
-            uint256 _pendingRebaseRewards = pendingRebaseRewards();
-            __pendingRebaseRewards = InterpolatedValue({
+            // update unmintedRebaseRewards interpolation
+            uint256 _unmintedRebaseRewards = unmintedRebaseRewards();
+            __unmintedRebaseRewards = InterpolatedValue({
                 lastTimestamp: SafeCastLib.safeCastTo32(block.timestamp),
-                lastValue: SafeCastLib.safeCastTo224(_pendingRebaseRewards),
+                lastValue: SafeCastLib.safeCastTo224(_unmintedRebaseRewards),
                 targetTimestamp: SafeCastLib.safeCastTo32(endTimestamp),
-                targetValue: __pendingRebaseRewards.targetValue +
+                targetValue: __unmintedRebaseRewards.targetValue +
                     SafeCastLib.safeCastTo224(amount)
             });
         }
@@ -404,11 +410,19 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         }
     }
 
+    /// @notice get the number of distributed tokens that have not yet entered
+    /// circulation through rebase due to the interpolation of rewards over time.
+    function pendingDistributedSupply() external view returns (uint256) {
+        InterpolatedValue memory val = __unmintedRebaseRewards;
+        uint256 _unmintedRebaseRewards = interpolatedValue(val);
+        return __unmintedRebaseRewards.targetValue - _unmintedRebaseRewards;
+    }
+
     /*///////////////////////////////////////////////////////////////
                             ERC20 OVERRIDE
     ///////////////////////////////////////////////////////////////*/
 
-    /// @notice Override of balanceOf() that takes into account the pending undistributed rebase rewards.
+    /// @notice Override of balanceOf() that takes into account the unminted rebase rewards.
     function balanceOf(
         address account
     ) public view virtual override returns (uint256) {
@@ -428,7 +442,14 @@ abstract contract ERC20RebaseDistributor is ERC20 {
 
     /// @notice Total number of the tokens in existence.
     function totalSupply() public view virtual override returns (uint256) {
-        return ERC20.totalSupply() + pendingRebaseRewards();
+        return ERC20.totalSupply() + unmintedRebaseRewards();
+    }
+
+    /// @notice Target total number of the tokens in existence after interpolations
+    /// of rebase rewards will have completed.
+    /// @dev Equal to totalSupply() + pendingDistributedSupply().
+    function targetTotalSupply() external view returns (uint256) {
+        return ERC20.totalSupply() + __unmintedRebaseRewards.targetValue;
     }
 
     /// @notice Override of default ERC20 behavior: exit rebase before movement (if rebasing),
@@ -456,7 +477,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             if (mintAmount != 0) {
                 ERC20._mint(account, mintAmount);
                 balanceBefore += mintAmount;
-                decreasePendingRebaseRewards(mintAmount);
+                decreaseUnmintedRebaseRewards(mintAmount);
                 emit RebaseReward(account, block.timestamp, mintAmount);
             }
         }
@@ -517,11 +538,11 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 int256(sharesReceived)
             );
 
-            // "realize" pending rebase rewards
+            // "realize" unminted rebase rewards
             uint256 mintAmount = rebasedBalance - rawBalance;
             if (mintAmount != 0) {
                 ERC20._mint(account, mintAmount);
-                decreasePendingRebaseRewards(mintAmount);
+                decreaseUnmintedRebaseRewards(mintAmount);
                 emit RebaseReward(account, block.timestamp, mintAmount);
             }
         }
@@ -554,7 +575,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             if (mintAmount != 0) {
                 ERC20._mint(msg.sender, mintAmount);
                 fromBalanceBefore += mintAmount;
-                decreasePendingRebaseRewards(mintAmount);
+                decreaseUnmintedRebaseRewards(mintAmount);
                 emit RebaseReward(msg.sender, block.timestamp, mintAmount);
             }
         }
@@ -601,11 +622,11 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 nShares: uint248(toSharesAfter)
             });
 
-            // "realize" pending rebase rewards
+            // "realize" unminted rebase rewards
             uint256 mintAmount = toBalanceAfter - rawToBalanceAfter;
             if (mintAmount != 0) {
                 ERC20._mint(to, mintAmount);
-                decreasePendingRebaseRewards(mintAmount);
+                decreaseUnmintedRebaseRewards(mintAmount);
                 emit RebaseReward(to, block.timestamp, mintAmount);
             }
         }
@@ -648,7 +669,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             if (mintAmount != 0) {
                 ERC20._mint(from, mintAmount);
                 fromBalanceBefore += mintAmount;
-                decreasePendingRebaseRewards(mintAmount);
+                decreaseUnmintedRebaseRewards(mintAmount);
                 emit RebaseReward(from, block.timestamp, mintAmount);
             }
         }
@@ -695,11 +716,11 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 nShares: uint248(toSharesAfter)
             });
 
-            // "realize" pending rebase rewards
+            // "realize" unminted rebase rewards
             uint256 mintAmount = toBalanceAfter - rawToBalanceAfter;
             if (mintAmount != 0) {
                 ERC20._mint(to, mintAmount);
-                decreasePendingRebaseRewards(mintAmount);
+                decreaseUnmintedRebaseRewards(mintAmount);
                 emit RebaseReward(to, block.timestamp, mintAmount);
             }
         }

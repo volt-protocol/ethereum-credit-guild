@@ -879,6 +879,8 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.totalSupply(), 300);
         assertEq(token.nonRebasingSupply(), 100);
         assertEq(token.rebasingSupply(), 200);
+        assertEq(token.pendingDistributedSupply(), 0);
+        assertEq(token.targetTotalSupply(), 300);
 
         // distribute 100 profits
         token.mint(address(this), 100);
@@ -887,10 +889,14 @@ contract ERC20RebaseDistributorUnitTest is Test {
 
         // check new supply after half of DISTRIBUTION_PERIOD
         // half of the 100 distribution has been passed through
+        assertEq(token.pendingDistributedSupply(), 100);
+        assertEq(token.targetTotalSupply(), 400);
         vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
         assertEq(token.totalSupply(), 350);
         assertEq(token.nonRebasingSupply(), 100);
         assertEq(token.rebasingSupply(), 250);
+        assertEq(token.pendingDistributedSupply(), 50);
+        assertEq(token.targetTotalSupply(), 400);
         assertEq(token.balanceOf(alice), 125);
         assertEq(token.balanceOf(bobby), 125);
         assertEq(token.balanceOf(carol), 100);
@@ -904,6 +910,8 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.totalSupply(), 350);
         assertEq(token.nonRebasingSupply(), 100);
         assertEq(token.rebasingSupply(), 250);
+        assertEq(token.pendingDistributedSupply(), 150);
+        assertEq(token.targetTotalSupply(), 500);
         assertEq(token.balanceOf(alice), 125);
         assertEq(token.balanceOf(bobby), 125);
         assertEq(token.balanceOf(carol), 100);
@@ -914,6 +922,8 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.totalSupply(), 350 + 75);
         assertEq(token.nonRebasingSupply(), 100);
         assertEq(token.rebasingSupply(), 250 + 75);
+        assertEq(token.pendingDistributedSupply(), 75);
+        assertEq(token.targetTotalSupply(), 500);
         assertEq(token.balanceOf(alice), 162); // round down
         assertEq(token.balanceOf(bobby), 162); // round down
         assertEq(token.balanceOf(carol), 100);
@@ -924,6 +934,20 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.totalSupply(), 500);
         assertEq(token.nonRebasingSupply(), 100);
         assertEq(token.rebasingSupply(), 400);
+        assertEq(token.pendingDistributedSupply(), 0);
+        assertEq(token.targetTotalSupply(), 500);
+        assertEq(token.balanceOf(alice), 200);
+        assertEq(token.balanceOf(bobby), 200);
+        assertEq(token.balanceOf(carol), 100);
+
+        // after interpolations end, supplies & balances do not change anymore
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() * 10);
+
+        assertEq(token.totalSupply(), 500);
+        assertEq(token.nonRebasingSupply(), 100);
+        assertEq(token.rebasingSupply(), 400);
+        assertEq(token.pendingDistributedSupply(), 0);
+        assertEq(token.targetTotalSupply(), 500);
         assertEq(token.balanceOf(alice), 200);
         assertEq(token.balanceOf(bobby), 200);
         assertEq(token.balanceOf(carol), 100);
