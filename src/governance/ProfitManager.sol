@@ -166,7 +166,9 @@ contract ProfitManager is CoreRef {
         psm = _psm;
     }
 
-    /// @notice returns the sum of all outstanding CREDIT debts
+    /// @notice returns the sum of all borrowed CREDIT, not including unpaid interests
+    /// and creditMultiplier changes that could make debt amounts higher than the initial
+    /// borrowed CREDIT amounts.
     function totalBorrowedCredit() external view returns (uint256) {
         return
             CreditToken(credit).targetTotalSupply() -
