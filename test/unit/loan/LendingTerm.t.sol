@@ -143,6 +143,77 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.totalSupply(), 0);
     }
 
+    // initialization test
+    function testInitialize() public {
+        LendingTerm implementation = new LendingTerm();
+        LendingTerm clone = LendingTerm(Clones.clone(address(implementation)));
+
+        // cannot initialize implementation
+        vm.expectRevert();
+        implementation.initialize(
+            address(core),
+            LendingTerm.LendingTermReferences({
+                profitManager: address(profitManager),
+                guildToken: address(guild),
+                auctionHouse: address(auctionHouse),
+                creditMinter: address(rlcm),
+                creditToken: address(credit)
+            }),
+            LendingTerm.LendingTermParams({
+                collateralToken: address(collateral),
+                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                interestRate: _INTEREST_RATE,
+                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                openingFee: 0.05e18,
+                hardCap: _HARDCAP
+            })
+        );
+
+        // can initialize clone
+        clone.initialize(
+            address(core),
+            LendingTerm.LendingTermReferences({
+                profitManager: address(profitManager),
+                guildToken: address(guild),
+                auctionHouse: address(auctionHouse),
+                creditMinter: address(rlcm),
+                creditToken: address(credit)
+            }),
+            LendingTerm.LendingTermParams({
+                collateralToken: address(collateral),
+                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                interestRate: _INTEREST_RATE,
+                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                openingFee: 0.05e18,
+                hardCap: _HARDCAP
+            })
+        );
+
+        // cannot initialize clone twice
+        vm.expectRevert();
+        clone.initialize(
+            address(core),
+            LendingTerm.LendingTermReferences({
+                profitManager: address(profitManager),
+                guildToken: address(guild),
+                auctionHouse: address(auctionHouse),
+                creditMinter: address(rlcm),
+                creditToken: address(credit)
+            }),
+            LendingTerm.LendingTermParams({
+                collateralToken: address(collateral),
+                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                interestRate: _INTEREST_RATE,
+                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                openingFee: 0.05e18,
+                hardCap: _HARDCAP
+            })
+        );
+    }
+
     // borrow success
     function testBorrowSuccess() public {
         // prepare
