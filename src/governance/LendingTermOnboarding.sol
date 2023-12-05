@@ -22,7 +22,7 @@ import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
 /// A term can be onboarded for the first time, or re-onboarded after it has been offboarded.
 contract LendingTermOnboarding is VoltGovernor {
     /// @notice minimum delay between proposals of onboarding of a given term
-    uint256 MIN_DELAY_BETWEEN_PROPOSALS = 7 days;
+    uint256 public constant MIN_DELAY_BETWEEN_PROPOSALS = 7 days;
     /// @notice time of last proposal of a given term
     mapping(address => uint256) public lastProposal;
 

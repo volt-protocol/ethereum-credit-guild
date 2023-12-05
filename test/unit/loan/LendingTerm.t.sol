@@ -45,20 +45,20 @@ contract LendingTermUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         collateral = new MockERC20();
         credit = new CreditToken(address(core));
-        guild = new GuildToken(address(core), address(profitManager), address(credit));
+        guild = new GuildToken(
+            address(core),
+            address(profitManager),
+            address(credit)
+        );
         rlcm = new RateLimitedMinter(
-            address(core), /*_core*/
-            address(credit), /*_token*/
-            CoreRoles.RATE_LIMITED_CREDIT_MINTER, /*_role*/
-            type(uint256).max, /*_maxRateLimitPerSecond*/
-            type(uint128).max, /*_rateLimitPerSecond*/
+            address(core) /*_core*/,
+            address(credit) /*_token*/,
+            CoreRoles.RATE_LIMITED_CREDIT_MINTER /*_role*/,
+            type(uint256).max /*_maxRateLimitPerSecond*/,
+            type(uint128).max /*_rateLimitPerSecond*/,
             type(uint128).max /*_bufferCap*/
         );
-        auctionHouse = new AuctionHouse(
-            address(core),
-            650,
-            1800
-        );
+        auctionHouse = new AuctionHouse(address(core), 650, 1800);
         term = LendingTerm(Clones.clone(address(new LendingTerm())));
         term.initialize(
             address(core),
@@ -129,9 +129,15 @@ contract LendingTermUnitTest is Test {
 
         LendingTerm.LendingTermParams memory params = term.getParameters();
         assertEq(params.collateralToken, address(collateral));
-        assertEq(params.maxDebtPerCollateralToken, _CREDIT_PER_COLLATERAL_TOKEN);
+        assertEq(
+            params.maxDebtPerCollateralToken,
+            _CREDIT_PER_COLLATERAL_TOKEN
+        );
         assertEq(params.interestRate, _INTEREST_RATE);
-        assertEq(params.maxDelayBetweenPartialRepay, _MAX_DELAY_BETWEEN_PARTIAL_REPAY);
+        assertEq(
+            params.maxDelayBetweenPartialRepay,
+            _MAX_DELAY_BETWEEN_PARTIAL_REPAY
+        );
         assertEq(params.minPartialRepayPercent, _MIN_PARTIAL_REPAY_PERCENT);
         assertEq(params.hardCap, _HARDCAP);
 
@@ -245,13 +251,15 @@ contract LendingTermUnitTest is Test {
 
         // check interest accrued over time
         vm.warp(block.timestamp + term.YEAR());
-        assertEq(term.getLoanDebt(loanId), borrowAmount * 110 / 100); // 10% APR
+        assertEq(term.getLoanDebt(loanId), (borrowAmount * 110) / 100); // 10% APR
     }
 
     // borrow with opening fee success
     function testBorrowWithOpeningFeeSuccess() public {
         // create a similar term but with 5% opening fee
-        LendingTerm term2 = LendingTerm(Clones.clone(address(new LendingTerm())));
+        LendingTerm term2 = LendingTerm(
+            Clones.clone(address(new LendingTerm()))
+        );
         term2.initialize(
             address(core),
             term.getReferences(),
@@ -290,7 +298,10 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.balanceOf(address(term2)), 0);
         assertEq(term2.getLoan(loanId).borrower, address(this));
         assertEq(term2.getLoan(loanId).borrowAmount, borrowAmount);
-        assertEq(term2.getLoanDebt(loanId), borrowAmount + 1_000e18 /*openingFee*/);
+        assertEq(
+            term2.getLoanDebt(loanId),
+            borrowAmount + 1_000e18 /*openingFee*/
+        );
     }
 
     // borrow fail because 0 collateral
@@ -315,7 +326,7 @@ contract LendingTermUnitTest is Test {
         uint256 collateralAmount = 1e18;
         vm.expectRevert("LendingTerm: cannot borrow 0");
         term.borrow(borrowAmount, collateralAmount);
-    } 
+    }
 
     // borrow fail because loan exists
     function testBorrowFailExists() public {
@@ -401,6 +412,7 @@ contract LendingTermUnitTest is Test {
 
         // add another gauge, equal voting weight for the 2nd gauge
         guild.addGauge(1, address(this));
+
         guild.mint(address(this), _weight);
         guild.incrementGauge(address(this), _weight);
 
@@ -480,7 +492,8 @@ contract LendingTermUnitTest is Test {
     function testBorrowFailHardcapReached() public {
         // prepare
         uint256 borrowAmount = _HARDCAP * 2;
-        uint256 collateralAmount = borrowAmount * 2 * 1e18 / _CREDIT_PER_COLLATERAL_TOKEN;
+        uint256 collateralAmount = (borrowAmount * 2 * 1e18) /
+            _CREDIT_PER_COLLATERAL_TOKEN;
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
 
@@ -507,7 +520,11 @@ contract LendingTermUnitTest is Test {
     }
 
     // borrow fuzz for extreme borrowAmount & collateralAmount
-    function testBorrowFuzz(uint256 borrowAmount, uint256 collateralAmount, uint256 interestTime) public {
+    function testBorrowFuzz(
+        uint256 borrowAmount,
+        uint256 collateralAmount,
+        uint256 interestTime
+    ) public {
         // fuzz conditions
         collateralAmount = bound(collateralAmount, 1, 1e32);
         borrowAmount = bound(borrowAmount, 1, 1e32);
@@ -531,7 +548,11 @@ contract LendingTermUnitTest is Test {
         // check interest accrued over time
         vm.warp(block.timestamp + interestTime);
         vm.roll(block.timestamp + interestTime / 13);
-        uint256 interestAccrued = borrowAmount * _INTEREST_RATE * interestTime / term.YEAR() / 1e18;
+        uint256 interestAccrued = (borrowAmount *
+            _INTEREST_RATE *
+            interestTime) /
+            term.YEAR() /
+            1e18;
         assertEq(term.getLoanDebt(loanId), borrowAmount + interestAccrued);
     }
 
@@ -566,6 +587,9 @@ contract LendingTermUnitTest is Test {
         collateral.mint(address(this), collateralAmount);
         collateral.approve(address(term), collateralAmount);
         bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+        uint256 startingTermCollateralBalance = collateral.balanceOf(
+            address(term)
+        );
 
         // repay
         vm.warp(block.timestamp + 13);
@@ -574,6 +598,17 @@ contract LendingTermUnitTest is Test {
         credit.mint(address(this), debt - borrowAmount);
         credit.approve(address(term), debt);
         term.repay(loanId);
+
+        assertEq(
+            collateral.balanceOf(address(term)),
+            startingTermCollateralBalance - collateralAmount,
+            "incorrect term collateral amounts"
+        );
+        assertEq(
+            collateral.balanceOf(address(this)),
+            collateralAmount,
+            "incorrect user collateral amount"
+        );
 
         // addCollateral failures
         vm.expectRevert("LendingTerm: cannot add 0");
@@ -912,7 +947,7 @@ contract LendingTermUnitTest is Test {
     }
 
     function testForgiveFailLoanNotFound() public {
-        // forgive 
+        // forgive
         vm.prank(governor);
         vm.expectRevert("LendingTerm: loan not found");
         term.forgive(bytes32(0));
@@ -921,7 +956,7 @@ contract LendingTermUnitTest is Test {
     // test governor-only setter for auctionHouse
     function testGovernorSetAuctionHouse() public {
         assertEq(term.getReferences().auctionHouse, address(auctionHouse));
-        
+
         vm.prank(governor);
         term.setAuctionHouse(address(this));
 
@@ -934,7 +969,7 @@ contract LendingTermUnitTest is Test {
     // test setter for hardCap
     function testSetHardCap() public {
         assertEq(term.getParameters().hardCap, _HARDCAP);
-        
+
         vm.prank(governor);
         term.setHardCap(type(uint256).max);
 
@@ -987,7 +1022,9 @@ contract LendingTermUnitTest is Test {
 
     // full flow test (borrow, call, onBid with good debt)
     function testFlowBorrowCallOnBidGoodDebt() public {
-        bytes32 loanId = keccak256(abi.encode(address(this), address(term), block.timestamp));
+        bytes32 loanId = keccak256(
+            abi.encode(address(this), address(term), block.timestamp)
+        );
 
         // prepare
         uint256 borrowAmount = 20_000e18;
@@ -1030,7 +1067,7 @@ contract LendingTermUnitTest is Test {
         vm.warp(block.timestamp + 1300);
         vm.roll(block.number + 100);
         assertEq(term.getLoanDebt(loanId), 22_000e18);
-    
+
         assertEq(term.getLoan(loanId).caller, caller);
         assertEq(term.getLoan(loanId).callTime, block.timestamp - 1300);
         assertEq(term.getLoan(loanId).closeTime, 0);
@@ -1072,7 +1109,9 @@ contract LendingTermUnitTest is Test {
 
     // full flow test (borrow, call, onBid with bad debt)
     function testFlowBorrowCallOnBidBadDebt() public {
-        bytes32 loanId = keccak256(abi.encode(address(this), address(term), block.timestamp));
+        bytes32 loanId = keccak256(
+            abi.encode(address(this), address(term), block.timestamp)
+        );
 
         // prepare
         uint256 borrowAmount = 20_000e18;
@@ -1138,7 +1177,9 @@ contract LendingTermUnitTest is Test {
 
     // full flow test (borrow, forgive)
     function testFlowBorrowForgive() public {
-        bytes32 loanId = keccak256(abi.encode(address(this), address(term), block.timestamp));
+        bytes32 loanId = keccak256(
+            abi.encode(address(this), address(term), block.timestamp)
+        );
 
         // prepare
         uint256 borrowAmount = 20_000e18;
@@ -1173,7 +1214,7 @@ contract LendingTermUnitTest is Test {
         vm.expectRevert("UNAUTHORIZED");
         term.forgive(loanId);
 
-        // forgive 
+        // forgive
         vm.prank(governor);
         term.forgive(loanId);
 
@@ -1188,7 +1229,7 @@ contract LendingTermUnitTest is Test {
         assertEq(guild.lastGaugeLoss(address(term)), block.timestamp);
 
         // cannot forgive twice
-        // forgive 
+        // forgive
         vm.prank(governor);
         vm.expectRevert("LendingTerm: loan closed");
         term.forgive(loanId);
@@ -1473,6 +1514,26 @@ contract LendingTermUnitTest is Test {
         vm.prank(governor);
         term.forgive(loanId);
         assertEq(profitManager.creditMultiplier(), 0);
+    }
+
+    // MIN_BORROW increases when creditMultiplier decreases - borrow()
+    function testMinBorrowAfterCreditLoseValue1() public {
+        uint256 MIN_BORROW = profitManager.minBorrow();
+
+        // prank the term to report a loss in another loan
+        // this should discount CREDIT value by 50%, marking up
+        // all loans by 2x.
+        credit.mint(address(this), 100e18);
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), int256(-50e18));
+        assertEq(profitManager.creditMultiplier(), 0.5e18);
+        credit.burn(100e18);
+
+        // borrow should fail because we try to borrow 1.75x
+        // the MIN_BORROW, but CREDIT value went up 2x.
+        vm.expectRevert("LendingTerm: borrow amount too low");
+        term.borrow((MIN_BORROW * 175) / 100, 10000000000e18);
     }
 
     // MIN_BORROW increases when creditMultiplier decreases - partialRepay()

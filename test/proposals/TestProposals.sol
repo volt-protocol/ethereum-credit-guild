@@ -42,6 +42,9 @@ contract TestProposals is Test {
 
         proposals.push(Proposal(address(new Proposal_0())));
         nProposals = proposals.length;
+
+        vm.label(address(this), "TestProposals");
+        vm.label(address(proposals[0]), "Proposal 0");
     }
 
     function setDebug(bool value) public {

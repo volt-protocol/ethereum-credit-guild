@@ -3,11 +3,13 @@ pragma solidity 0.8.13;
 
 import {Test} from "@forge-std/Test.sol";
 
-import {Addresses} from "../../proposals/Addresses.sol";
-import {TestProposals} from "../../proposals/TestProposals.sol";
+import {Addresses} from "@test/proposals/Addresses.sol";
+import {TestProposals} from "@test/proposals/TestProposals.sol";
 
 contract PostProposalCheck is Test {
     Addresses addresses;
+    TestProposals public proposals;
+
     uint256 preProposalsSnapshot;
     uint256 postProposalsSnapshot;
 
@@ -15,7 +17,7 @@ contract PostProposalCheck is Test {
         preProposalsSnapshot = vm.snapshot();
 
         // Run all pending proposals before doing e2e tests
-        TestProposals proposals = new TestProposals();
+        proposals = new TestProposals();
         proposals.setUp();
         proposals.setDebug(false);
         proposals.testProposals();

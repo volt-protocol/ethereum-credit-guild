@@ -3,10 +3,9 @@ pragma solidity 0.8.13;
 
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
-
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
 
 contract IntegrationTestRoles is PostProposalCheck {
 
@@ -27,10 +26,10 @@ contract IntegrationTestRoles is PostProposalCheck {
 
         string[] memory roles = vm.parseJsonKeys(json, "$");
 
-        assertEq(roles.length, 17);
-
-        Core core = Core(addresses.mainnet("CORE"));
+        assertEq(roles.length, 17, "incorrect role count");
+        
         for (uint256 i = 0; i < roles.length; i++) {
+            Core core = Core(addresses.mainnet("CORE"));
             bytes32 role = keccak256(bytes(string.concat(roles[i], "_ROLE")));
             
             assertEq(
