@@ -14,8 +14,8 @@ interface IProposal {
     function deploy(Addresses) external;
 
     // After deploying, call initializers and link contracts
-    // together, e.g. if you deployed Core and Volt contracts,
-    // you could link them in this step by calling core.setVolt(volt).
+    // together, e.g. if you deployed ABC and XYZ contracts,
+    // you could link them in this step by calling abc.setXYZ(xyz).
     function afterDeploy(Addresses, address) external;
 
     // Actually run the proposal (e.g. queue actions in the Timelock,

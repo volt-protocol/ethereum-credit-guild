@@ -66,7 +66,7 @@ contract GuildVetoGovernorUnitTest is Test {
         assertEq(governor.votingDelay(), 0);
         assertEq(governor.votingPeriod(), 2425847);
         assertEq(address(governor.token()), address(token));
-        assertEq(governor.name(), "Volt Protocol Veto Governor");
+        assertEq(governor.name(), "ECG Veto Governor");
         assertEq(governor.version(), "1");
     }
 

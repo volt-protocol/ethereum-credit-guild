@@ -151,7 +151,7 @@ contract LendingTermOnboardingUnitTest is Test {
         assertEq(onboarder.quorum(0), _QUORUM);
         assertEq(onboarder.COUNTING_MODE(), "support=bravo&quorum=for,abstain");
         assertEq(address(onboarder.token()), address(guild));
-        assertEq(onboarder.name(), "Volt Protocol Governor");
+        assertEq(onboarder.name(), "ECG Governor");
         assertEq(onboarder.version(), "1");
     }
 

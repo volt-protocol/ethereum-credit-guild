@@ -10,7 +10,7 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 
-/// @title Governor for on-chain governance of Volt Protocol, based on the OZ implementation.
+/// @title Governor for on-chain governance of Ethereum Credit Guild, based on the OZ implementation.
 /// This governor is specifically designed for adding veto capabilities :
 /// Token holders cannot propose() arbitrary actions, they have to create the proposals
 /// through the createVeto() function, and this governor will only be able to execute the
@@ -36,7 +36,7 @@ contract GuildVetoGovernor is CoreRef, Governor, GovernorVotes {
         uint256 initialQuorum
     )
         CoreRef(_core)
-        Governor("Volt Protocol Veto Governor")
+        Governor("ECG Veto Governor")
         GovernorVotes(IVotes(_token))
     {
         _setQuorum(initialQuorum);

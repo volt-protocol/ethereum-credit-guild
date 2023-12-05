@@ -211,12 +211,12 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         assertEq(
             uint8(governor.state(proposalId)),
             uint8(IGovernor.ProposalState.Queued),
-            "volt governor: proposal not queued"
+            "ecg governor: proposal not queued"
         );
         assertEq(
             uint8(veto.state(vetoId)),
             uint8(IGovernor.ProposalState.Active),
-            "veto governor: proposal not active"
+            "ecg governor: proposal not active"
         );
 
         veto.castVote(vetoId, uint8(GovernorCountingSimple.VoteType.Against));
@@ -286,7 +286,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         assertEq(
             uint8(governor.state(proposalId)),
             uint8(IGovernor.ProposalState.Queued),
-            "volt governor: proposal not queued"
+            "ecg governor: proposal not queued"
         );
 
         assertTrue(timelock.isOperation(timelockId), "incorrect operation");

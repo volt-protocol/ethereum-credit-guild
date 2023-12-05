@@ -26,7 +26,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
     The original version was included in 2 audits :
     - https://code4rena.com/reports/2022-04-xtribe/
     - https://consensys.net/diligence/audits/2022/04/tribe-dao-flywheel-v2-xtribe-xerc4626/
-    Volt Protocol made the following changes to the original flywheel-v2 version :
+    ECG made the following changes to the original flywheel-v2 version :
     - Does not inherit Solmate's Auth (all requiresAuth functions are now internal, see below)
         -> This contract is abstract, and permissioned public functions can be added in parent.
         -> permissioned public functions to add in parent:

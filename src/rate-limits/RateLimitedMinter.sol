@@ -25,7 +25,7 @@ contract RateLimitedMinter is RateLimitedV2 {
     /// @param _token reference to the token to mint
     /// @param _role role used to check access control
     /// @param _maxRateLimitPerSecond maximum rate limit per second that governance can set
-    /// @param _rateLimitPerSecond starting rate limit per second for Volt minting
+    /// @param _rateLimitPerSecond starting rate limit per second for minting
     /// @param _bufferCap cap on buffer size for this rate limited instance
     constructor(
         address _core,

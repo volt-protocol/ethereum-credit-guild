@@ -7,7 +7,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
 /// @title A Reference to Core
-/// @author Volt Protocol
+/// @author eswak
 /// @notice defines some modifiers and utilities around interacting with Core
 abstract contract CoreRef is Pausable {
     /// @notice emitted when the reference to core is updated

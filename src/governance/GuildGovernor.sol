@@ -37,7 +37,7 @@ contract GuildGovernor is
         uint256 initialQuorum
     )
         CoreRef(_core)
-        Governor("Volt Protocol Governor")
+        Governor("ECG Governor")
         GovernorVotes(IVotes(_token))
         GovernorTimelockControl(TimelockController(payable(_timelock)))
         GovernorSettings(

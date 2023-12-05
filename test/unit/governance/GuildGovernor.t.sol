@@ -78,7 +78,7 @@ contract GuildGovernorUnitTest is Test {
         assertEq(governor.quorum(0), _QUORUM);
         assertEq(governor.COUNTING_MODE(), "support=bravo&quorum=for,abstain");
         assertEq(address(governor.token()), address(token));
-        assertEq(governor.name(), "Volt Protocol Governor");
+        assertEq(governor.name(), "ECG Governor");
         assertEq(governor.version(), "1");
     }
 

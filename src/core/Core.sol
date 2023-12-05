@@ -5,7 +5,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 
 /// @title Core access control of the Ethereum Credit Guild
-/// @author Volt Protocol
+/// @author eswak
 /// @notice maintains roles and access control
 contract Core is AccessControlEnumerable {
     /// @notice construct Core
