@@ -30,7 +30,7 @@ contract SimplePSMUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         token = new MockERC20();
         token.setDecimals(6);
-        credit = new CreditToken(address(core));
+        credit = new CreditToken(address(core), "name", "symbol");
         guild = new GuildToken(address(core), address(profitManager), address(credit));
         psm = new SimplePSM(
             address(core),

@@ -33,7 +33,7 @@ contract ProfitManagerUnitTest is Test {
         vm.roll(16848497);
         core = new Core();
         profitManager = new ProfitManager(address(core));
-        credit = new CreditToken(address(core));
+        credit = new CreditToken(address(core), "name", "symbol");
         guild = new GuildToken(address(core), address(profitManager), address(credit));
         pegToken = new MockERC20();
         pegToken.setDecimals(6);

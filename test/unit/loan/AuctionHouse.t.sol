@@ -42,7 +42,7 @@ contract AuctionHouseUnitTest is Test {
 
         profitManager = new ProfitManager(address(core));
         collateral = new MockERC20();
-        credit = new CreditToken(address(core));
+        credit = new CreditToken(address(core), "name", "symbol");
         guild = new GuildToken(address(core), address(profitManager), address(credit));
         rlcm = new RateLimitedMinter(
             address(core), /*_core*/

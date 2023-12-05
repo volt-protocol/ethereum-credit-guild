@@ -32,7 +32,7 @@ contract SurplusGuildMinterUnitTest is Test {
         core = new Core();
 
         profitManager = new ProfitManager(address(core));
-        credit = new CreditToken(address(core));
+        credit = new CreditToken(address(core), "name", "symbol");
         guild = new GuildToken(address(core), address(profitManager), address(credit));
         rlgm = new RateLimitedMinter(
             address(core), /*_core*/

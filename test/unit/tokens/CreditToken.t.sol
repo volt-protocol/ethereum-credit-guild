@@ -20,7 +20,7 @@ contract CreditTokenUnitTest is Test {
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
-        token = new CreditToken(address(core));
+        token = new CreditToken(address(core), "name", "symbol");
 
         // labels
         vm.label(address(core), "core");

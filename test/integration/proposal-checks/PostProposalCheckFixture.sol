@@ -77,7 +77,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
         usdc = ERC20(addresses.mainnet("ERC20_USDC"));
         sdai = ERC20(addresses.mainnet("ERC20_SDAI"));
         guild = GuildToken(addresses.mainnet("ERC20_GUILD"));
-        credit = CreditToken(addresses.mainnet("ERC20_CREDIT"));
+        credit = CreditToken(addresses.mainnet("ERC20_GUSDC"));
 
         /// rate limited minters
         rateLimitedCreditMinter = RateLimitedMinter(

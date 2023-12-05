@@ -22,11 +22,13 @@ contract CreditToken is
     ERC20RebaseDistributor
 {
     constructor(
-        address _core
+        address _core,
+        string memory _name,
+        string memory _symbol
     )
         CoreRef(_core)
-        ERC20("Ethereum Credit Guild - CREDIT", "CREDIT")
-        ERC20Permit("Ethereum Credit Guild - CREDIT")
+        ERC20(_name, _symbol)
+        ERC20Permit(_name)
     {}
 
     /// @notice Mint new tokens to the target address

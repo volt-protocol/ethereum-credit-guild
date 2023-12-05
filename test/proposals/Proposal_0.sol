@@ -122,7 +122,11 @@ contract Proposal_0 is Proposal {
 
         // Tokens & minting
         {
-            CreditToken credit = new CreditToken(addresses.mainnet("CORE"));
+            CreditToken credit = new CreditToken(
+                addresses.mainnet("CORE"),
+                "Ethereum Credit Guild - gUSDC",
+                "gUSDC"
+            );
             GuildToken guild = new GuildToken(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("PROFIT_MANAGER"),
@@ -154,7 +158,7 @@ contract Proposal_0 is Proposal {
                 GUILD_CREDIT_REWARD_RATIO // amount of GUILD received per CREDIT earned from staking in Gauges
             );
 
-            addresses.addMainnet("ERC20_CREDIT", address(credit));
+            addresses.addMainnet("ERC20_GUSDC", address(credit));
             addresses.addMainnet("ERC20_GUILD", address(guild));
             addresses.addMainnet(
                 "RATE_LIMITED_CREDIT_MINTER",
@@ -180,7 +184,7 @@ contract Proposal_0 is Proposal {
             SimplePSM psm = new SimplePSM(
                 addresses.mainnet("CORE"),
                 addresses.mainnet("PROFIT_MANAGER"),
-                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_GUSDC"),
                 addresses.mainnet("ERC20_USDC")
             );
 
@@ -207,7 +211,7 @@ contract Proposal_0 is Proposal {
             VoltVetoGovernor daoVetoCredit = new VoltVetoGovernor(
                 addresses.mainnet("CORE"),
                 address(daoTimelock),
-                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_GUSDC"),
                 DAO_VETO_CREDIT_QUORUM // initialQuorum
             );
             VoltVetoGovernor daoVetoGuild = new VoltVetoGovernor(
@@ -229,7 +233,7 @@ contract Proposal_0 is Proposal {
                         creditMinter: addresses.mainnet(
                             "RATE_LIMITED_CREDIT_MINTER"
                         ),
-                        creditToken: addresses.mainnet("ERC20_CREDIT")
+                        creditToken: addresses.mainnet("ERC20_GUSDC")
                     }), /// _lendingTermReferences
                     1, // _gaugeType
                     addresses.mainnet("CORE"), // _core
@@ -242,7 +246,7 @@ contract Proposal_0 is Proposal {
             VoltVetoGovernor onboardVetoCredit = new VoltVetoGovernor(
                 addresses.mainnet("CORE"),
                 address(onboardTimelock),
-                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_GUSDC"),
                 ONBOARD_VETO_CREDIT_QUORUM // initialQuorum
             );
             VoltVetoGovernor onboardVetoGuild = new VoltVetoGovernor(
@@ -469,7 +473,7 @@ contract Proposal_0 is Proposal {
 
         // Configuration
         ProfitManager(addresses.mainnet("PROFIT_MANAGER")).initializeReferences(
-            addresses.mainnet("ERC20_CREDIT"),
+            addresses.mainnet("ERC20_GUSDC"),
             addresses.mainnet("ERC20_GUILD"),
             addresses.mainnet("PSM_USDC")
         );
@@ -493,7 +497,7 @@ contract Proposal_0 is Proposal {
         GuildToken(addresses.mainnet("ERC20_GUILD")).setMaxDelegates(
             MAX_DELEGATES
         );
-        CreditToken(addresses.mainnet("ERC20_CREDIT")).setMaxDelegates(
+        CreditToken(addresses.mainnet("ERC20_GUSDC")).setMaxDelegates(
             MAX_DELEGATES
         );
 
@@ -568,7 +572,7 @@ contract Proposal_0 is Proposal {
                 "DAO_VETO_CREDIT Incorrect Core Address"
             );
 
-            CreditToken credit = CreditToken(addresses.mainnet("ERC20_CREDIT"));
+            CreditToken credit = CreditToken(addresses.mainnet("ERC20_GUSDC"));
             GuildToken guild = GuildToken(addresses.mainnet("ERC20_GUILD"));
             LendingTermOnboarding onboarder = LendingTermOnboarding(
                 payable(addresses.mainnet("ONBOARD_GOVERNOR_GUILD"))
@@ -679,7 +683,7 @@ contract Proposal_0 is Proposal {
             );
             assertEq(
                 psm.credit(),
-                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_GUSDC"),
                 "USDC PSM Incorrect Credit Token Address"
             );
             assertEq(
@@ -701,7 +705,7 @@ contract Proposal_0 is Proposal {
             );
             assertEq(
                 rateLimitedCreditMinter.token(),
-                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_GUSDC"),
                 "credit token incorrect"
             );
             assertEq(
@@ -764,7 +768,7 @@ contract Proposal_0 is Proposal {
         /// GUILD and CREDIT Token Total Supply and balances
         {
             assertEq(
-                ERC20MultiVotes(addresses.mainnet("ERC20_CREDIT"))
+                ERC20MultiVotes(addresses.mainnet("ERC20_GUSDC"))
                     .maxDelegates(),
                 MAX_DELEGATES,
                 "max delegates incorrect"
@@ -793,13 +797,13 @@ contract Proposal_0 is Proposal {
                 "balance of team multisig not 0 after deployment"
             );
             assertEq(
-                ERC20MultiVotes(addresses.mainnet("ERC20_CREDIT"))
+                ERC20MultiVotes(addresses.mainnet("ERC20_GUSDC"))
                     .totalSupply(),
                 0,
                 "credit total supply not 0 after deployment"
             );
             assertEq(
-                ERC20MultiVotes(addresses.mainnet("ERC20_CREDIT")).balanceOf(
+                ERC20MultiVotes(addresses.mainnet("ERC20_GUSDC")).balanceOf(
                     deployer
                 ),
                 0,
@@ -810,7 +814,7 @@ contract Proposal_0 is Proposal {
         {
             assertEq(
                 ProfitManager(addresses.mainnet("PROFIT_MANAGER")).credit(),
-                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_GUSDC"),
                 "Profit Manager credit token incorrect"
             );
             assertEq(
@@ -916,7 +920,7 @@ contract Proposal_0 is Proposal {
             );
             assertEq(
                 profitManager.credit(),
-                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_GUSDC"),
                 "credit address incorrect"
             );
             assertEq(
@@ -991,7 +995,7 @@ contract Proposal_0 is Proposal {
             );
             assertEq(
                 address(vetoGovernorCredit.token()),
-                addresses.mainnet("ERC20_CREDIT"),
+                addresses.mainnet("ERC20_GUSDC"),
                 "veto governor token incorrect"
             );
             
@@ -1082,7 +1086,7 @@ contract Proposal_0 is Proposal {
                 );
                 assertEq(
                     params.creditToken,
-                    addresses.mainnet("ERC20_CREDIT"),
+                    addresses.mainnet("ERC20_GUSDC"),
                     "Credit Token address incorrect"
                 );
             }
