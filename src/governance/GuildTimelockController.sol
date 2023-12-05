@@ -11,7 +11,7 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 /// chose not to fork TimelockController and just bypass its access control system, to
 /// introduce as few code changes as possible on top of OpenZeppelin's governance code.
 /// @author eswak
-contract VoltTimelockController is TimelockController, CoreRef {
+contract GuildTimelockController is TimelockController, CoreRef {
     constructor(
         address _core,
         uint256 _minDelay

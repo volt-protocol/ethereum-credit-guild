@@ -11,7 +11,7 @@ import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
+import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
 
 /// @notice Utils to onboard a LendingTerm. Also acts as a LendingTerm factory.
 /// This contract acts as Governor, but users cannot queue arbitrary proposals,
@@ -20,7 +20,7 @@ import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
 /// where CREDIT holders can veto the onboarding.
 /// Only terms that have been deployed through this factory can be onboarded.
 /// A term can be onboarded for the first time, or re-onboarded after it has been offboarded.
-contract LendingTermOnboarding is VoltGovernor {
+contract LendingTermOnboarding is GuildGovernor {
     /// @notice minimum delay between proposals of onboarding of a given term
     uint256 public constant MIN_DELAY_BETWEEN_PROPOSALS = 7 days;
     /// @notice time of last proposal of a given term
@@ -70,7 +70,7 @@ contract LendingTermOnboarding is VoltGovernor {
         uint256 initialProposalThreshold,
         uint256 initialQuorum
     )
-        VoltGovernor(
+        GuildGovernor(
             _core,
             _timelock,
             _lendingTermReferences.guildToken,

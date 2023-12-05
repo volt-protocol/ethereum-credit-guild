@@ -12,8 +12,8 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
-import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
+import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
+import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
 import {CoreRoles as roles} from "@src/core/CoreRoles.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
@@ -175,7 +175,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             string memory description
         ) = testCanCastVoteAndQueue();
 
-        VoltVetoGovernor veto = VoltVetoGovernor(
+        GuildVetoGovernor veto = GuildVetoGovernor(
             payable(addresses.mainnet("DAO_VETO_GUILD"))
         );
         assertEq(

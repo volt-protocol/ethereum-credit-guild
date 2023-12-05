@@ -7,13 +7,13 @@ import {MockERC20} from "@test/mock/MockERC20.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
-import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
+import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
-contract VoltTimelockControllerUnitTest is Test {
+contract GuildTimelockControllerUnitTest is Test {
     address private governor = address(1);
     Core private core;
     MockERC20 private token;
-    VoltTimelockController private timelock;
+    GuildTimelockController private timelock;
 
     uint256 private constant _TIMELOCK_MIN_DELAY = 12345;
 
@@ -34,7 +34,7 @@ contract VoltTimelockControllerUnitTest is Test {
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         token = new MockERC20();
-        timelock = new VoltTimelockController(
+        timelock = new GuildTimelockController(
             address(core),
             _TIMELOCK_MIN_DELAY
         );
@@ -119,7 +119,7 @@ contract VoltTimelockControllerUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltTimelockControllerUnitTest.__dummyCall.selector,
+            GuildTimelockControllerUnitTest.__dummyCall.selector,
             12345
         );
         bytes32 predecessor = bytes32(0);
@@ -190,7 +190,7 @@ contract VoltTimelockControllerUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltTimelockControllerUnitTest.__dummyCall.selector,
+            GuildTimelockControllerUnitTest.__dummyCall.selector,
             12345
         );
         bytes32 predecessor = bytes32(0);

@@ -12,18 +12,18 @@ import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
+import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {TestProposals} from "@test/proposals/TestProposals.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
-import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
+import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
-import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
+import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
 contract PostProposalCheckFixture is PostProposalCheck {
     /// Users
@@ -54,10 +54,10 @@ contract PostProposalCheckFixture is PostProposalCheck {
     ERC20 public sdai;
 
     /// Governor
-    VoltGovernor public governor;
-    VoltVetoGovernor public vetoGuildGovernor;
-    VoltVetoGovernor public vetoCreditGovernor;
-    VoltTimelockController public timelock;
+    GuildGovernor public governor;
+    GuildVetoGovernor public vetoGuildGovernor;
+    GuildVetoGovernor public vetoCreditGovernor;
+    GuildTimelockController public timelock;
 
     /// Minting
     RateLimitedMinter public rateLimitedCreditMinter;
@@ -94,14 +94,14 @@ contract PostProposalCheckFixture is PostProposalCheck {
         auctionHouse = AuctionHouse(addresses.mainnet("AUCTION_HOUSE"));
         psm = SimplePSM(addresses.mainnet("PSM_USDC"));
 
-        governor = VoltGovernor(payable(addresses.mainnet("DAO_GOVERNOR_GUILD")));
-        vetoGuildGovernor = VoltVetoGovernor(
+        governor = GuildGovernor(payable(addresses.mainnet("DAO_GOVERNOR_GUILD")));
+        vetoGuildGovernor = GuildVetoGovernor(
             payable(addresses.mainnet("ONBOARD_VETO_GUILD"))
         );
-        vetoCreditGovernor = VoltVetoGovernor(
+        vetoCreditGovernor = GuildVetoGovernor(
             payable(addresses.mainnet("ONBOARD_VETO_CREDIT"))
         );
-        timelock = VoltTimelockController(
+        timelock = GuildTimelockController(
             payable(addresses.mainnet("DAO_TIMELOCK"))
         );
 

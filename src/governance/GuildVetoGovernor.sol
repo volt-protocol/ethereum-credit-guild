@@ -22,7 +22,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 /// After the action has been queued in the linked TimelockController for enough time to be
 /// executed, the veto vote is considered failed and the action cannot be cancelled anymore.
 /// @author eswak
-contract VoltVetoGovernor is CoreRef, Governor, GovernorVotes {
+contract GuildVetoGovernor is CoreRef, Governor, GovernorVotes {
     /// @notice Private storage variable for quorum (the minimum number of votes needed for a vote to pass).
     uint256 private _quorum;
 
@@ -203,14 +203,14 @@ contract VoltVetoGovernor is CoreRef, Governor, GovernorVotes {
 
         require(
             !proposalvote.hasVoted[account],
-            "VoltVetoGovernor: vote already cast"
+            "GuildVetoGovernor: vote already cast"
         );
         proposalvote.hasVoted[account] = true;
 
         if (support == uint8(VoteType.Against)) {
             proposalvote.againstVotes += weight;
         } else {
-            revert("VoltVetoGovernor: can only vote against in veto proposals");
+            revert("GuildVetoGovernor: can only vote against in veto proposals");
         }
     }
 
@@ -307,7 +307,7 @@ contract VoltVetoGovernor is CoreRef, Governor, GovernorVotes {
         bytes[] memory /* calldatas*/,
         string memory /* description*/
     ) public pure override returns (uint256) {
-        revert("VoltVetoGovernor: cannot propose arbitrary actions");
+        revert("GuildVetoGovernor: cannot propose arbitrary actions");
     }
 
     /// @notice Propose a governance action to veto (cancel) a target action ID in the
@@ -318,7 +318,7 @@ contract VoltVetoGovernor is CoreRef, Governor, GovernorVotes {
             .getTimestamp(timelockId);
         require(
             timelockExecutionTime > 1,
-            "VoltVetoGovernor: action must be pending"
+            "GuildVetoGovernor: action must be pending"
         );
 
         // Build proposal data

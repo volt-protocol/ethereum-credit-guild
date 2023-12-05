@@ -6,15 +6,15 @@ import {Core} from "@src/core/Core.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
-import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
-import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
+import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
+import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
-contract VoltVetoGovernorUnitTest is Test {
+contract GuildVetoGovernorUnitTest is Test {
     address private governorAddress = address(1);
     Core private core;
     MockERC20 private token;
-    VoltTimelockController private timelock;
-    VoltVetoGovernor private governor;
+    GuildTimelockController private timelock;
+    GuildVetoGovernor private governor;
 
     uint256 private constant _TIMELOCK_MIN_DELAY = 12345;
     uint256 private constant _VETO_QUORUM = 100e18;
@@ -36,11 +36,11 @@ contract VoltVetoGovernorUnitTest is Test {
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         token = new MockERC20();
-        timelock = new VoltTimelockController(
+        timelock = new GuildTimelockController(
             address(core),
             _TIMELOCK_MIN_DELAY
         );
-        governor = new VoltVetoGovernor(
+        governor = new GuildVetoGovernor(
             address(core),
             address(timelock),
             address(token),
@@ -107,7 +107,7 @@ contract VoltVetoGovernorUnitTest is Test {
         assertEq(forVotes, 0); // nobody voted
         assertEq(abstainVotes, 0); // nobody voted
         vm.expectRevert("Governor: vote not currently active");
-        governor.castVote(proposalId, uint8(VoltVetoGovernor.VoteType.Against));
+        governor.castVote(proposalId, uint8(GuildVetoGovernor.VoteType.Against));
 
         // on next block, the vote is active
         vm.roll(block.number + 1);
@@ -118,7 +118,7 @@ contract VoltVetoGovernorUnitTest is Test {
         );
 
         // we vote and reach quorum
-        governor.castVote(proposalId, uint8(VoltVetoGovernor.VoteType.Against));
+        governor.castVote(proposalId, uint8(GuildVetoGovernor.VoteType.Against));
         assertEq(governor.hasVoted(proposalId, address(this)), true); // we have voted
         (againstVotes, forVotes, abstainVotes) = governor.proposalVotes(
             proposalId
@@ -165,10 +165,10 @@ contract VoltVetoGovernorUnitTest is Test {
             uint256(governor.state(proposalId)),
             uint256(IGovernor.ProposalState.Active)
         );
-        governor.castVote(proposalId, uint8(VoltVetoGovernor.VoteType.Against));
+        governor.castVote(proposalId, uint8(GuildVetoGovernor.VoteType.Against));
         // cannot vote twice
-        vm.expectRevert("VoltVetoGovernor: vote already cast");
-        governor.castVote(proposalId, uint8(VoltVetoGovernor.VoteType.Against));
+        vm.expectRevert("GuildVetoGovernor: vote already cast");
+        governor.castVote(proposalId, uint8(GuildVetoGovernor.VoteType.Against));
         // still Active after voting because quorum is not reached
         assertEq(
             uint256(governor.state(proposalId)),
@@ -199,7 +199,7 @@ contract VoltVetoGovernorUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltVetoGovernorUnitTest.__dummyCall.selector,
+            GuildVetoGovernorUnitTest.__dummyCall.selector,
             12345
         );
         bytes32 predecessor = bytes32(0);
@@ -230,7 +230,7 @@ contract VoltVetoGovernorUnitTest is Test {
         );
 
         // vote for the proposal
-        governor.castVote(proposalId, uint8(VoltVetoGovernor.VoteType.Against));
+        governor.castVote(proposalId, uint8(GuildVetoGovernor.VoteType.Against));
         assertEq(
             uint256(governor.state(proposalId)),
             uint256(IGovernor.ProposalState.Succeeded)
@@ -249,7 +249,7 @@ contract VoltVetoGovernorUnitTest is Test {
 
         // cannot vote for veto anymore
         vm.expectRevert("Governor: vote not currently active");
-        governor.castVote(proposalId, uint8(VoltVetoGovernor.VoteType.Against));
+        governor.castVote(proposalId, uint8(GuildVetoGovernor.VoteType.Against));
     }
 
     function testCanOnlyVoteAgainst() public {
@@ -266,15 +266,15 @@ contract VoltVetoGovernorUnitTest is Test {
 
         // cannot vote For
         vm.expectRevert(
-            "VoltVetoGovernor: can only vote against in veto proposals"
+            "GuildVetoGovernor: can only vote against in veto proposals"
         );
-        governor.castVote(proposalId, uint8(VoltVetoGovernor.VoteType.For));
+        governor.castVote(proposalId, uint8(GuildVetoGovernor.VoteType.For));
 
         // cannot vote Abstain
         vm.expectRevert(
-            "VoltVetoGovernor: can only vote against in veto proposals"
+            "GuildVetoGovernor: can only vote against in veto proposals"
         );
-        governor.castVote(proposalId, uint8(VoltVetoGovernor.VoteType.Abstain));
+        governor.castVote(proposalId, uint8(GuildVetoGovernor.VoteType.Abstain));
     }
 
     function testSetQuorum() public {
@@ -293,7 +293,7 @@ contract VoltVetoGovernorUnitTest is Test {
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
-        vm.expectRevert("VoltVetoGovernor: cannot propose arbitrary actions");
+        vm.expectRevert("GuildVetoGovernor: cannot propose arbitrary actions");
         governor.propose(targets, values, payloads, "test");
     }
 
@@ -322,7 +322,7 @@ contract VoltVetoGovernorUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltVetoGovernorUnitTest.__dummyCall.selector,
+            GuildVetoGovernorUnitTest.__dummyCall.selector,
             number
         );
         bytes32 predecessor = bytes32(0);

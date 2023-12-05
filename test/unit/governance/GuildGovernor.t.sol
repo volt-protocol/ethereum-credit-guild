@@ -7,17 +7,17 @@ import {Governor} from "@openzeppelin/contracts/governance/Governor.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
-import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
+import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
-import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
+import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
-contract VoltGovernorUnitTest is Test {
+contract GuildGovernorUnitTest is Test {
     address private governorAddress = address(1);
     address private guardianAddress = address(2);
     Core private core;
     MockERC20 private token;
-    VoltTimelockController private timelock;
-    VoltGovernor private governor;
+    GuildTimelockController private timelock;
+    GuildGovernor private governor;
 
     uint256 private constant _TIMELOCK_MIN_DELAY = 12345;
     uint256 private constant _VOTING_DELAY = 0;
@@ -45,11 +45,11 @@ contract VoltGovernorUnitTest is Test {
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         token = new MockERC20();
-        timelock = new VoltTimelockController(
+        timelock = new GuildTimelockController(
             address(core),
             _TIMELOCK_MIN_DELAY
         );
-        governor = new VoltGovernor(
+        governor = new GuildGovernor(
             address(core),
             address(timelock),
             address(token),
@@ -89,7 +89,7 @@ contract VoltGovernorUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltGovernorUnitTest.__dummyCall.selector,
+            GuildGovernorUnitTest.__dummyCall.selector,
             12345
         );
 
@@ -187,7 +187,7 @@ contract VoltGovernorUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltGovernorUnitTest.__dummyCall.selector,
+            GuildGovernorUnitTest.__dummyCall.selector,
             12345
         );
 
@@ -239,7 +239,7 @@ contract VoltGovernorUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltGovernorUnitTest.__dummyCall.selector,
+            GuildGovernorUnitTest.__dummyCall.selector,
             12345
         );
 
@@ -291,7 +291,7 @@ contract VoltGovernorUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltGovernorUnitTest.__dummyCall.selector,
+            GuildGovernorUnitTest.__dummyCall.selector,
             12345
         );
 
@@ -330,7 +330,7 @@ contract VoltGovernorUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltGovernorUnitTest.__dummyCall.selector,
+            GuildGovernorUnitTest.__dummyCall.selector,
             12345
         );
 
@@ -363,7 +363,7 @@ contract VoltGovernorUnitTest is Test {
         uint256[] memory values = new uint256[](1);
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = abi.encodeWithSelector(
-            VoltGovernorUnitTest.__dummyCall.selector,
+            GuildGovernorUnitTest.__dummyCall.selector,
             12345
         );
 

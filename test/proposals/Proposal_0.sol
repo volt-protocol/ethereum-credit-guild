@@ -12,14 +12,14 @@ import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
-import {VoltGovernor} from "@src/governance/VoltGovernor.sol";
+import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
-import {VoltVetoGovernor} from "@src/governance/VoltVetoGovernor.sol";
+import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
-import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
+import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 
 /// @notice deployer must have 100 USDC to deploy the system on mainnet for the initial PSM mint.
@@ -195,11 +195,11 @@ contract Proposal_0 is Proposal {
 
         // Governance
         {
-            VoltTimelockController daoTimelock = new VoltTimelockController(
+            GuildTimelockController daoTimelock = new GuildTimelockController(
                 addresses.mainnet("CORE"),
                 DAO_TIMELOCK_DELAY
             );
-            VoltGovernor daoGovernorGuild = new VoltGovernor(
+            GuildGovernor daoGovernorGuild = new GuildGovernor(
                 addresses.mainnet("CORE"),
                 address(daoTimelock),
                 addresses.mainnet("ERC20_GUILD"),
@@ -208,20 +208,20 @@ contract Proposal_0 is Proposal {
                 DAO_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
                 DAO_GOVERNOR_GUILD_QUORUM // initialQuorum
             );
-            VoltVetoGovernor daoVetoCredit = new VoltVetoGovernor(
+            GuildVetoGovernor daoVetoCredit = new GuildVetoGovernor(
                 addresses.mainnet("CORE"),
                 address(daoTimelock),
                 addresses.mainnet("ERC20_GUSDC"),
                 DAO_VETO_CREDIT_QUORUM // initialQuorum
             );
-            VoltVetoGovernor daoVetoGuild = new VoltVetoGovernor(
+            GuildVetoGovernor daoVetoGuild = new GuildVetoGovernor(
                 addresses.mainnet("CORE"),
                 address(daoTimelock),
                 addresses.mainnet("ERC20_GUILD"),
                 DAO_VETO_GUILD_QUORUM // initialQuorum
             );
 
-            VoltTimelockController onboardTimelock = new VoltTimelockController(
+            GuildTimelockController onboardTimelock = new GuildTimelockController(
                 addresses.mainnet("CORE"),
                 ONBOARD_TIMELOCK_DELAY
             );
@@ -243,13 +243,13 @@ contract Proposal_0 is Proposal {
                     ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
                     ONBOARD_GOVERNOR_GUILD_QUORUM // initialQuorum
                 );
-            VoltVetoGovernor onboardVetoCredit = new VoltVetoGovernor(
+            GuildVetoGovernor onboardVetoCredit = new GuildVetoGovernor(
                 addresses.mainnet("CORE"),
                 address(onboardTimelock),
                 addresses.mainnet("ERC20_GUSDC"),
                 ONBOARD_VETO_CREDIT_QUORUM // initialQuorum
             );
-            VoltVetoGovernor onboardVetoGuild = new VoltVetoGovernor(
+            GuildVetoGovernor onboardVetoGuild = new GuildVetoGovernor(
                 addresses.mainnet("CORE"),
                 address(onboardTimelock),
                 addresses.mainnet("ERC20_GUILD"),
@@ -580,7 +580,7 @@ contract Proposal_0 is Proposal {
             LendingTermOffboarding offboarding = LendingTermOffboarding(
                 payable(addresses.mainnet("OFFBOARD_GOVERNOR_GUILD"))
             );
-            VoltTimelockController timelock = VoltTimelockController(
+            GuildTimelockController timelock = GuildTimelockController(
                 payable(addresses.mainnet("DAO_TIMELOCK"))
             );
             SurplusGuildMinter sgm = SurplusGuildMinter(
@@ -598,10 +598,10 @@ contract Proposal_0 is Proposal {
             AuctionHouse auctionHouse = AuctionHouse(
                 addresses.mainnet("AUCTION_HOUSE")
             );
-            VoltGovernor governor = VoltGovernor(
+            GuildGovernor governor = GuildGovernor(
                 payable(addresses.mainnet("DAO_GOVERNOR_GUILD"))
             );
-            VoltVetoGovernor vetoGovernorCredit = VoltVetoGovernor(
+            GuildVetoGovernor vetoGovernorCredit = GuildVetoGovernor(
                 payable(addresses.mainnet("ONBOARD_VETO_CREDIT"))
             );
 
@@ -866,7 +866,7 @@ contract Proposal_0 is Proposal {
         }
         /// TIMELOCK Verification
         {
-            VoltTimelockController timelock = VoltTimelockController(
+            GuildTimelockController timelock = GuildTimelockController(
                 payable(addresses.mainnet("DAO_TIMELOCK"))
             );
 
@@ -876,7 +876,7 @@ contract Proposal_0 is Proposal {
                 "DAO Timelock delay incorrect"
             );
 
-            VoltTimelockController onboardingTimelock = VoltTimelockController(
+            GuildTimelockController onboardingTimelock = GuildTimelockController(
                 payable(addresses.mainnet("ONBOARD_TIMELOCK"))
             );
 
@@ -954,7 +954,7 @@ contract Proposal_0 is Proposal {
 
         /// Governor Verification
         {
-            VoltGovernor governor = VoltGovernor(
+            GuildGovernor governor = GuildGovernor(
                 payable(addresses.mainnet("DAO_GOVERNOR_GUILD"))
             );
             assertEq(
@@ -974,7 +974,7 @@ contract Proposal_0 is Proposal {
             );
             assertEq(governor.quorum(0), DAO_GOVERNOR_GUILD_QUORUM, "governor quorum");
 
-            VoltVetoGovernor vetoGovernorCredit = VoltVetoGovernor(
+            GuildVetoGovernor vetoGovernorCredit = GuildVetoGovernor(
                 payable(addresses.mainnet("DAO_VETO_CREDIT"))
             );
             
@@ -999,7 +999,7 @@ contract Proposal_0 is Proposal {
                 "veto governor token incorrect"
             );
             
-            VoltVetoGovernor vetoGovernorGuild = VoltVetoGovernor(
+            GuildVetoGovernor vetoGovernorGuild = GuildVetoGovernor(
                 payable(addresses.mainnet("DAO_VETO_GUILD"))
             );
             assertEq(

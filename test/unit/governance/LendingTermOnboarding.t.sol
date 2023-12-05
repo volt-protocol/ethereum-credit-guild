@@ -16,7 +16,7 @@ import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
-import {VoltTimelockController} from "@src/governance/VoltTimelockController.sol";
+import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
 contract LendingTermOnboardingUnitTest is Test {
     address private governor = address(1);
@@ -30,12 +30,12 @@ contract LendingTermOnboardingUnitTest is Test {
     LendingTerm private termImplementation;
     AuctionHouse auctionHouse;
     RateLimitedMinter rlcm;
-    VoltTimelockController private timelock;
+    GuildTimelockController private timelock;
     LendingTermOnboarding private onboarder;
     address private constant alice = address(0x616c696365);
     address private constant bob = address(0xB0B);
 
-    // VoltTimelockController params
+    // GuildTimelockController params
     uint256 private constant _TIMELOCK_MIN_DELAY = 3600; // 1h
 
     // LendingTerm params
@@ -79,7 +79,7 @@ contract LendingTermOnboardingUnitTest is Test {
             1800
         );
         termImplementation = new LendingTerm();
-        timelock = new VoltTimelockController(
+        timelock = new GuildTimelockController(
             address(core),
             _TIMELOCK_MIN_DELAY
         );

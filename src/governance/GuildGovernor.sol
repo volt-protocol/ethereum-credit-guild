@@ -11,9 +11,9 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 
-/// @title Governor for on-chain governance of Volt Protocol, based on the OZ implementation.
+/// @title Governor for on-chain governance of Ethereum Credit Guild, based on the OZ implementation.
 /// @author eswak
-contract VoltGovernor is
+contract GuildGovernor is
     CoreRef,
     Governor,
     GovernorVotes,
