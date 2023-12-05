@@ -1518,6 +1518,8 @@ contract LendingTermUnitTest is Test {
 
     // MIN_BORROW increases when creditMultiplier decreases - borrow()
     function testMinBorrowAfterCreditLoseValue1() public {
+        uint256 MIN_BORROW = profitManager.minBorrow();
+
         // prank the term to report a loss in another loan
         // this should discount CREDIT value by 50%, marking up
         // all loans by 2x.
@@ -1530,7 +1532,6 @@ contract LendingTermUnitTest is Test {
 
         // borrow should fail because we try to borrow 1.75x
         // the MIN_BORROW, but CREDIT value went up 2x.
-        uint256 MIN_BORROW = profitManager.minBorrow();
         vm.expectRevert("LendingTerm: borrow amount too low");
         term.borrow((MIN_BORROW * 175) / 100, 10000000000e18);
     }
