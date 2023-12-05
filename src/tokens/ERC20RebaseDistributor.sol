@@ -94,7 +94,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
 
     /// @notice share price increase and pending rebase rewards from distribute() are
     /// interpolated linearly over a period of DISTRIBUTION_PERIOD seconds after a distribution.
-    uint256 public constant DISTRIBUTION_PERIOD = 1 days;
+    uint256 public constant DISTRIBUTION_PERIOD = 30 days;
 
     struct InterpolatedValue {
         uint32 lastTimestamp;
