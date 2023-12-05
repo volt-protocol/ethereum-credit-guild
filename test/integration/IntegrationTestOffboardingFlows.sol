@@ -16,9 +16,9 @@ import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
 import {CoreRoles as roles} from "@src/core/CoreRoles.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
-import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
+import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
-contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
+contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
     function setUp() public override {
         super.setUp();
 
@@ -48,22 +48,11 @@ contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
         );
     }
 
-    function testProposeFails() public {
-        vm.expectRevert("GuildVetoGovernor: cannot propose arbitrary actions");
-        vetoGuildGovernor.propose(
-            new address[](0),
-            new uint256[](0),
-            new bytes[](0),
-            ""
-        );
-    }
+    /// Offboarding setting quorum
 
-    function testProposalThresholdZero() public {
-        assertEq(vetoGuildGovernor.proposalThreshold(), 0); /// anyone can propose
-    }
+    function testSetOffboardingQuorum() public {
+        uint256 newQuorum = 100_000_000 * 1e18;
 
-    /// ----------------- Governor DAO Actions -------------------
-    function testUpdateTimelockVetoDao() public {
         address[] memory targets = new address[](1);
         targets[0] = address(vetoGuildGovernor);
 
@@ -72,11 +61,11 @@ contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
 
         bytes[] memory calldatas = new bytes[](1);
         calldatas[0] = abi.encodeWithSelector(
-            vetoGuildGovernor.updateTimelock.selector,
-            address(this)
+            vetoGuildGovernor.setQuorum.selector,
+            newQuorum
         );
 
-        string memory description = "Update timelock to this address";
+        string memory description = "Update veto governor quourum to 100m guild";
 
         uint256 proposalId = governor.propose(
             targets,
@@ -129,6 +118,15 @@ contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
             "proposal not executed"
         );
 
-        assertEq(vetoGuildGovernor.timelock(), address(this));
+        assertEq(vetoGuildGovernor.quorum(0), newQuorum, "new quorum not set");
+    }
+
+    function testSetOffboardingQuourumAsTimelock() public {
+        uint256 newQuorum = 100_000_000 * 1e18;
+
+        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
+        offboarder.setQuorum(newQuorum);
+
+        assertEq(offboarder.quorum(), newQuorum, "new quorum not set");
     }
 }

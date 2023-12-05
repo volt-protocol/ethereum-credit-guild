@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "@forge-std/Test.sol";
 
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
+import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
 contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     function testVoteForSDAIGauge() public {

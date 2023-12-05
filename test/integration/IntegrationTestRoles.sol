@@ -5,7 +5,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
+import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 
 contract IntegrationTestRoles is PostProposalCheck {
 

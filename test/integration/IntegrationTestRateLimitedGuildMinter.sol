@@ -5,7 +5,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "@forge-std/Test.sol";
 
-import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
+import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
 contract IntegrationTestRateLimitedGuildMinter is PostProposalCheckFixture {
     /// scenarios:

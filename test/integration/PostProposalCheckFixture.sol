@@ -19,7 +19,7 @@ import {TestProposals} from "@test/proposals/TestProposals.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
-import {PostProposalCheck} from "@test/integration/proposal-checks/PostProposalCheck.sol";
+import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";

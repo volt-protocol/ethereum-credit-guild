@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import "@forge-std/Test.sol";
 
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
-import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
+import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
 contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     //// ------------------------- loan helper functions -------------------------

@@ -17,7 +17,7 @@ import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
 import {CoreRoles as roles} from "@src/core/CoreRoles.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
-import {PostProposalCheckFixture} from "@test/integration/proposal-checks/PostProposalCheckFixture.sol";
+import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
 contract IntegrationTestDAOFlows is PostProposalCheckFixture {
     function setUp() public override {
