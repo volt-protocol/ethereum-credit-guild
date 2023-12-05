@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
 import {Addresses} from "@test/proposals/Addresses.sol";
 
-contract Proposal_Example is Proposal {
+contract GIP_X is Proposal {
     string public name = "Proposal_Example";
 
     function deploy(Addresses addresses) public pure {}

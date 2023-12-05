@@ -6,7 +6,7 @@ import {Test} from "@forge-std/Test.sol";
 import {Addresses} from "@test/proposals/Addresses.sol";
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
 
-import {Proposal_0} from "@test/proposals/Proposal_0.sol";
+import {GIP_0} from "@test/proposals/gips/GIP_0.sol";
 
 /*
 How to use:
@@ -40,11 +40,11 @@ contract TestProposals is Test {
         DO_VALIDATE = vm.envOr("DO_VALIDATE", true);
         addresses = new Addresses();
 
-        proposals.push(Proposal(address(new Proposal_0())));
+        proposals.push(Proposal(address(new GIP_0())));
         nProposals = proposals.length;
 
         vm.label(address(this), "TestProposals");
-        vm.label(address(proposals[0]), "Proposal 0");
+        vm.label(address(proposals[0]), "GIP_0");
     }
 
     function setDebug(bool value) public {

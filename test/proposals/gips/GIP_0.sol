@@ -23,7 +23,7 @@ import {GuildTimelockController} from "@src/governance/GuildTimelockController.s
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 
 /// @notice deployer must have 100 USDC to deploy the system on mainnet for the initial PSM mint.
-contract Proposal_0 is Proposal {
+contract GIP_0 is Proposal {
     string public constant name = "Proposal_0";
 
     /// --------------------------------------------------------------
