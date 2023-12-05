@@ -190,6 +190,15 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         );
     }
 
+    /// @notice emitted when reference to ProfitManager is updated
+    event ProfitManagerUpdated(uint256 timestamp, address newValue);
+
+    /// @notice set reference to ProfitManager
+    function setProfitManager(address _newProfitManager) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        profitManager = _newProfitManager;
+        emit ProfitManagerUpdated(block.timestamp, _newProfitManager);
+    }
+
     /// @dev prevent outbound token transfers (_decrementWeightUntilFree) and gauge weight decrease
     /// (decrementGauge, decrementGauges) for users who have an unrealized loss in a gauge, or if the
     /// gauge is currently using its allocated debt ceiling. To decrement gauge weight, guild holders

@@ -118,6 +118,19 @@ contract GuildTokenUnitTest is Test {
         assertEq(token.maxDelegates(), 1);
     }
 
+    function testSetProfitManager() public {
+        assertEq(token.profitManager(), address(profitManager));
+
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.setProfitManager(address(this));
+
+        // with role, can set profitManager reference
+        vm.startPrank(governor);
+        token.setProfitManager(address(this));
+        assertEq(token.profitManager(), address(this));
+    }
+
     function testSetContractExceedMaxDelegates() public {
         // without role, reverts
         vm.expectRevert("UNAUTHORIZED");
