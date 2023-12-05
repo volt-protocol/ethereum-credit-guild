@@ -2,7 +2,7 @@
 pragma solidity 0.8.13;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
@@ -12,7 +12,7 @@ import {IRateLimitedV2} from "@src/utils/IRateLimitedV2.sol";
 /// can perform an action e.g. Minting
 /// @author Elliot Friedman
 abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
-    using SafeCast for *;
+    using SafeCastLib for *;
 
     /// @notice maximum rate limit per second governance can set for this contract
     uint256 public immutable MAX_RATE_LIMIT_PER_SECOND;
@@ -42,7 +42,7 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
         uint128 _rateLimitPerSecond,
         uint128 _bufferCap
     ) {
-        lastBufferUsedTime = block.timestamp.toUint32();
+        lastBufferUsedTime = block.timestamp.safeCastTo32();
 
         _setBufferCap(_bufferCap);
         bufferStored = _bufferCap;
@@ -81,7 +81,7 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
     /// @notice the amount of action used before hitting limit
     /// @dev replenishes at rateLimitPerSecond per second up to bufferCap
     function buffer() public view returns (uint256) {
-        uint256 elapsed = block.timestamp.toUint32() - lastBufferUsedTime;
+        uint256 elapsed = block.timestamp.safeCastTo32() - lastBufferUsedTime;
         return
             Math.min(bufferStored + (rateLimitPerSecond * elapsed), bufferCap);
     }
@@ -96,8 +96,8 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
         require(newBuffer != 0, "RateLimited: no rate limit buffer");
         require(amount <= newBuffer, "RateLimited: rate limit hit");
 
-        uint32 blockTimestamp = block.timestamp.toUint32();
-        uint224 newBufferStored = (newBuffer - amount).toUint224();
+        uint32 blockTimestamp = block.timestamp.safeCastTo32();
+        uint224 newBufferStored = (newBuffer - amount).safeCastTo224();
 
         /// gas optimization to only use a single SSTORE
         lastBufferUsedTime = blockTimestamp;
@@ -121,11 +121,11 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
             return;
         }
 
-        uint32 blockTimestamp = block.timestamp.toUint32();
+        uint32 blockTimestamp = block.timestamp.safeCastTo32();
         /// ensure that bufferStored cannot be gt buffer cap
         uint224 newBufferStored = Math
             .min(newBuffer + amount, _bufferCap)
-            .toUint224();
+            .safeCastTo224();
 
         /// gas optimization to only use a single SSTORE
         lastBufferUsedTime = blockTimestamp;
@@ -156,8 +156,8 @@ abstract contract RateLimitedV2 is IRateLimitedV2, CoreRef {
     }
 
     function _updateBufferStored(uint128 newBufferCap) internal {
-        uint224 newBufferStored = buffer().toUint224();
-        uint32 newBlockTimestamp = block.timestamp.toUint32();
+        uint224 newBufferStored = buffer().safeCastTo224();
+        uint32 newBlockTimestamp = block.timestamp.safeCastTo32();
 
         if (newBufferStored > newBufferCap) {
             bufferStored = uint224(newBufferCap); /// safe upcast as no precision can be lost when going from 128 -> 224

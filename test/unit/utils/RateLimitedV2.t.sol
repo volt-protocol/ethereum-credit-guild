@@ -1,6 +1,6 @@
 pragma solidity 0.8.13;
 
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -11,7 +11,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockRateLimitedV2} from "@test/mock/MockRateLimitedV2.sol";
 
 contract UnitTestRateLimitedV2 is Test {
-    using SafeCast for *;
+    using SafeCastLib for *;
 
     address private governor = address(1);
 
@@ -78,7 +78,7 @@ contract UnitTestRateLimitedV2 is Test {
         vm.prank(governor);
         vm.expectEmit(true, false, false, true, address(rlm));
         emit BufferCapUpdate(bufferCap, newBufferCap);
-        rlm.setBufferCap(newBufferCap.toUint128());
+        rlm.setBufferCap(newBufferCap.safeCastTo128());
 
         assertEq(rlm.bufferCap(), newBufferCap);
         assertEq(rlm.buffer(), newBufferCap); /// buffer has not been depleted
@@ -92,12 +92,12 @@ contract UnitTestRateLimitedV2 is Test {
     function testSetRateLimitPerSecondAboveMaxFails() public {
         vm.expectRevert("RateLimited: rateLimitPerSecond too high");
         vm.prank(governor);
-        rlm.setRateLimitPerSecond(maxRateLimitPerSecond.toUint128() + 1);
+        rlm.setRateLimitPerSecond(maxRateLimitPerSecond.safeCastTo128() + 1);
     }
 
     function testSetRateLimitPerSecondSucceeds() public {
         vm.prank(governor);
-        rlm.setRateLimitPerSecond(maxRateLimitPerSecond.toUint128());
+        rlm.setRateLimitPerSecond(maxRateLimitPerSecond.safeCastTo128());
         assertEq(rlm.rateLimitPerSecond(), maxRateLimitPerSecond);
     }
 
@@ -116,7 +116,7 @@ contract UnitTestRateLimitedV2 is Test {
             rateLimitPerSecond,
             newRateLimitPerSecond
         );
-        rlm.setRateLimitPerSecond(newRateLimitPerSecond.toUint128());
+        rlm.setRateLimitPerSecond(newRateLimitPerSecond.safeCastTo128());
 
         assertEq(rlm.rateLimitPerSecond(), newRateLimitPerSecond);
     }
