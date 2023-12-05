@@ -29,10 +29,6 @@ contract IntegrationTestGuildToken is PostProposalCheckFixture {
         guild.transfer(address(this), 1);
     }
 
-    function testGuildCreditReference() public {
-        assertEq(guild.credit(), address(credit));
-    }
-
     function testMintGuildToUser(address to, uint96 amount) public {
         to = address(uint160(_bound(uint160(to), 1, type(uint160).max)));
 

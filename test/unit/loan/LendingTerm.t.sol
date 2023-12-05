@@ -47,8 +47,7 @@ contract LendingTermUnitTest is Test {
         credit = new CreditToken(address(core), "name", "symbol");
         guild = new GuildToken(
             address(core),
-            address(profitManager),
-            address(credit)
+            address(profitManager)
         );
         rlcm = new RateLimitedMinter(
             address(core) /*_core*/,

@@ -129,8 +129,7 @@ contract GIP_0 is Proposal {
             );
             GuildToken guild = new GuildToken(
                 addresses.mainnet("CORE"),
-                addresses.mainnet("PROFIT_MANAGER"),
-                address(credit)
+                addresses.mainnet("PROFIT_MANAGER")
             );
             RateLimitedMinter rateLimitedCreditMinter = new RateLimitedMinter(
                 addresses.mainnet("CORE"),

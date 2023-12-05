@@ -34,7 +34,7 @@ contract ProfitManagerUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core), "name", "symbol");
-        guild = new GuildToken(address(core), address(profitManager), address(credit));
+        guild = new GuildToken(address(core), address(profitManager));
         pegToken = new MockERC20();
         pegToken.setDecimals(6);
         gauge1 = address(new MockLendingTerm(address(core)));

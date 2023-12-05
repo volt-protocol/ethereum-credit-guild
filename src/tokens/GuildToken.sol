@@ -9,7 +9,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ERC20Gauges} from "@src/tokens/ERC20Gauges.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
@@ -25,7 +24,7 @@ import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
     The gauge system is used to define debt ceilings on a set of lending terms.
     Lending terms can be whitelisted by adding a gauge for their address, if GUILD
     holders vote for these lending terms in the gauge system, the lending terms will
-    have a non-zero debt ceiling, and CREDIT will be available to borrow under these terms.
+    have a non-zero debt ceiling, and borrowing will be available under these terms.
 
     When a lending term creates bad debt, a loss is notified in a gauge on this
     contract (`notifyGaugeLoss`). When a loss is notified, all the GUILD token weight voting
@@ -41,20 +40,15 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// @notice reference to ProfitManager
     address public profitManager;
 
-    /// @notice reference to CREDIT token.
-    address public credit;
-
     constructor(
         address _core,
-        address _profitManager,
-        address _credit
+        address _profitManager
     )
         CoreRef(_core)
         ERC20("Ethereum Credit Guild - GUILD", "GUILD")
         ERC20Permit("Ethereum Credit Guild - GUILD")
     {
         profitManager = _profitManager;
-        credit = _credit;
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -234,6 +228,8 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// If the user has 0 weight (i.e. no loss to realize), allow incrementing
     /// gauge weight & update lastGaugeLossApplied to current time.
     /// Also update the user profit index an claim rewards.
+    /// @dev note that users voting for a gauge that is not a proper lending term could result in this
+    /// share of the user's tokens to be frozen, due to being unable to decrement weight.
     function _incrementGaugeWeight(
         address user,
         address gauge,
