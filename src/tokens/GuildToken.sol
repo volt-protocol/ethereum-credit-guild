@@ -220,17 +220,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         // To decrement gauge weight, guild holders might have to call loans if the debt ceiling is used.
         uint256 issuance = LendingTerm(gauge).issuance();
         if (issuance != 0) {
-            uint256 creditTotalSupply = CreditToken(credit).totalSupply();
-            uint256 debtCeilingAfterDecrement = 0;
-            if (!_deprecatedGauges.contains(gauge)) {
-                uint256 currentTotalWeight = totalWeight;
-                if (currentTotalWeight != 0 && currentTotalWeight != weight) {
-                    uint256 currentGaugeWeight = getGaugeWeight[gauge];
-                    debtCeilingAfterDecrement =
-                        (creditTotalSupply * (currentGaugeWeight - weight)) /
-                        (currentTotalWeight - weight);
-                }
-            }
+            uint256 debtCeilingAfterDecrement = LendingTerm(gauge).debtCeiling(-int256(weight));
             require(
                 issuance <= debtCeilingAfterDecrement,
                 "GuildToken: debt ceiling used"

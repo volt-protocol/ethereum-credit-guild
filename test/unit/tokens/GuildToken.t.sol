@@ -23,6 +23,16 @@ contract GuildTokenUnitTest is Test {
 
     uint256 public issuance; // for mocked behavior
 
+    // debt ceiling with 0% tolerance
+    function debtCeiling(int256 deltaGaugeWeight) external returns (uint256) {
+        uint256 gaugeWeight = token.getGaugeWeight(address(this));
+        uint256 gaugeType = token.gaugeType(address(this));
+        uint256 totalWeight = token.totalTypeWeight(gaugeType);
+        uint256 borrowSupply = credit.totalSupply(); // simplify
+        uint256 gaugeWeightWithDelta = uint256(int256(gaugeWeight) + deltaGaugeWeight);
+        return borrowSupply * gaugeWeightWithDelta / totalWeight;
+    }
+
     function setUp() public {
         vm.warp(1679067867);
         vm.roll(16848497);
