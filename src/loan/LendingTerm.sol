@@ -265,11 +265,16 @@ contract LendingTerm is CoreRef {
     /// which is the formula to check debt ceiling in the borrow function.
     /// This gives the maximum borrowable amount to achieve 100% utilization of the debt
     /// ceiling, and if we add the current issuance to it, we get the current debt ceiling.
-    function debtCeiling() external view returns (uint256) {
+    /// @param gaugeWeightDelta an hypothetical change in gauge weight
+    /// @return the maximum amount of debt that can be issued by this term
+    function debtCeiling(
+        int256 gaugeWeightDelta
+    ) public view returns (uint256) {
         address _guildToken = refs.guildToken; // cached SLOAD
         uint256 gaugeWeight = GuildToken(_guildToken).getGaugeWeight(
             address(this)
         );
+        gaugeWeight = uint256(int256(gaugeWeight) + gaugeWeightDelta);
         uint256 gaugeType = GuildToken(_guildToken).gaugeType(address(this));
         uint256 totalWeight = GuildToken(_guildToken).totalTypeWeight(
             gaugeType
@@ -323,6 +328,11 @@ contract LendingTerm is CoreRef {
             return _hardCap;
         }
         return _debtCeiling;
+    }
+
+    /// @notice returns the debt ceiling without change to gauge weight
+    function debtCeiling() external view returns (uint256) {
+        return debtCeiling(0);
     }
 
     /// @notice initiate a new loan

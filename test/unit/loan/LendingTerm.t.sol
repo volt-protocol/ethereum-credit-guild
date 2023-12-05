@@ -406,9 +406,7 @@ contract LendingTermUnitTest is Test {
         assertEq(term.debtCeiling(), _HARDCAP);
 
         // if no weight is given to the term, debt ceiling is 0
-        guild.decrementGauge(address(term), _weight);
-        assertEq(term.debtCeiling(), 0);
-        guild.incrementGauge(address(term), _weight);
+        assertEq(term.debtCeiling(-int256(_weight)), 0);
 
         // add another gauge, equal voting weight for the 2nd gauge
         guild.addGauge(1, address(this));
