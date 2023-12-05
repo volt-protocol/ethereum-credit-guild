@@ -3,10 +3,7 @@ pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "@forge-std/Test.sol";
-
 import {Core} from "@src/core/Core.sol";
-import {CoreRef} from "@src/core/CoreRef.sol";
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
