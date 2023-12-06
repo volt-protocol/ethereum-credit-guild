@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {console} from "@forge-std/console.sol";
-import {Proposal_0 as proposal} from "@test/proposals/Proposal_0.sol";
 import {Script} from "@forge-std/Script.sol";
-import {AddressLib} from "@test/proposals/AddressLib.sol";
+
+import {GIP_0 as proposal} from "@test/proposals/gips/GIP_0.sol";
 
 contract DeployProposal is Script, proposal {
     uint256 public PRIVATE_KEY;
@@ -29,24 +28,12 @@ contract DeployProposal is Script, proposal {
 
     function run() public {
         _parseEnv();
-        Addresses addresses = new Addresses();
-        addresses.resetRecordingAddresses();
         address deployerAddress = vm.addr(PRIVATE_KEY);
 
         vm.startBroadcast(PRIVATE_KEY);
-        if (DO_DEPLOY) deploy(addresses);
-        if (DO_AFTERDEPLOY) afterDeploy(addresses, deployerAddress);
-        if (DO_TEARDOWN) teardown(addresses, deployerAddress);
+        if (DO_DEPLOY) deploy();
+        if (DO_AFTERDEPLOY) afterDeploy(deployerAddress);
+        if (DO_TEARDOWN) teardown(deployerAddress);
         vm.stopBroadcast();
-
-        if (DO_DEPLOY) {
-            (
-                string[] memory recordedNames,
-                address[] memory recordedAddresses
-            ) = addresses.getRecordedAddresses();
-            for (uint256 i = 0; i < recordedNames.length; i++) {
-                console.log("Deployed", recordedAddresses[i], recordedNames[i]);
-            }
-        }
     }
 }
