@@ -15,7 +15,7 @@ contract Addresses is Test {
 
     constructor() {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/protocol-configuration/addresses.mainnet.json");
+        string memory path = string.concat(root, "/protocol-configuration/addresses.json");
         string memory json = vm.readFile(path);
         bytes memory parsedJson = vm.parseJson(json);
         RecordedAddress[] memory addresses = abi.decode(parsedJson, (RecordedAddress[]));

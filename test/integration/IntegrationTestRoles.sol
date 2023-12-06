@@ -21,7 +21,7 @@ contract IntegrationTestRoles is PostProposalCheck {
 
     function testMainnetRoles() public {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/protocol-configuration/roles.mainnet.json");
+        string memory path = string.concat(root, "/protocol-configuration/roles.json");
         string memory json = vm.readFile(path);
 
         string[] memory roles = vm.parseJsonKeys(json, "$");

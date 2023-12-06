@@ -1,0 +1,26 @@
+[
+  {
+    "addr": "0x0000000000000000000000000000000000000000",
+    "name": "ZERO_ADDRESS"
+  },
+  {
+    "addr": "0xcbb83206698e8788f85efbeeecad17e53366ebdf",
+    "name": "TEAM_MULTISIG"
+  },
+  {
+    "addr": "0x6ef71ca9cd708883e129559f5edbfb9d9d5c6148",
+    "name": "EOA_1"
+  },
+  {
+    "addr": "0xd90e9181b20d8d1b5034d9f5737804da182039f6",
+    "name": "EOA_2"
+  },
+  {
+    "addr": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "name": "ERC20_USDC"
+  },
+  {
+    "addr": "0x83f20f44975d03b1b09e64809b757c47f942beea",
+    "name": "ERC20_SDAI"
+  }
+]
