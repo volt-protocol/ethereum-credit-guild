@@ -188,7 +188,7 @@ contract GIP_0 is Proposal {
             );
 
             AddressLib.set("AUCTION_HOUSE", address(auctionHouse));
-            AddressLib.set("LENDING_TERM", address(termV1));
+            AddressLib.set("LENDING_TERM_V1", address(termV1));
             AddressLib.set("PSM_USDC", address(psm));
         }
 
@@ -286,12 +286,6 @@ contract GIP_0 is Proposal {
                 "OFFBOARD_GOVERNOR_GUILD",
                 address(termOffboarding)
             );
-        }
-        {
-            /// create lending term implementation and add it to mainnet
-            address lendingTerm = address(new LendingTerm());
-
-            AddressLib.set("LENDING_TERM_V1", lendingTerm);
         }
 
         // Terms
