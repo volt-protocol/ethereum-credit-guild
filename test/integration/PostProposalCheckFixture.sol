@@ -7,8 +7,8 @@ import {Test} from "@forge-std/Test.sol";
 
 import {Core} from "@src/core/Core.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
-import {Addresses} from "@test/proposals/Addresses.sol";
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
@@ -30,6 +30,9 @@ contract PostProposalCheckFixture is PostProposalCheck {
     address public userOne = address(0x1111);
     address public userTwo = address(0x2222);
     address public userThree = address(0x3333);
+
+    /// Team multisig
+    address public teamMultisig;
 
     /// Core
     Core public core;
@@ -71,49 +74,52 @@ contract PostProposalCheckFixture is PostProposalCheck {
         /// ------------ address setup ------------ ///
         /// --------------------------------------- ///
 
-        /// core
-        core = Core(addresses.mainnet("CORE"));
+        /// Team multisig
+        teamMultisig = AddressLib.get("TEAM_MULTISIG");
 
-        usdc = ERC20(addresses.mainnet("ERC20_USDC"));
-        sdai = ERC20(addresses.mainnet("ERC20_SDAI"));
-        guild = GuildToken(addresses.mainnet("ERC20_GUILD"));
-        credit = CreditToken(addresses.mainnet("ERC20_GUSDC"));
+        /// core
+        core = Core(AddressLib.get("CORE"));
+
+        usdc = ERC20(AddressLib.get("ERC20_USDC"));
+        sdai = ERC20(AddressLib.get("ERC20_SDAI"));
+        guild = GuildToken(AddressLib.get("ERC20_GUILD"));
+        credit = CreditToken(AddressLib.get("ERC20_GUSDC"));
 
         /// rate limited minters
         rateLimitedCreditMinter = RateLimitedMinter(
-            addresses.mainnet("RATE_LIMITED_CREDIT_MINTER")
+            AddressLib.get("RATE_LIMITED_CREDIT_MINTER")
         );
         rateLimitedGuildMinter = RateLimitedMinter(
-            addresses.mainnet("RATE_LIMITED_GUILD_MINTER")
+            AddressLib.get("RATE_LIMITED_GUILD_MINTER")
         );
         surplusGuildMinter = SurplusGuildMinter(
-            addresses.mainnet("SURPLUS_GUILD_MINTER")
+            AddressLib.get("SURPLUS_GUILD_MINTER")
         );
 
-        profitManager = ProfitManager(addresses.mainnet("PROFIT_MANAGER"));
-        auctionHouse = AuctionHouse(addresses.mainnet("AUCTION_HOUSE"));
-        psm = SimplePSM(addresses.mainnet("PSM_USDC"));
+        profitManager = ProfitManager(AddressLib.get("PROFIT_MANAGER"));
+        auctionHouse = AuctionHouse(AddressLib.get("AUCTION_HOUSE"));
+        psm = SimplePSM(AddressLib.get("PSM_USDC"));
 
-        governor = GuildGovernor(payable(addresses.mainnet("DAO_GOVERNOR_GUILD")));
+        governor = GuildGovernor(payable(AddressLib.get("DAO_GOVERNOR_GUILD")));
         vetoGuildGovernor = GuildVetoGovernor(
-            payable(addresses.mainnet("ONBOARD_VETO_GUILD"))
+            payable(AddressLib.get("ONBOARD_VETO_GUILD"))
         );
         vetoCreditGovernor = GuildVetoGovernor(
-            payable(addresses.mainnet("ONBOARD_VETO_CREDIT"))
+            payable(AddressLib.get("ONBOARD_VETO_CREDIT"))
         );
         timelock = GuildTimelockController(
-            payable(addresses.mainnet("DAO_TIMELOCK"))
+            payable(AddressLib.get("DAO_TIMELOCK"))
         );
 
         /// lending terms
         onboarder = LendingTermOnboarding(
-            payable(addresses.mainnet("ONBOARD_GOVERNOR_GUILD"))
+            payable(AddressLib.get("ONBOARD_GOVERNOR_GUILD"))
         );
         offboarder = LendingTermOffboarding(
-            addresses.mainnet("OFFBOARD_GOVERNOR_GUILD")
+            AddressLib.get("OFFBOARD_GOVERNOR_GUILD")
         );
 
-        term = LendingTerm(addresses.mainnet("TERM_SDAI_1"));
+        term = LendingTerm(AddressLib.get("TERM_SDAI_1"));
         collateralToken = ERC20(term.getParameters().collateralToken);
         
         vm.label(userOne, "user one");

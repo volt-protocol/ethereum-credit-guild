@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import {console} from "@forge-std/console.sol";
 import {Proposal_0 as proposal} from "@test/proposals/Proposal_0.sol";
 import {Script} from "@forge-std/Script.sol";
-import {Addresses} from "@test/proposals/Addresses.sol";
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 
 contract DeployProposal is Script, proposal {
     uint256 public PRIVATE_KEY;

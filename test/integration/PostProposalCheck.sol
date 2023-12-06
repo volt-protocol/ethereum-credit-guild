@@ -3,11 +3,10 @@ pragma solidity 0.8.13;
 
 import {Test} from "@forge-std/Test.sol";
 
-import {Addresses} from "@test/proposals/Addresses.sol";
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {TestProposals} from "@test/proposals/TestProposals.sol";
 
 contract PostProposalCheck is Test {
-    Addresses addresses;
     TestProposals public proposals;
 
     uint256 preProposalsSnapshot;
@@ -21,7 +20,6 @@ contract PostProposalCheck is Test {
         proposals.setUp();
         proposals.setDebug(false);
         proposals.testProposals();
-        addresses = proposals.addresses();
 
         postProposalsSnapshot = vm.snapshot();
     }

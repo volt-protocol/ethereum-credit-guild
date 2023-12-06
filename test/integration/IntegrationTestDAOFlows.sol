@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
+
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import {Governor, IGovernor} from "@openzeppelin/contracts/governance/Governor.sol";
 import {IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
@@ -10,6 +11,7 @@ import "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
@@ -25,7 +27,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
 
         uint256 mintAmount = governor.quorum(0);
 
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         rateLimitedGuildMinter.mint(address(this), mintAmount); /// mint quorum to contract
 
         guild.delegate(address(this));
@@ -35,9 +37,9 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         /// new term so that onboard succeeds
         term = LendingTerm(
             onboarder.createTerm(
-                addresses.mainnet("TERM_IMPL"),
+                AddressLib.get("LENDING_TERM_V1"),
                 LendingTerm.LendingTermParams({
-                    collateralToken: addresses.mainnet("ERC20_SDAI"),
+                    collateralToken: AddressLib.get("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,
                     interestRate: 0.04e18,
                     maxDelayBetweenPartialRepay: 0,
@@ -176,7 +178,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
         ) = testCanCastVoteAndQueue();
 
         GuildVetoGovernor veto = GuildVetoGovernor(
-            payable(addresses.mainnet("DAO_VETO_GUILD"))
+            payable(AddressLib.get("DAO_VETO_GUILD"))
         );
         assertEq(
             address(veto.timelock()),
@@ -302,7 +304,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             "operation not pending"
         );
 
-        vm.startPrank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.startPrank(teamMultisig);
         governor.guardianCancel(
             targets,
             values,
@@ -547,7 +549,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
 
         assertEq(governor.proposalThreshold(), newProposalThreshold);
 
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         rateLimitedGuildMinter.mint(userOne, newProposalThreshold); /// mint quorum amount to user one
 
         vm.startPrank(userOne);
@@ -638,7 +640,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
 
         assertEq(governor.quorum(0), newQuorum, "new quorum not set");
 
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         rateLimitedGuildMinter.mint(userOne, newQuorum); /// mint new quorum amount to user one
 
         vm.startPrank(userOne);
@@ -771,7 +773,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
 
     function testMultisigCannotSetQuorum() public {
         uint256 newQuorum = 20_000_000 * 1e18;
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         vm.expectRevert("UNAUTHORIZED");
         governor.setQuorum(newQuorum);
     }
@@ -779,7 +781,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
     function testMultisigCannotSetProposalThreshold() public {
         uint256 newProposalThreshold = 2_000_000 * 1e18;
 
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         vm.expectRevert("UNAUTHORIZED");
         governor.setProposalThreshold(newProposalThreshold);
     }
@@ -787,7 +789,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
     function testMultisigCannotSetVotingDelay() public {
         uint256 newVotingDelay = 2 days / 12; /// convert time to block numbers
 
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         vm.expectRevert("UNAUTHORIZED");
         governor.setVotingDelay(newVotingDelay);
     }
@@ -795,7 +797,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
     function testMultisigCannotSetVotingPeriod() public {
         uint256 newVotingPeriod = 8 days / 12; /// convert time to block numbers
 
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         vm.expectRevert("UNAUTHORIZED");
         governor.setVotingPeriod(newVotingPeriod);
     }

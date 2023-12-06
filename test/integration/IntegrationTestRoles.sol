@@ -5,6 +5,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 
 contract IntegrationTestRoles is PostProposalCheck {
@@ -29,7 +30,7 @@ contract IntegrationTestRoles is PostProposalCheck {
         assertEq(roles.length, 17, "incorrect role count");
         
         for (uint256 i = 0; i < roles.length; i++) {
-            Core core = Core(addresses.mainnet("CORE"));
+            Core core = Core(AddressLib.get("CORE"));
             bytes32 role = keccak256(bytes(string.concat(roles[i], "_ROLE")));
             
             assertEq(
@@ -49,7 +50,7 @@ contract IntegrationTestRoles is PostProposalCheck {
 
             for (uint256 j = 0; j < addressNames.length; j++) {
                 assertEq(
-                    core.hasRole(role, addresses.mainnet(addressNames[j])),
+                    core.hasRole(role, AddressLib.get(addressNames[j])),
                     true,
                     string.concat("Expected ", addressNames[j], " to have role ", roles[i])
                 );

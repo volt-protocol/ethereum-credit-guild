@@ -10,6 +10,7 @@ import "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
@@ -24,7 +25,7 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
 
         uint256 mintAmount = governor.quorum(0);
 
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         rateLimitedGuildMinter.mint(address(this), mintAmount); /// mint quorum to contract
 
         guild.delegate(address(this));
@@ -34,9 +35,9 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
         /// new term so that onboard succeeds
         term = LendingTerm(
             onboarder.createTerm(
-                addresses.mainnet("TERM_IMPL"),
+                AddressLib.get("LENDING_TERM_V1"),
                 LendingTerm.LendingTermParams({
-                    collateralToken: addresses.mainnet("ERC20_SDAI"),
+                    collateralToken: AddressLib.get("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,
                     interestRate: 0.04e18,
                     maxDelayBetweenPartialRepay: 0,
@@ -124,7 +125,7 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
     function testSetOffboardingQuourumAsTimelock() public {
         uint256 newQuorum = 100_000_000 * 1e18;
 
-        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
+        vm.prank(AddressLib.get("DAO_TIMELOCK"));
         offboarder.setQuorum(newQuorum);
 
         assertEq(offboarder.quorum(), newQuorum, "new quorum not set");

@@ -3,8 +3,8 @@ pragma solidity 0.8.13;
 import {console} from "@forge-std/console.sol";
 
 import {Test} from "@forge-std/Test.sol";
-import {Addresses} from "@test/proposals/Addresses.sol";
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 
 import {GIP_0} from "@test/proposals/gips/GIP_0.sol";
 
@@ -17,11 +17,9 @@ Or, from another Solidity file (for post-proposal integration testing):
     proposals.setUp();
     proposals.setDebug(false); // don't console.log
     proposals.testProposals();
-    Addresses addresses = proposals.addresses();
 */
 
 contract TestProposals is Test {
-    Addresses public addresses;
     Proposal[] public proposals;
     uint256 public nProposals;
     bool public DEBUG;
@@ -38,7 +36,6 @@ contract TestProposals is Test {
         DO_RUN = vm.envOr("DO_RUN", true);
         DO_TEARDOWN = vm.envOr("DO_TEARDOWN", true);
         DO_VALIDATE = vm.envOr("DO_VALIDATE", true);
-        addresses = new Addresses();
 
         proposals.push(Proposal(address(new GIP_0())));
         nProposals = proposals.length;
@@ -71,48 +68,32 @@ contract TestProposals is Test {
 
             // Deploy step
             if (DO_DEPLOY) {
-                if (DEBUG) {
-                    console.log("Proposal", name, "deploy()");
-                    addresses.resetRecordingAddresses();
-                }
-                proposals[i].deploy(addresses);
-                if (DEBUG) {
-                    (
-                        string[] memory recordedNames,
-                        address[] memory recordedAddresses
-                    ) = addresses.getRecordedAddresses();
-                    for (uint256 j = 0; j < recordedNames.length; j++) {
-                        console.log(
-                            "  Deployed",
-                            recordedAddresses[j],
-                            recordedNames[j]
-                        );
-                    }
-                }
+                if (DEBUG) console.log("Proposal", name, "deploy()");
+                proposals[i].deploy();
             }
 
             // After-deploy step
             if (DO_AFTER_DEPLOY) {
                 if (DEBUG) console.log("Proposal", name, "afterDeploy()");
-                proposals[i].afterDeploy(addresses, address(proposals[i]));
+                proposals[i].afterDeploy(address(proposals[i]));
             }
 
             // Run step
             if (DO_RUN) {
                 if (DEBUG) console.log("Proposal", name, "run()");
-                proposals[i].run(addresses, address(proposals[i]));
+                proposals[i].run(address(proposals[i]));
             }
 
             // Teardown step
             if (DO_TEARDOWN) {
                 if (DEBUG) console.log("Proposal", name, "teardown()");
-                proposals[i].teardown(addresses, address(proposals[i]));
+                proposals[i].teardown(address(proposals[i]));
             }
 
             // Validate step
             if (DO_VALIDATE) {
                 if (DEBUG) console.log("Proposal", name, "validate()");
-                proposals[i].validate(addresses, address(proposals[i]));
+                proposals[i].validate(address(proposals[i]));
             }
 
             if (DEBUG) console.log("Proposal", name, "done.");

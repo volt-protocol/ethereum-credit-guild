@@ -9,6 +9,7 @@ import "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
@@ -22,9 +23,9 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         super.setUp();
         term = LendingTerm(
             onboarder.createTerm(
-                addresses.mainnet("TERM_IMPL"),
+                AddressLib.get("LENDING_TERM_V1"),
                 LendingTerm.LendingTermParams({
-                    collateralToken: addresses.mainnet("ERC20_SDAI"),
+                    collateralToken: AddressLib.get("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,
                     interestRate: 0.04e18,
                     maxDelayBetweenPartialRepay: 0,
@@ -35,11 +36,11 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
             )
         );
 
-        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
+        vm.prank(AddressLib.get("DAO_TIMELOCK"));
         guild.enableTransfer();
 
         uint256 mintAmount = onboarder.quorum(0);
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         rateLimitedGuildMinter.mint(address(this), mintAmount); /// mint all of the guild to this contract
         guild.delegate(address(this));
         vm.roll(block.number + 1); /// ensure user votes register
@@ -51,7 +52,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
 
     function testCoreCorrectlySetOnLendingTermLogic() public {
         assertEq(
-            address(LendingTerm(addresses.mainnet("TERM_IMPL")).core()),
+            address(LendingTerm(AddressLib.get("LENDING_TERM_V1")).core()),
             address(1)
         );
     }

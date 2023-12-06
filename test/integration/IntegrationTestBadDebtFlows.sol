@@ -9,7 +9,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
     function testVoteForSDAIGauge() public {
         uint256 mintAmount = governor.quorum(0);
         /// setup
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         rateLimitedGuildMinter.mint(address(this), mintAmount);
         guild.delegate(address(this));
 

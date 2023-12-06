@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 import "@forge-std/Test.sol";
 
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
 contract IntegrationTestGuildToken is PostProposalCheckFixture {
@@ -40,7 +41,7 @@ contract IntegrationTestGuildToken is PostProposalCheckFixture {
     function _mintGuildToUser(address to, uint96 amount) private {
         uint256 startingBalance = guild.balanceOf(to);
 
-        vm.prank(addresses.mainnet("TEAM_MULTISIG"));
+        vm.prank(teamMultisig);
         rateLimitedGuildMinter.mint(to, amount);
 
         assertEq(guild.balanceOf(to), startingBalance + amount);
@@ -96,7 +97,7 @@ contract IntegrationTestGuildToken is PostProposalCheckFixture {
         uint256 startingGaugeWeight = guild.getGaugeWeight(address(term));
         uint256 startingTotalWeight = guild.totalWeight();
 
-        vm.prank(addresses.mainnet("DAO_TIMELOCK"));
+        vm.prank(AddressLib.get("DAO_TIMELOCK"));
         guild.removeGauge(address(term));
 
         uint256 endingTotalWeight = guild.totalWeight();

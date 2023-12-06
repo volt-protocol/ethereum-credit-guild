@@ -1,5 +1,5 @@
 [profile.default]
-fs_permissions = [{ access = "read", path = "./"}]
+fs_permissions = [{ access = "read-write", path = "./protocol-configuration"}]
 
 # compilation
 optimizer = true

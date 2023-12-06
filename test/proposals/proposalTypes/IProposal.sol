@@ -1,6 +1,6 @@
 pragma solidity 0.8.13;
 
-import {Addresses} from "@test/proposals/Addresses.sol";
+import {AddressLib} from "@test/proposals/AddressLib.sol";
 
 interface IProposal {
     // Proposal name, e.g. "VIP16"
@@ -10,18 +10,18 @@ interface IProposal {
     // another solidity file that calls this proposal.
     function setDebug(bool) external;
 
-    // Deploy contracts and add them to list of addresses
-    function deploy(Addresses) external;
+    // Deploy contracts
+    function deploy() external;
 
     // After deploying, call initializers and link contracts
     // together, e.g. if you deployed ABC and XYZ contracts,
     // you could link them in this step by calling abc.setXYZ(xyz).
-    function afterDeploy(Addresses, address) external;
+    function afterDeploy(address) external;
 
     // Actually run the proposal (e.g. queue actions in the Timelock,
     // or execute a serie of Multisig calls...).
     // See contracts/test/proposals/proposalTypes for helper contracts.
-    function run(Addresses, address) external;
+    function run(address) external;
 
     // After a proposal executed, if you mocked some behavior in the
     // afterDeploy step, you might want to tear down the mocks here.
@@ -30,7 +30,7 @@ interface IProposal {
     // of changes that must happen before your proposal execution), and here
     // you could revert these changes, to make sure the integration tests
     // run on a state that is as close to mainnet as possible.
-    function teardown(Addresses, address) external;
+    function teardown(address) external;
 
     // For small post-proposal checks, e.g. read state variables of the
     // contracts you deployed, to make sure your deploy() and afterDeploy()
@@ -44,5 +44,5 @@ interface IProposal {
     // If you want to add extensive validation of a new component
     // deployed by your proposal, you might want to add a post-proposal
     // test file instead.
-    function validate(Addresses, address) external;
+    function validate(address) external;
 }
