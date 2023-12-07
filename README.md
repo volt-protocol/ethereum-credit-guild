@@ -79,7 +79,7 @@ _Note for C4 wardens: Anything included in this `Automated Findings / Publicly K
 Known issues :
 - Accounting is "pessimistic", which is at odd with how lending protocols usually work. Interest is distributed to lenders only after it is paid by borrowers.
 - Some contracts do not follow CEI. This is because they only do calls to other immutable protocol contracts, and the only "interactions" considered to have to happen after state updates are interactions to untrusted external contracts (like collateral tokens).
-- A quorum of `GUILD` or `gUSDC` can block all governance actions. This is expected and the protocol would rather bias towards immutability than require large governance votes for everything. Forks are expected in case of strong cohort disagreements.
+- A quorum of `GUILD` or `gUSDC` can block all governance actions except lending term offboarding. This is expected and the protocol would rather bias towards immutability and the ability to safely wind down than require large governance votes for everything. Forks are expected in case of strong cohort disagreements.
 - In profit distribution, savings rate can receive rewards even if the split is 0%, because of rounding down.
 - Collateral tokens can remain unclaimable by anyone (only by `GOVERNOR` role) and stay on lending terms if loans are forgiven
 - Rate limited `gUSDC` minter does not take `creditMultiplier` into account for buffer size & replenish rate
@@ -120,6 +120,7 @@ Total SLOC: 3739
 
 ### Additional Context
 
+- **Isolated markets:** by default, each lending asset is risk isolated and has its own set of available lending terms, so bad debt in the ETH market will not affect USDC lenders. It's possible to link the markets by accepting each others' deposit receipts as collateral (gUSDC, gETH, etc).
 - **Auction mechanism:** at first, offer 0% collateral, ask 100% debt. Then, over time, offer a larger % of the collateral and still 100% debt. At 'midpoint', 100% collateral is offered asking for 100% debt, and if nobody has bid, bad debt will be realized. In the second phase, 100% collateral is offered and less and less debt is asked. When we reach the end of the auction (100% collateral offered, 0% debt asked), nobody can bid in the auction anymore, and the loans can be automatically forgiven (marking it as a 100% loss). The first to bid wins the auction, making it a race to arbitrage (onchain MEV or otherwise).
 - **Collateral tokens**: The protocol is expected to handle properly most widely used ERC20 tokens as collateral. The collateral tokens are the least trusted external calls in the system. At launch, we expect to interact with RWA tokens, LSD tokens, and yield-bearing tokens in general, but **no rebasing tokens** and **no fee on transfer**.
 - **Deployment**: we anticipate to launch on Ethereum mainnet & L2s like Arbitrum.
@@ -193,7 +194,7 @@ The set of actions possible in the system are tightly constrained.
 
 #### Quorum Actions
 
-In several cases, a certain quorum of `GUILD` holders can perform a system action or make a parameter change, and another quorum veto it. Each action may have distinct quorums and voting periods or other delays.
+In several cases, a certain quorum of `GUILD` holders can perform a system action or make a parameter change, and another quorum veto it. Each action may have distinct quorums and voting periods or other delays. All of these actions are currently subject to veto except for lending term offboarding.
 
   * adjust the global debt ceiling of any credit token
   * approve a new `LendingTerm`, which defines collateral ratios, interest rates, etc
@@ -298,11 +299,9 @@ Once bad debt is realized, stakers in the associated gauge can be slashed and lo
 
 ### Bootstrapping Credit
 
-`gUSDC` will be launched under a guarded beta with a low debt ceiling. Participants can engage based on their own interest and at their own risk. The Electric Development Co will provide `USDC` to the PSM to make the system usable for early borrowers: anyone borrowing `gUSDC` in a lending term can redeem those for `USDC`. Provision of liquidity by the Electric Development Co is not guaranteed to last over any duration, and borrowers are responsible for any costs they incur opening or closing positions.
+The first market for USDC will be launched under a guarded beta with a low debt ceiling. This means users can mint or redeem in the PSM freely, but borrowing is limited while the collateral pricing and liquidation system is first put in production. Participants can engage based on their own interest and at their own risk.
 
-Other users can become lenders to the system by providing `USDC` to mint `gUSDC` in the PSM, and enter the savings rate.
-
-`GUILD` will be distributed on an ongoing basis to `gUSDC` holders and borrowers, encouraging decentralization of the supply and an engaged owner-user base in the early period. `GUILD` will be nontransferable upon protocol launch, and only usable for voting and gauge staking, discouraging purely speculative yield farming and the growth of an unsustainably large capital base.
+`GUILD` will be distributed on an ongoing basis to `gUSDC` holders and borrowers, as well as to those who actively participate in staking, encouraging decentralization of the supply and an engaged owner-user base in the early period. `GUILD` will be nontransferable upon protocol launch, and only usable for voting and gauge staking, discouraging purely speculative yield farming and the growth of an unsustainably large capital base.
 
 #### Governance
 
