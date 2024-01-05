@@ -58,11 +58,6 @@ contract AccountFactory is Ownable {
         emit CallAllowed(target, functionSelector, allowed);
     }
 
-    /// @notice check if a function call is allowed for a target address
-    function canCall(address target, bytes4 functionSelector) external view returns (bool) {
-        return allowedCalls[target][functionSelector];
-    }
-
     /// @notice Create a new acount and initialize it.
     function createAccount(address implementation) external returns (address) {
         require(
