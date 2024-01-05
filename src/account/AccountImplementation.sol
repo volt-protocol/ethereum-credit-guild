@@ -31,6 +31,19 @@ contract AccountImplementation is BoringBatchable, Ownable {
     function withdraw(address token, address receiver, uint256 amount) public onlyOwner {
         IERC20(token).transfer(receiver, amount);
     }
+    
+    /**
+     * @notice Allows the owner to withdraw all ETH from the contract to a specified receiver.
+     * @param receiver The address to which the ETH will be sent.
+     */
+    function withdrawEth(address payable receiver) external onlyOwner {
+        require(receiver != address(0), "AccountImplementation: invalid receiver address");
+        uint256 balance = address(this).balance;
+        require(balance > 0, "AccountImplementation: no ETH to withdraw");
+
+        (bool success, ) = receiver.call{value: balance}("");
+        require(success, "AccountImplementation: failed to send ETH");
+    }
 
     /// @notice function to perform external calls (can be batched)
     function callExternal(
