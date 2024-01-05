@@ -28,20 +28,18 @@ contract AccountImplementation is BoringBatchable, Ownable {
     }
 
     /// @notice allows to withdraw any token from the account contract
-    function withdraw(address token, address receiver, uint256 amount) public onlyOwner {
-        IERC20(token).transfer(receiver, amount);
+    function withdraw(address token, uint256 amount) public onlyOwner {
+        IERC20(token).transfer(owner(), amount);
     }
-    
+
     /**
      * @notice Allows the owner to withdraw all ETH from the contract to a specified receiver.
-     * @param receiver The address to which the ETH will be sent.
      */
-    function withdrawEth(address payable receiver) external onlyOwner {
-        require(receiver != address(0), "AccountImplementation: invalid receiver address");
+    function withdrawEth() external onlyOwner {
         uint256 balance = address(this).balance;
         require(balance > 0, "AccountImplementation: no ETH to withdraw");
 
-        (bool success, ) = receiver.call{value: balance}("");
+        (bool success, ) = owner().call{value: balance}("");
         require(success, "AccountImplementation: failed to send ETH");
     }
 
@@ -52,7 +50,7 @@ contract AccountImplementation is BoringBatchable, Ownable {
     ) public onlyOwner {
         // Extract the function selector from the first 4 bytes of `data`
         bytes4 functionSelector = bytes4(data[:4]);
-        require(AccountFactory(factory).canCall(target, functionSelector), "AccountImplementation: cannot call target");
+        require(AccountFactory(factory).allowedCalls(target, functionSelector), "AccountImplementation: cannot call target");
 
         (bool success, bytes memory result) = target.call(data);
         if (!success) {
