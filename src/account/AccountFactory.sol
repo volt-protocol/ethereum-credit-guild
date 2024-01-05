@@ -15,6 +15,10 @@ contract AccountFactory is Ownable {
     /// (used to check that an account has been created by this factory)
     mapping(address => uint256) public created;
 
+    /// @notice mapping of allowed signatures per target address
+    /// For example allowing "flashLoan" on the balancer vault
+    mapping(address => mapping(bytes4 => bool)) public allowedCalls;
+
     /// @notice emitted when an account implementation's "allowed" status changes
     event ImplementationAllowChanged(
         uint256 indexed when,
@@ -30,6 +34,9 @@ contract AccountFactory is Ownable {
         address user
     );
 
+    /// @notice emitted when a call is allowed or not by the function allowCall
+    event CallAllowed(address indexed target, bytes4 functionSelector, bool isAllowed);
+
     constructor() Ownable() {}
 
     /// @notice Allow or disallow a given implemenation
@@ -43,6 +50,17 @@ contract AccountFactory is Ownable {
             implementation,
             allowed
         );
+    }
+
+    /// @notice allow (or disallow) a function call for a target address
+    function allowCall(address target, bytes4 functionSelector, bool allowed) public onlyOwner {
+        allowedCalls[target][functionSelector] = allowed;
+        emit CallAllowed(target, functionSelector, allowed);
+    }
+
+    /// @notice check if a function call is allowed for a target address
+    function canCall(address target, bytes4 functionSelector) external view returns (bool) {
+        return allowedCalls[target][functionSelector];
     }
 
     /// @notice Create a new acount and initialize it.
