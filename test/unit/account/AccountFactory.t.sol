@@ -63,4 +63,23 @@ contract UnitTestAccountFactory is Test {
         assertEq(factory.allowedCalls(a2, s2), false);
         vm.stopPrank();
     }
+
+    function testCreateAccountWithoutImplementation(address a) public {
+        vm.expectRevert("AccountFactory: invalid implementation");
+        factory.createAccount(a);
+    }
+    
+    function testCreateAccount() public {
+        vm.prank(factoryOwner);
+        address implementation = address(new AccountImplementation());
+        vm.prank(factoryOwner);
+        factory.allowImplementation(implementation, true);
+
+        address accountCreated = factory.createAccount(implementation);
+
+        // validate account has been created
+        assertEq(factory.created(accountCreated), block.timestamp);
+
+        assertTrue(accountCreated != address(0));
+    }
 }
