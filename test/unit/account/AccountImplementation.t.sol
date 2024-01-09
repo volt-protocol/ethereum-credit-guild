@@ -6,6 +6,12 @@ import {AccountImplementation} from "@src/account/AccountImplementation.sol";
 import {AccountFactory} from "@src/account/AccountFactory.sol";
 import {MockERC20} from "../../mock/MockERC20.sol";
 
+contract RejectingReceiver {
+    receive() external payable {
+        revert("RejectingReceiver: rejecting ETH");
+    }
+}
+
 contract UnitTestAccountImplementation is Test {
     AccountFactory public factory;
     address factoryOwner = address(10101);
@@ -94,6 +100,21 @@ contract UnitTestAccountImplementation is Test {
         vm.prank(alice);
         vm.expectRevert("AccountImplementation: no ETH to withdraw");
         aliceAccount.withdrawEth();
+    }
+
+    function testWithdrawFailShouldRevert() public {
+        RejectingReceiver receiver = new RejectingReceiver();
+        vm.prank(address(receiver));
+        address createdAccount = factory.createAccount(validImplementation);
+        assertEq(createdAccount.balance, 0);
+        assertEq(AccountImplementation(createdAccount).owner(), address(receiver));
+
+        vm.deal(createdAccount, 1e18);
+        assertEq(createdAccount.balance, 1e18);
+
+        vm.prank(address(receiver));
+        vm.expectRevert("AccountImplementation: failed to send ETH");
+        AccountImplementation(createdAccount).withdrawEth();
     }
 
     function testWithdrawShouldWithdrawEth() public {
