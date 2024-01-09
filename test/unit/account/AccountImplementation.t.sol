@@ -12,20 +12,36 @@ contract RejectingReceiver {
     }
 }
 
+/// @title Test suite for the AccountImplementation contract
+/// @notice Implements various test cases to validate the functionality of AccountImplementation contract
 contract UnitTestAccountImplementation is Test {
+    /// @notice Contract instance of AccountFactory used in tests
     AccountFactory public factory;
+
+    /// @notice Address used as factory owner in tests
     address factoryOwner = address(10101);
+
+    /// @notice Address used to represent a typical user (Alice)
     address alice = address(1);
+    /// @notice Address used to represent another user (Bob)
     address bob = address(2);
+
+    /// @notice Address used as an allowed target in for the batching
     address allowedTarget = address(101);
-    bytes4 allowedSig1 = bytes4(0x68ad3191); // superfunction(address,uint256)
-    bytes4 allowedSig2 = bytes4(0x82c52709); // betterfunction(address,address)
 
+    /// @notice Signature for an allowed function call (superfunction(address,uint256))
+    bytes4 allowedSig1 = bytes4(0x68ad3191);
+    /// @notice Signature for an allowed function call (betterfunction(address,address))
+    bytes4 allowedSig2 = bytes4(0x82c52709);
+
+    /// @notice Address of the valid implementation used in tests
     address validImplementation;
+    /// @notice Instance of AccountImplementation for Alice
     AccountImplementation aliceAccount;
-
+    /// @notice MockERC20 token instance used in tests
     MockERC20 mockToken;
 
+    /// @notice Sets up the test by deploying contracts and setting initial states
     function setUp() public {
         // set up a factory and an implementation
         vm.startPrank(factoryOwner);
@@ -38,12 +54,15 @@ contract UnitTestAccountImplementation is Test {
 
         // set up an account for alice
         vm.prank(alice);
-        aliceAccount = AccountImplementation(factory.createAccount(validImplementation));
+        aliceAccount = AccountImplementation(
+            factory.createAccount(validImplementation)
+        );
 
         // set up a mockerc20
         mockToken = new MockERC20();
     }
 
+    /// @notice Tests the initial state of contracts and variables
     function testInit() public {
         assertEq(factory.allowedCalls(allowedTarget, allowedSig1), true);
         assertEq(factory.allowedCalls(allowedTarget, allowedSig2), true);
@@ -52,23 +71,27 @@ contract UnitTestAccountImplementation is Test {
         assertEq(alice, aliceAccount.owner());
     }
 
+    /// @notice Tests that calling initialize on an already initialized account should fail
     function testCallInitializeShouldFail() public {
         vm.expectRevert("AccountImplementation: already initialized");
         aliceAccount.initialize(bob);
     }
 
+    /// @notice Tests that a non-owner cannot renounce ownership
     function testRenounceOwnershipShouldFailIfNotOwner() public {
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(bob);
         aliceAccount.renounceOwnership();
     }
 
+    /// @notice Tests that even the owner cannot renounce ownership
     function testRenounceOwnershipShouldFailEvenifOwner() public {
         vm.expectRevert("AccountImplementation: cannot renounce ownership");
         vm.prank(alice);
         aliceAccount.renounceOwnership();
     }
 
+    /// @notice Tests that non-owner cannot withdraw tokens
     function testWithdrawShouldFailIfNotOwner() public {
         mockToken.mint(address(aliceAccount), 1000e18);
         assertEq(mockToken.balanceOf(address(aliceAccount)), 1000e18);
@@ -78,6 +101,7 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.withdraw(address(mockToken), 1000e18);
     }
 
+    /// @notice Tests that the owner can withdraw the specified amount of tokens
     function testWithdrawShouldWithdrawTheAmountRequested() public {
         mockToken.mint(address(aliceAccount), 1000e18);
         assertEq(mockToken.balanceOf(address(aliceAccount)), 1000e18);
@@ -89,6 +113,7 @@ contract UnitTestAccountImplementation is Test {
         assertEq(mockToken.balanceOf(alice), 250e18);
     }
 
+    /// @notice Tests that non-owner cannot withdraw ETH
     function testWithdrawEthShouldFailIfNotOwner() public {
         // try to withdraw eth as bob
         vm.prank(bob);
@@ -96,18 +121,23 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.withdrawEth();
     }
 
+    /// @notice Tests that withdrawing ETH fails if the balance is zero
     function testWithdrawEthShouldFailIfNoBalance() public {
         vm.prank(alice);
         vm.expectRevert("AccountImplementation: no ETH to withdraw");
         aliceAccount.withdrawEth();
     }
 
+    /// @notice Tests that ETH withdrawal fails if the call to send eth somehow fails
     function testWithdrawFailShouldRevert() public {
         RejectingReceiver receiver = new RejectingReceiver();
         vm.prank(address(receiver));
         address createdAccount = factory.createAccount(validImplementation);
         assertEq(createdAccount.balance, 0);
-        assertEq(AccountImplementation(createdAccount).owner(), address(receiver));
+        assertEq(
+            AccountImplementation(createdAccount).owner(),
+            address(receiver)
+        );
 
         vm.deal(createdAccount, 1e18);
         assertEq(createdAccount.balance, 1e18);
@@ -117,6 +147,7 @@ contract UnitTestAccountImplementation is Test {
         AccountImplementation(createdAccount).withdrawEth();
     }
 
+    /// @notice Tests that the owner can withdraw ETH successfully
     function testWithdrawShouldWithdrawEth() public {
         assertEq(alice.balance, 0);
 
