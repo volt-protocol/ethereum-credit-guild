@@ -46,6 +46,11 @@ contract UnitTestAccountImplementation is Test {
         assertEq(alice, aliceAccount.owner());
     }
 
+    function testCallInitializeShouldFail() public {
+        vm.expectRevert("AccountImplementation: already initialized");
+        aliceAccount.initialize(bob);
+    }
+
     function testRenounceOwnershipShouldFailIfNotOwner() public {
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(bob);
@@ -103,14 +108,4 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.withdrawEth();
         assertEq(alice.balance, 1e18);
     }
-
-    // function testWithdrawEth() public {
-    //     // Setup conditions for withdrawEth
-    //     // Test withdrawEth functionality
-    // }
-
-    // function testCallExternal() public {
-    //     // Setup conditions for callExternal
-    //     // Test callExternal functionality
-    // }
 }
