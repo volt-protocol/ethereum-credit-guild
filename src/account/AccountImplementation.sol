@@ -3,13 +3,15 @@ pragma solidity 0.8.13;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
-
 import {AccountFactory} from "@src/account/AccountFactory.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// Smart account implementation for the ECG
-contract AccountImplementation is Multicall, Ownable {
+contract AccountImplementation is Ownable {
+    error CallExternalError(bytes innerError);
+
+    address public BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+
     address public factory;
 
     constructor() Ownable() {}
@@ -61,7 +63,44 @@ contract AccountImplementation is Multicall, Ownable {
         }
     }
 
-    error CallExternalError(bytes innerError);
+    function multicall(bytes[] calldata calls) public payable {
+        for (uint256 i = 0; i < calls.length; i++) {
+            (bool success, bytes memory result) = address(this).delegatecall(
+                calls[i]
+            );
+            if (!success) {
+                _getRevertMsg(result);
+            }
+        }
+    }
+
+    /// @notice this is the receiveFlashLoan implementation for balancer
+    function receiveFlashLoan(
+        IERC20[] memory tokens,
+        uint256[] memory amounts,
+        uint256[] memory feeAmounts,
+        bytes memory userData
+    ) external {
+        // ensure no fees for balancer?
+        for (uint256 i = 0; i < feeAmounts.length; i++) {
+            require(feeAmounts[i] == 0);
+        }
+
+        // userData sent by the balancer vault should be the next actions
+        // to be performed, usually should be a multicall
+        (bool success, bytes memory result) = address(this).call(userData);
+        if (!success) {
+            _getRevertMsg(result);
+        }
+
+        // Transfer back the required amounts to the Balancer Vault
+        for (uint256 i = 0; i < tokens.length; i++) {
+            tokens[i].transfer(
+                address(BALANCER_VAULT),
+                amounts[i] + feeAmounts[i]
+            );
+        }
+    }
 
     /// @dev Helper function to extract a useful revert message from a failed call.
     /// If the returned data is malformed or not correctly abi encoded then this call can fail itself.
