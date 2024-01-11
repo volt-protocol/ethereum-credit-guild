@@ -5,12 +5,15 @@ import {Test} from "@forge-std/Test.sol";
 import {AccountImplementation} from "@src/account/AccountImplementation.sol";
 import {AccountFactory} from "@src/account/AccountFactory.sol";
 import {MockERC20} from "../../mock/MockERC20.sol";
+import {MockExternalContract} from "../../mock/MockExternalContract.sol";
 
 contract RejectingReceiver {
     receive() external payable {
         revert("RejectingReceiver: rejecting ETH");
     }
 }
+
+error CallExternalError(bytes innerError);
 
 /// @title Test suite for the AccountImplementation contract
 /// @notice Implements various test cases to validate the functionality of AccountImplementation contract
@@ -26,13 +29,10 @@ contract UnitTestAccountImplementation is Test {
     /// @notice Address used to represent another user (Bob)
     address bob = address(2);
 
-    /// @notice Address used as an allowed target in for the batching
-    address allowedTarget = address(101);
-
-    /// @notice Signature for an allowed function call (superfunction(address,uint256))
-    bytes4 allowedSig1 = bytes4(0x68ad3191);
-    /// @notice Signature for an allowed function call (betterfunction(address,address))
-    bytes4 allowedSig2 = bytes4(0x82c52709);
+    /// @notice Signature for an allowed function call (ThisFunctionWillRevert(uint256)
+    bytes4 allowedSig1 = bytes4(0xcfec160d);
+    /// @notice Signature for an allowed function call (ThisFunctionIsOk(uint256)
+    bytes4 allowedSig2 = bytes4(0x2af749ff);
 
     /// @notice Address of the valid implementation used in tests
     address validImplementation;
@@ -40,11 +40,14 @@ contract UnitTestAccountImplementation is Test {
     AccountImplementation aliceAccount;
     /// @notice MockERC20 token instance used in tests
     MockERC20 mockToken;
+    /// @notice Address used as an allowed target external calls
+    address allowedTarget;
 
     /// @notice Sets up the test by deploying contracts and setting initial states
     function setUp() public {
         // set up a factory and an implementation
         vm.startPrank(factoryOwner);
+        allowedTarget = address(new MockExternalContract());
         factory = new AccountFactory();
         validImplementation = address(new AccountImplementation());
         factory.allowImplementation(validImplementation, true);
@@ -159,5 +162,80 @@ contract UnitTestAccountImplementation is Test {
         vm.prank(alice);
         aliceAccount.withdrawEth();
         assertEq(alice.balance, 1e18);
+    }
+
+    function testCallExternalShouldFailIfNotOwner() public {
+        bytes memory data = bytes("0x01020304");
+
+        vm.expectRevert("Ownable: caller is not the owner");
+        aliceAccount.callExternal(address(1), data);
+    }
+
+    function testCallExternalShouldFailOnNonAllowedTarget() public {
+        bytes memory data = abi.encodeWithSignature(
+            "nonAllowedFunction(uint256,string)",
+            42,
+            "Hello"
+        );
+
+        vm.prank(alice);
+        vm.expectRevert("AccountImplementation: cannot call target");
+        aliceAccount.callExternal(address(1), data);
+    }
+
+    function testCallExternalShouldFailOnNonAllowedSignature() public {
+        bytes memory data = abi.encodeWithSignature(
+            "nonAllowedFunction(uint256,string)",
+            42,
+            "Hello"
+        );
+
+        vm.prank(alice);
+        vm.expectRevert("AccountImplementation: cannot call target");
+        aliceAccount.callExternal(allowedTarget, data);
+    }
+
+    function testCallExternalFailingShouldRevert() public {
+        bytes memory data = abi.encodeWithSignature(
+            "ThisFunctionWillRevert(uint256)",
+            uint256(1000)
+        );
+
+        vm.prank(alice);
+        vm.expectRevert("I told you I would revert");
+        aliceAccount.callExternal(allowedTarget, data);
+    }
+
+    function testCallExternalFailingShouldRevertWithoutMsg() public {
+        bytes memory data = abi.encodeWithSignature(
+            "ThisFunctionWillRevertWithoutMsg(uint256)",
+            uint256(1000)
+        );
+        bytes4 functionSelector = bytes4(
+            keccak256("ThisFunctionWillRevertWithoutMsg(uint256)")
+        );
+        vm.prank(factoryOwner);
+        // allow "ThisFunctionWillRevertWithoutMsg(uint256)"
+        factory.allowCall(allowedTarget, functionSelector, true);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(CallExternalError.selector, bytes(""))
+        );
+
+        aliceAccount.callExternal(allowedTarget, data);
+    }
+
+    function testCallExternalSuccessShouldWork() public {
+        assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
+
+        bytes memory data = abi.encodeWithSignature(
+            "ThisFunctionIsOk(uint256)",
+            uint256(1000)
+        );
+
+        vm.prank(alice);
+        aliceAccount.callExternal(allowedTarget, data);
+        assertEq(1000, MockExternalContract(allowedTarget).AmountSaved());
     }
 }
