@@ -41,6 +41,24 @@ contract AccountImplementation is Ownable {
     ///      Which is "onlyOwner" so the StoredCalls can only be set by the owner of the contract
     bytes[] private StoredCalls;
 
+    /// @notice YesNo status used to store YES or NO (or UNSET when creating the contract)
+    /// used to cost less gas than a simple boolean that will be reset to 0 between calls
+    enum YesNoStatus {
+        UNSET,
+        NO,
+        YES
+    }
+    YesNoStatus private initiatedByOwner;
+
+    modifier initiatedByOwnerOrOwner() {
+        require(
+            initiatedByOwner == YesNoStatus.YES || msg.sender == owner(),
+            "Not owner or initiated by owner"
+        );
+
+        _;
+    }
+
     /// @notice Creates a new AccountImplementation contract and sets the owner.
     constructor() Ownable() {}
 
@@ -79,12 +97,13 @@ contract AccountImplementation is Ownable {
     /// @notice Executes an external call to a specified target.
     ///         Only allows external calls to allowed target and function selector
     ///         these whitelisted calls are stored in the factory
+    /// @dev    this function is only callable by the owner or if the owner initiated a flashloan (and then the flashloan contract called the contract back to continue the execution)
     /// @param target The address of the contract to call.
     /// @param data The calldata to send.
     function callExternal(
         address target,
         bytes calldata data
-    ) public onlyOwner {
+    ) public initiatedByOwnerOrOwner {
         // Extract the function selector from the first 4 bytes of `data`
         bytes4 functionSelector = bytes4(data[:4]);
         require(
@@ -101,7 +120,9 @@ contract AccountImplementation is Ownable {
     /// @notice Executes multiple calls in a single transaction.
     /// @param calls An array of call data to execute.
     function multicall(bytes[] calldata calls) public onlyOwner {
+        initiatedByOwner = YesNoStatus.YES;
         _executeCalls(calls);
+        initiatedByOwner = YesNoStatus.NO;
     }
 
     /// @notice Initiates a Balancer flash loan and executes specified calls before and after receiving the loan.
@@ -122,6 +143,8 @@ contract AccountImplementation is Ownable {
         for (uint i = 0; i < postCalls.length; i++) {
             StoredCalls.push(postCalls[i]);
         }
+
+        initiatedByOwner = YesNoStatus.YES;
 
         // execute the pre calls
         _executeCalls(preCalls);
@@ -159,6 +182,8 @@ contract AccountImplementation is Ownable {
 
         // clear stored calls
         delete StoredCalls;
+        // clear initiated by owner
+        initiatedByOwner = YesNoStatus.NO;
 
         // Transfer back the required amounts to the Balancer Vault
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -169,13 +194,11 @@ contract AccountImplementation is Ownable {
         }
     }
 
-    /// @dev Executes a series of calls using delegatecall.
+    /// @dev Executes a series of calls using call on this contract.
     /// @param calls An array of call data to execute.
     function _executeCalls(bytes[] memory calls) private {
         for (uint256 i = 0; i < calls.length; i++) {
-            (bool success, bytes memory result) = address(this).delegatecall(
-                calls[i]
-            );
+            (bool success, bytes memory result) = address(this).call(calls[i]);
             if (!success) {
                 _getRevertMsg(result);
             }
