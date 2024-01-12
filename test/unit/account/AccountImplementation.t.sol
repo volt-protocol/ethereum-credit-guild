@@ -5,7 +5,9 @@ import {Test} from "@forge-std/Test.sol";
 import {AccountImplementation} from "@src/account/AccountImplementation.sol";
 import {AccountFactory} from "@src/account/AccountFactory.sol";
 import {MockERC20} from "../../mock/MockERC20.sol";
+import {MockBalancerVault} from "../../mock/MockBalancerVault.sol";
 import {MockExternalContract} from "../../mock/MockExternalContract.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract RejectingReceiver {
     receive() external payable {
@@ -42,6 +44,27 @@ contract UnitTestAccountImplementation is Test {
     MockERC20 mockToken;
     /// @notice Address used as an allowed target external calls
     address allowedTarget;
+
+    function getCode(address _addr) public view returns (bytes memory) {
+        bytes memory code;
+        assembly {
+            // Get the size of the code at address `_addr`
+            let size := extcodesize(_addr)
+
+            // Allocate memory for the code
+            code := mload(0x40)
+
+            // Update the free memory pointer
+            mstore(0x40, add(code, and(add(add(size, 0x20), 0x1f), not(0x1f))))
+
+            // Store the size in memory
+            mstore(code, size)
+
+            // Copy the code to memory
+            extcodecopy(_addr, add(code, 0x20), 0, size)
+        }
+        return code;
+    }
 
     /// @notice Sets up the test by deploying contracts and setting initial states
     function setUp() public {
@@ -167,7 +190,7 @@ contract UnitTestAccountImplementation is Test {
     function testCallExternalShouldFailIfNotOwner() public {
         bytes memory data = bytes("0x01020304");
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert("Not owner or initiated by owner");
         aliceAccount.callExternal(address(1), data);
     }
 
@@ -236,10 +259,34 @@ contract UnitTestAccountImplementation is Test {
 
         vm.prank(alice);
         aliceAccount.callExternal(allowedTarget, data);
+
         assertEq(1000, MockExternalContract(allowedTarget).AmountSaved());
     }
 
-    function testMulticall() public {
+    function testMulticallWithOneFailShouldFail() public {
+        assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
+
+        bytes[] memory calls = new bytes[](2);
+        calls[0] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            allowedTarget,
+            abi.encodeWithSignature("ThisFunctionIsOk(uint256)", uint256(1000))
+        );
+        calls[1] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            allowedTarget,
+            abi.encodeWithSignature(
+                "ThisFunctionWillRevert(uint256)",
+                uint256(25000)
+            )
+        );
+
+        vm.prank(alice);
+        vm.expectRevert("I told you I would revert");
+        aliceAccount.multicall(calls);
+    }
+
+    function testMulticallBasicSuccess() public {
         assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
 
         bytes[] memory calls = new bytes[](2);
@@ -257,5 +304,66 @@ contract UnitTestAccountImplementation is Test {
         vm.prank(alice);
         aliceAccount.multicall(calls);
         assertEq(25000, MockExternalContract(allowedTarget).AmountSaved());
+    }
+
+    function prepareBalancerVault() public {
+        address mockAddress = address(new MockBalancerVault());
+        bytes memory code = getCode(mockAddress);
+        vm.etch(aliceAccount.BALANCER_VAULT(), code);
+
+        // test that the contract is deployed at the good address
+        MockBalancerVault balancerVault = MockBalancerVault(
+            aliceAccount.BALANCER_VAULT()
+        );
+        assertEq("I am MockBalancerVault", balancerVault.WhoAmI());
+    }
+
+    function testBalancerFlashLoan() public {
+        // first deploy the mock balancer vault and set it at the correct address
+        prepareBalancerVault();
+
+        // we will deal 1000 token to the vault
+        mockToken.mint(aliceAccount.BALANCER_VAULT(), 1000);
+        assertEq(mockToken.balanceOf(aliceAccount.BALANCER_VAULT()), 1000);
+
+        // setup calls
+        IERC20[] memory tokens = new IERC20[](1);
+        tokens[0] = IERC20(mockToken);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 750;
+        bytes[] memory preCalls = new bytes[](1);
+        preCalls[0] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            allowedTarget,
+            abi.encodeWithSignature("ThisFunctionIsOk(uint256)", uint256(1000))
+        );
+        bytes[] memory postCalls = new bytes[](1);
+        postCalls[0] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            allowedTarget,
+            abi.encodeWithSignature("ThisFunctionIsOk(uint256)", uint256(750))
+        );
+
+        vm.prank(alice);
+        aliceAccount.multicallWithBalancerFlashLoan(
+            tokens,
+            amounts,
+            preCalls,
+            postCalls
+        );
+        assertEq(750, MockExternalContract(allowedTarget).AmountSaved());
+    }
+
+    function testNonBalancerVaultCannotCallReceiveFlashLoan() public {
+        IERC20[] memory tokens = new IERC20[](1);
+        tokens[0] = IERC20(mockToken);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 750;
+        uint256[] memory feeAmounts = new uint256[](1);
+        amounts[0] = 150;
+
+        vm.prank(bob);
+        vm.expectRevert("receiveFlashLoan: sender is not balancer");
+        aliceAccount.receiveFlashLoan(tokens, amounts, feeAmounts, "");
     }
 }
