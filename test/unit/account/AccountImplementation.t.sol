@@ -45,6 +45,7 @@ contract UnitTestAccountImplementation is Test {
     /// @notice Address used as an allowed target external calls
     address allowedTarget;
 
+    /// @notice Retrieves the bytecode of a contract at a specific address for testing purposes
     function getCode(address _addr) public view returns (bytes memory) {
         bytes memory code;
         assembly {
@@ -187,6 +188,7 @@ contract UnitTestAccountImplementation is Test {
         assertEq(alice.balance, 1e18);
     }
 
+    /// @notice Confirms that external calls by non-owners are correctly rejected
     function testCallExternalShouldFailIfNotOwner() public {
         bytes memory data = bytes("0x01020304");
 
@@ -194,6 +196,7 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.callExternal(address(1), data);
     }
 
+    /// @notice Ensures that calls to non-allowed targets are properly restricted
     function testCallExternalShouldFailOnNonAllowedTarget() public {
         bytes memory data = abi.encodeWithSignature(
             "nonAllowedFunction(uint256,string)",
@@ -206,6 +209,7 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.callExternal(address(1), data);
     }
 
+    /// @notice Checks that calls with non-allowed signatures are prohibited
     function testCallExternalShouldFailOnNonAllowedSignature() public {
         bytes memory data = abi.encodeWithSignature(
             "nonAllowedFunction(uint256,string)",
@@ -218,6 +222,7 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.callExternal(allowedTarget, data);
     }
 
+    /// @notice Verifies that failing external calls revert as expected
     function testCallExternalFailingShouldRevert() public {
         bytes memory data = abi.encodeWithSignature(
             "ThisFunctionWillRevert(uint256)",
@@ -229,6 +234,7 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.callExternal(allowedTarget, data);
     }
 
+    /// @notice Tests that external calls without a revert message are handled correctly
     function testCallExternalFailingShouldRevertWithoutMsg() public {
         bytes memory data = abi.encodeWithSignature(
             "ThisFunctionWillRevertWithoutMsg(uint256)",
@@ -249,6 +255,7 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.callExternal(allowedTarget, data);
     }
 
+    /// @notice Confirms successful execution of allowed external calls
     function testCallExternalSuccessShouldWork() public {
         assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
 
@@ -263,6 +270,7 @@ contract UnitTestAccountImplementation is Test {
         assertEq(1000, MockExternalContract(allowedTarget).AmountSaved());
     }
 
+    /// @notice Validates that a multicall with at least one failing call fails as expected
     function testMulticallWithOneFailShouldFail() public {
         assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
 
@@ -286,6 +294,7 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.multicall(calls);
     }
 
+    /// @notice Tests basic functionality of successful multicalls
     function testMulticallBasicSuccess() public {
         assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
 
@@ -306,6 +315,8 @@ contract UnitTestAccountImplementation is Test {
         assertEq(25000, MockExternalContract(allowedTarget).AmountSaved());
     }
 
+    /// @notice Prepares and verifies deployment of a mock Balancer vault for testing
+    /// this deploy the mock and set etch the bytecode to the real BALANCER_VAULT address
     function prepareBalancerVault() public {
         address mockAddress = address(new MockBalancerVault());
         bytes memory code = getCode(mockAddress);
@@ -318,6 +329,9 @@ contract UnitTestAccountImplementation is Test {
         assertEq("I am MockBalancerVault", balancerVault.WhoAmI());
     }
 
+    /// @notice Conducts a test scenario involving a Balancer flash loan
+    /// this test shows that the balancer send the tokens and then that the calls are performed
+    /// in a multicall way, and that we give the tokens back to the flashloan
     function testBalancerFlashLoan() public {
         // first deploy the mock balancer vault and set it at the correct address
         prepareBalancerVault();
@@ -354,6 +368,57 @@ contract UnitTestAccountImplementation is Test {
         assertEq(750, MockExternalContract(allowedTarget).AmountSaved());
     }
 
+    /// @notice Conducts a test scenario involving a Balancer flash loan where we don't have enough token reimburse the loan
+    function testBalancerFlashLoanFailToReimburse() public {
+        // first deploy the mock balancer vault and set it at the correct address
+        prepareBalancerVault();
+
+        // we will deal 1000 token to the vault
+        mockToken.mint(aliceAccount.BALANCER_VAULT(), 1000);
+        assertEq(mockToken.balanceOf(aliceAccount.BALANCER_VAULT()), 1000);
+
+        // whitelist a call to the mockToken for the transfer function
+        bytes4 functionSelector = bytes4(
+            keccak256("transfer(address,uint256)")
+        );
+        vm.prank(factoryOwner);
+        factory.allowCall(address(mockToken), functionSelector, true);
+
+        // setup calls
+        IERC20[] memory tokens = new IERC20[](1);
+        tokens[0] = IERC20(mockToken);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 750;
+        bytes[] memory preCalls = new bytes[](1);
+        preCalls[0] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            allowedTarget,
+            abi.encodeWithSignature("ThisFunctionIsOk(uint256)", uint256(1000))
+        );
+        bytes[] memory postCalls = new bytes[](1);
+
+        // this sends bob 100 token from the flash loan
+        postCalls[0] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            address(mockToken),
+            abi.encodeWithSignature(
+                "transfer(address,uint256)",
+                bob,
+                uint256(100)
+            )
+        );
+
+        vm.prank(alice);
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        aliceAccount.multicallWithBalancerFlashLoan(
+            tokens,
+            amounts,
+            preCalls,
+            postCalls
+        );
+    }
+
+    /// @notice Ensures that unauthorized addresses cannot call the receiveFlashLoan function
     function testNonBalancerVaultCannotCallReceiveFlashLoan() public {
         IERC20[] memory tokens = new IERC20[](1);
         tokens[0] = IERC20(mockToken);
