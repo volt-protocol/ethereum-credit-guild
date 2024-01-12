@@ -6,13 +6,25 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AccountFactory} from "@src/account/AccountFactory.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+interface IBalancerFlashLoan {
+    function flashLoan(
+        address recipient,
+        IERC20[] memory tokens,
+        uint256[] memory amounts,
+        bytes memory userData
+    ) external;
+}
+
 /// Smart account implementation for the ECG
 contract AccountImplementation is Ownable {
     error CallExternalError(bytes innerError);
 
-    address public BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+    address public immutable BALANCER_VAULT =
+        0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
     address public factory;
+
+    bytes[] private StoredCalls;
 
     constructor() Ownable() {}
 
@@ -63,7 +75,11 @@ contract AccountImplementation is Ownable {
         }
     }
 
-    function multicall(bytes[] calldata calls) public payable {
+    function multicall(bytes[] calldata calls) public onlyOwner {
+        executeCalls(calls);
+    }
+
+    function executeCalls(bytes[] memory calls) private {
         for (uint256 i = 0; i < calls.length; i++) {
             (bool success, bytes memory result) = address(this).delegatecall(
                 calls[i]
@@ -74,24 +90,53 @@ contract AccountImplementation is Ownable {
         }
     }
 
-    /// @notice this is the receiveFlashLoan implementation for balancer
+    function multicallWithBalancerFlashLoan(
+        IERC20[] calldata tokens,
+        uint256[] calldata amounts,
+        bytes[] calldata preCalls, // Calls to be made before receiving the flash loan
+        bytes[] calldata postCalls // Calls to be made after receiving the flash loan
+    ) external onlyOwner {
+        // Clear existing StoredCalls
+        delete StoredCalls;
+
+        // Manually copy each element
+        for (uint i = 0; i < postCalls.length; i++) {
+            StoredCalls.push(postCalls[i]);
+        }
+
+        // execute the pre calls
+        executeCalls(preCalls);
+
+        // Initiate the flash loan
+        IBalancerFlashLoan(BALANCER_VAULT).flashLoan(
+            address(this),
+            tokens,
+            amounts,
+            ""
+        );
+    }
+
+    /// @notice this is used to receive a flashloan from balancer
     function receiveFlashLoan(
         IERC20[] memory tokens,
         uint256[] memory amounts,
         uint256[] memory feeAmounts,
-        bytes memory userData
+        bytes memory /*userData*/
     ) external {
-        // ensure no fees for balancer?
-        for (uint256 i = 0; i < feeAmounts.length; i++) {
-            require(feeAmounts[i] == 0);
-        }
+        // ensure no fees for balancer
+        // for (uint256 i = 0; i < feeAmounts.length; i++) {
+        //     require(feeAmounts[i] == 0);
+        // }
 
-        // userData sent by the balancer vault should be the next actions
-        // to be performed, usually should be a multicall
-        (bool success, bytes memory result) = address(this).call(userData);
-        if (!success) {
-            _getRevertMsg(result);
-        }
+        require(
+            msg.sender == BALANCER_VAULT,
+            "receiveFlashLoan: sender is not balancer"
+        );
+
+        executeCalls(StoredCalls);
+
+        // clear stored calls
+        delete StoredCalls;
 
         // Transfer back the required amounts to the Balancer Vault
         for (uint256 i = 0; i < tokens.length; i++) {

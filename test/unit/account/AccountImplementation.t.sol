@@ -238,4 +238,24 @@ contract UnitTestAccountImplementation is Test {
         aliceAccount.callExternal(allowedTarget, data);
         assertEq(1000, MockExternalContract(allowedTarget).AmountSaved());
     }
+
+    function testMulticall() public {
+        assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
+
+        bytes[] memory calls = new bytes[](2);
+        calls[0] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            allowedTarget,
+            abi.encodeWithSignature("ThisFunctionIsOk(uint256)", uint256(1000))
+        );
+        calls[1] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            allowedTarget,
+            abi.encodeWithSignature("ThisFunctionIsOk(uint256)", uint256(25000))
+        );
+
+        vm.prank(alice);
+        aliceAccount.multicall(calls);
+        assertEq(25000, MockExternalContract(allowedTarget).AmountSaved());
+    }
 }
