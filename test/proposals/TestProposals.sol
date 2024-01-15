@@ -4,7 +4,6 @@ import {console} from "@forge-std/console.sol";
 
 import {Test} from "@forge-std/Test.sol";
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
-import {AddressLib} from "@test/proposals/AddressLib.sol";
 
 import {GIP_0} from "@test/proposals/gips/GIP_0.sol";
 

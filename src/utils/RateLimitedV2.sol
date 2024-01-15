@@ -2,7 +2,7 @@
 pragma solidity 0.8.13;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
+import {SafeCastLib} from "@solmate/src/utils/SafeCastLib.sol";
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";

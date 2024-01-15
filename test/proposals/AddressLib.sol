@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {console, Vm} from "@test/forge-std/src/Components.sol";
+import {Vm} from "@forge-std/Vm.sol";
+import {console} from "@forge-std/console.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 library AddressLib {

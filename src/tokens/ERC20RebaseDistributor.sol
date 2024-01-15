@@ -2,7 +2,7 @@
 pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
+import {SafeCastLib} from "@solmate/src/utils/SafeCastLib.sol";
 
 /** 
 @title  An ERC20 with rebase capabilities. Anyone can sacrifice tokens to rebase up the balance

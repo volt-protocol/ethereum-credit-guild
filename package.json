@@ -24,9 +24,6 @@
     "prettier:watch": "onchange \"(src|test)/**/*.sol\" -- prettier --write {{changed}}"
   },
   "authors": "elliotfriedman,eswak,joeysantoro,onetruekirk",
-  "dependencies": {
-    "@openzeppelin/contracts": "4.9.3"
-  },
   "devDependencies": {
     "husky": "7.0.4",
     "lint-staged": "12.2.0",

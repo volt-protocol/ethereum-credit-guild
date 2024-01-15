@@ -6,7 +6,7 @@ pragma solidity 0.8.13;
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {SafeCastLib} from "@src/external/solmate/SafeCastLib.sol";
+import {SafeCastLib} from "@solmate/src/utils/SafeCastLib.sol";
 
 /**
 @title  ERC20 Multi-Delegation Voting contract
