@@ -4,25 +4,10 @@ pragma solidity 0.8.13;
 import "@forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Core} from "@src/core/Core.sol";
-import {MockERC20} from "@test/mock/MockERC20.sol";
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
-import {AddressLib} from "@test/proposals/AddressLib.sol";
-import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
-import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
-import {TestProposals} from "@test/proposals/TestProposals.sol";
-import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
-import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
-import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
-import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
-import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
-import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
-import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
-import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
 import {IBalancerFlashLoan, AccountImplementation} from "@src/account/AccountImplementation.sol";
 import {AccountFactory} from "@src/account/AccountFactory.sol";
@@ -38,14 +23,9 @@ interface IUniswapRouter {
     ) external returns (uint256[] memory amounts);
 }
 
+/// @notice execute a integration test with the account implementation for leveraging a position via flashloan
+/// use like that: forge test --match-contract IntegrationTestSepoliaBorrowLeverage --fork-url {RPC_URL} -vv
 contract IntegrationTestSepoliaBorrowLeverage is Test {
-    bytes32 public immutable WBTCUSDC_POOLID =
-        0xc4623b1345af4e23dc6b86ed010c493e3e601267000200000000000000000073; // https://beta.balancer.fi/#/sepolia/pool/0xc4623b1345af4e23dc6b86ed010c493e3e601267000200000000000000000073
-    bytes32 public immutable USDCSDAI_POOLID =
-        0xc9c3e0e8f800c3efe116b16de314c13ebef9a359000200000000000000000074; // https://beta.balancer.fi/#/sepolia/pool/0xc9c3e0e8f800c3efe116b16de314c13ebef9a359000200000000000000000074
-
-    IBalancerFlashLoan public immutable BALANCER_VAULT =
-        IBalancerFlashLoan(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
     LendingTerm public immutable SDAI_TERM =
         LendingTerm(0xFBE67752BC63686707966b8Ace817094d26f5381);
 
@@ -56,12 +36,9 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
         TestnetToken(0xeeF0AB67262046d5bED00CE9C447e08D92b8dA61);
     TestnetToken public immutable USDC_TOKEN =
         TestnetToken(0xe9248437489bC542c68aC90E178f6Ca3699C3F6b);
-
     CreditToken public immutable CREDIT_TOKEN =
         CreditToken(0x33b79F707C137AD8b70FA27d63847254CF4cF80f);
 
-    address public immutable UNISWAP_USDCSDAI_PAIR =
-        0x2Da1418165474B60DD5Dd3Dd097422Aea9EE1655;
     IUniswapRouter public immutable UNISWAP_ROUTER =
         IUniswapRouter(0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008);
 
@@ -77,15 +54,6 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
     AccountImplementation allowedImplementation;
     AccountImplementation alicesAccount;
     AccountFactory accountFactory;
-
-    /* uint256 creditMultiplier = ProfitManager(refs.profitManager)
-            .creditMultiplier();
-        uint256 maxBorrow = (collateralAmount *
-            params.maxDebtPerCollateralToken) / creditMultiplier;
-        require(
-            borrowAmount <= maxBorrow,
-            "LendingTerm: not enough collateral"
-        );*/
 
     function setUp() public {
         LendingTerm.LendingTermReferences memory refs = SDAI_TERM
@@ -166,17 +134,6 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
             true
         );
 
-        // allow swap on balancer vault
-        // accountFactory.allowCall(
-        //     address(BALANCER_VAULT),
-        //     bytes4(
-        //         keccak256(
-        //             "swap((bytes32,uint8,address,address,uint256,bytes),(address,bool,address,bool),uint256,uint256)"
-        //         )
-        //     ),
-        //     true
-        // );
-
         // allow swap on uniswap router
         accountFactory.allowCall(
             address(UNISWAP_ROUTER),
@@ -192,7 +149,6 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
     }
 
     function labelUp() public {
-        vm.label(address(BALANCER_VAULT), "BALANCER_VAULT");
         vm.label(address(SDAI_TERM), "SDAI_TERM");
         vm.label(address(GOVERNOR), "GOVERNOR");
         vm.label(address(SDAI_TOKEN), "SDAI_TOKEN");
@@ -204,7 +160,6 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
         vm.label(address(allowedImplementation), "allowedImplementation");
         vm.label(address(alicesAccount), "alicesAccount");
         vm.label(address(accountFactory), "accountFactory");
-        vm.label(address(UNISWAP_USDCSDAI_PAIR), "UNISWAP_USDCSDAI_PAIR");
         vm.label(address(UNISWAP_ROUTER), "UNISWAP_ROUTER");
     }
 
@@ -215,8 +170,9 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
     // - borrow with 210k sDAI collateral
     // - get X gUSDC
     // - PSM.redeem X gUSDC for Y USDC
-    // - swap Y USDC for Z sDAI on balancer
+    // - swap Y USDC for Z sDAI on uniswapv2
     // - reimburse balancer flashloan
+    // REQUIREMENTS: have enough token in the balancer vault (for the flashloan) and a large enough liquidity in univ2 for the swap without too much slippage.
     function testFlashLoanWithBalancer() public {
         // - have an account with 10k sDAI
         vm.prank(GOVERNOR);
@@ -231,6 +187,15 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
         // - flashloan 200k sDAI from balancer
         uint256 flashloanAmount = 200_000e18;
         // this is done when calling the 'multicallWithBalancerFlashLoan' function on alice's Account
+
+        // compute the loanId that will be generated
+        bytes32 expectedLoanId = keccak256(
+            abi.encode(
+                address(alicesAccount),
+                address(SDAI_TERM),
+                block.timestamp
+            )
+        );
 
         // now we will prepare the call list to be sent as the "postCalls" to the 'multicallWithBalancerFlashLoan' function
         bytes[] memory postCalls = new bytes[](6);
@@ -310,55 +275,6 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
             )
         );
 
-        // - swap Y USDC for Z sDAI on uniswapv2
-        // postCalls[5] = abi.encodeWithSignature(
-        //     "callExternal(address,bytes)",
-        //     address(BALANCER_VAULT),
-        //     abi.encodeWithSignature(
-        //         "swap((bytes32,uint8,address,address,uint256,bytes),(address,bool,address,bool),uint256,uint256)",
-        //         abi.encodePacked(
-        //             bytes32(USDCSDAI_POOLID), // poolid
-        //             uint8(1), // swapkind = GIVEN_OUT, 0 is GIVEN_IN
-        //             address(USDC_TOKEN), // assetIn
-        //             address(SDAI_TOKEN), // assetOut
-        //             uint256(flashloanAmount), // amount = flashloan amount, to reimburse balancer
-        //             bytes("something") // userData
-        //         ),
-        //         abi.encodePacked(
-        //             address(alicesAccount), // sender
-        //             bool(false), // fromInternalBalance,
-        //             payable(address(alicesAccount)), // recipient
-        //             bool(false) // toInternalBalance
-        //         ),
-        //         uint256(210_000e6), // amountIn limit for a GIVEN_OUT, do not swap more than 210k USDC
-        //         uint256(block.timestamp + 3600) // deadline timestamp
-        //     )
-        // );
-
-        // postCalls[5] = abi.encodeWithSignature(
-        //     "callExternal(address,bytes)",
-        //     address(BALANCER_VAULT),
-        //     abi.encodeWithSignature(
-        //         "swap((bytes32,uint8,address,address,uint256,bytes),(address,bool,address,bool),uint256,uint256)",
-        //         IBalancerFlashLoan.SingleSwap({
-        //             poolId: bytes32(USDCSDAI_POOLID), // poolid
-        //             kind: IBalancerFlashLoan.SwapKind.GIVEN_OUT, // swapkind = GIVEN_OUT, 0 is GIVEN_IN
-        //             assetIn: address(USDC_TOKEN), // assetIn
-        //             assetOut: address(SDAI_TOKEN), // assetOut
-        //             amount: uint256(flashloanAmount), // amount = flashloan amount, to reimburse balancer
-        //             userData: bytes("something") // userData
-        //         }),
-        //         IBalancerFlashLoan.FundManagement({
-        //             sender: address(alicesAccount), // sender
-        //             fromInternalBalance: bool(false), // fromInternalBalance,
-        //             recipient: payable(address(alicesAccount)), // recipient
-        //             toInternalBalance: bool(false) // toInternalBalance
-        //         }),
-        //         uint256(210_000e6), // amountIn limit for a GIVEN_OUT, do not swap more than 210k USDC
-        //         uint256(block.timestamp + 3600) // deadline timestamp
-        //     )
-        // );
-
         // - reimburse balancer flashloan
         // automatically done by the account implementation
 
@@ -375,6 +291,18 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
             amountsArray,
             new bytes[](0),
             postCalls
+        );
+
+        // check that the loan exists
+        LendingTerm.Loan memory loan = SDAI_TERM.getLoan(expectedLoanId);
+
+        assertEq(loan.borrower, address(alicesAccount));
+        assertEq(loan.collateralAmount, 210_000e18);
+        assertEq(loan.borrowAmount, borrowAmount);
+
+        console.log(
+            "Remaining USDC in Alice's account: %s",
+            USDC_TOKEN.balanceOf(address(alicesAccount))
         );
     }
 
