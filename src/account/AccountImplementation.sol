@@ -14,6 +14,34 @@ interface IBalancerFlashLoan {
         uint256[] memory amounts,
         bytes memory userData
     ) external;
+
+    function swap(
+        SingleSwap memory singleSwap,
+        FundManagement memory funds,
+        uint256 limit,
+        uint256 deadline
+    ) external payable returns (uint256 amountCalculated);
+
+    struct SingleSwap {
+        bytes32 poolId;
+        SwapKind kind;
+        address assetIn;
+        address assetOut;
+        uint256 amount;
+        bytes userData;
+    }
+
+    struct FundManagement {
+        address sender;
+        bool fromInternalBalance;
+        address payable recipient;
+        bool toInternalBalance;
+    }
+
+    enum SwapKind {
+        GIVEN_IN,
+        GIVEN_OUT
+    }
 }
 
 /// @title Smart Account Implementation for ECG

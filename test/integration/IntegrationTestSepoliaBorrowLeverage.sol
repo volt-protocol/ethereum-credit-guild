@@ -28,6 +28,16 @@ import {IBalancerFlashLoan, AccountImplementation} from "@src/account/AccountImp
 import {AccountFactory} from "@src/account/AccountFactory.sol";
 import {TestnetToken} from "./TestNetToken.sol";
 
+interface IUniswapRouter {
+    function swapTokensForExactTokens(
+        uint256 amountOut,
+        uint256 amountInMax,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+}
+
 contract IntegrationTestSepoliaBorrowLeverage is Test {
     bytes32 public immutable WBTCUSDC_POOLID =
         0xc4623b1345af4e23dc6b86ed010c493e3e601267000200000000000000000073; // https://beta.balancer.fi/#/sepolia/pool/0xc4623b1345af4e23dc6b86ed010c493e3e601267000200000000000000000073
@@ -49,6 +59,11 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
 
     CreditToken public immutable CREDIT_TOKEN =
         CreditToken(0x33b79F707C137AD8b70FA27d63847254CF4cF80f);
+
+    address public immutable UNISWAP_USDCSDAI_PAIR =
+        0x2Da1418165474B60DD5Dd3Dd097422Aea9EE1655;
+    IUniswapRouter public immutable UNISWAP_ROUTER =
+        IUniswapRouter(0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008);
 
     // Alice will borrow on the sDAI term.
     address public alice = address(0x1010101);
@@ -152,11 +167,22 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
         );
 
         // allow swap on balancer vault
+        // accountFactory.allowCall(
+        //     address(BALANCER_VAULT),
+        //     bytes4(
+        //         keccak256(
+        //             "swap((bytes32,uint8,address,address,uint256,bytes),(address,bool,address,bool),uint256,uint256)"
+        //         )
+        //     ),
+        //     true
+        // );
+
+        // allow swap on uniswap router
         accountFactory.allowCall(
-            address(BALANCER_VAULT),
+            address(UNISWAP_ROUTER),
             bytes4(
                 keccak256(
-                    "swap((bytes32,uint8,address,address,uint256,bytes),(address,bool,address,bool),uint256,uint256)"
+                    "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)"
                 )
             ),
             true
@@ -178,6 +204,8 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
         vm.label(address(allowedImplementation), "allowedImplementation");
         vm.label(address(alicesAccount), "alicesAccount");
         vm.label(address(accountFactory), "accountFactory");
+        vm.label(address(UNISWAP_USDCSDAI_PAIR), "UNISWAP_USDCSDAI_PAIR");
+        vm.label(address(UNISWAP_ROUTER), "UNISWAP_ROUTER");
     }
 
     // should test the following scenario with a balancer flashloan and the new multicall account feature:
@@ -254,41 +282,82 @@ contract IntegrationTestSepoliaBorrowLeverage is Test {
             )
         );
 
-        // approve USDC spending by the balancer vault
+        // approve USDC spending by the uniswap router
         postCalls[4] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
             address(USDC_TOKEN),
             abi.encodeWithSignature(
                 "approve(address,uint256)",
-                address(BALANCER_VAULT),
+                address(UNISWAP_ROUTER),
                 uint256(210_000e6)
             )
         );
 
-        // - swap Y USDC for Z sDAI on balancer
+        address[] memory path = new address[](2);
+        path[0] = address(USDC_TOKEN);
+        path[1] = address(SDAI_TOKEN);
+        // - swap Y USDC for Z sDAI on uniswapv2
         postCalls[5] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
-            address(BALANCER_VAULT),
+            address(UNISWAP_ROUTER),
             abi.encodeWithSignature(
-                "swap((bytes32,uint8,address,address,uint256,bytes),(address,bool,address,bool),uint256,uint256)",
-                abi.encode(
-                    USDCSDAI_POOLID, // poolid
-                    uint8(1), // swapkind = GIVEN_OUT, 0 is GIVEN_IN
-                    address(USDC_TOKEN), // assetIn
-                    address(SDAI_TOKEN), // assetOut
-                    uint256(flashloanAmount), // amount = flashloan amount, to reimburse balancer
-                    bytes("something") // userData
-                ),
-                abi.encode(
-                    address(alicesAccount), // sender
-                    bool(false), // fromInternalBalance,
-                    address(alicesAccount), // recipient
-                    bool(false) // toInternalBalance
-                ),
-                uint256(210_000e6), // amountIn limit for a GIVEN_OUT, do not swap more than borrow amount
-                uint256(block.timestamp + 3600) // deadline timestamp
+                "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
+                flashloanAmount, // amount out
+                uint256(210_000e6), // amount in max
+                path, // path USDC->SDAI
+                address(alicesAccount), // to
+                uint256(block.timestamp + 3600) // deadline
             )
         );
+
+        // - swap Y USDC for Z sDAI on uniswapv2
+        // postCalls[5] = abi.encodeWithSignature(
+        //     "callExternal(address,bytes)",
+        //     address(BALANCER_VAULT),
+        //     abi.encodeWithSignature(
+        //         "swap((bytes32,uint8,address,address,uint256,bytes),(address,bool,address,bool),uint256,uint256)",
+        //         abi.encodePacked(
+        //             bytes32(USDCSDAI_POOLID), // poolid
+        //             uint8(1), // swapkind = GIVEN_OUT, 0 is GIVEN_IN
+        //             address(USDC_TOKEN), // assetIn
+        //             address(SDAI_TOKEN), // assetOut
+        //             uint256(flashloanAmount), // amount = flashloan amount, to reimburse balancer
+        //             bytes("something") // userData
+        //         ),
+        //         abi.encodePacked(
+        //             address(alicesAccount), // sender
+        //             bool(false), // fromInternalBalance,
+        //             payable(address(alicesAccount)), // recipient
+        //             bool(false) // toInternalBalance
+        //         ),
+        //         uint256(210_000e6), // amountIn limit for a GIVEN_OUT, do not swap more than 210k USDC
+        //         uint256(block.timestamp + 3600) // deadline timestamp
+        //     )
+        // );
+
+        // postCalls[5] = abi.encodeWithSignature(
+        //     "callExternal(address,bytes)",
+        //     address(BALANCER_VAULT),
+        //     abi.encodeWithSignature(
+        //         "swap((bytes32,uint8,address,address,uint256,bytes),(address,bool,address,bool),uint256,uint256)",
+        //         IBalancerFlashLoan.SingleSwap({
+        //             poolId: bytes32(USDCSDAI_POOLID), // poolid
+        //             kind: IBalancerFlashLoan.SwapKind.GIVEN_OUT, // swapkind = GIVEN_OUT, 0 is GIVEN_IN
+        //             assetIn: address(USDC_TOKEN), // assetIn
+        //             assetOut: address(SDAI_TOKEN), // assetOut
+        //             amount: uint256(flashloanAmount), // amount = flashloan amount, to reimburse balancer
+        //             userData: bytes("something") // userData
+        //         }),
+        //         IBalancerFlashLoan.FundManagement({
+        //             sender: address(alicesAccount), // sender
+        //             fromInternalBalance: bool(false), // fromInternalBalance,
+        //             recipient: payable(address(alicesAccount)), // recipient
+        //             toInternalBalance: bool(false) // toInternalBalance
+        //         }),
+        //         uint256(210_000e6), // amountIn limit for a GIVEN_OUT, do not swap more than 210k USDC
+        //         uint256(block.timestamp + 3600) // deadline timestamp
+        //     )
+        // );
 
         // - reimburse balancer flashloan
         // automatically done by the account implementation
