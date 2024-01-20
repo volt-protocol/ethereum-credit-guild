@@ -354,11 +354,6 @@ contract ProfitManager is CoreRef {
             uint256 amountForOther = (uint256(amount) *
                 uint256(_profitSharingConfig.otherSplit)) / 1e9;
 
-            uint256 amountForCredit = uint256(amount) -
-                amountForSurplusBuffer -
-                amountForGuild -
-                amountForOther;
-
             // distribute to surplus buffer
             if (amountForSurplusBuffer != 0) {
                 surplusBuffer = _surplusBuffer + amountForSurplusBuffer;
@@ -377,8 +372,14 @@ contract ProfitManager is CoreRef {
             }
 
             // distribute to lenders
-            if (amountForCredit != 0) {
-                CreditToken(_credit).distribute(amountForCredit);
+            {
+                uint256 amountForCredit = uint256(amount) -
+                    amountForSurplusBuffer -
+                    amountForGuild -
+                    amountForOther;
+                if (amountForCredit != 0) {
+                    CreditToken(_credit).distribute(amountForCredit);
+                }
             }
 
             // distribute to the guild
