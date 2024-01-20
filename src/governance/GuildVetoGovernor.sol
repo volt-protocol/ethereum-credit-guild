@@ -254,6 +254,16 @@ contract GuildVetoGovernor is
         revert("GuildVetoGovernor: cannot propose arbitrary actions");
     }
 
+    /// @dev override to prevent cancellation from the proposer
+    function cancel(
+        address[] memory /* targets*/,
+        uint256[] memory /* values*/,
+        bytes[] memory /* calldatas*/,
+        bytes32 /* descriptionHash*/
+    ) public pure override(Governor) returns (uint256) {
+        revert("LendingTermOnboarding: cannot cancel proposals");
+    }
+
     /// @notice Propose a governance action to veto (cancel) a target action ID in the
     /// governor's linked timelock.
     function createVeto(bytes32 timelockId) external returns (uint256) {

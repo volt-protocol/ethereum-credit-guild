@@ -71,6 +71,14 @@ contract GuildVetoGovernorUnitTest is Test {
         assertEq(governor.version(), "1");
     }
 
+    function testCannotCancel() public {
+        address[] memory targets;
+        uint256[] memory values;
+        bytes[] memory calldatas;
+        vm.expectRevert("LendingTermOnboarding: cannot cancel proposals");
+        governor.cancel(targets, values, calldatas, bytes32(0));
+    }
+
     function testSuccessfulVeto() public {
         // schedule an action in the timelock
         bytes32 timelockId = _queueDummyTimelockAction(12345);
