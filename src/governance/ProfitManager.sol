@@ -245,9 +245,9 @@ contract ProfitManager is CoreRef {
 
     /// @notice donate to surplus buffer
     function donateToSurplusBuffer(uint256 amount) external {
-        CreditToken(credit).transferFrom(msg.sender, address(this), amount);
         uint256 newSurplusBuffer = surplusBuffer + amount;
         surplusBuffer = newSurplusBuffer;
+        CreditToken(credit).transferFrom(msg.sender, address(this), amount);
         emit SurplusBufferUpdate(block.timestamp, newSurplusBuffer);
     }
 
