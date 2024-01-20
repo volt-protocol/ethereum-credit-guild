@@ -32,21 +32,19 @@ contract LendingTermOnboarding is GuildGovernor {
     mapping(address => bool) public auctionHouses;
     /// @notice immutable reference to the guild token
     address public immutable guildToken;
-    /// @notice immutable reference to the gauge type to use for the terms onboarded
-    uint256 public immutable gaugeType;
 
-    /// @notice timestamp of creation of a term
-    /// (used to check that a term has been created by this factory)
-    mapping(address => uint256) public created;
+    /// @notice gaugeType of created terms
+    /// note that gaugeType 0 is not valid, so this mapping can be used
+    /// to check that a term has been created by this factory.
+    mapping(address => uint256) public gaugeTypes;
 
-    /// @notice reference to profitManager to set in created lending terms
-    address public immutable profitManager;
-    /// @notice reference to auctionHouse to set in created lending terms
-    address public immutable auctionHouse;
-    /// @notice reference to creditMinter to set in created lending terms
-    address public immutable creditMinter;
-    /// @notice reference to creditToken to set in created lending terms
-    address public immutable creditToken;
+    /// @notice mapping of references per market (key = gaugeType = market id)
+    mapping(uint256 => MarketReferences) public marketReferences;
+    struct MarketReferences {
+        address profitManager;
+        address creditMinter;
+        address creditToken;
+    }
 
     /// @notice emitted when a lending term implementation's "allowed" status changes
     event ImplementationAllowChanged(
@@ -69,10 +67,9 @@ contract LendingTermOnboarding is GuildGovernor {
     );
 
     constructor(
-        LendingTerm.LendingTermReferences memory _lendingTermReferences,
-        uint256 _gaugeType,
         address _core,
         address _timelock,
+        address _guildToken,
         uint256 initialVotingDelay,
         uint256 initialVotingPeriod,
         uint256 initialProposalThreshold,
@@ -81,19 +78,22 @@ contract LendingTermOnboarding is GuildGovernor {
         GuildGovernor(
             _core,
             _timelock,
-            _lendingTermReferences.guildToken,
+            _guildToken,
             initialVotingDelay,
             initialVotingPeriod,
             initialProposalThreshold,
             initialQuorum
         )
     {
-        guildToken = _lendingTermReferences.guildToken;
-        gaugeType = _gaugeType;
-        profitManager = _lendingTermReferences.profitManager;
-        auctionHouse = _lendingTermReferences.auctionHouse;
-        creditMinter = _lendingTermReferences.creditMinter;
-        creditToken = _lendingTermReferences.creditToken;
+        guildToken = _guildToken;
+    }
+
+    /// @notice set market references for a given market id
+    function setMarketReferences(
+        uint256 gaugeType,
+        MarketReferences calldata references
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        marketReferences[gaugeType] = references;
     }
 
     /// @notice Allow or disallow a given implemenation
@@ -124,6 +124,7 @@ contract LendingTermOnboarding is GuildGovernor {
 
     /// @notice Create a new LendingTerm and initialize it.
     function createTerm(
+        uint256 gaugeType,
         address implementation,
         address auctionHouse,
         LendingTerm.LendingTermParams calldata params
@@ -176,19 +177,23 @@ contract LendingTermOnboarding is GuildGovernor {
             "LendingTermOnboarding: invalid hardCap"
         );
 
+        // check that references for this market has been set
+        MarketReferences storage references = marketReferences[gaugeType];
+        require(references.profitManager != address(0), "LendingTermOnboarding: unknown market");
+
         address term = Clones.clone(implementation);
         LendingTerm(term).initialize(
             address(core()),
             LendingTerm.LendingTermReferences({
-                profitManager: profitManager,
+                profitManager: references.profitManager,
                 guildToken: guildToken,
                 auctionHouse: auctionHouse,
-                creditMinter: creditMinter,
-                creditToken: creditToken
+                creditMinter: references.creditMinter,
+                creditToken: references.creditToken
             }),
             params
         );
-        created[term] = block.timestamp;
+        gaugeTypes[term] = gaugeType;
         emit TermCreated(block.timestamp, implementation, term, params);
         return term;
     }
@@ -208,7 +213,7 @@ contract LendingTermOnboarding is GuildGovernor {
         address term
     ) external whenNotPaused returns (uint256 proposalId) {
         // Check that the term has been created by this factory
-        require(created[term] != 0, "LendingTermOnboarding: invalid term");
+        require(gaugeTypes[term] != 0, "LendingTermOnboarding: invalid term");
 
         // Check that the term was not subject to an onboard vote recently
         require(
@@ -265,7 +270,7 @@ contract LendingTermOnboarding is GuildGovernor {
         targets[0] = guildToken;
         calldatas[0] = abi.encodeWithSelector(
             GuildToken.addGauge.selector,
-            gaugeType,
+            gaugeTypes[term],
             term
         );
 
