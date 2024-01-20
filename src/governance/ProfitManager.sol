@@ -330,7 +330,7 @@ contract ProfitManager is CoreRef {
                 emit SurplusBufferUpdate(block.timestamp, 0);
 
                 // update the CREDIT multiplier
-                uint256 creditTotalSupply = CreditToken(_credit).totalSupply();
+                uint256 creditTotalSupply = CreditToken(_credit).targetTotalSupply();
                 uint256 newCreditMultiplier = (creditMultiplier *
                     (creditTotalSupply - loss)) / creditTotalSupply;
                 creditMultiplier = newCreditMultiplier;
