@@ -296,6 +296,16 @@ contract LendingTermOnboardingUnitTest is Test {
             openingFee: 789,
             hardCap: 0 // hardCap of 0 makes no debt available
         }));
+        vm.expectRevert("LendingTermOnboarding: invalid periodic payment params");
+        onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 0, // incoherence between delay & minPercent
+            minPartialRepayPercent: 0.1e18,
+            openingFee: 789,
+            hardCap: _HARDCAP
+        }));
         vm.expectRevert("LendingTermOnboarding: unknown market");
         onboarder.createTerm(12345, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),

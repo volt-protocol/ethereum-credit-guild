@@ -177,6 +177,14 @@ contract LendingTermOnboarding is GuildGovernor {
             "LendingTermOnboarding: invalid hardCap"
         );
 
+        // if one of the periodic payment parameter is used, both must be used
+        if (params.minPartialRepayPercent != 0 || params.maxDelayBetweenPartialRepay != 0) {
+            require(
+                params.minPartialRepayPercent != 0 && params.maxDelayBetweenPartialRepay != 0,
+                "LendingTermOnboarding: invalid periodic payment params"
+            );
+        }
+
         // check that references for this market has been set
         MarketReferences storage references = marketReferences[gaugeType];
         require(references.profitManager != address(0), "LendingTermOnboarding: unknown market");
