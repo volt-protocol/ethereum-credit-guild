@@ -23,7 +23,9 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         super.setUp();
         term = LendingTerm(
             onboarder.createTerm(
+                1,
                 AddressLib.get("LENDING_TERM_V1"),
+                AddressLib.get("AUCTION_HOUSE"),
                 LendingTerm.LendingTermParams({
                     collateralToken: AddressLib.get("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,
@@ -145,7 +147,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
 
         _roleValidation();
 
-        assertTrue(offboarder.canOffboard(address(term)));
+        assertEq(uint8(offboarder.canOffboard(address(term))), 1);
 
         assertTrue(guild.isGauge(address(term)));
 
@@ -185,7 +187,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
 
         _roleValidation();
 
-        assertTrue(offboarder.canOffboard(address(term)));
+        assertEq(uint8(offboarder.canOffboard(address(term))), 1);
 
         assertTrue(guild.isGauge(address(term)));
 
@@ -210,11 +212,11 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
 
         offboarder.offboard(address(term));
 
-        assertTrue(offboarder.canOffboard(address(term)));
+        assertEq(uint8(offboarder.canOffboard(address(term))), 1);
         assertFalse(guild.isGauge(address(term)));
         offboarder.cleanup(address(term));
 
-        assertFalse(offboarder.canOffboard(address(term)));
+        assertEq(uint8(offboarder.canOffboard(address(term))), 0);
 
         assertFalse(core.hasRole(roles.GAUGE_PNL_NOTIFIER, address(term)));
         assertFalse(
