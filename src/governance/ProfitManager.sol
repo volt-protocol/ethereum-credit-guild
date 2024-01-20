@@ -182,6 +182,7 @@ contract ProfitManager is CoreRef {
     function setGaugeWeightTolerance(
         uint256 newValue
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        require(newValue >= 1e18, "ProfitManager: invalid tolerance");
         gaugeWeightTolerance = newValue;
         emit GaugeWeightToleranceUpdate(block.timestamp, newValue);
     }
