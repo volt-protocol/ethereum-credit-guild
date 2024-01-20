@@ -298,7 +298,7 @@ contract GuildTokenUnitTest is Test {
 
         // revert because user doesn't have role
         vm.expectRevert("UNAUTHORIZED");
-        profitManager.notifyPnL(gauge1, 0);
+        profitManager.notifyPnL(gauge1, 0, 0);
 
         // grant roles to test contract
         vm.startPrank(governor);
@@ -307,14 +307,14 @@ contract GuildTokenUnitTest is Test {
         vm.stopPrank();
 
         // successful call & check
-        profitManager.notifyPnL(gauge1, -100);
+        profitManager.notifyPnL(gauge1, -100, 0);
         assertEq(token.lastGaugeLoss(gauge1), block.timestamp);
 
         // successful call & check
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 13);
         credit.mint(address(profitManager), 200);
-        profitManager.notifyPnL(gauge1, 200);
+        profitManager.notifyPnL(gauge1, 200, 0);
         assertEq(token.lastGaugeLoss(gauge1), block.timestamp - 13);
     }
 
@@ -349,7 +349,7 @@ contract GuildTokenUnitTest is Test {
         vm.roll(block.number + 1);
 
         // loss in gauge 1
-        profitManager.notifyPnL(gauge1, -100);
+        profitManager.notifyPnL(gauge1, -100, 0);
     }
 
     function testApplyGaugeLoss() public {
@@ -473,7 +473,7 @@ contract GuildTokenUnitTest is Test {
         _setupAliceLossInGauge1();
 
         // loss in gauge 3
-        profitManager.notifyPnL(gauge3, -100);
+        profitManager.notifyPnL(gauge3, -100, 0);
 
         // roll to next block
         vm.warp(block.timestamp + 13);

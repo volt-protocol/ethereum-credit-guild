@@ -291,11 +291,11 @@ contract LendingTerm is CoreRef {
                 _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
         }
         uint256 _issuance = issuance; // cached SLOAD
-        uint256 totalBorrowedCredit = ProfitManager(refs.profitManager)
-            .totalBorrowedCredit();
+        uint256 totalIssuance = ProfitManager(refs.profitManager)
+            .totalIssuance();
         uint256 gaugeWeightTolerance = ProfitManager(refs.profitManager)
             .gaugeWeightTolerance();
-        if (totalBorrowedCredit == 0 && gaugeWeight != 0) {
+        if (totalIssuance == 0 && gaugeWeight != 0) {
             // first-ever CREDIT mint on a non-zero gauge weight term
             // does not check the relative debt ceilings
             // returns min(hardCap, creditMinterBuffer)
@@ -304,10 +304,11 @@ contract LendingTerm is CoreRef {
         }
         uint256 toleratedGaugeWeight = (gaugeWeight * gaugeWeightTolerance) /
             1e18;
-        uint256 debtCeilingBefore = (totalBorrowedCredit *
+        uint256 debtCeilingBefore = (totalIssuance *
             toleratedGaugeWeight) / totalWeight;
+        // if already above cap, no more borrows allowed
         if (_issuance >= debtCeilingBefore) {
-            return debtCeilingBefore; // no more borrows allowed
+            return debtCeilingBefore;
         }
         uint256 remainingDebtCeiling = debtCeilingBefore - _issuance; // always >0
         if (toleratedGaugeWeight >= totalWeight) {
@@ -376,16 +377,16 @@ contract LendingTerm is CoreRef {
         );
 
         // check the debt ceiling
-        uint256 totalBorrowedCredit = ProfitManager(refs.profitManager)
-            .totalBorrowedCredit();
+        uint256 totalIssuance = ProfitManager(refs.profitManager)
+            .totalIssuance();
         uint256 gaugeWeightTolerance = ProfitManager(refs.profitManager)
             .gaugeWeightTolerance();
         uint256 _debtCeiling = (GuildToken(refs.guildToken)
             .calculateGaugeAllocation(
                 address(this),
-                totalBorrowedCredit + borrowAmount
+                totalIssuance + borrowAmount
             ) * gaugeWeightTolerance) / 1e18;
-        if (totalBorrowedCredit == 0) {
+        if (totalIssuance == 0) {
             // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
             // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
             // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
@@ -413,6 +414,13 @@ contract LendingTerm is CoreRef {
         if (params.maxDelayBetweenPartialRepay != 0) {
             lastPartialRepay[loanId] = block.timestamp;
         }
+
+        // notify ProfitManager of issuance change
+        ProfitManager(refs.profitManager).notifyPnL(
+            address(this),
+            0,
+            int256(borrowAmount)
+        );
 
         // mint debt to the borrower
         RateLimitedMinter(refs.creditMinter).mint(borrower, borrowAmount);
@@ -543,14 +551,17 @@ contract LendingTerm is CoreRef {
         );
 
         // forward profit portion to the ProfitManager, burn the rest
-        CreditToken(refs.creditToken).transfer(
-            refs.profitManager,
-            interestRepaid
-        );
-        ProfitManager(refs.profitManager).notifyPnL(
-            address(this),
-            int256(interestRepaid)
-        );
+        if (interestRepaid != 0) {
+            CreditToken(refs.creditToken).transfer(
+                refs.profitManager,
+                interestRepaid
+            );
+            ProfitManager(refs.profitManager).notifyPnL(
+                address(this),
+                int256(interestRepaid),
+                -int256(issuanceDecrease)
+            );
+        }
         CreditToken(refs.creditToken).burn(principalRepaid);
         RateLimitedMinter(refs.creditMinter).replenishBuffer(principalRepaid);
 
@@ -602,7 +613,8 @@ contract LendingTerm is CoreRef {
             // report profit
             ProfitManager(refs.profitManager).notifyPnL(
                 address(this),
-                int256(interest)
+                int256(interest),
+                -int256(borrowAmount)
             );
         }
 
@@ -712,10 +724,13 @@ contract LendingTerm is CoreRef {
         uint256 principal = (borrowAmount *
             loans[loanId].borrowCreditMultiplier) / creditMultiplier;
         int256 pnl = -int256(principal);
-        ProfitManager(refs.profitManager).notifyPnL(address(this), pnl);
-
         // set hardcap to 0 to prevent new borrows
         params.hardCap = 0;
+        ProfitManager(refs.profitManager).notifyPnL(
+            address(this),
+            pnl,
+            -int256(borrowAmount)
+        );
 
         // emit event
         emit LoanClose(block.timestamp, loanId, LoanCloseType.Forgive, 0);
@@ -794,7 +809,11 @@ contract LendingTerm is CoreRef {
                     interest
                 );
             }
-            ProfitManager(refs.profitManager).notifyPnL(address(this), pnl);
+            ProfitManager(refs.profitManager).notifyPnL(
+                address(this),
+                pnl,
+                -int256(borrowAmount)
+            );
         }
 
         // decrease issuance

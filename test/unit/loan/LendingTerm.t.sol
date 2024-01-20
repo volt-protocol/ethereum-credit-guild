@@ -1252,7 +1252,7 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        profitManager.notifyPnL(address(term), int256(-10_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1277,7 +1277,7 @@ contract LendingTermUnitTest is Test {
         credit.mint(address(this), 100e18);
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-50e18));
+        profitManager.notifyPnL(address(term), int256(-50e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
         credit.burn(100e18);
 
@@ -1365,7 +1365,7 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        profitManager.notifyPnL(address(term), int256(-10_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1406,7 +1406,7 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        profitManager.notifyPnL(address(term), int256(-10_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1449,7 +1449,7 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        profitManager.notifyPnL(address(term), int256(-10_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1498,7 +1498,7 @@ contract LendingTermUnitTest is Test {
         assertEq(profitManager.creditMultiplier(), 1e18);
         credit.mint(address(this), 20_000e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-20_000e18));
+        profitManager.notifyPnL(address(term), int256(-20_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1523,7 +1523,7 @@ contract LendingTermUnitTest is Test {
         credit.mint(address(this), 100e18);
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-50e18));
+        profitManager.notifyPnL(address(term), int256(-50e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
         credit.burn(100e18);
 
@@ -1554,7 +1554,7 @@ contract LendingTermUnitTest is Test {
         assertEq(profitManager.creditMultiplier(), 1e18);
         credit.mint(address(this), 20_000e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-20_000e18));
+        profitManager.notifyPnL(address(term), int256(-20_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x

@@ -103,6 +103,10 @@ contract ProfitManager is CoreRef {
     /// can result in a deadlock situation where no new borrows are allowed.
     uint256 public gaugeWeightTolerance = 1.2e18; // 120%
 
+    /// @notice total amount of CREDIT issued in the lending terms of this market.
+    /// Should be equal to the sum of all LendingTerm.issuance().
+    uint256 public totalIssuance;
+
     constructor(address _core) CoreRef(_core) {
         emit MinBorrowUpdate(block.timestamp, 100e18);
     }
@@ -164,15 +168,6 @@ contract ProfitManager is CoreRef {
         credit = _credit;
         guild = _guild;
         psm = _psm;
-    }
-
-    /// @notice returns the sum of all borrowed CREDIT, not including unpaid interests
-    /// and creditMultiplier changes that could make debt amounts higher than the initial
-    /// borrowed CREDIT amounts.
-    function totalBorrowedCredit() external view returns (uint256) {
-        return
-            CreditToken(credit).targetTotalSupply() -
-            SimplePSM(psm).redeemableCredit();
     }
 
     /// @notice set the minimum borrow amount
@@ -291,11 +286,17 @@ contract ProfitManager is CoreRef {
     /// before `notifyPnL` is called.
     function notifyPnL(
         address gauge,
-        int256 amount
+        int256 amount,
+        int256 issuanceDelta
     ) external onlyCoreRole(CoreRoles.GAUGE_PNL_NOTIFIER) {
         uint256 _surplusBuffer = surplusBuffer;
         uint256 _termSurplusBuffer = termSurplusBuffer[gauge];
         address _credit = credit;
+
+        // underflow should not be possible because the issuance() in the
+        // lending terms are all unsigned integers and they all notify on
+        // increment/decrement.
+        totalIssuance = uint256(int256(totalIssuance) + issuanceDelta);
 
         // handling loss
         if (amount < 0) {

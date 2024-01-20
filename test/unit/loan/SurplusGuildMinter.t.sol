@@ -165,7 +165,7 @@ contract SurplusGuildMinterUnitTest is Test {
             address(0) // otherRecipient
         );
         credit.mint(address(profitManager), 35e18);
-        profitManager.notifyPnL(term, 35e18);
+        profitManager.notifyPnL(term, 35e18, 0);
         assertEq(profitManager.surplusBuffer(), 17.5e18);
         assertEq(profitManager.termSurplusBuffer(term), 150e18);
         (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
@@ -235,7 +235,7 @@ contract SurplusGuildMinterUnitTest is Test {
             address(0) // otherRecipient
         );
         credit.mint(address(profitManager), 35e18);
-        profitManager.notifyPnL(term, 35e18);
+        profitManager.notifyPnL(term, 35e18, 0);
         assertEq(profitManager.surplusBuffer(), 17.5e18);
         assertEq(profitManager.termSurplusBuffer(term), 150e18);
         (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
@@ -248,7 +248,7 @@ contract SurplusGuildMinterUnitTest is Test {
         vm.roll(block.number + 1);
 
         // loss in gauge
-        profitManager.notifyPnL(term, -27.5e18);
+        profitManager.notifyPnL(term, -27.5e18, 0);
         assertEq(profitManager.surplusBuffer(), 17.5e18 + 150e18 - 27.5e18); // 140e18
         assertEq(profitManager.termSurplusBuffer(term), 0);
 
@@ -347,8 +347,8 @@ contract SurplusGuildMinterUnitTest is Test {
             address(0) // otherRecipient
         );
         credit.mint(address(profitManager), 420e18);
-        profitManager.notifyPnL(term1, 140e18);
-        profitManager.notifyPnL(term2, 280e18);
+        profitManager.notifyPnL(term1, 140e18, 0);
+        profitManager.notifyPnL(term2, 280e18, 0);
 
         assertEq(profitManager.surplusBuffer(), 210e18);
         assertEq(profitManager.termSurplusBuffer(term1), 150e18);
@@ -359,7 +359,7 @@ contract SurplusGuildMinterUnitTest is Test {
         vm.roll(block.number + 1);
 
         // loss in term1 + slash sgm
-        profitManager.notifyPnL(term1, -20e18);
+        profitManager.notifyPnL(term1, -20e18, 0);
         assertEq(guild.balanceOf(address(sgm)), 600e18);
         guild.applyGaugeLoss(term1, address(sgm));
         assertEq(guild.balanceOf(address(sgm)), 300e18);

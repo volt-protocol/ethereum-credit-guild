@@ -118,17 +118,17 @@ contract ProfitManagerUnitTest is Test {
 
         // apply a loss (1)
         // 30 CREDIT of loans completely default (~30 USD loss)
-        profitManager.notifyPnL(address(this), -30e18);
+        profitManager.notifyPnL(address(this), -30e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.7e18); // 30% discounted
 
         // apply a loss (2)
         // 20 CREDIT of loans completely default (~14 USD loss because CREDIT now worth 0.7 USD)
-        profitManager.notifyPnL(address(this), -20e18);
+        profitManager.notifyPnL(address(this), -20e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.56e18); // 56% discounted
 
         // apply a gain on an existing loan
         credit.mint(address(profitManager), 70e18);
-        profitManager.notifyPnL(address(this), 70e18);
+        profitManager.notifyPnL(address(this), 70e18, 0);
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(profitManager.creditMultiplier(), 0.56e18); // unchanged, does not go back up
 
@@ -139,12 +139,15 @@ contract ProfitManagerUnitTest is Test {
 
         // apply a loss (3)
         // 500 CREDIT of loans completely default
-        profitManager.notifyPnL(address(this), -500e18);
+        profitManager.notifyPnL(address(this), -500e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.28e18); // half of previous value because half the supply defaulted
     }
 
-    function testTotalBorrowedCredit() public {
-        assertEq(profitManager.totalBorrowedCredit(), 100e18);
+    function testTotalIssuance() public {
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
+        vm.stopPrank();
+        assertEq(profitManager.totalIssuance(), 0);
 
         // psm mint 100 CREDIT
         pegToken.mint(address(this), 100e6);
@@ -154,11 +157,13 @@ contract ProfitManagerUnitTest is Test {
         assertEq(pegToken.balanceOf(address(this)), 0);
         assertEq(pegToken.balanceOf(address(psm)), 100e6);
         assertEq(credit.balanceOf(address(this)), 200e18);
-        assertEq(profitManager.totalBorrowedCredit(), 100e18);
+        assertEq(profitManager.totalIssuance(), 0);
 
-        // simulate a borrow & redeem in PSM
+        // simulate a borrow
         credit.mint(address(this), 50e18);
-        assertEq(profitManager.totalBorrowedCredit(), 150e18);
+        profitManager.notifyPnL(gauge1, 0, 50e18);
+        assertEq(profitManager.totalIssuance(), 50e18);
+        // redeem in PSM
         assertEq(credit.balanceOf(address(this)), 250e18);
         credit.approve(address(psm), 50e18);
         psm.redeem(address(this), 50e18);
@@ -166,7 +171,7 @@ contract ProfitManagerUnitTest is Test {
         assertEq(pegToken.balanceOf(address(this)), 50e6);
         assertEq(pegToken.balanceOf(address(psm)), 50e6);
         assertEq(credit.balanceOf(address(this)), 200e18);
-        assertEq(profitManager.totalBorrowedCredit(), 150e18);
+        assertEq(profitManager.totalIssuance(), 50e18);
     }
 
     function testMinBorrow() public {
@@ -181,7 +186,7 @@ contract ProfitManagerUnitTest is Test {
 
         // apply a loss
         // 50 CREDIT of loans completely default (50 USD loss)
-        profitManager.notifyPnL(address(this), -50e18);
+        profitManager.notifyPnL(gauge1, -50e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18); // 50% discounted
         
         // minBorrow() should 2x
@@ -347,7 +352,7 @@ contract ProfitManagerUnitTest is Test {
         // 10 goes to alice (guild voting)
         // 10 goes to test (rebasing credit)
         credit.mint(address(profitManager), 20e18);
-        profitManager.notifyPnL(gauge1, 20e18);
+        profitManager.notifyPnL(gauge1, 20e18, 0);
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(profitManager.claimRewards(alice), 10e18);
         assertEq(profitManager.claimRewards(bob), 0);
@@ -358,7 +363,7 @@ contract ProfitManagerUnitTest is Test {
         // 20 goes to bob (guild voting)
         // 25 goes to test (rebasing credit)
         credit.mint(address(profitManager), 50e18);
-        profitManager.notifyPnL(gauge2, 50e18);
+        profitManager.notifyPnL(gauge2, 50e18, 0);
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         assertEq(profitManager.claimRewards(alice), 5e18);
         assertEq(profitManager.claimRewards(bob), 20e18);
@@ -374,9 +379,9 @@ contract ProfitManagerUnitTest is Test {
         // 90 goes to bob (40 guild voting on gauge2 + 50 guild voting on gauge3)
         // 100 goes to test (50+50 for rebasing credit)
         credit.mint(address(profitManager), 100e18);
-        profitManager.notifyPnL(gauge2, 100e18);
+        profitManager.notifyPnL(gauge2, 100e18, 0);
         credit.mint(address(profitManager), 100e18);
-        profitManager.notifyPnL(gauge3, 100e18);
+        profitManager.notifyPnL(gauge3, 100e18, 0);
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         //assertEq(profitManager.claimRewards(alice), 10e18);
         vm.prank(alice);
@@ -395,7 +400,7 @@ contract ProfitManagerUnitTest is Test {
         // 100 goes to bob (guild voting)
         // 150 goes to test (rebasing credit)
         credit.mint(address(profitManager), 300e18);
-        profitManager.notifyPnL(gauge2, 300e18);
+        profitManager.notifyPnL(gauge2, 300e18, 0);
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
         //assertEq(profitManager.claimRewards(alice), 50e18);
         vm.prank(alice);
@@ -420,7 +425,7 @@ contract ProfitManagerUnitTest is Test {
 
         // simulate 100 profit on gauge3
         credit.mint(address(profitManager), 100e18);
-        profitManager.notifyPnL(gauge3, 100e18);
+        profitManager.notifyPnL(gauge3, 100e18, 0);
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
         assertEq(credit.balanceOf(alice), 50e18 + 15e18 + 10e18 + 50e18 + 100e18);
@@ -472,7 +477,7 @@ contract ProfitManagerUnitTest is Test {
         // 10 goes to alice (guild voting)
         // 10 goes to test (rebasing credit)
         credit.mint(address(profitManager), 20e18);
-        profitManager.notifyPnL(gauge1, 20e18);
+        profitManager.notifyPnL(gauge1, 20e18, 0);
 
         // check alice pending rewards
         (address[] memory aliceGauges, uint256[] memory aliceGaugeRewards, uint256 aliceTotalRewards) = profitManager.getPendingRewards(alice);
@@ -558,7 +563,7 @@ contract ProfitManagerUnitTest is Test {
         // apply a loss (1)
         // 30 CREDIT of loans completely default (~30 USD loss)
         // partially deplete surplus buffer
-        profitManager.notifyPnL(address(this), -30e18);
+        profitManager.notifyPnL(address(this), -30e18, 0);
         assertEq(profitManager.creditMultiplier(), 1e18); // 0% discounted
         assertEq(profitManager.surplusBuffer(), 70e18);
         assertEq(credit.balanceOf(address(profitManager)), 70e18);
@@ -573,14 +578,14 @@ contract ProfitManagerUnitTest is Test {
             address(0) // otherRecipient
         );
         credit.mint(address(profitManager), 10e18);
-        profitManager.notifyPnL(address(this), 10e18);
+        profitManager.notifyPnL(address(this), 10e18, 0);
         assertEq(profitManager.surplusBuffer(), 80e18);
         assertEq(credit.balanceOf(address(profitManager)), 80e18);
 
         // apply a loss (2)
         // 110 CREDIT of loans completely default (~14 USD loss because CREDIT now worth 0.7 USD)
         // overdraft on surplus buffer, adjust down creditMultiplier
-        profitManager.notifyPnL(address(this), -110e18);
+        profitManager.notifyPnL(address(this), -110e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.7e18); // 30% discounted (30 credit net loss)
         assertEq(profitManager.surplusBuffer(), 0);
         assertEq(credit.balanceOf(address(profitManager)), 0);
@@ -666,7 +671,7 @@ contract ProfitManagerUnitTest is Test {
         // apply a loss below termSurplusBuffer (30)
         // deplete term surplus buffer, 70 leftover transferred to
         // general surplus buffer
-        profitManager.notifyPnL(address(this), -30e18);
+        profitManager.notifyPnL(address(this), -30e18, 0);
         assertEq(profitManager.creditMultiplier(), 1e18); // 0% discounted
         assertEq(profitManager.termSurplusBuffer(address(this)), 0);
         assertEq(profitManager.surplusBuffer(), 170e18);
@@ -683,7 +688,7 @@ contract ProfitManagerUnitTest is Test {
 
         // apply a loss above termSurplusBuffer (170)
         // deplete term surplus buffer, 70 removed from general surplus buffer
-        profitManager.notifyPnL(address(this), -170e18);
+        profitManager.notifyPnL(address(this), -170e18, 0);
         assertEq(profitManager.creditMultiplier(), 1e18); // 0% discounted
         assertEq(profitManager.termSurplusBuffer(address(this)), 0);
         assertEq(profitManager.surplusBuffer(), 100e18);
@@ -699,7 +704,7 @@ contract ProfitManagerUnitTest is Test {
         assertEq(credit.totalSupply(), 300e18);
 
         // apply a loss above termSurplusBuffer (100) + surplusBuffer (100) = -50
-        profitManager.notifyPnL(address(this), -250e18);
+        profitManager.notifyPnL(address(this), -250e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18); // 50% discounted
         assertEq(profitManager.termSurplusBuffer(address(this)), 0);
         assertEq(profitManager.surplusBuffer(), 0);

@@ -88,7 +88,7 @@ contract SimplePSMUnitTest is Test {
         // update creditMultiplier
         credit.mint(address(this), 100e18);
         assertEq(profitManager.creditMultiplier(), 1e18);
-        profitManager.notifyPnL(address(this), -50e18);
+        profitManager.notifyPnL(address(this), -50e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         assertEq(psm.getMintAmountOut(0), 0);
@@ -107,7 +107,7 @@ contract SimplePSMUnitTest is Test {
         // update creditMultiplier
         credit.mint(address(this), 100e18);
         assertEq(profitManager.creditMultiplier(), 1e18);
-        profitManager.notifyPnL(address(this), -50e18);
+        profitManager.notifyPnL(address(this), -50e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         assertEq(psm.getRedeemAmountOut(0), 0);
@@ -128,7 +128,7 @@ contract SimplePSMUnitTest is Test {
         // and will create a min/redeem round-trip error of 1 wei.
         credit.mint(address(this), 100e18);
         assertEq(profitManager.creditMultiplier(), 1e18);
-        profitManager.notifyPnL(address(this), -int256(input % 90e18 + 1)); // [0-90%] loss
+        profitManager.notifyPnL(address(this), -int256(input % 90e18 + 1), 0); // [0-90%] loss
         assertLt(profitManager.creditMultiplier(), 1.0e18 + 1);
         assertGt(profitManager.creditMultiplier(), 0.1e18 - 1);
         credit.burn(100e18);
@@ -193,7 +193,7 @@ contract SimplePSMUnitTest is Test {
         assertEq(token.balanceOf(address(psm)), 50e6);
 
         assertEq(profitManager.creditMultiplier(), 1e18);
-        profitManager.notifyPnL(address(this), -int256(25e18));
+        profitManager.notifyPnL(address(this), -int256(25e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         assertEq(psm.pegTokenBalance(), 50e6);
