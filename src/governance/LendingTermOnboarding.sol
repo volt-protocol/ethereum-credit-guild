@@ -28,6 +28,8 @@ contract LendingTermOnboarding is GuildGovernor {
 
     /// @notice mapping of allowed LendingTerm implementations
     mapping(address => bool) public implementations;
+    /// @notice mapping of allowed AuctionHouses
+    mapping(address => bool) public auctionHouses;
     /// @notice immutable reference to the guild token
     address public immutable guildToken;
     /// @notice immutable reference to the gauge type to use for the terms onboarded
@@ -50,6 +52,12 @@ contract LendingTermOnboarding is GuildGovernor {
     event ImplementationAllowChanged(
         uint256 indexed when,
         address indexed implementation,
+        bool allowed
+    );
+    /// @notice emitted when an auctionHouse's "allowed" status changes
+    event AuctionHouseAllowChanged(
+        uint256 indexed when,
+        address indexed auctionHouses,
         bool allowed
     );
     /// @notice emitted when a term is created
@@ -101,14 +109,32 @@ contract LendingTermOnboarding is GuildGovernor {
         );
     }
 
+    /// @notice Allow or disallow a given auctionHouse
+    function allowAuctionHouse(
+        address auctionHouse,
+        bool allowed
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        auctionHouses[auctionHouse] = allowed;
+        emit AuctionHouseAllowChanged(
+            block.timestamp,
+            auctionHouse,
+            allowed
+        );
+    }
+
     /// @notice Create a new LendingTerm and initialize it.
     function createTerm(
         address implementation,
+        address auctionHouse,
         LendingTerm.LendingTermParams calldata params
     ) external returns (address) {
         require(
             implementations[implementation],
             "LendingTermOnboarding: invalid implementation"
+        );
+        require(
+            auctionHouses[auctionHouse],
+            "LendingTermOnboarding: invalid auctionHouse"
         );
         // must be an ERC20 (maybe, at least it prevents dumb input mistakes)
         (bool success, bytes memory returned) = params.collateralToken.call(
