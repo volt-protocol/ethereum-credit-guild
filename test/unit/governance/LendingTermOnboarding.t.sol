@@ -387,6 +387,10 @@ contract LendingTermOnboardingUnitTest is Test {
         vm.warp(block.timestamp + 13);
         assertEq(uint8(onboarder.state(proposalId)), uint8(IGovernor.ProposalState.Active));
 
+        // cannot cancel
+        vm.expectRevert("LendingTermOnboarding: cannot cancel proposals");
+        onboarder.cancel(targets, values, calldatas, keccak256(bytes(description)));
+
         // support & check status
         vm.prank(bob);
         onboarder.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.For));

@@ -216,6 +216,16 @@ contract LendingTermOnboarding is GuildGovernor {
         revert("LendingTermOnboarding: cannot propose arbitrary actions");
     }
 
+    /// @dev override to prevent cancellation from the proposer
+    function cancel(
+        address[] memory /* targets*/,
+        uint256[] memory /* values*/,
+        bytes[] memory /* calldatas*/,
+        bytes32 /* descriptionHash*/
+    ) public pure override(IGovernor, Governor) returns (uint256) {
+        revert("LendingTermOnboarding: cannot cancel proposals");
+    }
+
     /// @notice Propose the onboarding of a term
     function proposeOnboard(
         address term
