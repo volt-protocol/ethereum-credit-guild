@@ -172,6 +172,13 @@ contract ProfitManagerUnitTest is Test {
         assertEq(pegToken.balanceOf(address(psm)), 50e6);
         assertEq(credit.balanceOf(address(this)), 200e18);
         assertEq(profitManager.totalIssuance(), 50e18);
+
+        // set max
+        vm.prank(governor);
+        profitManager.setMaxTotalIssuance(1000e18);
+        profitManager.notifyPnL(gauge1, 0, 950e18); // ok
+        vm.expectRevert("ProfitManager: global debt ceiling reached");
+        profitManager.notifyPnL(gauge1, 0, 1);
     }
 
     function testMinBorrow() public {
@@ -288,6 +295,22 @@ contract ProfitManagerUnitTest is Test {
         profitManager.setMinBorrow(1000e18);
 
         assertEq(profitManager.minBorrow(), 1000e18);
+    }
+
+    function testSetMaxTotalIssuance() public {
+        assertEq(profitManager.maxTotalIssuance(), 1e30);
+
+        // revert if not governor
+        vm.expectRevert("UNAUTHORIZED");
+        profitManager.setMaxTotalIssuance(1000e18);
+
+        assertEq(profitManager.maxTotalIssuance(), 1e30);
+
+        // ok
+        vm.prank(governor);
+        profitManager.setMaxTotalIssuance(1000e18);
+
+        assertEq(profitManager.maxTotalIssuance(), 1000e18);
     }
 
     function testSetGaugeWeightTolerance() public {

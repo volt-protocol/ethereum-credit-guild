@@ -107,6 +107,11 @@ contract ProfitManager is CoreRef {
     /// Should be equal to the sum of all LendingTerm.issuance().
     uint256 public totalIssuance;
 
+    /// @notice maximum total amount of CREDIT allowed to be issued in this market.
+    /// This value is adjusted up when the creditMultiplier goes down.
+    /// This is set to a very large value by default to not restrict usage by default.
+    uint256 public _maxTotalIssuance = 1e30;
+
     constructor(address _core) CoreRef(_core) {
         emit MinBorrowUpdate(block.timestamp, 100e18);
     }
@@ -148,12 +153,20 @@ contract ProfitManager is CoreRef {
     /// @notice emitted when minBorrow is updated
     event MinBorrowUpdate(uint256 indexed when, uint256 newValue);
 
+    /// @notice emitted when maxTotalIssuance is updated
+    event MaxTotalIssuanceUpdate(uint256 indexed when, uint256 newValue);
+
     /// @notice emitted when gaugeWeightTolerance is updated
     event GaugeWeightToleranceUpdate(uint256 indexed when, uint256 newValue);
 
     /// @notice get the minimum borrow amount
     function minBorrow() external view returns (uint256) {
         return (_minBorrow * 1e18) / creditMultiplier;
+    }
+
+    /// @notice get the maximum total issuance
+    function maxTotalIssuance() external view returns (uint256) {
+        return (_maxTotalIssuance * 1e18) / creditMultiplier;
     }
 
     /// @notice initialize references to GUILD & CREDIT tokens.
@@ -176,6 +189,14 @@ contract ProfitManager is CoreRef {
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         _minBorrow = newValue;
         emit MinBorrowUpdate(block.timestamp, newValue);
+    }
+
+    /// @notice set the maximum total issuance
+    function setMaxTotalIssuance(
+        uint256 newValue
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        _maxTotalIssuance = newValue;
+        emit MaxTotalIssuanceUpdate(block.timestamp, newValue);
     }
 
     /// @notice set the gauge weight tolerance
@@ -298,6 +319,12 @@ contract ProfitManager is CoreRef {
         // lending terms are all unsigned integers and they all notify on
         // increment/decrement.
         totalIssuance = uint256(int256(totalIssuance) + issuanceDelta);
+
+        // check the maximum total issuance if the issuance is changing
+        if (issuanceDelta > 0) {
+            uint256 __maxTotalIssuance = (_maxTotalIssuance * 1e18) / creditMultiplier;
+            require(totalIssuance <= __maxTotalIssuance, "ProfitManager: global debt ceiling reached");
+        }
 
         // handling loss
         if (amount < 0) {
