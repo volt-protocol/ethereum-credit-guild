@@ -680,7 +680,7 @@ contract LendingTerm is CoreRef {
         loans[loanId].caller = caller;
 
         // auction the loan collateral
-        AuctionHouse(_auctionHouse).startAuction(loanId, loanDebt);
+        AuctionHouse(_auctionHouse).startAuction(loanId);
 
         // emit event
         emit LoanCall(block.timestamp, loanId);

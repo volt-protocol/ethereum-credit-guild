@@ -71,8 +71,7 @@ contract AuctionHouse is CoreRef {
     /// @notice start the auction of the collateral of a loan, to be exchanged for CREDIT,
     /// in order to pay the debt of a loan.
     /// @param loanId the ID of the loan which collateral is auctioned
-    /// @param callDebt the amount of CREDIT debt to recover from the collateral auction
-    function startAuction(bytes32 loanId, uint256 callDebt) external {
+    function startAuction(bytes32 loanId) external {
         // check that caller is a lending term that still has PnL reporting role
         require(
             core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, msg.sender),
@@ -98,7 +97,7 @@ contract AuctionHouse is CoreRef {
             endTime: 0,
             lendingTerm: msg.sender,
             collateralAmount: loan.collateralAmount,
-            callDebt: callDebt
+            callDebt: loan.callDebt
         });
         nAuctionsInProgress++;
 
@@ -108,7 +107,7 @@ contract AuctionHouse is CoreRef {
             loanId,
             LendingTerm(msg.sender).collateralToken(),
             loan.collateralAmount,
-            callDebt
+            loan.callDebt
         );
     }
 
@@ -152,7 +151,8 @@ contract AuctionHouse is CoreRef {
             creditAsked = _callDebt - (_callDebt * elapsed) / PHASE_2_DURATION;
         }
         // second phase fully elapsed, anyone can receive the full collateral and give 0 CREDIT
-        // in practice, somebody should have taken the arb before we reach this condition.
+        // in practice, somebody should have taken the arb before we reach this condition, and
+        // there are conditions in bid() & forgive() to prevent this from happening.
         else {
             // receive the full collateral
             collateralReceived = auctions[loanId].collateralAmount;

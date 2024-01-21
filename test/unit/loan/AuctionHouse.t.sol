@@ -173,7 +173,7 @@ contract AuctionHouseUnitTest is Test {
         bytes32 loanId = _setupAndCallLoan();
 
         vm.expectRevert("AuctionHouse: invalid caller");
-        auctionHouse.startAuction(loanId, 22_000e18);
+        auctionHouse.startAuction(loanId);
     }
 
     // startAuction fail if the loan is not closed in current block
@@ -186,7 +186,7 @@ contract AuctionHouseUnitTest is Test {
         vm.warp(block.timestamp + 13);
         vm.prank(address(term));
         vm.expectRevert("AuctionHouse: loan previously called");
-        auctionHouse.startAuction(loanId, 22_000e18);
+        auctionHouse.startAuction(loanId);
     }
     
     // startAuction fail if the auction already exists
@@ -197,7 +197,7 @@ contract AuctionHouseUnitTest is Test {
         // (this would only happen due to invalid logic in the LendingTerm)
         vm.prank(address(term));
         vm.expectRevert("AuctionHouse: auction exists");
-        auctionHouse.startAuction(loanId, 22_000e18);
+        auctionHouse.startAuction(loanId);
     }
 
     // getBidDetail at various steps
