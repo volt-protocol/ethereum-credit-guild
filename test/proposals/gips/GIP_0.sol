@@ -222,18 +222,9 @@ contract GIP_0 is Proposal {
                 ONBOARD_TIMELOCK_DELAY
             );
             LendingTermOnboarding onboardGovernorGuild = new LendingTermOnboarding(
-                    LendingTerm.LendingTermReferences({
-                        profitManager: AddressLib.get("PROFIT_MANAGER"),
-                        guildToken: AddressLib.get("ERC20_GUILD"),
-                        auctionHouse: AddressLib.get("AUCTION_HOUSE"),
-                        creditMinter: AddressLib.get(
-                            "RATE_LIMITED_CREDIT_MINTER"
-                        ),
-                        creditToken: AddressLib.get("ERC20_GUSDC")
-                    }), /// _lendingTermReferences
-                    1, // _gaugeType
                     AddressLib.get("CORE"), // _core
                     address(onboardTimelock), // _timelock
+                    AddressLib.get("ERC20_GUILD"), // _guildToken
                     ONBOARD_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
                     ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
                     ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
@@ -294,7 +285,9 @@ contract GIP_0 is Proposal {
             termOnboarding.allowImplementation(_lendingTermV1, true);
 
             address termSDAI1 = termOnboarding.createTerm(
-                _lendingTermV1,
+                1, // gauge type,
+                _lendingTermV1, // implementation
+                AddressLib.get("AUCTION_HOUSE"), // auctionHouse
                 LendingTerm.LendingTermParams({
                     collateralToken: AddressLib.get("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
