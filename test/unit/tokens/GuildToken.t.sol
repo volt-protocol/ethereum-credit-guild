@@ -584,6 +584,35 @@ contract GuildTokenUnitTest is Test {
         token.decrementGauge(address(this), 10e18);
     }
 
+    // if this passes, the bug is fixed
+    function testBugFreezeInfiniteLoop() public {
+        // enable transfers, add gauges, and mint tokens to bob
+        vm.startPrank(governor);
+        token.enableTransfer();
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        vm.stopPrank();
+        token.mint(bob, 100e18);
+        token.setMaxGauges(3);
+        token.addGauge(1, gauge1);
+        token.addGauge(1, gauge2);
+        token.addGauge(1, gauge3);
+
+        // bob does a gauge allocation
+        vm.startPrank(bob);
+        token.incrementGauge(gauge1, 0);
+        token.incrementGauge(gauge2, 100e18);
+        vm.stopPrank();
+
+        assertEq(token.userGauges(bob).length, 2);
+
+        vm.prank(bob);
+        token.transfer(alice, 100e18); // will loop forever without the fix
+        assertEq(token.balanceOf(alice), 100e18);
+        assertEq(token.balanceOf(bob), 0);
+    }
+
     function testDecrementWeightDeprecatedOnlyGauge() public {
         // grant role to test contract
         vm.startPrank(governor);
