@@ -527,6 +527,48 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.nonRebasingSupply(), 100);
     }
 
+    // if this is not reverting, the rounding error is fixed
+    function testBugRoundingError() public {
+        vm.prank(alice);
+        token.enterRebase();
+        token.mint(alice, 100e18);
+
+        vm.warp(block.timestamp + 5);
+        token.mint(bobby, 633761756280);
+        vm.prank(bobby);
+        token.distribute(633761756280);
+
+        vm.warp(block.timestamp + 1);
+        token.mint(bobby, 316880878140);
+        vm.prank(bobby);
+        token.distribute(316880878140);
+
+        vm.warp(block.timestamp + 1);
+        token.mint(carol, 100000000316880878140);
+
+        vm.prank(carol);
+        token.transfer(alice, 100000000316880878140);
+    }
+
+
+    // if this is passing, the bug of rounding revert is fixed
+    function testBugRevertOnReceive() external {
+        address from = address(uint160(1));
+        address to = address(uint160(2));
+
+        token.mint(to, 100 ether);
+
+        vm.startPrank(to);
+        token.enterRebase();
+        token.distribute(1 ether);
+
+        vm.warp(block.timestamp + 1);
+        vm.startPrank(from);
+
+        token.transfer(to, 0);
+
+        token.transferFrom(from, to, 0);
+    }
     function testDistributeFuzz(uint256 distributionAmount, uint256[3] memory userBalances) public {
         // fuzz values in the plausibility range
         distributionAmount = bound(distributionAmount, 0, 10_000e18);

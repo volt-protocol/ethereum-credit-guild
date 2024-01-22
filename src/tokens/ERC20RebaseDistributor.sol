@@ -320,6 +320,19 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             rawBalance
         );
         uint256 mintAmount = rebasedBalance - rawBalance;
+
+        /// @dev rounding errors could make mintAmount > unmintedRebaseRewards() because
+        /// the rebasedBalance can be a larger number than the unmintedRebaseRewards(),
+        /// and unmintedRebaseRewards() could be 1 wei less than the rebasedBalance,
+        /// especially if there is only one user rebasing.
+        /// In the next lines, when we decrement the unminted rebase rewards, there could be
+        /// an underflow, so we cap the mintAmount to unmintedRebaseRewards() to avoid it.
+        InterpolatedValue memory val = __unmintedRebaseRewards;
+        uint256 _unmintedRebaseRewards = interpolatedValue(val);
+        if (mintAmount > _unmintedRebaseRewards) {
+            mintAmount = _unmintedRebaseRewards;
+        }
+
         if (mintAmount != 0) {
             ERC20._mint(account, mintAmount);
             decreaseUnmintedRebaseRewards(mintAmount);
