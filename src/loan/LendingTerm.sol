@@ -202,6 +202,11 @@ contract LendingTerm is CoreRef {
         return refs.creditToken;
     }
 
+    /// @notice get reference 'auctionHouse' of this term
+    function auctionHouse() external view returns (address) {
+        return refs.auctionHouse;
+    }
+
     /// @notice get a loan
     function getLoan(bytes32 loanId) external view returns (Loan memory) {
         return loans[loanId];

@@ -38,6 +38,9 @@ contract LendingTermOnboarding is GuildGovernor {
     /// to check that a term has been created by this factory.
     mapping(address => uint256) public gaugeTypes;
 
+    /// @notice implementations of created terms
+    mapping(address => address) public termImplementations;
+
     /// @notice mapping of references per market (key = gaugeType = market id)
     mapping(uint256 => MarketReferences) public marketReferences;
     struct MarketReferences {
@@ -205,6 +208,7 @@ contract LendingTermOnboarding is GuildGovernor {
             params
         );
         gaugeTypes[term] = gaugeType;
+        termImplementations[term] = implementation;
         emit TermCreated(block.timestamp, implementation, term, params);
         return term;
     }
@@ -234,7 +238,12 @@ contract LendingTermOnboarding is GuildGovernor {
         address term
     ) external whenNotPaused returns (uint256 proposalId) {
         // Check that the term has been created by this factory
-        require(gaugeTypes[term] != 0, "LendingTermOnboarding: invalid term");
+        bool validImpl = implementations[termImplementations[term]];
+        bool validAh = auctionHouses[LendingTerm(term).auctionHouse()];
+        require(
+            gaugeTypes[term] != 0 && validImpl && validAh,
+            "LendingTermOnboarding: invalid term"
+        );
 
         // Check that the term was not subject to an onboard vote recently
         require(

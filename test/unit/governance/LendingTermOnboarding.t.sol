@@ -28,7 +28,7 @@ contract LendingTermOnboardingUnitTest is Test {
     MockERC20 private collateral;
     SimplePSM private psm;
     LendingTerm private termImplementation;
-    AuctionHouse auctionHouse;
+    AuctionHouse public auctionHouse;
     RateLimitedMinter rlcm;
     GuildTimelockController private timelock;
     LendingTermOnboarding private onboarder;
@@ -352,6 +352,20 @@ contract LendingTermOnboardingUnitTest is Test {
         // cannot propose an arbitrary address (must come from factory)
         vm.expectRevert("LendingTermOnboarding: invalid term");
         onboarder.proposeOnboard(address(this));
+
+        // cannot propose if implementation has been disallowed since
+        vm.prank(governor);
+        onboarder.allowImplementation(
+            address(termImplementation),
+            false
+        );
+        vm.expectRevert("LendingTermOnboarding: invalid term");
+        onboarder.proposeOnboard(address(this));
+        vm.prank(governor);
+        onboarder.allowImplementation(
+            address(termImplementation),
+            true
+        );
 
         // cannot propose if the user doesn't have enough GUILD
         vm.expectRevert("Governor: proposer votes below proposal threshold");
