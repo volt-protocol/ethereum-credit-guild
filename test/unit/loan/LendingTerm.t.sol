@@ -125,6 +125,8 @@ contract LendingTermUnitTest is Test {
         assertEq(refs.auctionHouse, address(auctionHouse));
         assertEq(refs.creditMinter, address(rlcm));
         assertEq(refs.creditToken, address(credit));
+        assertEq(term.creditToken(), address(credit));
+        assertEq(term.profitManager(), address(profitManager));
 
         LendingTerm.LendingTermParams memory params = term.getParameters();
         assertEq(params.collateralToken, address(collateral));

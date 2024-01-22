@@ -192,6 +192,16 @@ contract LendingTerm is CoreRef {
         return params.collateralToken;
     }
 
+    /// @notice get reference 'profitManager' of this term
+    function profitManager() external view returns (address) {
+        return refs.profitManager;
+    }
+
+    /// @notice get reference 'creditToken' of this term
+    function creditToken() external view returns (address) {
+        return refs.creditToken;
+    }
+
     /// @notice get a loan
     function getLoan(bytes32 loanId) external view returns (Loan memory) {
         return loans[loanId];
