@@ -59,7 +59,11 @@ contract LendingTermOffboarding is CoreRef {
 
     /// @notice mapping of terms that can be offboarded.
     mapping(address => OffboardStatus) public canOffboard;
-    enum OffboardStatus {UNSET, CAN_OFFBOARD, CAN_CLEANUP}
+    enum OffboardStatus {
+        UNSET,
+        CAN_OFFBOARD,
+        CAN_CLEANUP
+    }
 
     /// @notice number of offboardings in progress.
     uint256 public nOffboardingsInProgress;
@@ -102,7 +106,10 @@ contract LendingTermOffboarding is CoreRef {
             "LendingTermOffboarding: not an active term"
         );
         // Check that another offboarding is not in progress
-        require(canOffboard[term] == OffboardStatus.UNSET, "LendingTermOffboarding: offboard in progress");
+        require(
+            canOffboard[term] == OffboardStatus.UNSET,
+            "LendingTermOffboarding: offboard in progress"
+        );
 
         polls[block.number][term] = 1; // voting power
         lastPollBlock[term] = block.number;
@@ -154,7 +161,10 @@ contract LendingTermOffboarding is CoreRef {
     /// This will prevent new loans from being open, and will prevent GUILD holders to vote for the term.
     /// @param term LendingTerm to offboard from the system.
     function offboard(address term) external whenNotPaused {
-        require(canOffboard[term] == OffboardStatus.CAN_OFFBOARD, "LendingTermOffboarding: cannot offboard");
+        require(
+            canOffboard[term] == OffboardStatus.CAN_OFFBOARD,
+            "LendingTermOffboarding: cannot offboard"
+        );
         canOffboard[term] = OffboardStatus.CAN_CLEANUP;
         lastPollBlock[term] = 1; // not 0 to reduce gas cost of next offboard
 
@@ -188,7 +198,10 @@ contract LendingTermOffboarding is CoreRef {
                 core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, term),
             "LendingTermOffboarding: re-onboarded"
         );
-        require(canOffboard[term] == OffboardStatus.CAN_CLEANUP, "LendingTermOffboarding: cannot cleanup");
+        require(
+            canOffboard[term] == OffboardStatus.CAN_CLEANUP,
+            "LendingTermOffboarding: cannot cleanup"
+        );
         canOffboard[term] = OffboardStatus.UNSET;
 
         // update protocol config
@@ -214,7 +227,10 @@ contract LendingTermOffboarding is CoreRef {
     /// - 3b) if re-onboarded before cleanup, resetOffboarding()
     /// @param term LendingTerm to reset offboarding for.
     function resetOffboarding(address term) external whenNotPaused {
-        require(canOffboard[term] != OffboardStatus.UNSET, "LendingTermOffboarding: cannot reset");
+        require(
+            canOffboard[term] != OffboardStatus.UNSET,
+            "LendingTermOffboarding: cannot reset"
+        );
         require(
             GuildToken(guildToken).isGauge(term) &&
                 core().hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term) &&

@@ -116,7 +116,10 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     /// @notice notify loss in a given gauge
     function notifyGaugeLoss(address gauge) external {
         require(_gauges.contains(gauge), "GuildToken: gauge not found");
-        require(msg.sender == LendingTerm(gauge).profitManager(), "UNAUTHORIZED");
+        require(
+            msg.sender == LendingTerm(gauge).profitManager(),
+            "UNAUTHORIZED"
+        );
 
         // save gauge loss
         lastGaugeLoss[gauge] = block.timestamp;
@@ -207,12 +210,17 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         }
 
         // update the user profit index and claim rewards
-        ProfitManager(LendingTerm(gauge).profitManager()).claimGaugeRewards(user, gauge);
+        ProfitManager(LendingTerm(gauge).profitManager()).claimGaugeRewards(
+            user,
+            gauge
+        );
 
         // check if gauge is currently using its allocated debt ceiling.
         // To decrement gauge weight, guild holders might have to call loans if the debt ceiling is used.
         if (issuance != 0) {
-            uint256 debtCeilingAfterDecrement = LendingTerm(gauge).debtCeiling(-int256(weight));
+            uint256 debtCeilingAfterDecrement = LendingTerm(gauge).debtCeiling(
+                -int256(weight)
+            );
             require(
                 issuance <= debtCeilingAfterDecrement,
                 "GuildToken: debt ceiling used"
@@ -244,7 +252,10 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             );
         }
 
-        ProfitManager(LendingTerm(gauge).profitManager()).claimGaugeRewards(user, gauge);
+        ProfitManager(LendingTerm(gauge).profitManager()).claimGaugeRewards(
+            user,
+            gauge
+        );
 
         super._incrementGaugeWeight(user, gauge, weight);
     }

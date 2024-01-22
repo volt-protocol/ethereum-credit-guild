@@ -128,7 +128,10 @@ contract SurplusGuildMinter is CoreRef {
         // check that the term is from the same market
         // if this test passes, the GUILD token will still check that the term is an active
         // gauge, so a forged term that would return the same creditToken address cannot be passed.
-        require(LendingTerm(term).creditToken() == credit, "SurplusGuildMinter: invalid term");
+        require(
+            LendingTerm(term).creditToken() == credit,
+            "SurplusGuildMinter: invalid term"
+        );
 
         // pull CREDIT from user & transfer it to surplus buffer
         CreditToken(credit).transferFrom(msg.sender, address(this), amount);

@@ -131,7 +131,13 @@ contract GuildVetoGovernor is
     // in GovernorCountingSimple, this returns forVotes + abstainVotes
     function _quorumReached(
         uint256 proposalId
-    ) internal view virtual override(Governor, GovernorCountingSimple) returns (bool) {
+    )
+        internal
+        view
+        virtual
+        override(Governor, GovernorCountingSimple)
+        returns (bool)
+    {
         (uint256 againstVotes, , ) = proposalVotes(proposalId);
         uint256 proposalQuorum = quorum(proposalSnapshot(proposalId));
         return proposalQuorum <= againstVotes;
@@ -145,7 +151,13 @@ contract GuildVetoGovernor is
     // in GovernorCountingSimple, this returns forVotes > againstVotes
     function _voteSucceeded(
         uint256 /* proposalId*/
-    ) internal pure virtual override(Governor, GovernorCountingSimple) returns (bool) {
+    )
+        internal
+        pure
+        virtual
+        override(Governor, GovernorCountingSimple)
+        returns (bool)
+    {
         return true;
     }
 
@@ -160,7 +172,10 @@ contract GuildVetoGovernor is
         uint256 weight,
         bytes memory params
     ) internal virtual override(Governor, GovernorCountingSimple) {
-        require(support == uint8(VoteType.Against), "GuildVetoGovernor: can only vote against in veto proposals");
+        require(
+            support == uint8(VoteType.Against),
+            "GuildVetoGovernor: can only vote against in veto proposals"
+        );
         super._countVote(proposalId, account, support, weight, params);
     }
 

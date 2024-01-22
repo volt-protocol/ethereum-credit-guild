@@ -25,11 +25,7 @@ contract CreditToken is
         address _core,
         string memory _name,
         string memory _symbol
-    )
-        CoreRef(_core)
-        ERC20(_name, _symbol)
-        ERC20Permit(_name)
-    {}
+    ) CoreRef(_core) ERC20(_name, _symbol) ERC20Permit(_name) {}
 
     /// @notice Mint new tokens to the target address
     function mint(

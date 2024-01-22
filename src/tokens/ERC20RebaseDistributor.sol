@@ -322,7 +322,8 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                     _unmintedRebaseRewards - mintAmount
                 ), // adjusted current
                 targetTimestamp: val.targetTimestamp, // unchanged
-                targetValue: val.targetValue - SafeCastLib.safeCastTo224(mintAmount) // adjusted target
+                targetValue: val.targetValue -
+                    SafeCastLib.safeCastTo224(mintAmount) // adjusted target
             });
 
             emit RebaseReward(account, block.timestamp, mintAmount);

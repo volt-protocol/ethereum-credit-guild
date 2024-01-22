@@ -322,8 +322,12 @@ contract ProfitManager is CoreRef {
 
         // check the maximum total issuance if the issuance is changing
         if (issuanceDelta > 0) {
-            uint256 __maxTotalIssuance = (_maxTotalIssuance * 1e18) / creditMultiplier;
-            require(totalIssuance <= __maxTotalIssuance, "ProfitManager: global debt ceiling reached");
+            uint256 __maxTotalIssuance = (_maxTotalIssuance * 1e18) /
+                creditMultiplier;
+            require(
+                totalIssuance <= __maxTotalIssuance,
+                "ProfitManager: global debt ceiling reached"
+            );
         }
 
         // handling loss
@@ -357,7 +361,8 @@ contract ProfitManager is CoreRef {
                 emit SurplusBufferUpdate(block.timestamp, 0);
 
                 // update the CREDIT multiplier
-                uint256 creditTotalSupply = CreditToken(_credit).targetTotalSupply();
+                uint256 creditTotalSupply = CreditToken(_credit)
+                    .targetTotalSupply();
                 uint256 newCreditMultiplier = (creditMultiplier *
                     (creditTotalSupply - loss)) / creditTotalSupply;
                 creditMultiplier = newCreditMultiplier;

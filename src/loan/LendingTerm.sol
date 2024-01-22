@@ -326,8 +326,8 @@ contract LendingTerm is CoreRef {
         }
         uint256 toleratedGaugeWeight = (gaugeWeight * gaugeWeightTolerance) /
             1e18;
-        uint256 debtCeilingBefore = (totalIssuance *
-            toleratedGaugeWeight) / totalWeight;
+        uint256 debtCeilingBefore = (totalIssuance * toleratedGaugeWeight) /
+            totalWeight;
         // if already above cap, no more borrows allowed
         if (_issuance >= debtCeilingBefore) {
             return debtCeilingBefore;
@@ -535,14 +535,15 @@ contract LendingTerm is CoreRef {
         uint256 borrowAmount = loan.borrowAmount;
         uint256 creditMultiplier = ProfitManager(refs.profitManager)
             .creditMultiplier();
-        uint256 principalRepaid = (borrowAmount * loan.borrowCreditMultiplier * debtToRepay) / creditMultiplier / loanDebt;
+        uint256 principalRepaid = (borrowAmount *
+            loan.borrowCreditMultiplier *
+            debtToRepay) /
+            creditMultiplier /
+            loanDebt;
         uint256 interestRepaid = debtToRepay - principalRepaid;
         uint256 issuanceDecrease = (borrowAmount * debtToRepay) / loanDebt;
 
-        require(
-            principalRepaid != 0,
-            "LendingTerm: repay too small"
-        );
+        require(principalRepaid != 0, "LendingTerm: repay too small");
         require(
             debtToRepay >= (loanDebt * params.minPartialRepayPercent) / 1e18,
             "LendingTerm: repay below min"

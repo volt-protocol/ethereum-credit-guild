@@ -115,11 +115,7 @@ contract LendingTermOnboarding is GuildGovernor {
         bool allowed
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         auctionHouses[auctionHouse] = allowed;
-        emit AuctionHouseAllowChanged(
-            block.timestamp,
-            auctionHouse,
-            allowed
-        );
+        emit AuctionHouseAllowChanged(block.timestamp, auctionHouse, allowed);
     }
 
     /// @notice Create a new LendingTerm and initialize it.
@@ -178,16 +174,23 @@ contract LendingTermOnboarding is GuildGovernor {
         );
 
         // if one of the periodic payment parameter is used, both must be used
-        if (params.minPartialRepayPercent != 0 || params.maxDelayBetweenPartialRepay != 0) {
+        if (
+            params.minPartialRepayPercent != 0 ||
+            params.maxDelayBetweenPartialRepay != 0
+        ) {
             require(
-                params.minPartialRepayPercent != 0 && params.maxDelayBetweenPartialRepay != 0,
+                params.minPartialRepayPercent != 0 &&
+                    params.maxDelayBetweenPartialRepay != 0,
                 "LendingTermOnboarding: invalid periodic payment params"
             );
         }
 
         // check that references for this market has been set
         MarketReferences storage references = marketReferences[gaugeType];
-        require(references.profitManager != address(0), "LendingTermOnboarding: unknown market");
+        require(
+            references.profitManager != address(0),
+            "LendingTermOnboarding: unknown market"
+        );
 
         address term = Clones.clone(implementation);
         LendingTerm(term).initialize(
