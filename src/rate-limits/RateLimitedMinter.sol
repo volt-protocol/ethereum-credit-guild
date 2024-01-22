@@ -45,7 +45,7 @@ contract RateLimitedMinter is RateLimitedV2 {
     function mint(
         address to,
         uint256 amount
-    ) external onlyCoreRole(role) whenNotPaused {
+    ) external onlyCoreRole(role) {
         _depleteBuffer(amount); /// check and effects
         IERC20Mintable(token).mint(to, amount); /// interactions
     }

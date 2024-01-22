@@ -97,21 +97,4 @@ contract RateLimitedCreditMinterUnitTest is Test {
         // can mint the replenished amount
         rlcm.mint(alice, 100);
     }
-
-    function testMintPausable() public {
-        // create/grant role
-        vm.startPrank(governor);
-        core.createRole(
-            CoreRoles.RATE_LIMITED_CREDIT_MINTER,
-            CoreRoles.GOVERNOR
-        );
-        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(this));
-        vm.stopPrank();
-        vm.prank(guardian);
-        rlcm.pause();
-
-        // minting reverts because the contract is paused
-        vm.expectRevert("Pausable: paused");
-        rlcm.mint(alice, 100);
-    }
 }

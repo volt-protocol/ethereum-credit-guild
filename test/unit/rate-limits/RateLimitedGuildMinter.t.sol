@@ -97,21 +97,4 @@ contract RateLimitedGuildMinterUnitTest is Test {
         // can mint the replenished amount
         rlgm.mint(alice, 100);
     }
-
-    function testMintPausable() public {
-        // create/grant role
-        vm.startPrank(governor);
-        core.createRole(
-            CoreRoles.RATE_LIMITED_GUILD_MINTER,
-            CoreRoles.GOVERNOR
-        );
-        core.grantRole(CoreRoles.RATE_LIMITED_GUILD_MINTER, address(this));
-        vm.stopPrank();
-        vm.prank(guardian);
-        rlgm.pause();
-
-        // minting reverts because the contract is paused
-        vm.expectRevert("Pausable: paused");
-        rlgm.mint(alice, 100);
-    }
 }
