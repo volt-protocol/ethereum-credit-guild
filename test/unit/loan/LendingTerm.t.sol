@@ -45,10 +45,7 @@ contract LendingTermUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         collateral = new MockERC20();
         credit = new CreditToken(address(core), "name", "symbol");
-        guild = new GuildToken(
-            address(core),
-            address(profitManager)
-        );
+        guild = new GuildToken(address(core), address(profitManager));
         rlcm = new RateLimitedMinter(
             address(core) /*_core*/,
             address(credit) /*_token*/,
@@ -84,7 +81,11 @@ contract LendingTermUnitTest is Test {
             address(credit),
             address(collateral)
         );
-        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+        profitManager.initializeReferences(
+            address(credit),
+            address(guild),
+            address(psm)
+        );
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -238,6 +239,45 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.totalSupply(), borrowAmount);
 
         assertEq(term.getLoan(loanId).borrower, address(this));
+        assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
+        assertEq(term.getLoan(loanId).borrowAmount, borrowAmount);
+        assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
+        assertEq(term.getLoan(loanId).caller, address(0));
+        assertEq(term.getLoan(loanId).callTime, 0);
+        assertEq(term.getLoan(loanId).closeTime, 0);
+
+        assertEq(term.issuance(), borrowAmount);
+        assertEq(term.getLoanDebt(loanId), borrowAmount);
+
+        // check interest accrued over time
+        vm.warp(block.timestamp + term.YEAR());
+        assertEq(term.getLoanDebt(loanId), (borrowAmount * 110) / 100); // 10% APR
+    }
+
+    // borrow on behalf success
+    function testBorrowOnBehalfSuccess() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 12e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        address onBehalfOf = address(0x987654321);
+
+        // borrow
+        bytes32 loanId = term.borrowOnBehalf(
+            borrowAmount,
+            collateralAmount,
+            onBehalfOf
+        );
+
+        // check loan creation
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+        assertEq(credit.balanceOf(onBehalfOf), borrowAmount);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.totalSupply(), borrowAmount);
+
+        assertEq(term.getLoan(loanId).borrower, onBehalfOf);
         assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
         assertEq(term.getLoan(loanId).borrowAmount, borrowAmount);
         assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
@@ -434,9 +474,9 @@ contract LendingTermUnitTest is Test {
 
         // if the term's weight is above 100% when we include tolerance,
         // the debt ceiling is the hardCap
-        guild.decrementGauge(address(this), _weight * 9 / 10);
+        guild.decrementGauge(address(this), (_weight * 9) / 10);
         assertEq(term.debtCeiling(), _HARDCAP);
-        guild.incrementGauge(address(this), _weight * 9 / 10);
+        guild.incrementGauge(address(this), (_weight * 9) / 10);
 
         // second borrow fails because of relative debt ceilings
         vm.expectRevert("LendingTerm: debt ceiling reached");
@@ -529,7 +569,8 @@ contract LendingTermUnitTest is Test {
 
         // do not fuzz reverting conditions (below MIN_BORROW or above maxBorrow)
         borrowAmount += profitManager.minBorrow();
-        uint256 maxBorrow = collateralAmount * _CREDIT_PER_COLLATERAL_TOKEN / 1e18;
+        uint256 maxBorrow = (collateralAmount * _CREDIT_PER_COLLATERAL_TOKEN) /
+            1e18;
         vm.assume(borrowAmount <= maxBorrow);
 
         // prepare
