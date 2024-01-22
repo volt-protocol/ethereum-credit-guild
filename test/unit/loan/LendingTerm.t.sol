@@ -1555,4 +1555,54 @@ contract LendingTermUnitTest is Test {
         credit.approve(address(term), 41_000e18);
         term.partialRepay(loanId, 41_000e18);
     }
+
+    // partialRepay when term has 0% interest rate
+    function testPartialRepay0InterestRate() public {
+        // create a similar term but with 0% interest rate
+        LendingTerm term2 = LendingTerm(
+            Clones.clone(address(new LendingTerm()))
+        );
+        term2.initialize(
+            address(core),
+            term.getReferences(),
+            LendingTerm.LendingTermParams({
+                collateralToken: address(collateral),
+                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                interestRate: 0,
+                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                openingFee: 0,
+                hardCap: _HARDCAP
+            })
+        );
+        assertEq(term2.debtCeiling(), 0);
+        vm.label(address(term2), "term2");
+        guild.addGauge(1, address(term2));
+        guild.decrementGauge(address(term), _HARDCAP / 2);
+        guild.incrementGauge(address(term2), _HARDCAP / 2);
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term2));
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term2));
+        vm.stopPrank();
+        assertEq(term2.debtCeiling(), type(uint256).max);
+
+        // borrow
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term2), collateralAmount);
+        bytes32 loanId = term2.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, no interest accrued
+        vm.warp(block.timestamp + term2.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term2.getLoanDebt(loanId), 20_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
+
+        // do partialRepay
+        credit.approve(address(term2), 10_000e18);
+        term2.partialRepay(loanId, 10_000e18);
+        
+        assertEq(term2.getLoanDebt(loanId), 10_000e18);
+    }
 }

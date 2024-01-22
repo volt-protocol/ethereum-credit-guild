@@ -532,17 +532,15 @@ contract LendingTerm is CoreRef {
         // compute partial repayment
         uint256 loanDebt = getLoanDebt(loanId);
         require(debtToRepay < loanDebt, "LendingTerm: full repayment");
-        uint256 percentRepaid = (debtToRepay * 1e18) / loanDebt; // [0, 1e18[
         uint256 borrowAmount = loan.borrowAmount;
         uint256 creditMultiplier = ProfitManager(refs.profitManager)
             .creditMultiplier();
-        uint256 principal = (borrowAmount * loan.borrowCreditMultiplier) /
-            creditMultiplier;
-        uint256 principalRepaid = (principal * percentRepaid) / 1e18;
+        uint256 principalRepaid = (borrowAmount * loan.borrowCreditMultiplier * debtToRepay) / creditMultiplier / loanDebt;
         uint256 interestRepaid = debtToRepay - principalRepaid;
-        uint256 issuanceDecrease = (borrowAmount * percentRepaid) / 1e18;
+        uint256 issuanceDecrease = (borrowAmount * debtToRepay) / loanDebt;
+
         require(
-            principalRepaid != 0 && interestRepaid != 0,
+            principalRepaid != 0,
             "LendingTerm: repay too small"
         );
         require(
