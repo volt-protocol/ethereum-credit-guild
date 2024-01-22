@@ -64,7 +64,8 @@ contract LendingTerm is CoreRef {
         bytes32 s;
     }
 
-    /// @notice reference number of seconds in 1 year
+    /// @notice Reference number of seconds per periods in which the interestRate is expressed.
+    /// This is equal to 365.25 days.
     uint256 public constant YEAR = 31557600;
 
     /// @notice timestamp of last partial repayment for a given loanId.
