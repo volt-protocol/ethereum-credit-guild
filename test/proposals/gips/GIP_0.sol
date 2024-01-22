@@ -53,8 +53,8 @@ contract GIP_0 is Proposal {
     /// @notice credit hardcap at launch
     uint256 internal constant CREDIT_HARDCAP = 2_000_000 * 1e18;
 
-    /// @notice SDAI credit hardcap at launch
-    uint256 internal constant SDAI_CREDIT_HARDCAP = 2_000_000 * 1e18;
+    /// @notice rate limit per second
+    uint256 internal constant RLCM_BUFFER_REPLENISH = 11.574e18; // ~1M/day
 
     /// ------------------------------------------------------------------------
     /// @notice Interest Rate Parameters
@@ -132,8 +132,8 @@ contract GIP_0 is Proposal {
                 AddressLib.get("CORE"),
                 address(credit),
                 CoreRoles.RATE_LIMITED_CREDIT_MINTER,
-                0, // maxRateLimitPerSecond
-                0, // rateLimitPerSecond
+                type(uint256).max, // maxRateLimitPerSecond
+                uint128(RLCM_BUFFER_REPLENISH), // rateLimitPerSecond
                 uint128(CREDIT_HARDCAP) // bufferCap
             );
             RateLimitedMinter rateLimitedGuildMinter = new RateLimitedMinter(
@@ -282,12 +282,19 @@ contract GIP_0 is Proposal {
                 payable(AddressLib.get("ONBOARD_GOVERNOR_GUILD"))
             );
             address _lendingTermV1 = AddressLib.get("LENDING_TERM_V1");
+            address _auctionHouse = AddressLib.get("AUCTION_HOUSE");
+            termOnboarding.setMarketReferences(1, LendingTermOnboarding.MarketReferences({
+                profitManager: AddressLib.get("PROFIT_MANAGER"),
+                creditMinter: AddressLib.get("RATE_LIMITED_CREDIT_MINTER"),
+                creditToken: AddressLib.get("ERC20_GUSDC")
+            }));
             termOnboarding.allowImplementation(_lendingTermV1, true);
+            termOnboarding.allowAuctionHouse(_auctionHouse, true);
 
             address termSDAI1 = termOnboarding.createTerm(
                 1, // gauge type,
                 _lendingTermV1, // implementation
-                AddressLib.get("AUCTION_HOUSE"), // auctionHouse
+                _auctionHouse, // auctionHouse
                 LendingTerm.LendingTermParams({
                     collateralToken: AddressLib.get("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
@@ -467,6 +474,8 @@ contract GIP_0 is Proposal {
                 OTHER_SPLIT, // otherSplit
                 OTHER_ADDRESS // otherRecipient
             );
+        ProfitManager(AddressLib.get("PROFIT_MANAGER"))
+            .setMaxTotalIssuance(CREDIT_HARDCAP);
         GuildToken(AddressLib.get("ERC20_GUILD")).setCanExceedMaxGauges(
             AddressLib.get("SURPLUS_GUILD_MINTER"),
             true
@@ -682,7 +691,7 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 rateLimitedCreditMinter.MAX_RATE_LIMIT_PER_SECOND(),
-                0,
+                type(uint256).max,
                 "credit max rate limit per second"
             );
             assertEq(
@@ -697,7 +706,7 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 rateLimitedCreditMinter.rateLimitPerSecond(),
-                0,
+                uint128(RLCM_BUFFER_REPLENISH),
                 "rate limit per second credit incorrect"
             );
             assertEq(
@@ -972,7 +981,7 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 vetoGovernorCredit.votingPeriod(),
-                2425847,
+                2628000,
                 "veto governor voting period"
             );
             assertEq(
@@ -996,7 +1005,7 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 vetoGovernorGuild.votingPeriod(),
-                2425847,
+                2628000,
                 "veto governor voting period"
             );
             assertEq(
