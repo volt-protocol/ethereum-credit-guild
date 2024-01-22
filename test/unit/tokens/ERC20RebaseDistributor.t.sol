@@ -569,6 +569,28 @@ contract ERC20RebaseDistributorUnitTest is Test {
 
         token.transferFrom(from, to, 0);
     }
+
+    // reach the underflow condition in nonRebasingSupply() for coverage
+    function testNonRebasingSupplyRounding() public {
+        token.mint(bobby, 1);
+        vm.prank(bobby);
+        token.enterRebase();
+
+        // distribute 1
+        token.mint(address(this), 379);
+        token.distribute(379);
+        vm.warp(block.timestamp + 64);
+
+        // distribute 2
+        token.mint(address(this), 542);
+        token.distribute(542);
+        vm.warp(block.timestamp + 5622);
+
+        assertEq(token.totalSupply(), 2);
+        assertEq(token.rebasingSupply(), 3);
+        assertEq(token.nonRebasingSupply(), 0); // return 0 to prevent underflow
+    }
+
     function testDistributeFuzz(uint256 distributionAmount, uint256[3] memory userBalances) public {
         // fuzz values in the plausibility range
         distributionAmount = bound(distributionAmount, 0, 10_000e18);
