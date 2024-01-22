@@ -242,7 +242,7 @@ contract SurplusGuildMinter is CoreRef {
             return (lastGaugeLoss, userStake, slashed);
 
         // compute CREDIT rewards
-        ProfitManager(profitManager).claimRewards(address(this)); // this will update profit indexes
+        ProfitManager(profitManager).claimGaugeRewards(address(this), term); // this will update profit indexes
         uint256 _profitIndex = ProfitManager(profitManager)
             .userGaugeProfitIndex(address(this), term);
         uint256 _userProfitIndex = uint256(userStake.profitIndex);
