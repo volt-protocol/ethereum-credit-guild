@@ -26,6 +26,10 @@ contract SurplusGuildMinterUnitTest is Test {
     uint256 constant MINT_RATIO = 2e18;
     uint256 constant REWARD_RATIO = 5e18;
 
+    function creditToken() public pure returns (address) {
+        return address(12345);
+    }
+
     function setUp() public {
         vm.warp(1679067867);
         vm.roll(16848497);
@@ -141,6 +145,14 @@ contract SurplusGuildMinterUnitTest is Test {
         assertEq(stake.profitIndex, 0);
         assertEq(stake.credit, 250e18);
         assertEq(stake.guild, 500e18);
+    }
+
+    // test stake function
+    function testStakeInvalidTerm() public {
+        credit.mint(address(this), 100e18);
+        credit.approve(address(sgm), 100e18);
+        vm.expectRevert("SurplusGuildMinter: invalid term");
+        sgm.stake(address(this), 100e18);
     }
 
     // test unstake function without loss & with interests
