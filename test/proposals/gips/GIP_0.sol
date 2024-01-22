@@ -335,6 +335,20 @@ contract GIP_0 is Proposal {
         );
         core.grantRole(CoreRoles.CREDIT_MINTER, AddressLib.get("PSM_USDC"));
 
+        // CREDIT_BURNER
+        core.grantRole(
+            CoreRoles.CREDIT_BURNER,
+            AddressLib.get("PROFIT_MANAGER")
+        );
+        core.grantRole(
+            CoreRoles.CREDIT_BURNER,
+            AddressLib.get("PSM_USDC")
+        );
+        core.grantRole(
+            CoreRoles.CREDIT_BURNER,
+            AddressLib.get("TERM_SDAI_1")
+        );
+
         // RATE_LIMITED_CREDIT_MINTER
         core.grantRole(
             CoreRoles.RATE_LIMITED_CREDIT_MINTER,

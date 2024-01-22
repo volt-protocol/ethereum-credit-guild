@@ -63,6 +63,11 @@ contract ProfitManagerUnitTest is Test {
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(psm));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(gauge1));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(gauge2));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(gauge3));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(profitManager));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(psm));
 
         // non-zero CREDIT circulating (for notify gauge losses)
         credit.mint(address(this), 100e18);

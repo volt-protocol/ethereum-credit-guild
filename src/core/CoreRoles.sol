@@ -19,6 +19,9 @@ library CoreRoles {
     /// @notice can mint CREDIT arbitrarily
     bytes32 internal constant CREDIT_MINTER = keccak256("CREDIT_MINTER_ROLE");
 
+    /// @notice can burn CREDIT tokens
+    bytes32 internal constant CREDIT_BURNER = keccak256("CREDIT_BURNER_ROLE");
+
     /// @notice can mint CREDIT within rate limits & cap
     bytes32 internal constant RATE_LIMITED_CREDIT_MINTER =
         keccak256("RATE_LIMITED_CREDIT_MINTER_ROLE");

@@ -276,9 +276,9 @@ contract LendingTermOnboarding is GuildGovernor {
             string memory description
         )
     {
-        targets = new address[](3);
-        values = new uint256[](3);
-        calldatas = new bytes[](3);
+        targets = new address[](4);
+        values = new uint256[](4);
+        calldatas = new bytes[](4);
         description = string.concat(
             "[",
             Strings.toString(block.number),
@@ -295,18 +295,26 @@ contract LendingTermOnboarding is GuildGovernor {
             term
         );
 
-        // 2nd call: core.grantRole(term, RATE_LIMITED_CREDIT_MINTER)
+        // 2nd call: core.grantRole(term, CREDIT_BURNER)
         address _core = address(core());
         targets[1] = _core;
         calldatas[1] = abi.encodeWithSelector(
+            AccessControl.grantRole.selector,
+            CoreRoles.CREDIT_BURNER,
+            term
+        );
+
+        // 3rd call: core.grantRole(term, RATE_LIMITED_CREDIT_MINTER)
+        targets[2] = _core;
+        calldatas[2] = abi.encodeWithSelector(
             AccessControl.grantRole.selector,
             CoreRoles.RATE_LIMITED_CREDIT_MINTER,
             term
         );
 
-        // 3rd call: core.grantRole(term, GAUGE_PNL_NOTIFIER)
-        targets[2] = _core;
-        calldatas[2] = abi.encodeWithSelector(
+        // 4th call: core.grantRole(term, GAUGE_PNL_NOTIFIER)
+        targets[3] = _core;
+        calldatas[3] = abi.encodeWithSelector(
             AccessControl.grantRole.selector,
             CoreRoles.GAUGE_PNL_NOTIFIER,
             term

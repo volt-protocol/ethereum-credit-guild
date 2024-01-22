@@ -27,7 +27,7 @@ contract IntegrationTestRoles is PostProposalCheck {
 
         string[] memory roles = vm.parseJsonKeys(json, "$");
 
-        assertEq(roles.length, 17, "incorrect role count");
+        assertEq(roles.length, 18, "incorrect role count");
         
         for (uint256 i = 0; i < roles.length; i++) {
             Core core = Core(AddressLib.get("CORE"));

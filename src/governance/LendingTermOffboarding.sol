@@ -194,6 +194,7 @@ contract LendingTermOffboarding is CoreRef {
         );
         require(
             GuildToken(guildToken).isDeprecatedGauge(term) &&
+                core().hasRole(CoreRoles.CREDIT_BURNER, term) &&
                 core().hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term) &&
                 core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, term),
             "LendingTermOffboarding: re-onboarded"
@@ -205,6 +206,7 @@ contract LendingTermOffboarding is CoreRef {
         canOffboard[term] = OffboardStatus.UNSET;
 
         // update protocol config
+        core().revokeRole(CoreRoles.CREDIT_BURNER, term);
         core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
         core().revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, term);
 
@@ -233,6 +235,7 @@ contract LendingTermOffboarding is CoreRef {
         );
         require(
             GuildToken(guildToken).isGauge(term) &&
+                core().hasRole(CoreRoles.CREDIT_BURNER, term) &&
                 core().hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term) &&
                 core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, term),
             "LendingTermOffboarding: not re-onboarded"

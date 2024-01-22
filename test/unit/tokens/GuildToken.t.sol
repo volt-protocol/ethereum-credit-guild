@@ -47,6 +47,7 @@ contract GuildTokenUnitTest is Test {
 
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(profitManager));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         // labels

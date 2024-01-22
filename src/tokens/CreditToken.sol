@@ -35,6 +35,21 @@ contract CreditToken is
         _mint(to, amount);
     }
 
+    /// @notice Destroys `amount` tokens from the caller.
+    function burn(
+        uint256 amount
+    ) public override onlyCoreRole(CoreRoles.CREDIT_BURNER) {
+        super.burn(amount);
+    }
+
+    /// @notice Destroys `amount` tokens from `account`, deducting from the caller's allowance.
+    function burnFrom(
+        address account,
+        uint256 amount
+    ) public override onlyCoreRole(CoreRoles.CREDIT_BURNER) {
+        super.burnFrom(account, amount);
+    }
+
     /// @notice Set `maxDelegates`, the maximum number of addresses any account can delegate voting power to.
     function setMaxDelegates(
         uint256 newMax

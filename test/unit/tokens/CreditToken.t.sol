@@ -64,6 +64,25 @@ contract CreditTokenUnitTest is Test {
         assertEq(token.totalSupply(), 100);
     }
 
+    function testBurn() public {
+        // without role, burn reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.burn(100);
+
+        // mint tokens for alice
+        vm.prank(governor);
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        token.mint(alice, 100);
+        assertEq(token.balanceOf(alice), 100);
+
+        // burn tokens
+        vm.prank(governor);
+        core.grantRole(CoreRoles.CREDIT_BURNER, alice);
+        vm.prank(alice);
+        token.burn(60);
+        assertEq(token.balanceOf(alice), 40);
+    }
+
     function testSetMaxDelegates() public {
         assertEq(token.maxDelegates(), 0);
 

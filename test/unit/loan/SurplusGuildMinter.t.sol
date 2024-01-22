@@ -62,6 +62,8 @@ contract SurplusGuildMinterUnitTest is Test {
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.GUARDIAN, guardian);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(term));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(profitManager));
         core.grantRole(CoreRoles.GUILD_MINTER, address(this));
         core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         core.grantRole(CoreRoles.GAUGE_REMOVE, address(this));
