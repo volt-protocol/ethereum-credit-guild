@@ -232,12 +232,12 @@ contract SurplusGuildMinter is CoreRef {
     {
         bool updateState;
         lastGaugeLoss = GuildToken(guild).lastGaugeLoss(term);
+        userStake = _stakes[user][term];
         if (lastGaugeLoss > uint256(userStake.lastGaugeLoss)) {
             slashed = true;
         }
 
         // if the user is not staking, do nothing
-        userStake = _stakes[user][term];
         if (userStake.stakeTime == 0)
             return (lastGaugeLoss, userStake, slashed);
 

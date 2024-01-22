@@ -123,7 +123,7 @@ contract SurplusGuildMinterUnitTest is Test {
         SurplusGuildMinter.UserStake memory stake = sgm.getUserStake(address(this), term);
         assertEq(uint256(stake.stakeTime), block.timestamp);
         assertEq(stake.lastGaugeLoss, 0);
-        assertEq(stake.profitIndex, 0);
+        assertEq(stake.profitIndex, 1e18);
         assertEq(stake.credit, 100e18);
         assertEq(stake.guild, 200e18);
 
@@ -142,7 +142,7 @@ contract SurplusGuildMinterUnitTest is Test {
         stake = sgm.getUserStake(address(this), term);
         assertEq(uint256(stake.stakeTime), block.timestamp);
         assertEq(stake.lastGaugeLoss, 0);
-        assertEq(stake.profitIndex, 0);
+        assertEq(stake.profitIndex, 1e18);
         assertEq(stake.credit, 250e18);
         assertEq(stake.guild, 500e18);
     }
@@ -153,6 +153,56 @@ contract SurplusGuildMinterUnitTest is Test {
         credit.approve(address(sgm), 100e18);
         vm.expectRevert("SurplusGuildMinter: invalid term");
         sgm.stake(address(this), 100e18);
+    }
+
+    function testStakeAfterLoss() public {
+        // initial state
+        assertEq(profitManager.termSurplusBuffer(term), 0);
+        assertEq(guild.balanceOf(address(this)), 50e18);
+        assertEq(guild.balanceOf(address(sgm)), 0);
+        assertEq(guild.getGaugeWeight(term), 50e18);
+
+        // stake 100 CREDIT
+        credit.mint(address(this), 100e18);
+        credit.approve(address(sgm), 100e18);
+        sgm.stake(term, 100e18);
+        
+        // check after-stake state
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(profitManager.termSurplusBuffer(term), 100e18);
+        assertEq(guild.balanceOf(address(sgm)), 200e18);
+        assertEq(guild.getGaugeWeight(term), 250e18);
+        SurplusGuildMinter.UserStake memory stake = sgm.getUserStake(address(this), term);
+        assertEq(uint256(stake.stakeTime), block.timestamp);
+        assertEq(stake.lastGaugeLoss, 0);
+        assertEq(stake.profitIndex, 1e18);
+        assertEq(stake.credit, 100e18);
+        assertEq(stake.guild, 200e18);
+
+        // loss in gauge
+        profitManager.notifyPnL(term, -27.5e18, 0);
+        assertEq(profitManager.surplusBuffer(), 100e18 - 27.5e18); // 72.5
+        assertEq(profitManager.termSurplusBuffer(term), 0);
+
+        // stake 150 CREDIT
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 13);
+        credit.mint(address(this), 150e18);
+        credit.approve(address(sgm), 150e18);
+        sgm.stake(term, 150e18);
+
+        // check after-stake state
+        stake = sgm.getUserStake(address(this), term);
+        assertEq(uint256(stake.stakeTime), block.timestamp);
+        assertEq(stake.lastGaugeLoss, block.timestamp - 13);
+        assertEq(stake.profitIndex, 1e18);
+        assertEq(stake.credit, 150e18);
+        assertEq(stake.guild, 300e18);
+        
+        // unstake
+        sgm.unstake(term, 150e18);
+        assertEq(credit.balanceOf(address(this)), 150e18);
+        assertEq(guild.balanceOf(address(this)), 50e18);
     }
 
     // test unstake function without loss & with interests
