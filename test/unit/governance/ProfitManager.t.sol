@@ -61,6 +61,7 @@ contract ProfitManagerUnitTest is Test {
 
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(psm));
 
         // non-zero CREDIT circulating (for notify gauge losses)
@@ -109,7 +110,9 @@ contract ProfitManagerUnitTest is Test {
         vm.startPrank(governor);
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         vm.stopPrank();
+        guild.addGauge(42, address(this));
 
         // initial state
         // 100 CREDIT circulating (assuming backed by >= 100 USD)
@@ -186,7 +189,9 @@ contract ProfitManagerUnitTest is Test {
         vm.startPrank(governor);
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         vm.stopPrank();
+        guild.addGauge(42, gauge1);
 
         // initial minBorrow()
         assertEq(profitManager.minBorrow(), 100e18);
@@ -579,7 +584,9 @@ contract ProfitManagerUnitTest is Test {
         vm.startPrank(governor);
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
         core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         vm.stopPrank();
+        guild.addGauge(42, address(this));
 
         // initial state
         // 100 CREDIT circulating (assuming backed by >= 100 USD)
@@ -679,7 +686,9 @@ contract ProfitManagerUnitTest is Test {
         vm.startPrank(governor);
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
         core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
         vm.stopPrank();
+        guild.addGauge(42, address(this));
 
         // initial state
         // 100 CREDIT circulating (assuming backed by >= 100 USD)
@@ -789,6 +798,53 @@ contract ProfitManagerUnitTest is Test {
         // The gaugeProfitIndex will be 1.025e18 so the attacker will steal the rewards
         profitManager.claimGaugeRewards(attacker, gauge1);
         assertEq(credit.balanceOf(attacker), 0);
+
+        // Other users will then fail to claim their rewards
+        profitManager.claimGaugeRewards(bob,gauge1);
+        assertEq(credit.balanceOf(bob), 10e18);
+    }
+
+    // if this test is passing, the issue is fixed
+    function testBugIncrement0WeightInfiniteLoop() public {
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GOVERNOR, address(this));
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
+        vm.stopPrank();
+
+        vm.prank(governor);
+        profitManager.setProfitSharingConfig(
+            0, // surplusBufferSplit
+            0.5e18, // creditSplit
+            0.5e18, // guildSplit
+            0, // otherSplit
+            address(0) // otherRecipient
+        );
+        guild.setMaxGauges(1);
+        guild.addGauge(1, gauge1);
+        guild.mint(alice, 150e18);
+        guild.mint(bob, 400e18);
+
+
+        vm.prank(bob);
+        guild.incrementGauge(gauge1, 400e18);
+        
+
+        credit.mint(address(profitManager), 20e18);
+        profitManager.notifyPnL(gauge1, 20e18, 0);
+
+        // Alice votes for a gauge after it notifies profit
+        // The userGaugeProfitIndex of alice is not set 
+        vm.prank(alice);
+        guild.incrementGauge(gauge1, 0);
+
+        // Because the userGaugeProfitIndex is not set it will be set to 1e18
+        // The gaugeProfitIndex will be 1.025e18 so alice will steal the rewards
+        profitManager.claimGaugeRewards(alice, gauge1);
+        assertEq(credit.balanceOf(alice), 0);
 
         // Other users will then fail to claim their rewards
         profitManager.claimGaugeRewards(bob,gauge1);
