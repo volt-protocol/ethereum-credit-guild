@@ -265,16 +265,17 @@ contract LendingTerm is CoreRef {
 
     /// @notice returns the maximum amount of debt that can be issued by this term
     /// according to the current gauge allocations.
-    /// Note that the debt ceiling can be lower than the current issuance under 4 conditions :
-    /// - params.hardCap is lower than since last borrow happened
-    /// - gauge votes are fewer than when last borrow happened
-    /// - profitManager.totalBorrowedCredit() decreased since last borrow
-    /// - creditMinter.buffer() is close to being depleted
+    /// Note that the debt ceiling can be lower than the current issuance under 2 conditions :
+    /// - gauge votes are fewer than when last borrow happened (in % relative to other terms)
+    /// - profitManager.totalIssuance() decreased since last borrow
+    /// Note that borrowing term.debtCeiling() - term.issuance() could still revert if the
+    /// credit minter buffer is not enough to mint the borrowAmount, or if the term's hardCap
+    /// is set to a lower value than the debt ceiling.
     /// @dev this solves the following equation :
     /// borrowAmount + issuance <=
-    /// (totalBorrowedCredit + borrowAmount) * gaugeWeight * gaugeWeightTolerance / totalWeight / 1e18
+    /// (totalIssuance + borrowAmount) * gaugeWeight * gaugeWeightTolerance / totalWeight / 1e18
     /// which is the formula to check debt ceiling in the borrow function.
-    /// This gives the maximum borrowable amount to achieve 100% utilization of the debt
+    /// This equation gives the maximum borrowable amount to achieve 100% utilization of the debt
     /// ceiling, and if we add the current issuance to it, we get the current debt ceiling.
     /// @param gaugeWeightDelta an hypothetical change in gauge weight
     /// @return the maximum amount of debt that can be issued by this term
@@ -282,24 +283,36 @@ contract LendingTerm is CoreRef {
         int256 gaugeWeightDelta
     ) public view returns (uint256) {
         address _guildToken = refs.guildToken; // cached SLOAD
+        // if the term is deprecated, return 0 debtCeiling
+        if (!GuildToken(_guildToken).isGauge(address(this))) {
+            // intended side effect: if the gauge is deprecated, wait that all loans
+            // are closed (liquidation auctions conclude) before allowing GUILD token
+            // holders to decrement weight.
+            return 0;
+        }
         uint256 gaugeWeight = GuildToken(_guildToken).getGaugeWeight(
             address(this)
         );
-        gaugeWeight = uint256(int256(gaugeWeight) + gaugeWeightDelta);
         uint256 gaugeType = GuildToken(_guildToken).gaugeType(address(this));
         uint256 totalWeight = GuildToken(_guildToken).totalTypeWeight(
             gaugeType
         );
-        uint256 creditMinterBuffer = RateLimitedMinter(refs.creditMinter)
-            .buffer();
-        uint256 _hardCap = params.hardCap; // cached SLOAD
-        if (gaugeWeight == 0) {
-            return 0; // no gauge vote, 0 debt ceiling
+        if (gaugeWeightDelta < 0 && uint256(-gaugeWeightDelta) > gaugeWeight) {
+            uint256 decrement = uint256(-gaugeWeightDelta);
+            if (decrement > gaugeWeight || decrement > totalWeight) {
+                // early return for cases where the hypothetical gaugeWeightDelta
+                // would make the gaugeWeight or totalWeight <= 0.
+                // This allows unchecked casting on the following lines.
+                return 0;
+            }
+        }
+        gaugeWeight = uint256(int256(gaugeWeight) + gaugeWeightDelta);
+        totalWeight = uint256(int256(totalWeight) + gaugeWeightDelta);
+        if (gaugeWeight == 0 || totalWeight == 0) {
+            return 0; // no gauge vote or all gauges deprecated, 0 debt ceiling
         } else if (gaugeWeight == totalWeight) {
             // one gauge, unlimited debt ceiling
-            // returns min(hardCap, creditMinterBuffer)
-            return
-                _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
+            return type(uint256).max;
         }
         uint256 _issuance = issuance; // cached SLOAD
         uint256 totalIssuance = ProfitManager(refs.profitManager)
@@ -309,9 +322,7 @@ contract LendingTerm is CoreRef {
         if (totalIssuance == 0 && gaugeWeight != 0) {
             // first-ever CREDIT mint on a non-zero gauge weight term
             // does not check the relative debt ceilings
-            // returns min(hardCap, creditMinterBuffer)
-            return
-                _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
+            return type(uint256).max;
         }
         uint256 toleratedGaugeWeight = (gaugeWeight * gaugeWeightTolerance) /
             1e18;
@@ -321,25 +332,20 @@ contract LendingTerm is CoreRef {
         if (_issuance >= debtCeilingBefore) {
             return debtCeilingBefore;
         }
-        uint256 remainingDebtCeiling = debtCeilingBefore - _issuance; // always >0
+        /// @dev this can only underflow if gaugeWeightTolerance is < 1e18
+        /// and that value is enforced >= 1e18 in the ProfitManager setter.
+        uint256 remainingDebtCeiling = debtCeilingBefore - _issuance;
         if (toleratedGaugeWeight >= totalWeight) {
             // if the gauge weight is above 100% when we include tolerance,
             // the gauge relative debt ceilings are not constraining.
-            return
-                _hardCap < creditMinterBuffer ? _hardCap : creditMinterBuffer;
+            return type(uint256).max;
         }
-        uint256 otherGaugesWeight = totalWeight - toleratedGaugeWeight; // always >0
+        /// @dev this can never underflow due to previous if() block
+        uint256 otherGaugesWeight = totalWeight - toleratedGaugeWeight;
+
         uint256 maxBorrow = (remainingDebtCeiling * totalWeight) /
             otherGaugesWeight;
-        uint256 _debtCeiling = _issuance + maxBorrow;
-        // return min(creditMinterBuffer, hardCap, debtCeiling)
-        if (creditMinterBuffer < _debtCeiling) {
-            return creditMinterBuffer;
-        }
-        if (_hardCap < _debtCeiling) {
-            return _hardCap;
-        }
-        return _debtCeiling;
+        return _issuance + maxBorrow;
     }
 
     /// @notice returns the debt ceiling without change to gauge weight
