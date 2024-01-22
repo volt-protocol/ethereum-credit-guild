@@ -143,7 +143,10 @@ abstract contract ERC20MultiVotes is ERC20Permit {
     /// @notice an approve list for contracts to go above the max delegate limit.
     mapping(address => bool) public canContractExceedMaxDelegates;
 
-    /// @notice set the new max delegates per user. Requires auth by `authority`.
+    /// @notice set the new max delegates per user.
+    /// Does not prevent delegation updates to existing delegates, and does not
+    /// force undelegation to existing delegates, if the maxDelegates is set to
+    /// a lower value and delegators have existing delegatees.
     function _setMaxDelegates(uint256 newMax) internal {
         uint256 oldMax = maxDelegates;
         maxDelegates = newMax;
