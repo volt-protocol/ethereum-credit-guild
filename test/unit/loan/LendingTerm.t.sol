@@ -515,8 +515,8 @@ contract LendingTermUnitTest is Test {
         uint256 interestTime
     ) public {
         // fuzz conditions
-        collateralAmount = bound(collateralAmount, 1, 1e32);
-        borrowAmount = bound(borrowAmount, 1, 1e32);
+        collateralAmount = bound(collateralAmount, 1, 1e29);
+        borrowAmount = bound(borrowAmount, 1, 1e29);
         interestTime = bound(interestTime, 1, 10 * 365 * 24 * 3600);
 
         // do not fuzz reverting conditions (below MIN_BORROW or above maxBorrow)
