@@ -19,7 +19,7 @@ contract LendingTermUnitTest is Test {
     address private governor = address(1);
     address private guardian = address(2);
     Core private core;
-    ProfitManager private profitManager;
+    ProfitManager public profitManager;
     CreditToken credit;
     GuildToken guild;
     MockERC20 collateral;
@@ -45,10 +45,7 @@ contract LendingTermUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         collateral = new MockERC20();
         credit = new CreditToken(address(core), "name", "symbol");
-        guild = new GuildToken(
-            address(core),
-            address(profitManager)
-        );
+        guild = new GuildToken(address(core));
         rlcm = new RateLimitedMinter(
             address(core) /*_core*/,
             address(credit) /*_token*/,

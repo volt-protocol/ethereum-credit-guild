@@ -127,10 +127,7 @@ contract GIP_0 is Proposal {
                 "Ethereum Credit Guild - gUSDC",
                 "gUSDC"
             );
-            GuildToken guild = new GuildToken(
-                AddressLib.get("CORE"),
-                AddressLib.get("PROFIT_MANAGER")
-            );
+            GuildToken guild = new GuildToken(AddressLib.get("CORE"));
             RateLimitedMinter rateLimitedCreditMinter = new RateLimitedMinter(
                 AddressLib.get("CORE"),
                 address(credit),

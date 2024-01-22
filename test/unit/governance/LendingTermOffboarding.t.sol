@@ -50,7 +50,7 @@ contract LendingTermOffboardingUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core), "name", "symbol");
-        guild = new GuildToken(address(core), address(profitManager));
+        guild = new GuildToken(address(core));
         collateral = new MockERC20();
         rlcm = new RateLimitedMinter(
             address(core), /*_core*/

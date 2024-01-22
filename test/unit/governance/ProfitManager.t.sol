@@ -15,7 +15,7 @@ import {MockLendingTerm} from "@test/mock/MockLendingTerm.sol";
 contract ProfitManagerUnitTest is Test {
     address private governor = address(1);
     Core private core;
-    ProfitManager private profitManager;
+    ProfitManager public profitManager;
     CreditToken credit;
     GuildToken guild;
     MockERC20 private pegToken;
@@ -34,12 +34,12 @@ contract ProfitManagerUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core), "name", "symbol");
-        guild = new GuildToken(address(core), address(profitManager));
+        guild = new GuildToken(address(core));
         pegToken = new MockERC20();
         pegToken.setDecimals(6);
-        gauge1 = address(new MockLendingTerm(address(core)));
-        gauge2 = address(new MockLendingTerm(address(core)));
-        gauge3 = address(new MockLendingTerm(address(core)));
+        gauge1 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        gauge2 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        gauge3 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
         psm = new SimplePSM(
             address(core),
             address(profitManager),

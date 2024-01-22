@@ -16,7 +16,7 @@ contract SimplePSMUnitTest is Test {
     address private guardian = address(2);
 
     Core private core;
-    ProfitManager private profitManager;
+    ProfitManager public profitManager;
     CreditToken credit;
     GuildToken guild;
     MockERC20 token;
@@ -31,7 +31,7 @@ contract SimplePSMUnitTest is Test {
         token = new MockERC20();
         token.setDecimals(6);
         credit = new CreditToken(address(core), "name", "symbol");
-        guild = new GuildToken(address(core), address(profitManager));
+        guild = new GuildToken(address(core));
         psm = new SimplePSM(
             address(core),
             address(profitManager),

@@ -12,7 +12,7 @@ import {MockLendingTerm} from "@test/mock/MockLendingTerm.sol";
 contract GuildTokenUnitTest is Test {
     address private governor = address(1);
     Core private core;
-    ProfitManager private profitManager;
+    ProfitManager public profitManager;
     CreditToken credit;
     GuildToken token;
     address constant alice = address(0x616c696365);
@@ -39,11 +39,11 @@ contract GuildTokenUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core), "name", "symbol");
-        token = new GuildToken(address(core), address(profitManager));
+        token = new GuildToken(address(core));
         profitManager.initializeReferences(address(credit), address(token), address(0));
-        gauge1 = address(new MockLendingTerm(address(core)));
-        gauge2 = address(new MockLendingTerm(address(core)));
-        gauge3 = address(new MockLendingTerm(address(core)));
+        gauge1 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        gauge2 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        gauge3 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
 
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
@@ -116,19 +116,6 @@ contract GuildTokenUnitTest is Test {
         // set max delegates
         token.setMaxDelegates(1);
         assertEq(token.maxDelegates(), 1);
-    }
-
-    function testSetProfitManager() public {
-        assertEq(token.profitManager(), address(profitManager));
-
-        // without role, reverts
-        vm.expectRevert("UNAUTHORIZED");
-        token.setProfitManager(address(this));
-
-        // with role, can set profitManager reference
-        vm.startPrank(governor);
-        token.setProfitManager(address(this));
-        assertEq(token.profitManager(), address(this));
     }
 
     function testSetContractExceedMaxDelegates() public {

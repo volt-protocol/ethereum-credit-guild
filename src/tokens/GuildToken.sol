@@ -37,19 +37,13 @@ import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @notice reference to ProfitManager
-    address public profitManager;
-
     constructor(
-        address _core,
-        address _profitManager
+        address _core
     )
         CoreRef(_core)
         ERC20("Ethereum Credit Guild - GUILD", "GUILD")
         ERC20Permit("Ethereum Credit Guild - GUILD")
-    {
-        profitManager = _profitManager;
-    }
+    {}
 
     /*///////////////////////////////////////////////////////////////
                         VOTING MANAGEMENT
@@ -121,7 +115,8 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
 
     /// @notice notify loss in a given gauge
     function notifyGaugeLoss(address gauge) external {
-        require(msg.sender == profitManager, "UNAUTHORIZED");
+        require(_gauges.contains(gauge), "GuildToken: gauge not found");
+        require(msg.sender == LendingTerm(gauge).profitManager(), "UNAUTHORIZED");
 
         // save gauge loss
         lastGaugeLoss[gauge] = block.timestamp;
@@ -190,15 +185,6 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         );
     }
 
-    /// @notice emitted when reference to ProfitManager is updated
-    event ProfitManagerUpdated(uint256 timestamp, address newValue);
-
-    /// @notice set reference to ProfitManager
-    function setProfitManager(address _newProfitManager) external onlyCoreRole(CoreRoles.GOVERNOR) {
-        profitManager = _newProfitManager;
-        emit ProfitManagerUpdated(block.timestamp, _newProfitManager);
-    }
-
     /// @dev prevent outbound token transfers (_decrementWeightUntilFree) and gauge weight decrease
     /// (decrementGauge, decrementGauges) for users who have an unrealized loss in a gauge, or if the
     /// gauge is currently using its allocated debt ceiling. To decrement gauge weight, guild holders
@@ -217,7 +203,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         );
 
         // update the user profit index and claim rewards
-        ProfitManager(profitManager).claimGaugeRewards(user, gauge);
+        ProfitManager(LendingTerm(gauge).profitManager()).claimGaugeRewards(user, gauge);
 
         // check if gauge is currently using its allocated debt ceiling.
         // To decrement gauge weight, guild holders might have to call loans if the debt ceiling is used.
@@ -255,7 +241,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             );
         }
 
-        ProfitManager(profitManager).claimGaugeRewards(user, gauge);
+        ProfitManager(LendingTerm(gauge).profitManager()).claimGaugeRewards(user, gauge);
 
         super._incrementGaugeWeight(user, gauge, weight);
     }

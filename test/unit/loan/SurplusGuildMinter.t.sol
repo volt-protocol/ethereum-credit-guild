@@ -33,7 +33,7 @@ contract SurplusGuildMinterUnitTest is Test {
 
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core), "name", "symbol");
-        guild = new GuildToken(address(core), address(profitManager));
+        guild = new GuildToken(address(core));
         rlgm = new RateLimitedMinter(
             address(core), /*_core*/
             address(guild), /*_token*/
@@ -52,7 +52,7 @@ contract SurplusGuildMinterUnitTest is Test {
             REWARD_RATIO
         );
         profitManager.initializeReferences(address(credit), address(guild), address(0));
-        term = address(new MockLendingTerm(address(core)));
+        term = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -307,8 +307,8 @@ contract SurplusGuildMinterUnitTest is Test {
     // test with multiple users, some gauges with losses and some not
     function testMultipleUsers() public {
         // add a 2 terms with equal weight
-        address term1 = address(new MockLendingTerm(address(core)));
-        address term2 = address(new MockLendingTerm(address(core)));
+        address term1 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        address term2 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
         guild.addGauge(1, term1);
         guild.addGauge(1, term2);
         guild.mint(address(this), 100e18);
