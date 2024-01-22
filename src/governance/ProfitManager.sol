@@ -443,23 +443,21 @@ contract ProfitManager is CoreRef {
         uint256 _userGaugeWeight = uint256(
             GuildToken(guild).getUserGaugeWeight(user, gauge)
         );
-        if (_userGaugeWeight == 0) {
-            return 0;
+        uint256 _userGaugeProfitIndex = userGaugeProfitIndex[user][gauge];
+        if (_userGaugeProfitIndex == 0) {
+            _userGaugeProfitIndex = 1e18;
         }
         uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
-        uint256 _userGaugeProfitIndex = userGaugeProfitIndex[user][gauge];
         if (_gaugeProfitIndex == 0) {
             _gaugeProfitIndex = 1e18;
         }
-        if (_userGaugeProfitIndex == 0) {
-            _userGaugeProfitIndex = 1e18;
+        userGaugeProfitIndex[user][gauge] = _gaugeProfitIndex;
+        if (_userGaugeWeight == 0) {
+            return 0;
         }
         uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
         if (deltaIndex != 0) {
             creditEarned = (_userGaugeWeight * deltaIndex) / 1e18;
-            userGaugeProfitIndex[user][gauge] = _gaugeProfitIndex;
-        }
-        if (creditEarned != 0) {
             emit ClaimRewards(block.timestamp, user, gauge, creditEarned);
             CreditToken(credit).transfer(user, creditEarned);
         }
@@ -502,9 +500,11 @@ contract ProfitManager is CoreRef {
             if (_gaugeProfitIndex == 0) {
                 _gaugeProfitIndex = 1e18;
             }
-            if (_userGaugeProfitIndex == 0) {
-                _userGaugeProfitIndex = 1e18;
-            }
+
+            // this should never fail, because when the user increment weight
+            // a call to claimGaugeRewards() is made that initializes this value
+            assert(_userGaugeProfitIndex != 0);
+
             uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
             if (deltaIndex != 0) {
                 uint256 _userGaugeWeight = uint256(

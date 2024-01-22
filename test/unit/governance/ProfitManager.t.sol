@@ -496,6 +496,17 @@ contract ProfitManagerUnitTest is Test {
         guild.incrementGauge(gauge3, 200e18);
         vm.stopPrank();
 
+        // check alice pending rewards
+        (address[] memory aliceGauges, uint256[] memory aliceGaugeRewards, uint256 aliceTotalRewards) = profitManager.getPendingRewards(alice);
+        assertEq(aliceGauges.length, 2);
+        assertEq(aliceGauges[0], gauge1);
+        assertEq(aliceGauges[1], gauge2);
+        assertEq(aliceGaugeRewards.length, 2);
+        assertEq(aliceGaugeRewards[0], 0);
+        assertEq(aliceGaugeRewards[1], 0);
+        assertEq(aliceTotalRewards, 0);
+        assertEq(profitManager.claimRewards(alice), 0);
+
         // simulate 20 profit on gauge1
         // 10 goes to alice (guild voting)
         // 10 goes to test (rebasing credit)
@@ -503,7 +514,7 @@ contract ProfitManagerUnitTest is Test {
         profitManager.notifyPnL(gauge1, 20e18, 0);
 
         // check alice pending rewards
-        (address[] memory aliceGauges, uint256[] memory aliceGaugeRewards, uint256 aliceTotalRewards) = profitManager.getPendingRewards(alice);
+        (aliceGauges, aliceGaugeRewards, aliceTotalRewards) = profitManager.getPendingRewards(alice);
         assertEq(aliceGauges.length, 2);
         assertEq(aliceGauges[0], gauge1);
         assertEq(aliceGauges[1], gauge2);
@@ -733,5 +744,54 @@ contract ProfitManagerUnitTest is Test {
         assertEq(profitManager.surplusBuffer(), 0);
         assertEq(credit.balanceOf(address(profitManager)), 0);
         assertEq(credit.totalSupply(), 100e18);
+    }
+
+    // PoC from issue 1194 that is marked as duplicate to 1211
+    // if this test passes, the issue is fixed
+    function testBugRewardsStealing() public {
+        address attacker = address(4567897899);
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GOVERNOR, address(this));
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(this));
+        vm.stopPrank();
+
+        vm.prank(governor);
+        profitManager.setProfitSharingConfig(
+            0, // surplusBufferSplit
+            0.5e18, // creditSplit
+            0.5e18, // guildSplit
+            0, // otherSplit
+            address(0) // otherRecipient
+        );
+        guild.setMaxGauges(1);
+        guild.addGauge(1, gauge1);
+        guild.mint(attacker, 150e18);
+        guild.mint(bob, 400e18);
+
+
+        vm.prank(bob);
+        guild.incrementGauge(gauge1, 400e18);
+        
+
+        credit.mint(address(profitManager), 20e18);
+        profitManager.notifyPnL(gauge1, 20e18, 0);
+
+        // Attacker votes for a gauge after it notifies profit
+        // The userGaugeProfitIndex of the attacker is not set 
+        vm.prank(attacker);
+        guild.incrementGauge(gauge1, 150e18);
+
+        // Because the userGaugeProfitIndex is not set it will be set to 1e18
+        // The gaugeProfitIndex will be 1.025e18 so the attacker will steal the rewards
+        profitManager.claimGaugeRewards(attacker, gauge1);
+        assertEq(credit.balanceOf(attacker), 0);
+
+        // Other users will then fail to claim their rewards
+        profitManager.claimGaugeRewards(bob,gauge1);
+        assertEq(credit.balanceOf(bob), 10e18);
     }
 }

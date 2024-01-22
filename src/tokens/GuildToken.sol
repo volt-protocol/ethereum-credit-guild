@@ -139,11 +139,11 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
 
         // remove gauge weight allocation
         lastGaugeLossApplied[gauge][who] = block.timestamp;
-        _decrementGaugeWeight(who, gauge, _userGaugeWeight);
         if (!_deprecatedGauges.contains(gauge)) {
             totalTypeWeight[gaugeType[gauge]] -= _userGaugeWeight;
             totalWeight -= _userGaugeWeight;
         }
+        _decrementGaugeWeight(who, gauge, _userGaugeWeight);
 
         // apply loss
         _burn(who, uint256(_userGaugeWeight));
