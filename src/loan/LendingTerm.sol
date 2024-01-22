@@ -725,6 +725,9 @@ contract LendingTerm is CoreRef {
         // check that the loan exists
         require(loan.borrowTime != 0, "LendingTerm: loan not found");
 
+        // check that the loan is not already called
+        require(loan.callTime == 0, "LendingTerm: loan called");
+
         // check that the loan is not already closed
         require(loan.closeTime == 0, "LendingTerm: loan closed");
 
