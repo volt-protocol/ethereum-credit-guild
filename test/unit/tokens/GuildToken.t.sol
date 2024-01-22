@@ -281,6 +281,13 @@ contract GuildTokenUnitTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testNotifyPnLLastGaugeLoss() public {
+        vm.prank(governor);
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        vm.prank(governor);
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        token.setMaxGauges(1);
+        token.addGauge(1, gauge1);
+
         assertEq(token.lastGaugeLoss(gauge1), 0);
 
         // revert because user doesn't have role
@@ -575,5 +582,41 @@ contract GuildTokenUnitTest is Test {
         // now bob can decrement his gauge vote.
         vm.prank(bob);
         token.decrementGauge(address(this), 10e18);
+    }
+
+    function testDecrementWeightDeprecatedOnlyGauge() public {
+        // grant role to test contract
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        core.grantRole(CoreRoles.GAUGE_REMOVE, address(this));
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        vm.stopPrank();
+
+        // gauge config
+        token.setMaxGauges(10);
+        token.addGauge(1, gauge1);
+
+        // allocate weight to gauge
+        token.mint(bob, 100e18);
+        vm.prank(bob);
+        token.incrementGauge(gauge1, 100e18);
+
+        assertEq(token.totalWeight(), 100e18);
+        assertEq(token.totalTypeWeight(1), 100e18);
+        assertEq(token.getUserGaugeWeight(bob, gauge1), 100e18);
+
+        // deprecate gauge
+        token.removeGauge(gauge1);
+
+        assertEq(token.totalWeight(), 0);
+        assertEq(token.totalTypeWeight(1), 0);
+        assertEq(token.getUserGaugeWeight(bob, gauge1), 100e18);
+        
+        // decrement weight
+        vm.prank(bob);
+        token.decrementGauge(gauge1, 100e18);
+
+        assertEq(token.getUserGaugeWeight(bob, gauge1), 0);
     }
 }

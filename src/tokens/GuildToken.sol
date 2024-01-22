@@ -201,13 +201,16 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             _lastGaugeLossApplied >= _lastGaugeLoss,
             "GuildToken: pending loss"
         );
+        uint256 issuance = LendingTerm(gauge).issuance();
+        if (isDeprecatedGauge(gauge)) {
+            require(issuance == 0, "GuildToken: not all loans closed");
+        }
 
         // update the user profit index and claim rewards
         ProfitManager(LendingTerm(gauge).profitManager()).claimGaugeRewards(user, gauge);
 
         // check if gauge is currently using its allocated debt ceiling.
         // To decrement gauge weight, guild holders might have to call loans if the debt ceiling is used.
-        uint256 issuance = LendingTerm(gauge).issuance();
         if (issuance != 0) {
             uint256 debtCeilingAfterDecrement = LendingTerm(gauge).debtCeiling(-int256(weight));
             require(
