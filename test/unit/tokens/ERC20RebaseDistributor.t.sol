@@ -550,6 +550,41 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.transfer(alice, 100000000316880878140);
     }
 
+    // if this is passing, the rebase rewards stealing is fixed
+    function testBugSelfSendAfterDistributeStealRewards() public {
+        token.mint(bobby, 1e18);
+        vm.prank(bobby);
+        token.enterRebase();
+
+        token.mint(alice, 1e18);
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 1e18);
+        assertEq(token.balanceOf(bobby), 1e18);
+
+        token.mint(address(this), 1e18);
+        token.distribute(1e18);
+
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
+
+        assertEq(token.balanceOf(alice), 1.25e18);
+        assertEq(token.balanceOf(bobby), 1.25e18);
+
+        vm.prank(alice);
+        token.transfer(alice, 0.5e18);
+
+        assertEq(token.balanceOf(alice), 1.25e18);
+        assertEq(token.balanceOf(bobby), 1.25e18);
+
+        token.mint(address(this), 1e18);
+        token.distribute(1e18);
+
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
+
+        assertEq(token.balanceOf(alice), 2e18);
+        assertEq(token.balanceOf(bobby), 2e18);
+    }
 
     // if this is passing, the bug of rounding revert is fixed
     function testBugRevertOnReceive() external {
