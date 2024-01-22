@@ -275,7 +275,7 @@ contract SurplusGuildMinterUnitTest is Test {
     }
 
     // test unstake function with loss & interests
-    function testUnstakeWithLoss() public {
+    function testUnstakeWithLossBeforeSlash() public {
         // setup
         credit.mint(address(this), 150e18);
         credit.approve(address(sgm), 150e18);
@@ -331,6 +331,68 @@ contract SurplusGuildMinterUnitTest is Test {
         guild.applyGaugeLoss(term, address(sgm));
         assertEq(guild.balanceOf(address(sgm)), 0); // slashed
         assertEq(guild.getGaugeWeight(term), 50e18); // weight decremented
+    }
+
+    // test unstake function with loss & interests
+    function testUnstakeWithLossAfterSlash() public {
+        // setup
+        credit.mint(address(this), 150e18);
+        credit.approve(address(sgm), 150e18);
+        sgm.stake(term, 150e18);
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(profitManager.surplusBuffer(), 0);
+        assertEq(profitManager.termSurplusBuffer(term), 150e18);
+        assertEq(guild.balanceOf(address(sgm)), 300e18);
+        assertEq(guild.getGaugeWeight(term), 350e18);
+        assertEq(sgm.getUserStake(address(this), term).credit, 150e18);
+
+        // the guild token earn interests
+        vm.prank(governor);
+        profitManager.setProfitSharingConfig(
+            0.5e18, // surplusBufferSplit
+            0, // creditSplit
+            0.5e18, // guildSplit
+            0, // otherSplit
+            address(0) // otherRecipient
+        );
+        credit.mint(address(profitManager), 35e18);
+        profitManager.notifyPnL(term, 35e18, 0);
+        assertEq(profitManager.surplusBuffer(), 17.5e18);
+        assertEq(profitManager.termSurplusBuffer(term), 150e18);
+        (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
+        (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
+        assertEq(rewardsThis, 2.5e18);
+        assertEq(rewardsSgm, 15e18);
+
+        // next block
+        vm.warp(block.timestamp + 13);
+        vm.roll(block.number + 1);
+
+        // loss in gauge
+        profitManager.notifyPnL(term, -27.5e18, 0);
+        assertEq(profitManager.surplusBuffer(), 17.5e18 + 150e18 - 27.5e18); // 140e18
+        assertEq(profitManager.termSurplusBuffer(term), 0);
+
+        // cannot stake if there was just a loss
+        vm.expectRevert("SurplusGuildMinter: loss in block");
+        sgm.stake(term, 123);
+
+        // slash sgm
+        guild.applyGaugeLoss(term, address(sgm));
+        assertEq(guild.balanceOf(address(sgm)), 0); // slashed
+        assertEq(guild.getGaugeWeight(term), 50e18); // weight decremented
+
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(guild.balanceOf(address(this)), 50e18);
+        assertEq(credit.balanceOf(address(sgm)), 15e18); // undistributed rewards
+        assertEq(sgm.getUserStake(address(this), term).credit, 150e18);
+
+        // unstake (sgm)
+        sgm.unstake(term, 123);
+        assertEq(credit.balanceOf(address(this)), rewardsSgm); // lost 150 credit principal but earn the 15 credit of dividends
+        assertEq(guild.balanceOf(address(this)), 50e18 + 0); // no guild reward because position is slashed
+        assertEq(credit.balanceOf(address(sgm)), 0); // did not withdraw from surplus buffer
+        assertEq(sgm.getUserStake(address(this), term).credit, 0); // position slashed
     }
 
     // test pausability
