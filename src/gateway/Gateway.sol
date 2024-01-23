@@ -25,15 +25,10 @@ abstract contract Gateway is Ownable, Pausable {
         bool isAllowed
     );
 
-    /// @notice Stores calls to be executed after receiving a Balancer flash loan.
-    /// @dev The StoredCalls should only be set in the 'multicallWithBalancerFlashLoan' function
-    ///      Which is "onlyOwner" so the StoredCalls can only be set by the owner of the contract
-    bytes[] internal _storedCalls;
-
     address internal _originalSender = address(1);
 
     /// @notice mapping of allowed signatures per target address
-    /// For example allowing "flashLoan" on the balancer vault
+    /// For example allowing "approve" on a token
     mapping(address => mapping(bytes4 => bool)) public allowedCalls;
 
     constructor() Ownable() Pausable() {}

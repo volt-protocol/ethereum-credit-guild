@@ -21,37 +21,44 @@ contract GatewayV1 is Gateway {
     address public immutable balancerVault =
         0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
+    /// @notice Stores calls to be executed after receiving a flash loan.
+    /// @dev The StoredCalls should only be set in the 'multicallWithBalancerFlashLoan'
+    bytes[] internal _storedCalls;
+
     function multicallWithBalancerFlashLoan(
-        IERC20[] calldata tokens,
+        address[] calldata tokens,
         uint256[] calldata amounts,
         bytes[] calldata calls // Calls to be made after receiving the flash loan
     ) public whenNotPaused {
         require(
             _originalSender == address(1),
-            "Gateway: original sender already set"
+            "GatewayV1: original sender already set"
         );
 
         _originalSender = msg.sender;
-        // Clear existing StoredCalls
-        delete _storedCalls;
 
         // Manually copy each element
         for (uint i = 0; i < calls.length; i++) {
             _storedCalls.push(calls[i]);
         }
 
+        IERC20[] ierc20Tokens = new IERC20[](tokens.length);
+        for (uint i = 0; i < tokens.length; i++) {
+            ierc20Tokens[i] = IERC20(tokens[i]);
+        }
+
         // Initiate the flash loan
         IBalancerFlashLoan(balancerVault).flashLoan(
             address(this),
-            tokens,
+            ierc20Tokens,
             amounts,
             ""
         );
 
-        _originalSender = address(1);
-
         // clear stored calls
         delete _storedCalls;
+        // clear _originalSender
+        _originalSender = address(1);
     }
 
     /// @notice Handles the receipt of a flash loan, executes stored calls, and repays the loan.
@@ -71,12 +78,12 @@ contract GatewayV1 is Gateway {
 
         require(
             msg.sender == balancerVault,
-            "receiveFlashLoan: sender is not balancer"
+            "GatewayV1: sender is not balancer"
         );
 
         require(
             _originalSender != address(1),
-            "receiveFlashLoan: original sender must be set"
+            "GatewayV1: original sender must be set"
         );
 
         // execute the storedCalls, enforcing that the 'receiveFlashLoan' is called
@@ -85,10 +92,7 @@ contract GatewayV1 is Gateway {
 
         // Transfer back the required amounts to the Balancer Vault
         for (uint256 i = 0; i < tokens.length; i++) {
-            tokens[i].transfer(
-                address(balancerVault),
-                amounts[i] + feeAmounts[i]
-            );
+            tokens[i].transfer(balancerVault, amounts[i] + feeAmounts[i]);
         }
     }
 }
