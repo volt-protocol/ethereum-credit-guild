@@ -126,7 +126,8 @@ abstract contract Gateway is Ownable, Pausable {
         IERC20(token).transferFrom(_originalSender, address(this), amount);
     }
 
-    /// @notice
+    /// @notice allows sweeping remaining token on the gateway
+    ///         should be used at the end of a multicall
     /// @dev can only be used from the multicall function that sets "_originalSender"
     /// @dev anyone can sweep any token from this contract
     function sweep(address token) public {

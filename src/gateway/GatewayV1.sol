@@ -42,7 +42,7 @@ contract GatewayV1 is Gateway {
             _storedCalls.push(calls[i]);
         }
 
-        IERC20[] ierc20Tokens = new IERC20[](tokens.length);
+        IERC20[] memory ierc20Tokens = new IERC20[](tokens.length);
         for (uint i = 0; i < tokens.length; i++) {
             ierc20Tokens[i] = IERC20(tokens[i]);
         }

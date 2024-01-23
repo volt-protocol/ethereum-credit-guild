@@ -460,8 +460,8 @@ contract UnitTestGatewayV1 is Test {
         mockToken.mint(gatewayv1.balancerVault(), 1000);
         assertEq(mockToken.balanceOf(gatewayv1.balancerVault()), 1000);
         // setup calls
-        IERC20[] memory tokens = new IERC20[](1);
-        tokens[0] = IERC20(mockToken);
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(mockToken);
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 750;
         bytes[] memory calls = new bytes[](1);
@@ -484,7 +484,7 @@ contract UnitTestGatewayV1 is Test {
         uint256[] memory feeAmounts = new uint256[](1);
         amounts[0] = 150;
         vm.prank(bob);
-        vm.expectRevert("receiveFlashLoan: sender is not balancer");
+        vm.expectRevert("GatewayV1: sender is not balancer");
         gatewayv1.receiveFlashLoan(tokens, amounts, feeAmounts, "");
     }
 }
