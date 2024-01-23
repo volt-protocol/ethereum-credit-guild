@@ -53,6 +53,7 @@ abstract contract ERC20RebaseDistributor is ERC20 {
         address indexed source,
         uint256 indexed timestamp,
         uint256 amountDistributed,
+        uint256 totalPendingDistributions,
         uint256 amountRebasing
     );
     /// @notice Emitted when an `amount` of tokens is realized as rebase rewards for `account`.
@@ -353,12 +354,6 @@ abstract contract ERC20RebaseDistributor is ERC20 {
             0,
             0
         );
-        emit RebaseDistribution(
-            msg.sender,
-            block.timestamp,
-            amount,
-            _rebasingSupply
-        );
 
         // adjust up the balance of all accounts that are rebasing by increasing
         // the share price of rebasing tokens
@@ -385,6 +380,22 @@ abstract contract ERC20RebaseDistributor is ERC20 {
                 targetValue: __unmintedRebaseRewards.targetValue +
                     SafeCastLib.safeCastTo224(amount)
             });
+
+            emit RebaseDistribution(
+                msg.sender,
+                block.timestamp,
+                amount,
+                _unmintedRebaseRewards,
+                _rebasingSupply
+            );
+        } else {
+            emit RebaseDistribution(
+                msg.sender,
+                block.timestamp,
+                amount,
+                0,
+                _rebasingSupply
+            );
         }
     }
 
