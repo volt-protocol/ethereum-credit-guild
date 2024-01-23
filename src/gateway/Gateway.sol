@@ -30,6 +30,8 @@ abstract contract Gateway is Ownable, Pausable {
     ///      Which is "onlyOwner" so the StoredCalls can only be set by the owner of the contract
     bytes[] internal _storedCalls;
 
+    address internal _originalSender = address(1);
+
     /// @notice mapping of allowed signatures per target address
     /// For example allowing "flashLoan" on the balancer vault
     mapping(address => mapping(bytes4 => bool)) public allowedCalls;
@@ -61,22 +63,6 @@ abstract contract Gateway is Ownable, Pausable {
         emit CallAllowed(target, functionSelector, allowed);
     }
 
-    /// @notice Withdraws a specified ERC20 token amount to the owner's address.
-    /// @param token The ERC20 token address to withdraw.
-    /// @param amount The amount of the token to withdraw.
-    function withdraw(address token, uint256 amount) public onlyOwner {
-        IERC20(token).transfer(owner(), amount);
-    }
-
-    /// @notice Withdraws all Ether from the contract to the owner's address.
-    function withdrawEth() external onlyOwner {
-        uint256 balance = address(this).balance;
-        require(balance > 0, "Gateway: no ETH to withdraw");
-
-        (bool success, ) = owner().call{value: balance}("");
-        require(success, "Gateway: failed to send ETH");
-    }
-
     /// @notice Executes an external call to a specified target.
     ///         Only allows external calls to allowed target and function selector
     ///         these whitelisted calls are stored in the factory
@@ -103,62 +89,57 @@ abstract contract Gateway is Ownable, Pausable {
     /// @notice Executes multiple calls in a single transaction.
     /// and if amount > 0, tries to transfer From the sender
     /// @param calls An array of call data to execute.
-    function multicallWithTokens(
-        address tokenToTransferFrom,
-        uint256 amountToTransferFrom,
-        bytes[] calldata calls
-    ) public whenNotPaused {
+    function multicall(bytes[] calldata calls) public whenNotPaused {
         require(
-            tokenToTransferFrom != address(0),
-            "Gateway: address(0) invalid for token"
-        );
-        require(amountToTransferFrom > 0, "Gateway: token amount must be > 0");
-
-        uint256 balanceBefore = IERC20(tokenToTransferFrom).balanceOf(
-            address(this)
+            _originalSender == address(1),
+            "Gateway: original sender already set"
         );
 
-        IERC20(tokenToTransferFrom).transferFrom(
-            msg.sender,
-            address(this),
-            amountToTransferFrom
-        );
+        _originalSender = msg.sender;
 
         _executeCalls(calls);
 
-        uint256 leftovers = IERC20(tokenToTransferFrom).balanceOf(
-            address(this)
-        ) - balanceBefore;
-
-        IERC20(tokenToTransferFrom).transfer(msg.sender, leftovers);
+        _originalSender = address(1);
     }
 
-    function multicallWithTokensAndPermit(
-        address tokenToTransferFrom,
-        uint256 amountToTransferFrom,
-        bytes[] calldata calls,
-        // below are permit data
+    /// @notice
+    /// @dev can only be used from the multicall function that sets "_originalSender"
+    function consumePermit(
+        address token,
+        uint256 amount,
         uint256 deadline,
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) public whenNotPaused {
-        require(
-            tokenToTransferFrom != address(0),
-            "Gateway: address(0) invalid for token"
-        );
-        require(amountToTransferFrom > 0, "Gateway: token amount must be > 0");
-        IERC20Permit(tokenToTransferFrom).permit(
-            msg.sender,
+    ) public {
+        require(_originalSender != address(1), "");
+        IERC20Permit(token).permit(
+            _originalSender,
             address(this),
-            amountToTransferFrom,
+            amount,
             deadline,
             v,
             r,
             s
         );
+    }
 
-        multicallWithTokens(tokenToTransferFrom, amountToTransferFrom, calls);
+    /// @notice
+    /// @dev can only be used from the multicall function that sets "_originalSender"
+    function consumeAllowance(address token, uint256 amount) public {
+        require(_originalSender != address(1), "");
+        IERC20(token).transferFrom(_originalSender, address(this), amount);
+    }
+
+    /// @notice
+    /// @dev can only be used from the multicall function that sets "_originalSender"
+    /// @dev anyone can sweep any token from this contract
+    function sweep(address token) public {
+        require(_originalSender != address(1), "");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        if (balance > 0) {
+            IERC20(token).transfer(_originalSender, balance);
+        }
     }
 
     /// @dev Executes a series of calls using call on this contract.

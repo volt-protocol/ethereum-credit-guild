@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
-import {Gateway} from "./Gateway.sol";
+import "./Gateway.sol";
 
 interface IBalancerFlashLoan {
     function flashLoan(
@@ -24,23 +21,17 @@ contract GatewayV1 is Gateway {
     address public immutable balancerVault =
         0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
-    constructor() Gateway() {}
-
-    function multicallWithTokensWithBalancerFlashLoan(
-        address tokenToTransferFrom,
-        uint256 amountToTransferFrom,
+    function multicallWithBalancerFlashLoan(
         IERC20[] calldata tokens,
         uint256[] calldata amounts,
         bytes[] calldata calls // Calls to be made after receiving the flash loan
     ) public whenNotPaused {
-        if (amountToTransferFrom > 0) {
-            IERC20(tokenToTransferFrom).transferFrom(
-                msg.sender,
-                address(this),
-                amountToTransferFrom
-            );
-        }
+        require(
+            _originalSender == address(1),
+            "Gateway: original sender already set"
+        );
 
+        _originalSender = msg.sender;
         // Clear existing StoredCalls
         delete _storedCalls;
 
@@ -56,37 +47,11 @@ contract GatewayV1 is Gateway {
             amounts,
             ""
         );
-    }
 
-    function multicallWithTokensWithBalancerFlashLoanAndPermit(
-        address tokenToTransferFrom,
-        uint256 amountToTransferFrom,
-        IERC20[] calldata tokens,
-        uint256[] calldata amounts,
-        bytes[] calldata calls,
-        // below are permit data
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) public whenNotPaused {
-        IERC20Permit(tokenToTransferFrom).permit(
-            msg.sender,
-            address(this),
-            amountToTransferFrom,
-            deadline,
-            v,
-            r,
-            s
-        );
+        _originalSender = address(1);
 
-        multicallWithTokensWithBalancerFlashLoan(
-            tokenToTransferFrom,
-            amountToTransferFrom,
-            tokens,
-            amounts,
-            calls
-        );
+        // clear stored calls
+        delete _storedCalls;
     }
 
     /// @notice Handles the receipt of a flash loan, executes stored calls, and repays the loan.
@@ -109,12 +74,14 @@ contract GatewayV1 is Gateway {
             "receiveFlashLoan: sender is not balancer"
         );
 
+        require(
+            _originalSender != address(1),
+            "receiveFlashLoan: original sender must be set"
+        );
+
         // execute the storedCalls, enforcing that the 'receiveFlashLoan' is called
         // after having called 'multicallWithBalancerFlashLoan';
         _executeCalls(_storedCalls);
-
-        // clear stored calls
-        delete _storedCalls;
 
         // Transfer back the required amounts to the Balancer Vault
         for (uint256 i = 0; i < tokens.length; i++) {

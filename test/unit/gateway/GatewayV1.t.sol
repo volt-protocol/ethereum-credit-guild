@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 import {Test} from "@forge-std/Test.sol";
 
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {GatewayV1} from "@src/gateway/GatewayV1.sol";
 import {Gateway} from "@src/gateway/Gateway.sol";
 import {MockBalancerVault} from "../../mock/MockBalancerVault.sol";
@@ -10,17 +11,12 @@ import {MockExternalContract} from "../../mock/MockExternalContract.sol";
 import {MockERC20} from "../../mock/MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract RejectingReceiver {
-    receive() external payable {
-        revert("RejectingReceiver: rejecting ETH");
-    }
-}
-
 // /// @title Test suite for the AccountFactory contract
 // /// @notice Implements various test cases to validate the functionality of AccountFactory contract
 contract UnitTestGatewayV1 is Test {
-    /// @notice Address used to represent a typical user (Alice)
-    address alice = address(0xaaaaaaaa);
+    uint256 public alicePrivateKey = uint256(0x42);
+    address public alice = vm.addr(alicePrivateKey);
+
     /// @notice Address used to represent another user (Bob)
     address bob = address(0xb0bb0b);
 
@@ -246,100 +242,7 @@ contract UnitTestGatewayV1 is Test {
         gatewayv1.callExternal(allowedTarget, data);
     }
 
-    /// @notice Tests that non-owner cannot withdraw tokens
-    function testWithdrawShouldFailIfNotOwner() public {
-        mockToken.mint(address(gatewayv1), 1000e18);
-        assertEq(mockToken.balanceOf(address(gatewayv1)), 1000e18);
-        vm.prank(alice);
-        vm.expectRevert("Ownable: caller is not the owner");
-        gatewayv1.withdraw(address(mockToken), 1000e18);
-    }
-
-    /// @notice Tests that the owner can withdraw the specified amount of tokens
-    function testWithdrawShouldWithdrawTheAmountRequested() public {
-        mockToken.mint(address(gatewayv1), 1000e18);
-        assertEq(mockToken.balanceOf(address(gatewayv1)), 1000e18);
-        assertEq(mockToken.balanceOf(gatewayOwner), 0);
-        vm.prank(gatewayOwner);
-        gatewayv1.withdraw(address(mockToken), 250e18);
-        assertEq(mockToken.balanceOf(address(gatewayv1)), 750e18);
-        assertEq(mockToken.balanceOf(gatewayOwner), 250e18);
-    }
-
-    /// @notice Tests that non-owner cannot withdraw ETH
-    function testWithdrawEthShouldFailIfNotOwner() public {
-        // try to withdraw eth as bob
-        vm.prank(alice);
-        vm.expectRevert("Ownable: caller is not the owner");
-        gatewayv1.withdrawEth();
-    }
-
-    /// @notice Tests that withdrawing ETH fails if the balance is zero
-    function testWithdrawEthShouldFailIfNoBalance() public {
-        vm.prank(gatewayOwner);
-        vm.expectRevert("Gateway: no ETH to withdraw");
-        gatewayv1.withdrawEth();
-    }
-
-    /// @notice Tests that ETH withdrawal fails if the call to send eth somehow fails
-    function testWithdrawFailShouldRevert() public {
-        RejectingReceiver receiver = new RejectingReceiver();
-        vm.prank(address(receiver));
-        GatewayV1 gw = new GatewayV1();
-        assertEq(address(gw).balance, 0);
-        assertEq(gw.owner(), address(receiver));
-        vm.deal(address(gw), 1e18);
-        assertEq(address(gw).balance, 1e18);
-        vm.prank(address(receiver));
-        vm.expectRevert("Gateway: failed to send ETH");
-        gw.withdrawEth();
-    }
-
-    /// @notice Tests that the owner can withdraw ETH successfully
-    function testWithdrawShouldWithdrawEth() public {
-        assertEq(gatewayOwner.balance, 0);
-        // deal 1 eth to alice account
-        assertEq(address(gatewayv1).balance, 0);
-        vm.deal(address(gatewayv1), 1e18);
-        assertEq(address(gatewayv1).balance, 1e18);
-        vm.prank(gatewayOwner);
-        gatewayv1.withdrawEth();
-        assertEq(gatewayOwner.balance, 1e18);
-    }
-
-    function testBobCannotSpendAliceTokens() public {
-        mockToken.mint(alice, 1000e18);
-
-        // alice will approve 1000 token to the gateway
-        // and bob will try to use them without any allowance
-        vm.prank(alice);
-        mockToken.approve(address(gatewayv1), 1000e18);
-
-        // for the test, allow transfer function on the mockToken
-        vm.prank(gatewayOwner);
-        gatewayv1.allowCall(
-            address(mockToken),
-            bytes4(keccak256("transfer(address,uint256)")),
-            true
-        );
-
-        bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            address(mockToken),
-            abi.encodeWithSignature(
-                "transfer(address,uint256)",
-                bob,
-                uint256(1000e18)
-            )
-        );
-
-        vm.prank(bob);
-        vm.expectRevert("ERC20: insufficient allowance");
-        gatewayv1.multicallWithTokens(address(mockToken), 1000e18, calls);
-    }
-
-    function testAliceCanSpendAllowanceWithMulticall() public {
+    function testMulticall() public {
         mockToken.mint(alice, 1000e18);
 
         // alice will approve 1000 token to the gateway
@@ -355,8 +258,15 @@ contract UnitTestGatewayV1 is Test {
             true
         );
 
-        bytes[] memory calls = new bytes[](1);
+        bytes[] memory calls = new bytes[](2);
         calls[0] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)", // token, amount
+            address(mockToken),
+            1000e18
+        );
+
+        // send tokens to bob
+        calls[1] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
             address(mockToken),
             abi.encodeWithSignature(
@@ -367,9 +277,164 @@ contract UnitTestGatewayV1 is Test {
         );
 
         vm.prank(alice);
-        gatewayv1.multicallWithTokens(address(mockToken), 1000e18, calls);
+        gatewayv1.multicall(calls);
 
         assertEq(mockToken.balanceOf(bob), 1000e18);
+    }
+
+    function getPermitDataFromAlice(
+        MockERC20 _mockToken,
+        uint256 amount,
+        address to
+    ) public returns (uint8 v, bytes32 r, bytes32 s, uint256 deadline) {
+        deadline = block.timestamp + 100;
+        // sign permit message valid for 10s
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256(
+                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+                ),
+                alice,
+                to,
+                amount,
+                _mockToken.nonces(alice),
+                deadline
+            )
+        );
+
+        bytes32 digest = ECDSA.toTypedDataHash(
+            _mockToken.DOMAIN_SEPARATOR(),
+            structHash
+        );
+
+        (v, r, s) = vm.sign(alicePrivateKey, digest);
+        assertEq(ECDSA.recover(digest, v, r, s), alice);
+    }
+
+    function testMulticallWithPermit() public {
+        mockToken.mint(alice, 1000e18);
+
+        (
+            uint8 v,
+            bytes32 r,
+            bytes32 s,
+            uint256 deadline
+        ) = getPermitDataFromAlice(mockToken, 1000e18, address(gatewayv1));
+
+        // for the test, allow transfer function on the mockToken
+        vm.prank(gatewayOwner);
+        gatewayv1.allowCall(
+            address(mockToken),
+            bytes4(keccak256("transfer(address,uint256)")),
+            true
+        );
+
+        bytes[] memory calls = new bytes[](3);
+        calls[0] = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)", // token, amount
+            address(mockToken),
+            1000e18,
+            deadline,
+            v,
+            r,
+            s
+        );
+        calls[1] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)", // token, amount
+            address(mockToken),
+            1000e18
+        );
+
+        // send tokens to bob
+        calls[2] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            address(mockToken),
+            abi.encodeWithSignature(
+                "transfer(address,uint256)",
+                bob,
+                uint256(1000e18)
+            )
+        );
+
+        vm.prank(alice);
+        gatewayv1.multicall(calls);
+
+        assertEq(mockToken.balanceOf(bob), 1000e18);
+    }
+
+    function testMulticallWithSweep() public {
+        mockToken.mint(alice, 1000e18);
+
+        // alice will approve 1000 token to the gateway
+        // and then transfer them via the gateway to bob
+        vm.prank(alice);
+        mockToken.approve(address(gatewayv1), 1000e18);
+
+        // for the test, allow transfer function on the mockToken
+        vm.prank(gatewayOwner);
+        gatewayv1.allowCall(
+            address(mockToken),
+            bytes4(keccak256("transfer(address,uint256)")),
+            true
+        );
+
+        bytes[] memory calls = new bytes[](2);
+        calls[0] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)", // token, amount
+            address(mockToken),
+            1000e18
+        );
+
+        // sweep tokens to alice
+        calls[1] = abi.encodeWithSignature(
+            "sweep(address)", // token
+            address(mockToken)
+        );
+
+        vm.prank(alice);
+        gatewayv1.multicall(calls);
+
+        assertEq(mockToken.balanceOf(address(gatewayv1)), 0);
+        assertEq(mockToken.balanceOf(alice), 1000e18);
+    }
+
+    function testBobCannotSpendAliceTokens() public {
+        mockToken.mint(alice, 1000e18);
+
+        // alice will approve 1000 token to the gateway
+        // and then transfer them via the gateway to bob
+        vm.prank(alice);
+        mockToken.approve(address(gatewayv1), 1000e18);
+
+        // for the test, allow transfer function on the mockToken
+        vm.prank(gatewayOwner);
+        gatewayv1.allowCall(
+            address(mockToken),
+            bytes4(keccak256("transfer(address,uint256)")),
+            true
+        );
+
+        bytes[] memory calls = new bytes[](2);
+        calls[0] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)", // token, amount
+            address(mockToken),
+            1000e18
+        );
+
+        // send tokens to bob
+        calls[1] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            address(mockToken),
+            abi.encodeWithSignature(
+                "transfer(address,uint256)",
+                bob,
+                uint256(1000e18)
+            )
+        );
+
+        vm.prank(bob);
+        vm.expectRevert("ERC20: insufficient allowance");
+        gatewayv1.multicall(calls);
     }
 
     /// @notice Prepares and verifies deployment of a mock Balancer vault for testing
@@ -406,95 +471,8 @@ contract UnitTestGatewayV1 is Test {
             abi.encodeWithSignature("ThisFunctionIsOk(uint256)", uint256(750))
         );
         vm.prank(alice);
-        gatewayv1.multicallWithTokensWithBalancerFlashLoan(
-            address(0),
-            0,
-            tokens,
-            amounts,
-            calls
-        );
+        gatewayv1.multicallWithBalancerFlashLoan(tokens, amounts, calls);
         assertEq(750, MockExternalContract(allowedTarget).AmountSaved());
-    }
-
-    /// @notice Conducts a test scenario involving a Balancer flash loan
-    /// this test shows that the balancer send the tokens and then that the calls are performed
-    /// in a multicall way, and that we give the tokens back to the flashloan
-    function testBalancerFlashLoanWithTransferFrom() public {
-        mockToken.mint(alice, 1000e18);
-
-        // alice will approve 1000 token to the gateway
-        // and then transfer them via the gateway to bob
-        vm.prank(alice);
-        mockToken.approve(address(gatewayv1), 1000e18);
-
-        // first deploy the mock balancer vault and set it at the correct address
-        prepareBalancerVault();
-        // we will deal 1000 token to the vault
-        mockToken.mint(gatewayv1.balancerVault(), 1000);
-        assertEq(mockToken.balanceOf(gatewayv1.balancerVault()), 1000);
-        // setup calls
-        IERC20[] memory tokens = new IERC20[](1);
-        tokens[0] = IERC20(mockToken);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 750;
-        bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            allowedTarget,
-            abi.encodeWithSignature("ThisFunctionIsOk(uint256)", uint256(750))
-        );
-        vm.prank(alice);
-        gatewayv1.multicallWithTokensWithBalancerFlashLoan(
-            address(mockToken),
-            1000e18,
-            tokens,
-            amounts,
-            calls
-        );
-        assertEq(750, MockExternalContract(allowedTarget).AmountSaved());
-
-        // check that the gateway now has 1000 tokens from alice
-        assertEq(mockToken.balanceOf(address(gatewayv1)), 1000e18);
-    }
-
-    /// @notice Conducts a test scenario involving a Balancer flash loan where we don't have enough token reimburse the loan
-    function testBalancerFlashLoanFailToReimburse() public {
-        // first deploy the mock balancer vault and set it at the correct address
-        prepareBalancerVault();
-        // we will deal 1000 token to the vault
-        mockToken.mint(gatewayv1.balancerVault(), 1000);
-        assertEq(mockToken.balanceOf(gatewayv1.balancerVault()), 1000);
-        // whitelist a call to the mockToken for the transfer function
-        bytes4 functionSelector = bytes4(
-            keccak256("transfer(address,uint256)")
-        );
-        vm.prank(gatewayOwner);
-        gatewayv1.allowCall(address(mockToken), functionSelector, true);
-        // setup calls
-        IERC20[] memory tokens = new IERC20[](1);
-        tokens[0] = IERC20(mockToken);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 750;
-        bytes[] memory calls = new bytes[](1);
-        // this sends bob 100 token from the flash loan
-        calls[0] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            address(mockToken),
-            abi.encodeWithSignature(
-                "transfer(address,uint256)",
-                bob,
-                uint256(100)
-            )
-        );
-        vm.prank(alice);
-        vm.expectRevert("ERC20: transfer amount exceeds balance");
-        gatewayv1.multicallWithTokensWithBalancerFlashLoan(
-            address(0),
-            0,
-            tokens,
-            amounts,
-            calls
-        );
     }
 
     /// @notice Ensures that unauthorized addresses cannot call the receiveFlashLoan function
