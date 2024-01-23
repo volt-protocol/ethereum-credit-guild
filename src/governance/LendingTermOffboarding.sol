@@ -173,7 +173,8 @@ contract LendingTermOffboarding is CoreRef {
         // through another mean.
         GuildToken(guildToken).removeGauge(term);
 
-        // pause psm redemptions
+        // if there are no other offboardings in progress, this is the
+        // first offboarding to start, so we pause psm redemptions
         if (
             nOffboardingsInProgress++ == 0 &&
             !SimplePSM(psm).redemptionsPaused()
@@ -210,7 +211,8 @@ contract LendingTermOffboarding is CoreRef {
         core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
         core().revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, term);
 
-        // unpause psm redemptions
+        // if there are no other offboardings in progress, this is the
+        // last offboarding to end, so we unpause psm redemptions
         if (
             --nOffboardingsInProgress == 0 && SimplePSM(psm).redemptionsPaused()
         ) {
@@ -241,7 +243,8 @@ contract LendingTermOffboarding is CoreRef {
             "LendingTermOffboarding: not re-onboarded"
         );
 
-        // unpause psm redemptions
+        // if there are no other offboardings in progress, this is the
+        // last offboarding to end, so we unpause psm redemptions
         if (
             --nOffboardingsInProgress == 0 && SimplePSM(psm).redemptionsPaused()
         ) {
