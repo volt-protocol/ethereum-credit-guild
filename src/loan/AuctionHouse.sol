@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 
 /// @notice Auction House contract of the Ethereum Credit Guild,
 /// where collateral of borrowers is auctioned to cover their CREDIT debt.
@@ -38,11 +39,12 @@ contract AuctionHouse is CoreRef {
     uint256 public immutable auctionDuration;
 
     struct Auction {
-        uint256 startTime;
-        uint256 endTime;
+        uint48 startTime;
+        uint48 endTime;
         address lendingTerm;
         uint256 collateralAmount;
         uint256 callDebt;
+        uint256 callCreditMultiplier;
     }
 
     /// @notice the list of all auctions that existed or are still active.
@@ -93,11 +95,12 @@ contract AuctionHouse is CoreRef {
 
         // save auction in state
         auctions[loanId] = Auction({
-            startTime: block.timestamp,
+            startTime: uint48(block.timestamp),
             endTime: 0,
             lendingTerm: msg.sender,
             collateralAmount: loan.collateralAmount,
-            callDebt: loan.callDebt
+            callDebt: loan.callDebt,
+            callCreditMultiplier: ProfitManager(LendingTerm(msg.sender).profitManager()).creditMultiplier()
         });
         nAuctionsInProgress++;
 
@@ -158,6 +161,10 @@ contract AuctionHouse is CoreRef {
             collateralReceived = auctions[loanId].collateralAmount;
             //creditAsked = 0; // implicit
         }
+
+        // apply eventual creditMultiplier updates
+        uint256 creditMultiplier = ProfitManager(LendingTerm(auctions[loanId].lendingTerm).profitManager()).creditMultiplier();
+        creditAsked = creditAsked * auctions[loanId].callCreditMultiplier / creditMultiplier;
     }
 
     /// @notice bid for an active auction
@@ -172,7 +179,7 @@ contract AuctionHouse is CoreRef {
         require(creditAsked != 0, "AuctionHouse: cannot bid 0");
 
         // close the auction in state
-        auctions[loanId].endTime = block.timestamp;
+        auctions[loanId].endTime = uint48(block.timestamp);
         nAuctionsInProgress--;
 
         // notify LendingTerm of auction result
@@ -206,7 +213,7 @@ contract AuctionHouse is CoreRef {
         require(creditAsked == 0, "AuctionHouse: ongoing auction");
 
         // close the auction in state
-        auctions[loanId].endTime = block.timestamp;
+        auctions[loanId].endTime = uint48(block.timestamp);
         nAuctionsInProgress--;
 
         // notify LendingTerm of auction result
