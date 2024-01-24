@@ -15,7 +15,7 @@ contract SimpleBorrowOnSDAI is Script {
     GatewayV1 public gatewayv1 =
         GatewayV1(0x760Cb292043a99b867E0b994BC22071ceE958faa);
     address public SDAI_TOKEN = 0xeeF0AB67262046d5bED00CE9C447e08D92b8dA61;
-    address public SDAI_TERM = 0xFBE67752BC63686707966b8Ace817094d26f5381;
+    address public SDAI_TERM = 0x64812e299076Bc01DF37C83Ce288E11d373D454c;
     address public PSM = 0x66839a9a16BebA26af1c717e9C1D604dff9d91F7;
     ProfitManager public profitManager =
         ProfitManager(0xD8c5748984d27Af2b1FC8235848B16C326e1F6de);
@@ -49,7 +49,7 @@ contract SimpleBorrowOnSDAI is Script {
         _labelUp();
         vm.startBroadcast(PRIVATE_KEY);
 
-        uint256 collateralAmount = 100e18; // 100 sDAI as collateral
+        uint256 collateralAmount = 200e18; // 200 sDAI as collateral
         uint256 debtAmount = getBorrowAmountFromCollateralAmount(
             collateralAmount
         );
