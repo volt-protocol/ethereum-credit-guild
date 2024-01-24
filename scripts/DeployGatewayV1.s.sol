@@ -109,8 +109,8 @@ contract DeployGatewayV1 is Script {
     }
 
     function getSelector(
-        string memory functionStr
-    ) public view returns (bytes4) {
-        return bytes4(keccack256(functionStr));
+        bytes memory functionStr
+    ) public pure returns (bytes4) {
+        return bytes4(keccak256(functionStr));
     }
 }
