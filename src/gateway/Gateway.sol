@@ -122,7 +122,10 @@ abstract contract Gateway is Ownable, Pausable {
     /// @notice
     /// @dev can only be used from the multicall function that sets "_originalSender"
     function consumeAllowance(address token, uint256 amount) public {
-        require(_originalSender != address(1), "");
+        require(
+            _originalSender != address(1),
+            "Gateway: Original sender not set in consumeAllowance"
+        );
         IERC20(token).transferFrom(_originalSender, address(this), amount);
     }
 
@@ -131,7 +134,10 @@ abstract contract Gateway is Ownable, Pausable {
     /// @dev can only be used from the multicall function that sets "_originalSender"
     /// @dev anyone can sweep any token from this contract
     function sweep(address token) public {
-        require(_originalSender != address(1), "");
+        require(
+            _originalSender != address(1),
+            "Gateway: Original sender not set in sweep"
+        );
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
             IERC20(token).transfer(_originalSender, balance);
