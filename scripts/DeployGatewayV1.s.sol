@@ -4,6 +4,39 @@ pragma solidity 0.8.13;
 import {Script} from "@forge-std/Script.sol";
 import {GatewayV1} from "@src/gateway/GatewayV1.sol";
 
+contract AddGatewayCalls is Script {
+    uint256 public PRIVATE_KEY;
+    GatewayV1 public gatewayv1 =
+        GatewayV1(0x760Cb292043a99b867E0b994BC22071ceE958faa);
+
+    function _parseEnv() internal {
+        // Default behavior: use Anvil 0 private key
+        PRIVATE_KEY = vm.envOr(
+            "ETH_PRIVATE_KEY",
+            77814517325470205911140941194401928579557062014761831930645393041380819009408
+        );
+    }
+
+    function run() public {
+        _parseEnv();
+
+        vm.startBroadcast(PRIVATE_KEY);
+
+        gatewayv1.allowCall(
+            0x64812e299076Bc01DF37C83Ce288E11d373D454c,
+            bytes4(keccak256("borrowOnBehalf(uint256,uint256,address)")),
+            true
+        );
+        gatewayv1.allowCall(
+            0x64812e299076Bc01DF37C83Ce288E11d373D454c,
+            bytes4(keccak256("partialRepay(bytes32,uint256)")),
+            true
+        );
+
+        vm.stopBroadcast();
+    }
+}
+
 contract DeployGatewayV1 is Script {
     uint256 public PRIVATE_KEY;
     GatewayV1 public gatewayv1;
