@@ -55,7 +55,7 @@ contract SurplusGuildMinterUnitTest is Test {
             MINT_RATIO,
             REWARD_RATIO
         );
-        profitManager.initializeReferences(address(credit), address(guild), address(0));
+        profitManager.initializeReferences(address(credit), address(guild));
         term = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
 
         // roles

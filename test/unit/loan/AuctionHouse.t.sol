@@ -83,7 +83,7 @@ contract AuctionHouseUnitTest is Test {
                 hardCap: 20_000_000e18 // 20M CREDIT
             })
         );
-        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+        profitManager.initializeReferences(address(credit), address(guild));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);

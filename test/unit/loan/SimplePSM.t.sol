@@ -38,7 +38,7 @@ contract SimplePSMUnitTest is Test {
             address(credit),
             address(token)
         );
-        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+        profitManager.initializeReferences(address(credit), address(guild));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);

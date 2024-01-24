@@ -3,7 +3,6 @@ pragma solidity 0.8.13;
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 
@@ -33,9 +32,6 @@ contract ProfitManager is CoreRef {
 
     /// @notice reference to CREDIT token.
     address public credit;
-
-    /// @notice reference to CREDIT token PSM.
-    address public psm;
 
     /// @notice profit index of a given gauge
     mapping(address => uint256) public gaugeProfitIndex;
@@ -172,15 +168,13 @@ contract ProfitManager is CoreRef {
     /// @notice initialize references to GUILD & CREDIT tokens.
     function initializeReferences(
         address _credit,
-        address _guild,
-        address _psm
+        address _guild
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         assert(
-            credit == address(0) && guild == address(0) && psm == address(0)
+            credit == address(0) && guild == address(0)
         );
         credit = _credit;
         guild = _guild;
-        psm = _psm;
     }
 
     /// @notice set the minimum borrow amount

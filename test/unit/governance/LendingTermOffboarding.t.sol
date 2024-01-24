@@ -66,7 +66,7 @@ contract LendingTermOffboardingUnitTest is Test {
             address(credit),
             address(collateral)
         );
-        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+        profitManager.initializeReferences(address(credit), address(guild));
         offboarder = new LendingTermOffboarding(
             address(core),
             address(guild),

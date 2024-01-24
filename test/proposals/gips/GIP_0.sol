@@ -477,8 +477,7 @@ contract GIP_0 is Proposal {
         // Configuration
         ProfitManager(AddressLib.get("PROFIT_MANAGER")).initializeReferences(
             AddressLib.get("ERC20_GUSDC"),
-            AddressLib.get("ERC20_GUILD"),
-            AddressLib.get("PSM_USDC")
+            AddressLib.get("ERC20_GUILD")
         );
         ProfitManager(AddressLib.get("PROFIT_MANAGER"))
             .setProfitSharingConfig(

@@ -81,7 +81,7 @@ contract LendingTermUnitTest is Test {
             address(credit),
             address(collateral)
         );
-        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+        profitManager.initializeReferences(address(credit), address(guild));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);

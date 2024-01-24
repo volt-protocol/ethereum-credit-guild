@@ -103,7 +103,7 @@ contract LendingTermOnboardingUnitTest is Test {
             creditToken: address(credit)
         }));
 
-        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+        profitManager.initializeReferences(address(credit), address(guild));
 
         // permissions
         core.grantRole(CoreRoles.GOVERNOR, governor);

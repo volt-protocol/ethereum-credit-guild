@@ -76,8 +76,7 @@ contract ProfitManagerUnitTest is Test {
         // initialize profitManager
         assertEq(profitManager.credit(), address(0));
         assertEq(profitManager.guild(), address(0));
-        assertEq(profitManager.psm(), address(0));
-        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+        profitManager.initializeReferences(address(credit), address(guild));
 
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
     }
@@ -90,7 +89,6 @@ contract ProfitManagerUnitTest is Test {
         assertEq(address(profitManager.core()), address(core));
         assertEq(profitManager.credit(), address(credit));
         assertEq(profitManager.guild(), address(guild));
-        assertEq(profitManager.psm(), address(psm));
         assertEq(profitManager.surplusBuffer(), 0);
         assertEq(profitManager.creditMultiplier(), 1e18);
     }
@@ -100,14 +98,14 @@ contract ProfitManagerUnitTest is Test {
         assertEq(pm2.credit(), address(0));
         assertEq(pm2.guild(), address(0));
         vm.expectRevert("UNAUTHORIZED");
-        pm2.initializeReferences(address(credit), address(guild), address(psm));
+        pm2.initializeReferences(address(credit), address(guild));
         vm.prank(governor);
-        pm2.initializeReferences(address(credit), address(guild), address(psm));
+        pm2.initializeReferences(address(credit), address(guild));
         assertEq(pm2.credit(), address(credit));
         assertEq(pm2.guild(), address(guild));
         vm.expectRevert();
         vm.prank(governor);
-        pm2.initializeReferences(address(credit), address(guild), address(psm));
+        pm2.initializeReferences(address(credit), address(guild));
     }
 
     function testCreditMultiplier() public {
