@@ -938,6 +938,41 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
     }
 
+    // if loan accrues interest above maxDebtForCollateral, can call it
+    function testCallAfterInterestAccrue() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        uint256 maxDebt = term.maxDebtForCollateral(collateralAmount);
+        assertEq(maxDebt, 30_000e18);
+
+        // wait that interest accrue
+        uint256 loanDebt = term.getLoanDebt(loanId);
+        while(loanDebt < maxDebt) {
+            vm.warp(block.timestamp + 1 weeks);
+            vm.roll(block.number + 1);
+            loanDebt = term.getLoanDebt(loanId);
+        }
+
+        // call
+        term.call(loanId);
+
+        // loan is called
+        assertEq(term.getLoan(loanId).callTime, block.timestamp);
+        assertEq(term.getLoan(loanId).callDebt, loanDebt);
+
+        // issuance not yet decremented
+        assertEq(term.issuance(), borrowAmount);
+
+        // borrower kept credit, collateral still escrowed
+        assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+    }
+
     function testForgiveFailLoanNotFound() public {
         // forgive
         vm.prank(governor);
@@ -1271,9 +1306,11 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         credit.mint(address(this), 100e18);
         assertEq(profitManager.creditMultiplier(), 1e18);
+        assertEq(term.maxDebtForCollateral(15e18), 15 * 2000e18);
         vm.prank(address(term));
         profitManager.notifyPnL(address(term), int256(-50e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
+        assertEq(term.maxDebtForCollateral(15e18), 15 * 2000e18 * 2);
         credit.burn(100e18);
 
         // borrow

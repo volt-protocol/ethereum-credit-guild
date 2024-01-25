@@ -250,6 +250,19 @@ contract LendingTerm is CoreRef {
         return loanDebt;
     }
 
+    /// @notice maximum debt for a given amount of collateral
+    function maxDebtForCollateral(uint256 collateralAmount) public view returns (uint256) {
+        uint256 creditMultiplier = ProfitManager(refs.profitManager)
+            .creditMultiplier();
+        return _maxDebtForCollateral(collateralAmount, creditMultiplier);
+    }
+
+    /// @notice maximum debt for a given amount of collateral & creditMultiplier
+    function _maxDebtForCollateral(uint256 collateralAmount, uint256 creditMultiplier) internal view returns (uint256) {
+        return (collateralAmount *
+            params.maxDebtPerCollateralToken) / creditMultiplier;
+    }
+
     /// @notice returns true if the term has a maximum delay between partial repays
     /// and the loan has passed the delay for partial repayments.
     function partialRepayDelayPassed(
@@ -379,8 +392,7 @@ contract LendingTerm is CoreRef {
         // check that enough collateral is provided
         uint256 creditMultiplier = ProfitManager(refs.profitManager)
             .creditMultiplier();
-        uint256 maxBorrow = (collateralAmount *
-            params.maxDebtPerCollateralToken) / creditMultiplier;
+        uint256 maxBorrow = _maxDebtForCollateral(collateralAmount, creditMultiplier);
         require(
             borrowAmount <= maxBorrow,
             "LendingTerm: not enough collateral"
@@ -687,6 +699,7 @@ contract LendingTerm is CoreRef {
         uint256 loanDebt = _getLoanDebt(loanId, creditMultiplier);
         require(
             GuildToken(refs.guildToken).isDeprecatedGauge(address(this)) ||
+                loanDebt > _maxDebtForCollateral(loans[loanId].collateralAmount, creditMultiplier) ||
                 partialRepayDelayPassed(loanId),
             "LendingTerm: cannot call"
         );
