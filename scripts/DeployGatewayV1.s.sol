@@ -37,6 +37,9 @@ contract AddGatewayCalls is Script {
     }
 }
 
+/// @notice
+/// deploy like that to verify:
+/// forge script scripts/DeployGatewayV1.s.sol:DeployGatewayV1 -vvvv --rpc-url {{RPC URL}} --broadcast --etherscan-api-key {ETHERSCAN KEY} --verify --verifier-url https://api-sepolia.etherscan.io/api --chain-id 11155111 --verifier etherscan --force --slow
 contract DeployGatewayV1 is Script {
     uint256 public PRIVATE_KEY;
     GatewayV1 public gatewayv1;
@@ -50,6 +53,7 @@ contract DeployGatewayV1 is Script {
 
     // TERMS
     address public SDAI_TERM = 0xFBE67752BC63686707966b8Ace817094d26f5381;
+    address public SDAI_TERM_2 = 0x64812e299076Bc01DF37C83Ce288E11d373D454c;
     address public WBTC_TERM = 0x94122FD2772622ED2C9E2DDfCe46214242f11419;
 
     // OTHERS
@@ -103,6 +107,11 @@ contract DeployGatewayV1 is Script {
             true
         );
         gatewayv1.allowCall(
+            SDAI_TERM_2,
+            getSelector("borrowOnBehalf(uint256,uint256,address)"),
+            true
+        );
+        gatewayv1.allowCall(
             WBTC_TERM,
             getSelector("borrowOnBehalf(uint256,uint256,address)"),
             true
@@ -111,6 +120,11 @@ contract DeployGatewayV1 is Script {
         // allow partial repay on various terms
         gatewayv1.allowCall(
             SDAI_TERM,
+            getSelector("partialRepay(bytes32,uint256)"),
+            true
+        );
+        gatewayv1.allowCall(
+            SDAI_TERM_2,
             getSelector("partialRepay(bytes32,uint256)"),
             true
         );

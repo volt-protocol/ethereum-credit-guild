@@ -92,6 +92,7 @@ contract SimpleBorrowOnSDAIWithLeverage is Script {
             collateralAmount
         );
 
+        // approve on gateway->term for user collateral + flashloaned amount
         calls[2] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
             SDAI_TOKEN,
@@ -102,6 +103,7 @@ contract SimpleBorrowOnSDAIWithLeverage is Script {
             )
         );
 
+        // borrow on behalf for user collateral + flashloaned amount
         calls[3] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
             SDAI_TERM,
@@ -113,6 +115,7 @@ contract SimpleBorrowOnSDAIWithLeverage is Script {
             )
         );
 
+        // consume the user permit for the debt amount
         calls[4] = abi.encodeWithSignature(
             "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)", // token, amount
             CREDIT_TOKEN,
@@ -123,19 +126,21 @@ contract SimpleBorrowOnSDAIWithLeverage is Script {
             permitDataGUSDC.s
         );
 
+        // consume the user allowance for the debt amount
         calls[5] = abi.encodeWithSignature(
             "consumeAllowance(address,uint256)", // token, amount
             CREDIT_TOKEN,
             debtAmount
         );
 
+        // approve gateway->psm for the debt amount of credit token
         calls[6] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
             CREDIT_TOKEN,
             abi.encodeWithSignature("approve(address,uint256)", PSM, debtAmount)
         );
 
-        // redeem gUSDC => USDC to the gateway
+        // redeem credit token => USDC to the gateway (not the user !!)
         calls[7] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
             PSM,
@@ -145,7 +150,8 @@ contract SimpleBorrowOnSDAIWithLeverage is Script {
                 debtAmount
             )
         );
-        // get the amount USDC we should have received
+
+        // compute the amount USDC we should have received
         uint256 amountUSDC = SimplePSM(PSM).getRedeemAmountOut(debtAmount);
 
         // here we have the full value in USDC after redeeming, need to change to sDAI
