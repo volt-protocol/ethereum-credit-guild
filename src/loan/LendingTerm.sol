@@ -68,21 +68,17 @@ contract LendingTerm is CoreRef {
     /// This is equal to 365.25 days.
     uint256 public constant YEAR = 31557600;
 
-    /// @notice timestamp of last partial repayment for a given loanId.
-    /// during borrow(), this is initialized to the borrow timestamp, if
-    /// maxDelayBetweenPartialRepay is != 0
-    mapping(bytes32 => uint256) public lastPartialRepay;
-
     struct Loan {
         address borrower; // address of a loan's borrower
-        uint256 borrowTime; // the time the loan was initiated
+        uint48 borrowTime; // the time the loan was initiated
+        uint48 lastPartialRepay; // the time of last partial repay
         uint256 borrowAmount; // initial CREDIT debt of a loan
         uint256 borrowCreditMultiplier; // creditMultiplier when loan was opened
         uint256 collateralAmount; // balance of collateral token provided by the borrower
         address caller; // a caller of 0 indicates that the loan has not been called
-        uint256 callTime; // a call time of 0 indicates that the loan has not been called
+        uint48 callTime; // a call time of 0 indicates that the loan has not been called
+        uint48 closeTime; // the time the loan was closed (repaid or call+bid or forgive)
         uint256 callDebt; // the CREDIT debt when the loan was called
-        uint256 closeTime; // the time the loan was closed (repaid or call+bid or forgive)
     }
 
     /// @notice the list of all loans that existed or are still active.
@@ -214,6 +210,14 @@ contract LendingTerm is CoreRef {
 
     /// @notice outstanding borrowed amount of a loan, including interests
     function getLoanDebt(bytes32 loanId) public view returns (uint256) {
+        uint256 creditMultiplier = ProfitManager(refs.profitManager)
+            .creditMultiplier();
+        return _getLoanDebt(loanId, creditMultiplier);
+    }
+
+    /// @notice outstanding borrowed amount of a loan, including interests,
+    /// given a creditMultiplier
+    function _getLoanDebt(bytes32 loanId, uint256 creditMultiplier) internal view returns (uint256) {
         Loan storage loan = loans[loanId];
         uint256 borrowTime = loan.borrowTime;
 
@@ -241,8 +245,6 @@ contract LendingTerm is CoreRef {
         if (_openingFee != 0) {
             loanDebt += (borrowAmount * _openingFee) / 1e18;
         }
-        uint256 creditMultiplier = ProfitManager(refs.profitManager)
-            .creditMultiplier();
         loanDebt = (loanDebt * loan.borrowCreditMultiplier) / creditMultiplier;
 
         return loanDebt;
@@ -264,7 +266,7 @@ contract LendingTerm is CoreRef {
 
         // return true if delay is passed
         return
-            lastPartialRepay[loanId] <
+            loans[loanId].lastPartialRepay <
             block.timestamp - params.maxDelayBetweenPartialRepay;
     }
 
@@ -423,19 +425,17 @@ contract LendingTerm is CoreRef {
         // save loan in state
         loans[loanId] = Loan({
             borrower: borrower,
-            borrowTime: block.timestamp,
+            borrowTime: uint48(block.timestamp),
+            lastPartialRepay: uint48(block.timestamp),
             borrowAmount: borrowAmount,
             borrowCreditMultiplier: creditMultiplier,
             collateralAmount: collateralAmount,
             caller: address(0),
             callTime: 0,
-            callDebt: 0,
-            closeTime: 0
+            closeTime: 0,
+            callDebt: 0
         });
         issuance = _postBorrowIssuance;
-        if (params.maxDelayBetweenPartialRepay != 0) {
-            lastPartialRepay[loanId] = block.timestamp;
-        }
 
         // notify ProfitManager of issuance change
         ProfitManager(refs.profitManager).notifyPnL(
@@ -535,11 +535,11 @@ contract LendingTerm is CoreRef {
         require(loan.callTime == 0, "LendingTerm: loan called");
 
         // compute partial repayment
-        uint256 loanDebt = getLoanDebt(loanId);
-        require(debtToRepay < loanDebt, "LendingTerm: full repayment");
-        uint256 borrowAmount = loan.borrowAmount;
         uint256 creditMultiplier = ProfitManager(refs.profitManager)
             .creditMultiplier();
+        uint256 loanDebt = _getLoanDebt(loanId, creditMultiplier);
+        require(debtToRepay < loanDebt, "LendingTerm: full repayment");
+        uint256 borrowAmount = loan.borrowAmount;
         uint256 principalRepaid = (borrowAmount *
             loan.borrowCreditMultiplier *
             debtToRepay) /
@@ -561,7 +561,7 @@ contract LendingTerm is CoreRef {
 
         // update loan in state
         loans[loanId].borrowAmount -= issuanceDecrease;
-        lastPartialRepay[loanId] = block.timestamp;
+        loans[loanId].lastPartialRepay = uint48(block.timestamp);
         issuance -= issuanceDecrease;
 
         // pull the debt from the borrower
@@ -610,10 +610,10 @@ contract LendingTerm is CoreRef {
         require(loan.callTime == 0, "LendingTerm: loan called");
 
         // compute interest owed
-        uint256 loanDebt = getLoanDebt(loanId);
-        uint256 borrowAmount = loan.borrowAmount;
         uint256 creditMultiplier = ProfitManager(refs.profitManager)
             .creditMultiplier();
+        uint256 loanDebt = _getLoanDebt(loanId, creditMultiplier);
+        uint256 borrowAmount = loan.borrowAmount;
         uint256 principal = (borrowAmount * loan.borrowCreditMultiplier) /
             creditMultiplier;
         uint256 interest = loanDebt - principal;
@@ -644,7 +644,7 @@ contract LendingTerm is CoreRef {
         RateLimitedMinter(refs.creditMinter).replenishBuffer(principal);
 
         // close the loan
-        loan.closeTime = block.timestamp;
+        loan.closeTime = uint48(block.timestamp);
         issuance -= borrowAmount;
 
         // return the collateral to the borrower
@@ -682,6 +682,9 @@ contract LendingTerm is CoreRef {
         require(loan.callTime == 0, "LendingTerm: loan called");
 
         // check that the loan can be called
+        uint256 creditMultiplier = ProfitManager(refs.profitManager)
+            .creditMultiplier();
+        uint256 loanDebt = _getLoanDebt(loanId, creditMultiplier);
         require(
             GuildToken(refs.guildToken).isDeprecatedGauge(address(this)) ||
                 partialRepayDelayPassed(loanId),
@@ -695,8 +698,7 @@ contract LendingTerm is CoreRef {
         );
 
         // update loan in state
-        uint256 loanDebt = getLoanDebt(loanId);
-        loans[loanId].callTime = block.timestamp;
+        loans[loanId].callTime = uint48(block.timestamp);
         loans[loanId].callDebt = loanDebt;
         loans[loanId].caller = caller;
 
@@ -738,7 +740,7 @@ contract LendingTerm is CoreRef {
         require(loan.closeTime == 0, "LendingTerm: loan closed");
 
         // close the loan
-        loans[loanId].closeTime = block.timestamp;
+        loans[loanId].closeTime = uint48(block.timestamp);
         uint256 borrowAmount = loans[loanId].borrowAmount;
         issuance -= borrowAmount;
 
@@ -805,7 +807,7 @@ contract LendingTerm is CoreRef {
         }
 
         // save loan state
-        loans[loanId].closeTime = block.timestamp;
+        loans[loanId].closeTime = uint48(block.timestamp);
 
         // pull credit from bidder
         if (creditFromBidder != 0) {
