@@ -64,6 +64,13 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         _setContractExceedMaxDelegates(account, canExceedMax);
     }
 
+    /// @notice Set the lockup period after delegating votes
+    function setDelegateLockupPeriod(
+        uint256 newValue
+    ) external onlyCoreRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS) {
+        _setDelegateLockupPeriod(newValue);
+    }
+
     /*///////////////////////////////////////////////////////////////
                         GAUGE MANAGEMENT
     //////////////////////////////////////////////////////////////*/
@@ -282,6 +289,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     ) internal virtual override(ERC20, ERC20Gauges, ERC20MultiVotes) {
         _decrementWeightUntilFree(from, amount);
         _decrementVotesUntilFree(from, amount);
+        _checkDelegateLockupPeriod(from);
         ERC20._burn(from, amount);
     }
 
@@ -296,6 +304,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     {
         _decrementWeightUntilFree(msg.sender, amount);
         _decrementVotesUntilFree(msg.sender, amount);
+        _checkDelegateLockupPeriod(msg.sender);
         return ERC20.transfer(to, amount);
     }
 
@@ -311,6 +320,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     {
         _decrementWeightUntilFree(from, amount);
         _decrementVotesUntilFree(from, amount);
+        _checkDelegateLockupPeriod(from);
         return ERC20.transferFrom(from, to, amount);
     }
 }

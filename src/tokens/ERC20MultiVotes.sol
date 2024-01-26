@@ -31,6 +31,7 @@ import {SafeCastLib} from "@solmate/src/utils/SafeCastLib.sol";
     - Import OpenZeppelin ERC20Permit & EnumerableSet instead of Solmate's
     - Update error management style (use require + messages instead of Solidity errors)
     - Implement C4 audit fix for [L-01] & [N-06].
+    - Add optional lockup period upon delegation
 */
 abstract contract ERC20MultiVotes is ERC20Permit {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -128,6 +129,35 @@ abstract contract ERC20MultiVotes is ERC20Permit {
                         ADMIN OPERATIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice emitted when updating the delegate lockup time
+    event DelegateLockupUpdate(uint256 oldValue, uint256 newValue);
+
+    /// @notice the period in seconds after a delegation where tokens
+    /// cannot be transferred
+    uint256 public delegateLockupPeriod;
+
+    /// @notice set the delegate lockup period.
+    function _setDelegateLockupPeriod(uint256 newValue) internal {
+        uint256 oldValue = delegateLockupPeriod;
+        delegateLockupPeriod = newValue;
+
+        emit DelegateLockupUpdate(oldValue, newValue);
+    }
+
+    /// @notice hook to check lockup period on transfer
+    function _checkDelegateLockupPeriod(address user) internal view {
+        uint256 _delegateLockupPeriod = delegateLockupPeriod;
+        if (_delegateLockupPeriod != 0) {
+            uint256 _lastDelegation = lastDelegation[user];
+            if (_lastDelegation != 0) {
+                require(
+                    block.timestamp > _lastDelegation + _delegateLockupPeriod,
+                    "ERC20MultiVotes: delegate lockup period"
+                );
+            }
+        }
+    }
+
     /// @notice emitted when updating the maximum amount of delegates per user
     event MaxDelegatesUpdate(uint256 oldMaxDelegates, uint256 newMaxDelegates);
 
@@ -208,6 +238,9 @@ abstract contract ERC20MultiVotes is ERC20Permit {
 
     /// @notice mapping from a delegator to the total number of delegated votes.
     mapping(address => uint256) public userDelegatedVotes;
+
+    /// @notice mapping from a delegator to their last timestamp of delegation.
+    mapping(address => uint256) public lastDelegation;
 
     /// @notice list of delegates per user.
     mapping(address => EnumerableSet.AddressSet) private _delegates;
@@ -339,6 +372,7 @@ abstract contract ERC20MultiVotes is ERC20Permit {
 
         _delegatesVotesCount[delegator][delegatee] += amount;
         userDelegatedVotes[delegator] += amount;
+        lastDelegation[delegator] = block.timestamp;
 
         emit Delegation(delegator, delegatee, amount);
         _writeCheckpoint(delegatee, _add, amount);
@@ -405,6 +439,7 @@ abstract contract ERC20MultiVotes is ERC20Permit {
 
     function _burn(address from, uint256 amount) internal virtual override {
         _decrementVotesUntilFree(from, amount);
+        _checkDelegateLockupPeriod(from);
         super._burn(from, amount);
     }
 
@@ -413,6 +448,7 @@ abstract contract ERC20MultiVotes is ERC20Permit {
         uint256 amount
     ) public virtual override returns (bool) {
         _decrementVotesUntilFree(msg.sender, amount);
+        _checkDelegateLockupPeriod(msg.sender);
         return super.transfer(to, amount);
     }
 
@@ -422,6 +458,7 @@ abstract contract ERC20MultiVotes is ERC20Permit {
         uint256 amount
     ) public virtual override returns (bool) {
         _decrementVotesUntilFree(from, amount);
+        _checkDelegateLockupPeriod(from);
         return super.transferFrom(from, to, amount);
     }
 

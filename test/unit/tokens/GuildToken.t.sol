@@ -119,6 +119,23 @@ contract GuildTokenUnitTest is Test {
         assertEq(token.maxDelegates(), 1);
     }
 
+    function testSetDelegateLockupPeriod() public {
+        assertEq(token.delegateLockupPeriod(), 0);
+
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.setDelegateLockupPeriod(7 days);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // set max delegates
+        token.setDelegateLockupPeriod(7 days);
+        assertEq(token.delegateLockupPeriod(), 7 days);
+    }
+
     function testSetContractExceedMaxDelegates() public {
         // without role, reverts
         vm.expectRevert("UNAUTHORIZED");
@@ -198,6 +215,55 @@ contract GuildTokenUnitTest is Test {
         // check the tokens moved
         assertEq(token.balanceOf(alice), 0);
         assertEq(token.balanceOf(bob), 100e18);
+    }
+
+    function testDelegateLockupPeriod() public {
+        // setup
+        address other = address(12345);
+        vm.startPrank(governor);
+        token.enableTransfer();
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+        token.mint(address(this), 100);
+        token.setMaxDelegates(2);
+
+        // before lockup, can do movements
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
+        // even after delegate
+        token.incrementDelegation(address(this), 10);
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
+
+        // set a delegate lockup period
+        assertEq(token.delegateLockupPeriod(), 0);
+        token.setDelegateLockupPeriod(1 days);
+        assertEq(token.delegateLockupPeriod(), 1 days);
+
+        // cannot do movements anymore
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.transfer(other, 1);
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.transferFrom(address(this), other, 1);
+
+        // after lockup period, can transfer again
+        vm.warp(block.timestamp + 1 days + 1);
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
     }
 
     /*///////////////////////////////////////////////////////////////

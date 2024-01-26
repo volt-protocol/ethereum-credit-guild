@@ -47,6 +47,9 @@ contract GIP_0 is Proposal {
     /// @notice maximum delegates for both credit and guild token
     uint256 internal constant MAX_DELEGATES = 10;
 
+    /// @notice delegate lockup period for CREDIT & GUILD
+    uint256 internal constant DELEGATE_LOCKUP_PERIOD = 7 days;
+
     /// @notice for each SDAI collateral, up to 1 credit can be borrowed
     uint256 internal constant MAX_SDAI_CREDIT_RATIO = 1e18;
 
@@ -501,8 +504,14 @@ contract GIP_0 is Proposal {
         GuildToken(AddressLib.get("ERC20_GUILD")).setMaxDelegates(
             MAX_DELEGATES
         );
+        GuildToken(AddressLib.get("ERC20_GUILD")).setDelegateLockupPeriod(
+            DELEGATE_LOCKUP_PERIOD
+        );
         CreditToken(AddressLib.get("ERC20_GUSDC")).setMaxDelegates(
             MAX_DELEGATES
+        );
+        CreditToken(AddressLib.get("ERC20_GUSDC")).setDelegateLockupPeriod(
+            DELEGATE_LOCKUP_PERIOD
         );
 
         // deployer renounces governor role

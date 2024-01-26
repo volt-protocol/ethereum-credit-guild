@@ -65,6 +65,13 @@ contract CreditToken is
         _setContractExceedMaxDelegates(account, canExceedMax);
     }
 
+    /// @notice Set the lockup period after delegating votes
+    function setDelegateLockupPeriod(
+        uint256 newValue
+    ) external onlyCoreRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS) {
+        _setDelegateLockupPeriod(newValue);
+    }
+
     /// @notice Force an address to enter rebase.
     function forceEnterRebase(
         address account
@@ -103,6 +110,7 @@ contract CreditToken is
         uint256 amount
     ) internal override(ERC20, ERC20MultiVotes, ERC20RebaseDistributor) {
         _decrementVotesUntilFree(account, amount); // from ERC20MultiVotes
+        _checkDelegateLockupPeriod(account); // from ERC20MultiVotes
         ERC20RebaseDistributor._burn(account, amount);
     }
 
@@ -130,6 +138,7 @@ contract CreditToken is
         returns (bool)
     {
         _decrementVotesUntilFree(msg.sender, amount); // from ERC20MultiVotes
+        _checkDelegateLockupPeriod(msg.sender); // from ERC20MultiVotes
         return ERC20RebaseDistributor.transfer(to, amount);
     }
 
@@ -143,6 +152,7 @@ contract CreditToken is
         returns (bool)
     {
         _decrementVotesUntilFree(from, amount); // from ERC20MultiVotes
+        _checkDelegateLockupPeriod(from); // from ERC20MultiVotes
         return ERC20RebaseDistributor.transferFrom(from, to, amount);
     }
 }

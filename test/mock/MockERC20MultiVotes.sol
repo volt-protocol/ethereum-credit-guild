@@ -18,6 +18,10 @@ contract MockERC20MultiVotes is ERC20MultiVotes, MockERC20 {
         _setMaxDelegates(newMax);
     }
 
+    function setDelegateLockupPeriod(uint256 newValue) external {
+        _setDelegateLockupPeriod(newValue);
+    }
+
     function setContractExceedMaxDelegates(address account, bool canExceedMax) external {
         _setContractExceedMaxDelegates(account, canExceedMax);
     }
