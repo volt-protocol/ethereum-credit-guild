@@ -38,6 +38,10 @@ contract AuctionHouse is CoreRef {
     /// every block will ask 1/((1800-650)/13)=1.13% less CREDIT in each block.
     uint256 public immutable auctionDuration;
 
+    /// @notice starting percentage of collateral offered, expressed as a percentage
+    /// with 18 decimals.
+    uint256 public immutable startCollateralOffered;
+
     struct Auction {
         uint48 startTime;
         uint48 endTime;
@@ -58,11 +62,13 @@ contract AuctionHouse is CoreRef {
     constructor(
         address _core,
         uint256 _midPoint,
-        uint256 _auctionDuration
+        uint256 _auctionDuration,
+        uint256 _startCollateralOffered
     ) CoreRef(_core) {
         require(_midPoint < _auctionDuration, "AuctionHouse: invalid params");
         midPoint = _midPoint;
         auctionDuration = _auctionDuration;
+        startCollateralOffered = _startCollateralOffered;
     }
 
     /// @notice get a full auction structure from storage
@@ -140,7 +146,9 @@ contract AuctionHouse is CoreRef {
             // compute amount of collateral received
             uint256 elapsed = block.timestamp - _startTime; // [0, midPoint[
             uint256 _collateralAmount = auctions[loanId].collateralAmount; // SLOAD
-            collateralReceived = (_collateralAmount * elapsed) / midPoint;
+            uint256 minCollateralReceived = startCollateralOffered * _collateralAmount / 1e18;
+            uint256 remainingCollateral = _collateralAmount - minCollateralReceived;
+            collateralReceived = minCollateralReceived + (remainingCollateral * elapsed) / midPoint;
         }
         // second phase of the auction, where less and less CREDIT is asked
         else if (block.timestamp < _startTime + auctionDuration) {

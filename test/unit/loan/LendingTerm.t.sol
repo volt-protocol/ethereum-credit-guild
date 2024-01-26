@@ -54,7 +54,7 @@ contract LendingTermUnitTest is Test {
             type(uint128).max /*_rateLimitPerSecond*/,
             type(uint128).max /*_bufferCap*/
         );
-        auctionHouse = new AuctionHouse(address(core), 650, 1800);
+        auctionHouse = new AuctionHouse(address(core), 650, 1800, 0);
         term = LendingTerm(Clones.clone(address(new LendingTerm())));
         term.initialize(
             address(core),

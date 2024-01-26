@@ -175,7 +175,8 @@ contract GIP_0 is Proposal {
             AuctionHouse auctionHouse = new AuctionHouse(
                 AddressLib.get("CORE"),
                 650, // midPoint = 10m50s
-                1800 // auctionDuration = 30m
+                1800, // auctionDuration = 30m
+                0 // 0% collateral offered at start
             );
 
             LendingTerm termV1 = new LendingTerm();

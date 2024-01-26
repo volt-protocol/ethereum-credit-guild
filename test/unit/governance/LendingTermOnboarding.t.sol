@@ -76,7 +76,8 @@ contract LendingTermOnboardingUnitTest is Test {
         auctionHouse = new AuctionHouse(
             address(core),
             650,
-            1800
+            1800,
+            0
         );
         termImplementation = new LendingTerm();
         timelock = new GuildTimelockController(

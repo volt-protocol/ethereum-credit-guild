@@ -76,7 +76,8 @@ contract LendingTermOffboardingUnitTest is Test {
         auctionHouse = new AuctionHouse(
             address(core),
             650,
-            1800
+            1800,
+            0
         );
         term = LendingTerm(Clones.clone(address(new LendingTerm())));
         term.initialize(
