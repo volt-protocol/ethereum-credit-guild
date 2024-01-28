@@ -42,10 +42,7 @@ contract RateLimitedMinter is RateLimitedV2 {
     /// Pausable and depletes the buffer, reverts if buffer is used.
     /// @param to the recipient address of the minted tokens.
     /// @param amount the amount of tokens to mint.
-    function mint(
-        address to,
-        uint256 amount
-    ) external onlyCoreRole(role) {
+    function mint(address to, uint256 amount) external onlyCoreRole(role) {
         _depleteBuffer(amount); /// check and effects
         IERC20Mintable(token).mint(to, amount); /// interactions
     }

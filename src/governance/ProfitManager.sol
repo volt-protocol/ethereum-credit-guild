@@ -170,9 +170,7 @@ contract ProfitManager is CoreRef {
         address _credit,
         address _guild
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
-        assert(
-            credit == address(0) && guild == address(0)
-        );
+        assert(credit == address(0) && guild == address(0));
         credit = _credit;
         guild = _guild;
     }

@@ -106,7 +106,9 @@ contract AuctionHouse is CoreRef {
             lendingTerm: msg.sender,
             collateralAmount: loan.collateralAmount,
             callDebt: loan.callDebt,
-            callCreditMultiplier: ProfitManager(LendingTerm(msg.sender).profitManager()).creditMultiplier()
+            callCreditMultiplier: ProfitManager(
+                LendingTerm(msg.sender).profitManager()
+            ).creditMultiplier()
         });
         nAuctionsInProgress++;
 
@@ -146,9 +148,14 @@ contract AuctionHouse is CoreRef {
             // compute amount of collateral received
             uint256 elapsed = block.timestamp - _startTime; // [0, midPoint[
             uint256 _collateralAmount = auctions[loanId].collateralAmount; // SLOAD
-            uint256 minCollateralReceived = startCollateralOffered * _collateralAmount / 1e18;
-            uint256 remainingCollateral = _collateralAmount - minCollateralReceived;
-            collateralReceived = minCollateralReceived + (remainingCollateral * elapsed) / midPoint;
+            uint256 minCollateralReceived = (startCollateralOffered *
+                _collateralAmount) / 1e18;
+            uint256 remainingCollateral = _collateralAmount -
+                minCollateralReceived;
+            collateralReceived =
+                minCollateralReceived +
+                (remainingCollateral * elapsed) /
+                midPoint;
         }
         // second phase of the auction, where less and less CREDIT is asked
         else if (block.timestamp < _startTime + auctionDuration) {
@@ -171,8 +178,12 @@ contract AuctionHouse is CoreRef {
         }
 
         // apply eventual creditMultiplier updates
-        uint256 creditMultiplier = ProfitManager(LendingTerm(auctions[loanId].lendingTerm).profitManager()).creditMultiplier();
-        creditAsked = creditAsked * auctions[loanId].callCreditMultiplier / creditMultiplier;
+        uint256 creditMultiplier = ProfitManager(
+            LendingTerm(auctions[loanId].lendingTerm).profitManager()
+        ).creditMultiplier();
+        creditAsked =
+            (creditAsked * auctions[loanId].callCreditMultiplier) /
+            creditMultiplier;
     }
 
     /// @notice bid for an active auction
