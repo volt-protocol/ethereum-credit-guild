@@ -9,7 +9,6 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
-import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 /// @notice Simple PSM contract of the Ethereum Credit Guild, that allows mint/redeem
 /// of CREDIT token outside of lending terms & guarantee a stable peg of the CREDIT token
@@ -72,6 +71,8 @@ contract SimplePSM is CoreRef {
         credit = _credit;
         pegToken = _pegToken;
 
+        /// @dev note that peg tokens with more than 18 decimals are not
+        /// supported and will revert on PSM deploy.
         uint256 decimals = uint256(ERC20(_pegToken).decimals());
         decimalCorrection = 10 ** (18 - decimals);
     }
@@ -137,8 +138,8 @@ contract SimplePSM is CoreRef {
     ) external returns (uint256 amountOut) {
         require(!redemptionsPaused, "SimplePSM: redemptions paused");
         amountOut = getRedeemAmountOut(amountIn);
-        CreditToken(credit).burnFrom(msg.sender, amountIn);
         pegTokenBalance -= amountOut;
+        CreditToken(credit).burnFrom(msg.sender, amountIn);
         ERC20(pegToken).safeTransfer(to, amountOut);
         emit Redeem(block.timestamp, to, amountIn, amountOut);
     }

@@ -41,8 +41,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         ... Add internal _setMaxGauges(uint256) method
     - Remove public setContractExceedMaxGauges(address, bool) requiresAuth method
         ... Add internal _setCanExceedMaxGauges(address, bool) method
-        ... Remove check of "target address has nonzero code size"
-        ... Rename to remove "contract" from name because we don't check if target is a contract
     - Rename `calculateGaugeAllocation` to `calculateGaugeStoredAllocation` to make clear that it reads from stored weights.
     - Add `calculateGaugeAllocation` helper function that reads from current weight.
     - Add `isDeprecatedGauge(address)->bool` view function that returns true if gauge is deprecated.
@@ -528,10 +526,9 @@ abstract contract ERC20Gauges is ERC20 {
                     totalTypeWeight[gaugeType[gauge]] -= userGaugeWeight;
                     totalFreed += userGaugeWeight;
                 }
-
-                unchecked {
-                    ++i;
-                }
+            }
+            unchecked {
+                ++i;
             }
         }
 

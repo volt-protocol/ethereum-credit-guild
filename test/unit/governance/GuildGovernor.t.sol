@@ -8,6 +8,7 @@ import {MockERC20} from "@test/mock/MockERC20.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
+import {IGovernorTimelock} from "@openzeppelin/contracts/governance/extensions/IGovernorTimelock.sol";
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
@@ -80,6 +81,7 @@ contract GuildGovernorUnitTest is Test {
         assertEq(address(governor.token()), address(token));
         assertEq(governor.name(), "ECG Governor");
         assertEq(governor.version(), "1");
+        assertEq(governor.supportsInterface(type(IGovernorTimelock).interfaceId), true);
     }
 
     function testSuccessfulProposal() public {

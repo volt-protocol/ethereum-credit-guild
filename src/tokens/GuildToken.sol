@@ -37,19 +37,13 @@ import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @notice reference to ProfitManager
-    address public profitManager;
-
     constructor(
-        address _core,
-        address _profitManager
+        address _core
     )
         CoreRef(_core)
         ERC20("Ethereum Credit Guild - GUILD", "GUILD")
         ERC20Permit("Ethereum Credit Guild - GUILD")
-    {
-        profitManager = _profitManager;
-    }
+    {}
 
     /*///////////////////////////////////////////////////////////////
                         VOTING MANAGEMENT
@@ -68,6 +62,13 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         bool canExceedMax
     ) external onlyCoreRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS) {
         _setContractExceedMaxDelegates(account, canExceedMax);
+    }
+
+    /// @notice Set the lockup period after delegating votes
+    function setDelegateLockupPeriod(
+        uint256 newValue
+    ) external onlyCoreRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS) {
+        _setDelegateLockupPeriod(newValue);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -121,7 +122,11 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
 
     /// @notice notify loss in a given gauge
     function notifyGaugeLoss(address gauge) external {
-        require(msg.sender == profitManager, "UNAUTHORIZED");
+        require(_gauges.contains(gauge), "GuildToken: gauge not found");
+        require(
+            msg.sender == LendingTerm(gauge).profitManager(),
+            "UNAUTHORIZED"
+        );
 
         // save gauge loss
         lastGaugeLoss[gauge] = block.timestamp;
@@ -144,11 +149,11 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
 
         // remove gauge weight allocation
         lastGaugeLossApplied[gauge][who] = block.timestamp;
-        _decrementGaugeWeight(who, gauge, _userGaugeWeight);
         if (!_deprecatedGauges.contains(gauge)) {
             totalTypeWeight[gaugeType[gauge]] -= _userGaugeWeight;
             totalWeight -= _userGaugeWeight;
         }
+        _decrementGaugeWeight(who, gauge, _userGaugeWeight);
 
         // apply loss
         _burn(who, uint256(_userGaugeWeight));
@@ -190,15 +195,6 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
         );
     }
 
-    /// @notice emitted when reference to ProfitManager is updated
-    event ProfitManagerUpdated(uint256 timestamp, address newValue);
-
-    /// @notice set reference to ProfitManager
-    function setProfitManager(address _newProfitManager) external onlyCoreRole(CoreRoles.GOVERNOR) {
-        profitManager = _newProfitManager;
-        emit ProfitManagerUpdated(block.timestamp, _newProfitManager);
-    }
-
     /// @dev prevent outbound token transfers (_decrementWeightUntilFree) and gauge weight decrease
     /// (decrementGauge, decrementGauges) for users who have an unrealized loss in a gauge, or if the
     /// gauge is currently using its allocated debt ceiling. To decrement gauge weight, guild holders
@@ -215,15 +211,23 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             _lastGaugeLossApplied >= _lastGaugeLoss,
             "GuildToken: pending loss"
         );
+        uint256 issuance = LendingTerm(gauge).issuance();
+        if (isDeprecatedGauge(gauge)) {
+            require(issuance == 0, "GuildToken: not all loans closed");
+        }
 
         // update the user profit index and claim rewards
-        ProfitManager(profitManager).claimGaugeRewards(user, gauge);
+        ProfitManager(LendingTerm(gauge).profitManager()).claimGaugeRewards(
+            user,
+            gauge
+        );
 
         // check if gauge is currently using its allocated debt ceiling.
         // To decrement gauge weight, guild holders might have to call loans if the debt ceiling is used.
-        uint256 issuance = LendingTerm(gauge).issuance();
         if (issuance != 0) {
-            uint256 debtCeilingAfterDecrement = LendingTerm(gauge).debtCeiling(-int256(weight));
+            uint256 debtCeilingAfterDecrement = LendingTerm(gauge).debtCeiling(
+                -int256(weight)
+            );
             require(
                 issuance <= debtCeilingAfterDecrement,
                 "GuildToken: debt ceiling used"
@@ -255,7 +259,10 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
             );
         }
 
-        ProfitManager(profitManager).claimGaugeRewards(user, gauge);
+        ProfitManager(LendingTerm(gauge).profitManager()).claimGaugeRewards(
+            user,
+            gauge
+        );
 
         super._incrementGaugeWeight(user, gauge, weight);
     }
@@ -282,6 +289,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     ) internal virtual override(ERC20, ERC20Gauges, ERC20MultiVotes) {
         _decrementWeightUntilFree(from, amount);
         _decrementVotesUntilFree(from, amount);
+        _checkDelegateLockupPeriod(from);
         ERC20._burn(from, amount);
     }
 
@@ -296,6 +304,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     {
         _decrementWeightUntilFree(msg.sender, amount);
         _decrementVotesUntilFree(msg.sender, amount);
+        _checkDelegateLockupPeriod(msg.sender);
         return ERC20.transfer(to, amount);
     }
 
@@ -311,6 +320,7 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     {
         _decrementWeightUntilFree(from, amount);
         _decrementVotesUntilFree(from, amount);
+        _checkDelegateLockupPeriod(from);
         return ERC20.transferFrom(from, to, amount);
     }
 }

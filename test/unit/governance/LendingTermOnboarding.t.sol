@@ -28,7 +28,7 @@ contract LendingTermOnboardingUnitTest is Test {
     MockERC20 private collateral;
     SimplePSM private psm;
     LendingTerm private termImplementation;
-    AuctionHouse auctionHouse;
+    AuctionHouse public auctionHouse;
     RateLimitedMinter rlcm;
     GuildTimelockController private timelock;
     LendingTermOnboarding private onboarder;
@@ -57,7 +57,7 @@ contract LendingTermOnboardingUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core), "name", "symbol");
-        guild = new GuildToken(address(core), address(profitManager));
+        guild = new GuildToken(address(core));
         collateral = new MockERC20();
         rlcm = new RateLimitedMinter(
             address(core), /*_core*/
@@ -76,7 +76,8 @@ contract LendingTermOnboardingUnitTest is Test {
         auctionHouse = new AuctionHouse(
             address(core),
             650,
-            1800
+            1800,
+            0
         );
         termImplementation = new LendingTerm();
         timelock = new GuildTimelockController(
@@ -84,16 +85,9 @@ contract LendingTermOnboardingUnitTest is Test {
             _TIMELOCK_MIN_DELAY
         );
         onboarder = new LendingTermOnboarding(
-            LendingTerm.LendingTermReferences({
-                profitManager: address(profitManager),
-                guildToken: address(guild),
-                auctionHouse: address(auctionHouse),
-                creditMinter: address(rlcm),
-                creditToken: address(credit)
-            }), /// _lendingTermReferences
-            1, // _gaugeType
             address(core), // _core
             address(timelock), // _timelock
+            address(guild), // _guildToken
             _VOTING_DELAY, // initialVotingDelay
             _VOTING_PERIOD, // initialVotingPeriod
             _PROPOSAL_THRESHOLD, // initialProposalThreshold
@@ -103,8 +97,14 @@ contract LendingTermOnboardingUnitTest is Test {
             address(termImplementation),
             true
         );
+        onboarder.allowAuctionHouse(address(auctionHouse), true);
+        onboarder.setMarketReferences(1, LendingTermOnboarding.MarketReferences({
+            profitManager: address(profitManager),
+            creditMinter: address(rlcm),
+            creditToken: address(credit)
+        }));
 
-        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+        profitManager.initializeReferences(address(credit), address(guild));
 
         // permissions
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -181,7 +181,9 @@ contract LendingTermOnboardingUnitTest is Test {
 
     function testCreateTerm() public {
         LendingTerm term = LendingTerm(onboarder.createTerm(
+            1,
             address(termImplementation),
+            address(auctionHouse),
             LendingTerm.LendingTermParams({
                 collateralToken: address(collateral),
                 maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
@@ -211,12 +213,12 @@ contract LendingTermOnboardingUnitTest is Test {
         assertEq(params.openingFee, 789);
         assertEq(params.hardCap, _HARDCAP);
 
-        assertEq(onboarder.created(address(term)), block.timestamp);
+        assertEq(onboarder.gaugeTypes(address(term)), 1);
     }
 
     function testCreateCheckParams() public {
         vm.expectRevert("LendingTermOnboarding: invalid implementation");
-        onboarder.createTerm(address(this), LendingTerm.LendingTermParams({
+        onboarder.createTerm(1, address(this), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),
             maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
             interestRate: _INTEREST_RATE,
@@ -226,7 +228,7 @@ contract LendingTermOnboardingUnitTest is Test {
             hardCap: _HARDCAP
         }));
         vm.expectRevert("LendingTermOnboarding: invalid collateralToken");
-        onboarder.createTerm(address(termImplementation), LendingTerm.LendingTermParams({
+        onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(0), // not a token
             maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
             interestRate: _INTEREST_RATE,
@@ -236,7 +238,7 @@ contract LendingTermOnboardingUnitTest is Test {
             hardCap: _HARDCAP
         }));
         vm.expectRevert("LendingTermOnboarding: invalid maxDebtPerCollateralToken");
-        onboarder.createTerm(address(termImplementation), LendingTerm.LendingTermParams({
+        onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),
             maxDebtPerCollateralToken: 0, // no debt available
             interestRate: _INTEREST_RATE,
@@ -246,7 +248,7 @@ contract LendingTermOnboardingUnitTest is Test {
             hardCap: _HARDCAP
         }));
         vm.expectRevert("LendingTermOnboarding: invalid interestRate");
-        onboarder.createTerm(address(termImplementation), LendingTerm.LendingTermParams({
+        onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),
             maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
             interestRate: 1e18, // 100% APR is too high
@@ -256,7 +258,7 @@ contract LendingTermOnboardingUnitTest is Test {
             hardCap: _HARDCAP
         }));
         vm.expectRevert("LendingTermOnboarding: invalid maxDelayBetweenPartialRepay");
-        onboarder.createTerm(address(termImplementation), LendingTerm.LendingTermParams({
+        onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),
             maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
             interestRate: _INTEREST_RATE,
@@ -266,7 +268,7 @@ contract LendingTermOnboardingUnitTest is Test {
             hardCap: _HARDCAP
         }));
         vm.expectRevert("LendingTermOnboarding: invalid minPartialRepayPercent");
-        onboarder.createTerm(address(termImplementation), LendingTerm.LendingTermParams({
+        onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),
             maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
             interestRate: _INTEREST_RATE,
@@ -276,7 +278,7 @@ contract LendingTermOnboardingUnitTest is Test {
             hardCap: _HARDCAP
         }));
         vm.expectRevert("LendingTermOnboarding: invalid openingFee");
-        onboarder.createTerm(address(termImplementation), LendingTerm.LendingTermParams({
+        onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),
             maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
             interestRate: _INTEREST_RATE,
@@ -286,7 +288,7 @@ contract LendingTermOnboardingUnitTest is Test {
             hardCap: _HARDCAP
         }));
         vm.expectRevert("LendingTermOnboarding: invalid hardCap");
-        onboarder.createTerm(address(termImplementation), LendingTerm.LendingTermParams({
+        onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),
             maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
             interestRate: _INTEREST_RATE,
@@ -294,6 +296,26 @@ contract LendingTermOnboardingUnitTest is Test {
             minPartialRepayPercent: 456,
             openingFee: 789,
             hardCap: 0 // hardCap of 0 makes no debt available
+        }));
+        vm.expectRevert("LendingTermOnboarding: invalid periodic payment params");
+        onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 0, // incoherence between delay & minPercent
+            minPartialRepayPercent: 0.1e18,
+            openingFee: 789,
+            hardCap: _HARDCAP
+        }));
+        vm.expectRevert("LendingTermOnboarding: unknown market");
+        onboarder.createTerm(12345, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
+            collateralToken: address(collateral),
+            maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+            interestRate: _INTEREST_RATE,
+            maxDelayBetweenPartialRepay: 123,
+            minPartialRepayPercent: 456,
+            openingFee: 789,
+            hardCap: _HARDCAP
         }));
     }
 
@@ -317,7 +339,7 @@ contract LendingTermOnboardingUnitTest is Test {
     }
 
     function testProposeOnboard() public {
-        LendingTerm term = LendingTerm(onboarder.createTerm(address(termImplementation), LendingTerm.LendingTermParams({
+        LendingTerm term = LendingTerm(onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),
             maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
             interestRate: _INTEREST_RATE,
@@ -331,6 +353,20 @@ contract LendingTermOnboardingUnitTest is Test {
         // cannot propose an arbitrary address (must come from factory)
         vm.expectRevert("LendingTermOnboarding: invalid term");
         onboarder.proposeOnboard(address(this));
+
+        // cannot propose if implementation has been disallowed since
+        vm.prank(governor);
+        onboarder.allowImplementation(
+            address(termImplementation),
+            false
+        );
+        vm.expectRevert("LendingTermOnboarding: invalid term");
+        onboarder.proposeOnboard(address(this));
+        vm.prank(governor);
+        onboarder.allowImplementation(
+            address(termImplementation),
+            true
+        );
 
         // cannot propose if the user doesn't have enough GUILD
         vm.expectRevert("Governor: proposer votes below proposal threshold");
@@ -365,6 +401,10 @@ contract LendingTermOnboardingUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 13);
         assertEq(uint8(onboarder.state(proposalId)), uint8(IGovernor.ProposalState.Active));
+
+        // cannot cancel
+        vm.expectRevert("LendingTermOnboarding: cannot cancel proposals");
+        onboarder.cancel(targets, values, calldatas, keccak256(bytes(description)));
 
         // support & check status
         vm.prank(bob);
@@ -408,7 +448,7 @@ contract LendingTermOnboardingUnitTest is Test {
     }
 
     function testOnboardAgainLater() public {
-        LendingTerm term = LendingTerm(onboarder.createTerm(address(termImplementation), LendingTerm.LendingTermParams({
+        LendingTerm term = LendingTerm(onboarder.createTerm(1, address(termImplementation), address(auctionHouse), LendingTerm.LendingTermParams({
             collateralToken: address(collateral),
             maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
             interestRate: _INTEREST_RATE,

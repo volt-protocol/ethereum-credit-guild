@@ -216,6 +216,50 @@ contract ERC20MultiVotesUnitTest is Test {
         require(token.freeVotes(address(this)) == expectedFree);
     }
 
+    function testDelegateLockupPeriod() public {
+        // setup
+        address other = address(12345);
+        token.mint(address(this), 100);
+        token.setMaxDelegates(2);
+
+        // before lockup, can do movements
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
+        // even after delegate
+        token.incrementDelegation(address(this), 10);
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
+
+        // set a delegate lockup period
+        assertEq(token.delegateLockupPeriod(), 0);
+        token.setDelegateLockupPeriod(1 days);
+        assertEq(token.delegateLockupPeriod(), 1 days);
+
+        // cannot do movements anymore
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.transfer(other, 1);
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.transferFrom(address(this), other, 1);
+
+        // after lockup period, can transfer again
+        vm.warp(block.timestamp + 1 days + 1);
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
+    }
+
     function testBackwardCompatibleDelegateBySig(
         uint128 delegatorPk,
         address oldDelegatee,
