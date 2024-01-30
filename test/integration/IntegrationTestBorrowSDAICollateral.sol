@@ -101,7 +101,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     function testRepayLoan(uint128 seed) public {
         uint256 startingCreditSupplyBeforeSupplyingCollateral = credit
             .totalSupply(); /// start off at 100
-            uint256 startingBuffer = rateLimitedCreditMinter.buffer();
+        uint256 startingBuffer = rateLimitedCreditMinter.buffer();
         (bytes32 loanId, uint128 suppliedAmount) = testSupplyCollateralUserOne(
             seed
         ); /// borrow 100

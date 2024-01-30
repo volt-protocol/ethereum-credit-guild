@@ -81,7 +81,10 @@ contract GuildGovernorUnitTest is Test {
         assertEq(address(governor.token()), address(token));
         assertEq(governor.name(), "ECG Governor");
         assertEq(governor.version(), "1");
-        assertEq(governor.supportsInterface(type(IGovernorTimelock).interfaceId), true);
+        assertEq(
+            governor.supportsInterface(type(IGovernorTimelock).interfaceId),
+            true
+        );
     }
 
     function testSuccessfulProposal() public {
@@ -318,7 +321,12 @@ contract GuildGovernorUnitTest is Test {
 
         // guardian cancel
         vm.prank(guardianAddress);
-        governor.guardianCancel(targets, values, payloads, keccak256("Vote for 12345"));
+        governor.guardianCancel(
+            targets,
+            values,
+            payloads,
+            keccak256("Vote for 12345")
+        );
         assertEq(
             uint256(governor.state(proposalId)),
             uint256(IGovernor.ProposalState.Canceled)

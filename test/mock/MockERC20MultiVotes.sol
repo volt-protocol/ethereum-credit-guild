@@ -7,7 +7,6 @@ import {MockERC20} from "@test/mock/MockERC20.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 
 contract MockERC20MultiVotes is ERC20MultiVotes, MockERC20 {
-
     constructor() {}
 
     function decimals() public view override(ERC20, MockERC20) returns (uint8) {
@@ -22,7 +21,10 @@ contract MockERC20MultiVotes is ERC20MultiVotes, MockERC20 {
         _setDelegateLockupPeriod(newValue);
     }
 
-    function setContractExceedMaxDelegates(address account, bool canExceedMax) external {
+    function setContractExceedMaxDelegates(
+        address account,
+        bool canExceedMax
+    ) external {
         _setContractExceedMaxDelegates(account, canExceedMax);
     }
 
@@ -33,7 +35,7 @@ contract MockERC20MultiVotes is ERC20MultiVotes, MockERC20 {
     function getPastVotes(
         address account,
         uint256 blockNumber
-    ) public override(MockERC20, ERC20MultiVotes) view returns (uint256) {
+    ) public view override(MockERC20, ERC20MultiVotes) returns (uint256) {
         return ERC20MultiVotes.getPastVotes(account, blockNumber);
     }
 

@@ -37,9 +37,27 @@ contract ProfitManagerUnitTest is Test {
         guild = new GuildToken(address(core));
         pegToken = new MockERC20();
         pegToken.setDecimals(6);
-        gauge1 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
-        gauge2 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
-        gauge3 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        gauge1 = address(
+            new MockLendingTerm(
+                address(core),
+                address(profitManager),
+                address(credit)
+            )
+        );
+        gauge2 = address(
+            new MockLendingTerm(
+                address(core),
+                address(profitManager),
+                address(credit)
+            )
+        );
+        gauge3 = address(
+            new MockLendingTerm(
+                address(core),
+                address(profitManager),
+                address(credit)
+            )
+        );
         psm = new SimplePSM(
             address(core),
             address(profitManager),
@@ -203,7 +221,7 @@ contract ProfitManagerUnitTest is Test {
         // 50 CREDIT of loans completely default (50 USD loss)
         profitManager.notifyPnL(gauge1, -50e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18); // 50% discounted
-        
+
         // minBorrow() should 2x
         assertEq(profitManager.minBorrow(), 200e18);
     }
@@ -388,7 +406,7 @@ contract ProfitManagerUnitTest is Test {
         assertEq(profitManager.claimRewards(alice), 10e18);
         assertEq(profitManager.claimRewards(bob), 0);
         assertEq(credit.balanceOf(address(this)), 110e18);
-    
+
         // simulate 50 profit on gauge2
         // 5 goes to alice (guild voting)
         // 20 goes to bob (guild voting)
@@ -459,7 +477,10 @@ contract ProfitManagerUnitTest is Test {
         profitManager.notifyPnL(gauge3, 100e18, 0);
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
-        assertEq(credit.balanceOf(alice), 50e18 + 15e18 + 10e18 + 50e18 + 100e18);
+        assertEq(
+            credit.balanceOf(alice),
+            50e18 + 15e18 + 10e18 + 50e18 + 100e18
+        );
     }
 
     function testGetPendingRewards() public {
@@ -505,7 +526,11 @@ contract ProfitManagerUnitTest is Test {
         vm.stopPrank();
 
         // check alice pending rewards
-        (address[] memory aliceGauges, uint256[] memory aliceGaugeRewards, uint256 aliceTotalRewards) = profitManager.getPendingRewards(alice);
+        (
+            address[] memory aliceGauges,
+            uint256[] memory aliceGaugeRewards,
+            uint256 aliceTotalRewards
+        ) = profitManager.getPendingRewards(alice);
         assertEq(aliceGauges.length, 2);
         assertEq(aliceGauges[0], gauge1);
         assertEq(aliceGauges[1], gauge2);
@@ -522,7 +547,8 @@ contract ProfitManagerUnitTest is Test {
         profitManager.notifyPnL(gauge1, 20e18, 0);
 
         // check alice pending rewards
-        (aliceGauges, aliceGaugeRewards, aliceTotalRewards) = profitManager.getPendingRewards(alice);
+        (aliceGauges, aliceGaugeRewards, aliceTotalRewards) = profitManager
+            .getPendingRewards(alice);
         assertEq(aliceGauges.length, 2);
         assertEq(aliceGauges[0], gauge1);
         assertEq(aliceGauges[1], gauge2);
@@ -667,21 +693,33 @@ contract ProfitManagerUnitTest is Test {
 
         // without role, cannot withdraw
         vm.expectRevert("UNAUTHORIZED");
-        profitManager.withdrawFromTermSurplusBuffer(address(this), address(this), 10e18);
+        profitManager.withdrawFromTermSurplusBuffer(
+            address(this),
+            address(this),
+            10e18
+        );
 
         // grant role to test contract
         vm.prank(governor);
         core.grantRole(CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW, address(this));
 
         // withdraw
-        profitManager.withdrawFromTermSurplusBuffer(address(this), address(this), 10e18);
+        profitManager.withdrawFromTermSurplusBuffer(
+            address(this),
+            address(this),
+            10e18
+        );
         assertEq(profitManager.termSurplusBuffer(address(this)), 90e18);
         assertEq(credit.balanceOf(address(this)), 110e18);
         assertEq(credit.balanceOf(address(profitManager)), 90e18);
 
         // cannot withdraw more than current buffer
         vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // underflow
-        profitManager.withdrawFromTermSurplusBuffer(address(this), address(this), 999e18);
+        profitManager.withdrawFromTermSurplusBuffer(
+            address(this),
+            address(this),
+            999e18
+        );
     }
 
     function testDepleteTermSurplusBuffer() public {
@@ -784,16 +822,14 @@ contract ProfitManagerUnitTest is Test {
         guild.mint(attacker, 150e18);
         guild.mint(bob, 400e18);
 
-
         vm.prank(bob);
         guild.incrementGauge(gauge1, 400e18);
-        
 
         credit.mint(address(profitManager), 20e18);
         profitManager.notifyPnL(gauge1, 20e18, 0);
 
         // Attacker votes for a gauge after it notifies profit
-        // The userGaugeProfitIndex of the attacker is not set 
+        // The userGaugeProfitIndex of the attacker is not set
         vm.prank(attacker);
         guild.incrementGauge(gauge1, 150e18);
 
@@ -803,7 +839,7 @@ contract ProfitManagerUnitTest is Test {
         assertEq(credit.balanceOf(attacker), 0);
 
         // Other users will then fail to claim their rewards
-        profitManager.claimGaugeRewards(bob,gauge1);
+        profitManager.claimGaugeRewards(bob, gauge1);
         assertEq(credit.balanceOf(bob), 10e18);
     }
 
@@ -831,16 +867,14 @@ contract ProfitManagerUnitTest is Test {
         guild.mint(alice, 150e18);
         guild.mint(bob, 400e18);
 
-
         vm.prank(bob);
         guild.incrementGauge(gauge1, 400e18);
-        
 
         credit.mint(address(profitManager), 20e18);
         profitManager.notifyPnL(gauge1, 20e18, 0);
 
         // Alice votes for a gauge after it notifies profit
-        // The userGaugeProfitIndex of alice is not set 
+        // The userGaugeProfitIndex of alice is not set
         vm.prank(alice);
         guild.incrementGauge(gauge1, 0);
 
@@ -850,7 +884,7 @@ contract ProfitManagerUnitTest is Test {
         assertEq(credit.balanceOf(alice), 0);
 
         // Other users will then fail to claim their rewards
-        profitManager.claimGaugeRewards(bob,gauge1);
+        profitManager.claimGaugeRewards(bob, gauge1);
         assertEq(credit.balanceOf(bob), 10e18);
     }
 }

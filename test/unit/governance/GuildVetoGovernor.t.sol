@@ -116,7 +116,10 @@ contract GuildVetoGovernorUnitTest is Test {
         assertEq(forVotes, 0); // nobody voted
         assertEq(abstainVotes, 0); // nobody voted
         vm.expectRevert("Governor: vote not currently active");
-        governor.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.Against));
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.Against)
+        );
 
         // on next block, the vote is active
         vm.roll(block.number + 1);
@@ -127,7 +130,10 @@ contract GuildVetoGovernorUnitTest is Test {
         );
 
         // we vote and reach quorum
-        governor.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.Against));
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.Against)
+        );
         assertEq(governor.hasVoted(proposalId, address(this)), true); // we have voted
         (againstVotes, forVotes, abstainVotes) = governor.proposalVotes(
             proposalId
@@ -174,10 +180,16 @@ contract GuildVetoGovernorUnitTest is Test {
             uint256(governor.state(proposalId)),
             uint256(IGovernor.ProposalState.Active)
         );
-        governor.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.Against));
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.Against)
+        );
         // cannot vote twice
         vm.expectRevert("GovernorVotingSimple: vote already cast");
-        governor.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.Against));
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.Against)
+        );
         // still Active after voting because quorum is not reached
         assertEq(
             uint256(governor.state(proposalId)),
@@ -239,7 +251,10 @@ contract GuildVetoGovernorUnitTest is Test {
         );
 
         // vote for the proposal
-        governor.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.Against));
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.Against)
+        );
         assertEq(
             uint256(governor.state(proposalId)),
             uint256(IGovernor.ProposalState.Succeeded)
@@ -258,7 +273,10 @@ contract GuildVetoGovernorUnitTest is Test {
 
         // cannot vote for veto anymore
         vm.expectRevert("Governor: vote not currently active");
-        governor.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.Against));
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.Against)
+        );
     }
 
     function testCanOnlyVoteAgainst() public {
@@ -277,13 +295,19 @@ contract GuildVetoGovernorUnitTest is Test {
         vm.expectRevert(
             "GuildVetoGovernor: can only vote against in veto proposals"
         );
-        governor.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.For));
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.For)
+        );
 
         // cannot vote Abstain
         vm.expectRevert(
             "GuildVetoGovernor: can only vote against in veto proposals"
         );
-        governor.castVote(proposalId, uint8(GovernorCountingSimple.VoteType.Abstain));
+        governor.castVote(
+            proposalId,
+            uint8(GovernorCountingSimple.VoteType.Abstain)
+        );
     }
 
     function testSetQuorum() public {

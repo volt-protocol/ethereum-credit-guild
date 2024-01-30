@@ -481,9 +481,9 @@ contract LendingTermUnitTest is Test {
 
         // if the term's weight is above 100% when we include tolerance,
         // the debt ceiling = max
-        guild.decrementGauge(address(this), _weight * 9 / 10);
+        guild.decrementGauge(address(this), (_weight * 9) / 10);
         assertEq(term.debtCeiling(), type(uint256).max);
-        guild.incrementGauge(address(this), _weight * 9 / 10);
+        guild.incrementGauge(address(this), (_weight * 9) / 10);
 
         // second borrow fails because of relative debt ceilings
         vm.expectRevert("LendingTerm: debt ceiling reached");
@@ -992,7 +992,7 @@ contract LendingTermUnitTest is Test {
 
         // wait that interest accrue
         uint256 loanDebt = term.getLoanDebt(loanId);
-        while(loanDebt < maxDebt) {
+        while (loanDebt < maxDebt) {
             vm.warp(block.timestamp + 1 weeks);
             vm.roll(block.number + 1);
             loanDebt = term.getLoanDebt(loanId);
@@ -1686,7 +1686,7 @@ contract LendingTermUnitTest is Test {
         // do partialRepay
         credit.approve(address(term2), 10_000e18);
         term2.partialRepay(loanId, 10_000e18);
-        
+
         assertEq(term2.getLoanDebt(loanId), 10_000e18);
     }
 }

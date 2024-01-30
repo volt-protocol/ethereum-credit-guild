@@ -24,13 +24,17 @@ contract GuildTokenUnitTest is Test {
     uint256 public issuance; // for mocked behavior
 
     // debt ceiling with 0% tolerance
-    function debtCeiling(int256 deltaGaugeWeight) external view returns (uint256) {
+    function debtCeiling(
+        int256 deltaGaugeWeight
+    ) external view returns (uint256) {
         uint256 gaugeWeight = token.getGaugeWeight(address(this));
         uint256 gaugeType = token.gaugeType(address(this));
         uint256 totalWeight = token.totalTypeWeight(gaugeType);
         uint256 borrowSupply = credit.totalSupply(); // simplify
-        uint256 gaugeWeightWithDelta = uint256(int256(gaugeWeight) + deltaGaugeWeight);
-        return borrowSupply * gaugeWeightWithDelta / totalWeight;
+        uint256 gaugeWeightWithDelta = uint256(
+            int256(gaugeWeight) + deltaGaugeWeight
+        );
+        return (borrowSupply * gaugeWeightWithDelta) / totalWeight;
     }
 
     function setUp() public {
@@ -41,9 +45,27 @@ contract GuildTokenUnitTest is Test {
         credit = new CreditToken(address(core), "name", "symbol");
         token = new GuildToken(address(core));
         profitManager.initializeReferences(address(credit), address(token));
-        gauge1 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
-        gauge2 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
-        gauge3 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        gauge1 = address(
+            new MockLendingTerm(
+                address(core),
+                address(profitManager),
+                address(credit)
+            )
+        );
+        gauge2 = address(
+            new MockLendingTerm(
+                address(core),
+                address(profitManager),
+                address(credit)
+            )
+        );
+        gauge3 = address(
+            new MockLendingTerm(
+                address(core),
+                address(profitManager),
+                address(credit)
+            )
+        );
 
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
@@ -543,7 +565,7 @@ contract GuildTokenUnitTest is Test {
         // can increment gauge for the first time, event if it had a loss in the past
         vm.prank(alice);
         token.incrementGauge(gauge3, 20e18);
-    
+
         assertEq(token.getUserGaugeWeight(alice, gauge1), 40e18);
         assertEq(token.getUserGaugeWeight(alice, gauge2), 40e18);
         assertEq(token.getUserGaugeWeight(alice, gauge3), 20e18);
@@ -708,7 +730,7 @@ contract GuildTokenUnitTest is Test {
         assertEq(token.totalWeight(), 0);
         assertEq(token.totalTypeWeight(1), 0);
         assertEq(token.getUserGaugeWeight(bob, gauge1), 100e18);
-        
+
         // decrement weight
         vm.prank(bob);
         token.decrementGauge(gauge1, 100e18);
