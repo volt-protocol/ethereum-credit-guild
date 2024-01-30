@@ -9,6 +9,8 @@ library AddressLib {
 
     string internal constant ADDR_PATH = "/protocol-configuration/addresses.json";
 
+    string internal constant ADDR_PATH_SEPOLIA = "/protocol-configuration/addresses.sepolia.json";
+
     Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     struct RecordedAddress {
@@ -19,6 +21,11 @@ library AddressLib {
     function _read() internal view returns (RecordedAddress[] memory addresses) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, ADDR_PATH);
+
+        if(block.chainid != 1) {
+           path = string.concat(root, ADDR_PATH_SEPOLIA);
+        } 
+
         string memory json = vm.readFile(path);
         bytes memory parsedJson = vm.parseJson(json);
         addresses = abi.decode(parsedJson, (RecordedAddress[]));
@@ -27,6 +34,10 @@ library AddressLib {
     function _write(RecordedAddress[] memory addresses) internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, ADDR_PATH);
+        
+        if(block.chainid != 1) {
+           path = string.concat(root, ADDR_PATH_SEPOLIA);
+        } 
 
         string memory json = '[';
         for (uint256 i = 0; i < addresses.length; i++) {

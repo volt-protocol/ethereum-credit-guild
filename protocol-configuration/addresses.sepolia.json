@@ -1,0 +1,106 @@
+[
+  {
+    "addr": "0x0000000000000000000000000000000000000000",
+    "name": "ZERO_ADDRESS"
+  },
+  {
+    "addr": "0x6ef71ca9cd708883e129559f5edbfb9d9d5c6148",
+    "name": "TEAM_MULTISIG"
+  },
+  {
+    "addr": "0x29e15016c99ad4d1467ae4ba4d532a679a3a6524",
+    "name": "CORE"
+  },
+  {
+    "addr": "0xeb2325e8967203c1ac2231f069f5cf7fe3cca794",
+    "name": "ERC20_USDC"
+  },
+  {
+    "addr": "0x9032247311bae210b5700d01f5f0482cdd785690",
+    "name": "ERC20_WBTC"
+  },
+  {
+    "addr": "0xe04fe2e71242f937ae85ba60998871a388413fda",
+    "name": "ERC20_SDAI"
+  },
+  {
+    "addr": "0xca83d64b385aecad2028bd881560ab304ee7ec47",
+    "name": "PROFIT_MANAGER"
+  },
+  {
+    "addr": "0xd4ad8929d0976e8469c069ef9798be7e5c1d53f5",
+    "name": "ERC20_GUSDC"
+  },
+  {
+    "addr": "0xa5b686b63f315dccd263c3bf9b5916673f49a064",
+    "name": "ERC20_GUILD"
+  },
+  {
+    "addr": "0xd6998963f5e772af7488774b11fbecbdd7ea4b21",
+    "name": "RATE_LIMITED_CREDIT_MINTER"
+  },
+  {
+    "addr": "0xeb7a64e12c1811f0d3dbb0730c76d2708e179ae0",
+    "name": "RATE_LIMITED_GUILD_MINTER"
+  },
+  {
+    "addr": "0xa47625797a49f96cf771c3e3b239bb1f52201b30",
+    "name": "SURPLUS_GUILD_MINTER"
+  },
+  {
+    "addr": "0x425bc41f3181ceffcfee3a8a7dcae7a31fff0fd9",
+    "name": "AUCTION_HOUSE"
+  },
+  {
+    "addr": "0xcddfd4ebe80b6d9a05524bcfe9d53b828ac7b13f",
+    "name": "LENDING_TERM_V1"
+  },
+  {
+    "addr": "0xf257a564fbe77aedbf2b00cc3fef096b54774de5",
+    "name": "PSM_USDC"
+  },
+  {
+    "addr": "0xe72b158c338afc3c8ae4558a774ee989725d5daf",
+    "name": "DAO_GOVERNOR_GUILD"
+  },
+  {
+    "addr": "0xc4441b660c362e15b4a8de8647ec5a46e58159e7",
+    "name": "DAO_TIMELOCK"
+  },
+  {
+    "addr": "0x5243df53c13671799a07c366db103c0ce11abeed",
+    "name": "DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x33904b7528b6b412abea20d8cbf04c292da14a7f",
+    "name": "DAO_VETO_GUILD"
+  },
+  {
+    "addr": "0xd8f654436cef6065d16709f9405999586a07984b",
+    "name": "ONBOARD_GOVERNOR_GUILD"
+  },
+  {
+    "addr": "0x61c12600823bf2c8b019f78977ebe318070d0379",
+    "name": "ONBOARD_TIMELOCK"
+  },
+  {
+    "addr": "0xbd4bc4485b62dab62cd9df675e44d5ae13780f68",
+    "name": "ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x3b5efb1b95649870c978111b1fe2181059e3cd18",
+    "name": "ONBOARD_VETO_GUILD"
+  },
+  {
+    "addr": "0xd44b7187c314b08f9799e5ce3712d7782cc08358",
+    "name": "OFFBOARD_GOVERNOR_GUILD"
+  },
+  {
+    "addr": "0xdcdbe4eec17d6de1d812ab8d129db9d29b247d56",
+    "name": "TERM_SDAI_1"
+  },
+  {
+    "addr": "0x2182e398c0f3282e5610c9532c6ba084eebb0709",
+    "name": "TERM_WBTC_1"
+  }
+]

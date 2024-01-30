@@ -21,6 +21,7 @@ import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
+import {TestnetToken} from "@src/tokens/TestnetToken.sol";
 
 /// @notice deployer must have 100 USDC to deploy the system on mainnet for the initial PSM mint.
 contract GIP_0 is Proposal {
@@ -113,6 +114,31 @@ contract GIP_0 is Proposal {
         {
             Core core = new Core();
             AddressLib.set("CORE", address(core));
+        }
+
+        if (block.chainid != 1) {
+            address core = AddressLib.get("CORE");
+            TestnetToken usdc = new TestnetToken(
+                core,
+                "ECG Testnet USDC",
+                "USDC",
+                6
+            );
+            TestnetToken wbtc = new TestnetToken(
+                core,
+                "ECG Testnet WBTC",
+                "WBTC",
+                8
+            );
+            TestnetToken sdai = new TestnetToken(
+                core,
+                "ECG Testnet sDAI",
+                "sDAI",
+                18
+            );
+            AddressLib.set("ERC20_USDC", address(usdc));
+            AddressLib.set("ERC20_WBTC", address(wbtc));
+            AddressLib.set("ERC20_SDAI", address(sdai));
         }
 
         // ProfitManager
@@ -222,18 +248,18 @@ contract GIP_0 is Proposal {
             );
 
             GuildTimelockController onboardTimelock = new GuildTimelockController(
-                AddressLib.get("CORE"),
-                ONBOARD_TIMELOCK_DELAY
-            );
-            LendingTermOnboarding onboardGovernorGuild = new LendingTermOnboarding(
-                    AddressLib.get("CORE"), // _core
-                    address(onboardTimelock), // _timelock
-                    AddressLib.get("ERC20_GUILD"), // _guildToken
-                    ONBOARD_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
-                    ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
-                    ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
-                    ONBOARD_GOVERNOR_GUILD_QUORUM // initialQuorum
+                    AddressLib.get("CORE"),
+                    ONBOARD_TIMELOCK_DELAY
                 );
+            LendingTermOnboarding onboardGovernorGuild = new LendingTermOnboarding(
+                AddressLib.get("CORE"), // _core
+                address(onboardTimelock), // _timelock
+                AddressLib.get("ERC20_GUILD"), // _guildToken
+                ONBOARD_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
+                ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
+                ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
+                ONBOARD_GOVERNOR_GUILD_QUORUM // initialQuorum
+            );
             GuildVetoGovernor onboardVetoCredit = new GuildVetoGovernor(
                 AddressLib.get("CORE"),
                 address(onboardTimelock),
@@ -254,10 +280,7 @@ contract GIP_0 is Proposal {
                 OFFBOARD_QUORUM // quorum
             );
 
-            AddressLib.set(
-                "DAO_GOVERNOR_GUILD",
-                address(daoGovernorGuild)
-            );
+            AddressLib.set("DAO_GOVERNOR_GUILD", address(daoGovernorGuild));
             AddressLib.set("DAO_TIMELOCK", address(daoTimelock));
             AddressLib.set("DAO_VETO_CREDIT", address(daoVetoCredit));
             AddressLib.set("DAO_VETO_GUILD", address(daoVetoGuild));
@@ -266,18 +289,9 @@ contract GIP_0 is Proposal {
                 address(onboardGovernorGuild)
             );
             AddressLib.set("ONBOARD_TIMELOCK", address(onboardTimelock));
-            AddressLib.set(
-                "ONBOARD_VETO_CREDIT",
-                address(onboardVetoCredit)
-            );
-            AddressLib.set(
-                "ONBOARD_VETO_GUILD",
-                address(onboardVetoGuild)
-            );
-            AddressLib.set(
-                "OFFBOARD_GOVERNOR_GUILD",
-                address(termOffboarding)
-            );
+            AddressLib.set("ONBOARD_VETO_CREDIT", address(onboardVetoCredit));
+            AddressLib.set("ONBOARD_VETO_GUILD", address(onboardVetoGuild));
+            AddressLib.set("OFFBOARD_GOVERNOR_GUILD", address(termOffboarding));
         }
 
         // Terms
@@ -287,11 +301,14 @@ contract GIP_0 is Proposal {
             );
             address _lendingTermV1 = AddressLib.get("LENDING_TERM_V1");
             address _auctionHouse = AddressLib.get("AUCTION_HOUSE");
-            termOnboarding.setMarketReferences(1, LendingTermOnboarding.MarketReferences({
-                profitManager: AddressLib.get("PROFIT_MANAGER"),
-                creditMinter: AddressLib.get("RATE_LIMITED_CREDIT_MINTER"),
-                creditToken: AddressLib.get("ERC20_GUSDC")
-            }));
+            termOnboarding.setMarketReferences(
+                1,
+                LendingTermOnboarding.MarketReferences({
+                    profitManager: AddressLib.get("PROFIT_MANAGER"),
+                    creditMinter: AddressLib.get("RATE_LIMITED_CREDIT_MINTER"),
+                    creditToken: AddressLib.get("ERC20_GUSDC")
+                })
+            );
             termOnboarding.allowImplementation(_lendingTermV1, true);
             termOnboarding.allowAuctionHouse(_auctionHouse, true);
 
@@ -309,8 +326,26 @@ contract GIP_0 is Proposal {
                     hardCap: CREDIT_HARDCAP // max 2m CREDIT issued
                 })
             );
-
             AddressLib.set("TERM_SDAI_1", termSDAI1);
+
+            if (block.chainid != 1) {
+                address termWBTC1 = termOnboarding.createTerm(
+                    1, // gauge type,
+                    _lendingTermV1, // implementation
+                    _auctionHouse, // auctionHouse
+                    LendingTerm.LendingTermParams({
+                        collateralToken: AddressLib.get("ERC20_WBTC"),
+                        maxDebtPerCollateralToken: 20000e28, // 20k CREDIT per WBTC collateral + 10 decimals correction
+                        interestRate: 0.06e18, // 6%
+                        maxDelayBetweenPartialRepay: 2629800, // monthly payments
+                        minPartialRepayPercent: 0.005e18, // 6% / 12
+                        openingFee: 0.02e18, // 2%
+                        hardCap: 2_000_000e18 // max 2m CREDIT issued
+                    })
+                );
+
+                AddressLib.set("TERM_WBTC_1", termWBTC1);
+            }
         }
     }
 
@@ -320,10 +355,7 @@ contract GIP_0 is Proposal {
         // grant roles to smart contracts
         // GOVERNOR
         core.grantRole(CoreRoles.GOVERNOR, AddressLib.get("DAO_TIMELOCK"));
-        core.grantRole(
-            CoreRoles.GOVERNOR,
-            AddressLib.get("ONBOARD_TIMELOCK")
-        );
+        core.grantRole(CoreRoles.GOVERNOR, AddressLib.get("ONBOARD_TIMELOCK"));
         core.grantRole(
             CoreRoles.GOVERNOR,
             AddressLib.get("OFFBOARD_GOVERNOR_GUILD")
@@ -344,14 +376,8 @@ contract GIP_0 is Proposal {
             CoreRoles.CREDIT_BURNER,
             AddressLib.get("PROFIT_MANAGER")
         );
-        core.grantRole(
-            CoreRoles.CREDIT_BURNER,
-            AddressLib.get("PSM_USDC")
-        );
-        core.grantRole(
-            CoreRoles.CREDIT_BURNER,
-            AddressLib.get("TERM_SDAI_1")
-        );
+        core.grantRole(CoreRoles.CREDIT_BURNER, AddressLib.get("PSM_USDC"));
+        core.grantRole(CoreRoles.CREDIT_BURNER, AddressLib.get("TERM_SDAI_1"));
 
         // RATE_LIMITED_CREDIT_MINTER
         core.grantRole(
@@ -379,17 +405,11 @@ contract GIP_0 is Proposal {
 
         // GAUGE_ADD
         core.grantRole(CoreRoles.GAUGE_ADD, AddressLib.get("DAO_TIMELOCK"));
-        core.grantRole(
-            CoreRoles.GAUGE_ADD,
-            AddressLib.get("ONBOARD_TIMELOCK")
-        );
+        core.grantRole(CoreRoles.GAUGE_ADD, AddressLib.get("ONBOARD_TIMELOCK"));
         core.grantRole(CoreRoles.GAUGE_ADD, deployer);
 
         // GAUGE_REMOVE
-        core.grantRole(
-            CoreRoles.GAUGE_REMOVE,
-            AddressLib.get("DAO_TIMELOCK")
-        );
+        core.grantRole(CoreRoles.GAUGE_REMOVE, AddressLib.get("DAO_TIMELOCK"));
         core.grantRole(
             CoreRoles.GAUGE_REMOVE,
             AddressLib.get("OFFBOARD_GOVERNOR_GUILD")
@@ -478,21 +498,36 @@ contract GIP_0 is Proposal {
             AddressLib.get("ONBOARD_GOVERNOR_GUILD")
         );
 
+        if (block.chainid != 1) {
+            core.grantRole(
+                CoreRoles.RATE_LIMITED_CREDIT_MINTER,
+                AddressLib.get("TERM_WBTC_1")
+            );
+            core.grantRole(
+                CoreRoles.GAUGE_PNL_NOTIFIER,
+                AddressLib.get("TERM_WBTC_1")
+            );
+            GuildToken(AddressLib.get("ERC20_GUILD")).addGauge(
+                1,
+                AddressLib.get("TERM_WBTC_1")
+            );
+        }
+
         // Configuration
         ProfitManager(AddressLib.get("PROFIT_MANAGER")).initializeReferences(
             AddressLib.get("ERC20_GUSDC"),
             AddressLib.get("ERC20_GUILD")
         );
-        ProfitManager(AddressLib.get("PROFIT_MANAGER"))
-            .setProfitSharingConfig(
-                SURPLUS_BUFFER_SPLIT, // 9% surplusBufferSplit
-                CREDIT_SPLIT, // 90% creditSplit
-                GUILD_SPLIT, // 1% guildSplit
-                OTHER_SPLIT, // otherSplit
-                OTHER_ADDRESS // otherRecipient
-            );
-        ProfitManager(AddressLib.get("PROFIT_MANAGER"))
-            .setMaxTotalIssuance(CREDIT_HARDCAP);
+        ProfitManager(AddressLib.get("PROFIT_MANAGER")).setProfitSharingConfig(
+            SURPLUS_BUFFER_SPLIT, // 9% surplusBufferSplit
+            CREDIT_SPLIT, // 90% creditSplit
+            GUILD_SPLIT, // 1% guildSplit
+            OTHER_SPLIT, // otherSplit
+            OTHER_ADDRESS // otherRecipient
+        );
+        ProfitManager(AddressLib.get("PROFIT_MANAGER")).setMaxTotalIssuance(
+            CREDIT_HARDCAP
+        );
         GuildToken(AddressLib.get("ERC20_GUILD")).setCanExceedMaxGauges(
             AddressLib.get("SURPLUS_GUILD_MINTER"),
             true
@@ -541,6 +576,13 @@ contract GIP_0 is Proposal {
                 address(LendingTerm(AddressLib.get("TERM_SDAI_1")).core()),
                 "sDAI Term Incorrect Core Address"
             );
+            if (block.chainid != 1) {
+                assertEq(
+                    address(core),
+                    address(LendingTerm(AddressLib.get("TERM_WBTC_1")).core()),
+                    "WBTC Term Incorrect Core Address"
+                );
+            }
             assertEq(
                 address(core),
                 address(
@@ -558,31 +600,24 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 address(core),
-                address(
-                    LendingTerm(AddressLib.get("ONBOARD_TIMELOCK")).core()
-                ),
+                address(LendingTerm(AddressLib.get("ONBOARD_TIMELOCK")).core()),
                 "ONBOARD_TIMELOCK Incorrect Core Address"
             );
             assertEq(
                 address(core),
                 address(
-                    LendingTerm(AddressLib.get("ONBOARD_GOVERNOR_GUILD"))
-                        .core()
+                    LendingTerm(AddressLib.get("ONBOARD_GOVERNOR_GUILD")).core()
                 ),
                 "ONBOARD_GOVERNOR_GUILD Incorrect Core Address"
             );
             assertEq(
                 address(core),
-                address(
-                    LendingTerm(AddressLib.get("DAO_VETO_GUILD")).core()
-                ),
+                address(LendingTerm(AddressLib.get("DAO_VETO_GUILD")).core()),
                 "DAO_VETO_GUILD Incorrect Core Address"
             );
             assertEq(
                 address(core),
-                address(
-                    LendingTerm(AddressLib.get("DAO_VETO_CREDIT")).core()
-                ),
+                address(LendingTerm(AddressLib.get("DAO_VETO_CREDIT")).core()),
                 "DAO_VETO_CREDIT Incorrect Core Address"
             );
 
@@ -782,8 +817,7 @@ contract GIP_0 is Proposal {
         /// GUILD and CREDIT Token Total Supply and balances
         {
             assertEq(
-                ERC20MultiVotes(AddressLib.get("ERC20_GUSDC"))
-                    .maxDelegates(),
+                ERC20MultiVotes(AddressLib.get("ERC20_GUSDC")).maxDelegates(),
                 MAX_DELEGATES,
                 "max delegates incorrect"
             );
@@ -793,8 +827,7 @@ contract GIP_0 is Proposal {
                 "guild token should not be transferable"
             );
             assertEq(
-                ERC20MultiVotes(AddressLib.get("ERC20_GUILD"))
-                    .maxDelegates(),
+                ERC20MultiVotes(AddressLib.get("ERC20_GUILD")).maxDelegates(),
                 MAX_DELEGATES,
                 "max delegates incorrect"
             );
@@ -811,8 +844,7 @@ contract GIP_0 is Proposal {
                 "balance of team multisig not 0 after deployment"
             );
             assertEq(
-                ERC20MultiVotes(AddressLib.get("ERC20_GUSDC"))
-                    .totalSupply(),
+                ERC20MultiVotes(AddressLib.get("ERC20_GUSDC")).totalSupply(),
                 0,
                 "credit total supply not 0 after deployment"
             );
@@ -837,8 +869,7 @@ contract GIP_0 is Proposal {
                 "Profit Manager guild token incorrect"
             );
             assertEq(
-                ProfitManager(AddressLib.get("PROFIT_MANAGER"))
-                    .surplusBuffer(),
+                ProfitManager(AddressLib.get("PROFIT_MANAGER")).surplusBuffer(),
                 0,
                 "Profit Manager surplus buffer incorrect"
             );
@@ -891,8 +922,8 @@ contract GIP_0 is Proposal {
             );
 
             GuildTimelockController onboardingTimelock = GuildTimelockController(
-                payable(AddressLib.get("ONBOARD_TIMELOCK"))
-            );
+                    payable(AddressLib.get("ONBOARD_TIMELOCK"))
+                );
 
             assertEq(
                 onboardingTimelock.getMinDelay(),
@@ -986,12 +1017,16 @@ contract GIP_0 is Proposal {
                 DAO_GOVERNOR_GUILD_PROPOSAL_THRESHOLD,
                 "proposal threshold"
             );
-            assertEq(governor.quorum(0), DAO_GOVERNOR_GUILD_QUORUM, "governor quorum");
+            assertEq(
+                governor.quorum(0),
+                DAO_GOVERNOR_GUILD_QUORUM,
+                "governor quorum"
+            );
 
             GuildVetoGovernor vetoGovernorCredit = GuildVetoGovernor(
                 payable(AddressLib.get("DAO_VETO_CREDIT"))
             );
-            
+
             assertEq(
                 vetoGovernorCredit.quorum(0),
                 DAO_VETO_CREDIT_QUORUM,
@@ -1012,7 +1047,7 @@ contract GIP_0 is Proposal {
                 AddressLib.get("ERC20_GUSDC"),
                 "veto governor token incorrect"
             );
-            
+
             GuildVetoGovernor vetoGovernorGuild = GuildVetoGovernor(
                 payable(AddressLib.get("DAO_VETO_GUILD"))
             );
