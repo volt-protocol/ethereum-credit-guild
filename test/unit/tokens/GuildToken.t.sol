@@ -12,7 +12,7 @@ import {MockLendingTerm} from "@test/mock/MockLendingTerm.sol";
 contract GuildTokenUnitTest is Test {
     address private governor = address(1);
     Core private core;
-    ProfitManager private profitManager;
+    ProfitManager public profitManager;
     CreditToken credit;
     GuildToken token;
     address constant alice = address(0x616c696365);
@@ -39,14 +39,15 @@ contract GuildTokenUnitTest is Test {
         core = new Core();
         profitManager = new ProfitManager(address(core));
         credit = new CreditToken(address(core), "name", "symbol");
-        token = new GuildToken(address(core), address(profitManager));
-        profitManager.initializeReferences(address(credit), address(token), address(0));
-        gauge1 = address(new MockLendingTerm(address(core)));
-        gauge2 = address(new MockLendingTerm(address(core)));
-        gauge3 = address(new MockLendingTerm(address(core)));
+        token = new GuildToken(address(core));
+        profitManager.initializeReferences(address(credit), address(token));
+        gauge1 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        gauge2 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        gauge3 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
 
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(profitManager));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         // labels
@@ -118,17 +119,21 @@ contract GuildTokenUnitTest is Test {
         assertEq(token.maxDelegates(), 1);
     }
 
-    function testSetProfitManager() public {
-        assertEq(token.profitManager(), address(profitManager));
+    function testSetDelegateLockupPeriod() public {
+        assertEq(token.delegateLockupPeriod(), 0);
 
         // without role, reverts
         vm.expectRevert("UNAUTHORIZED");
-        token.setProfitManager(address(this));
+        token.setDelegateLockupPeriod(7 days);
 
-        // with role, can set profitManager reference
+        // grant role
         vm.startPrank(governor);
-        token.setProfitManager(address(this));
-        assertEq(token.profitManager(), address(this));
+        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // set max delegates
+        token.setDelegateLockupPeriod(7 days);
+        assertEq(token.delegateLockupPeriod(), 7 days);
     }
 
     function testSetContractExceedMaxDelegates() public {
@@ -210,6 +215,55 @@ contract GuildTokenUnitTest is Test {
         // check the tokens moved
         assertEq(token.balanceOf(alice), 0);
         assertEq(token.balanceOf(bob), 100e18);
+    }
+
+    function testDelegateLockupPeriod() public {
+        // setup
+        address other = address(12345);
+        vm.startPrank(governor);
+        token.enableTransfer();
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+        token.mint(address(this), 100);
+        token.setMaxDelegates(2);
+
+        // before lockup, can do movements
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
+        // even after delegate
+        token.incrementDelegation(address(this), 10);
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
+
+        // set a delegate lockup period
+        assertEq(token.delegateLockupPeriod(), 0);
+        token.setDelegateLockupPeriod(1 days);
+        assertEq(token.delegateLockupPeriod(), 1 days);
+
+        // cannot do movements anymore
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.transfer(other, 1);
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.transferFrom(address(this), other, 1);
+
+        // after lockup period, can transfer again
+        vm.warp(block.timestamp + 1 days + 1);
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -294,11 +348,18 @@ contract GuildTokenUnitTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testNotifyPnLLastGaugeLoss() public {
+        vm.prank(governor);
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        vm.prank(governor);
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        token.setMaxGauges(1);
+        token.addGauge(1, gauge1);
+
         assertEq(token.lastGaugeLoss(gauge1), 0);
 
         // revert because user doesn't have role
         vm.expectRevert("UNAUTHORIZED");
-        profitManager.notifyPnL(gauge1, 0);
+        profitManager.notifyPnL(gauge1, 0, 0);
 
         // grant roles to test contract
         vm.startPrank(governor);
@@ -307,14 +368,14 @@ contract GuildTokenUnitTest is Test {
         vm.stopPrank();
 
         // successful call & check
-        profitManager.notifyPnL(gauge1, -100);
+        profitManager.notifyPnL(gauge1, -100, 0);
         assertEq(token.lastGaugeLoss(gauge1), block.timestamp);
 
         // successful call & check
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 13);
         credit.mint(address(profitManager), 200);
-        profitManager.notifyPnL(gauge1, 200);
+        profitManager.notifyPnL(gauge1, 200, 0);
         assertEq(token.lastGaugeLoss(gauge1), block.timestamp - 13);
     }
 
@@ -349,7 +410,7 @@ contract GuildTokenUnitTest is Test {
         vm.roll(block.number + 1);
 
         // loss in gauge 1
-        profitManager.notifyPnL(gauge1, -100);
+        profitManager.notifyPnL(gauge1, -100, 0);
     }
 
     function testApplyGaugeLoss() public {
@@ -473,7 +534,7 @@ contract GuildTokenUnitTest is Test {
         _setupAliceLossInGauge1();
 
         // loss in gauge 3
-        profitManager.notifyPnL(gauge3, -100);
+        profitManager.notifyPnL(gauge3, -100, 0);
 
         // roll to next block
         vm.warp(block.timestamp + 13);
@@ -588,5 +649,70 @@ contract GuildTokenUnitTest is Test {
         // now bob can decrement his gauge vote.
         vm.prank(bob);
         token.decrementGauge(address(this), 10e18);
+    }
+
+    // if this passes, the bug is fixed
+    function testBugFreezeInfiniteLoop() public {
+        // enable transfers, add gauges, and mint tokens to bob
+        vm.startPrank(governor);
+        token.enableTransfer();
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        vm.stopPrank();
+        token.mint(bob, 100e18);
+        token.setMaxGauges(3);
+        token.addGauge(1, gauge1);
+        token.addGauge(1, gauge2);
+        token.addGauge(1, gauge3);
+
+        // bob does a gauge allocation
+        vm.startPrank(bob);
+        token.incrementGauge(gauge1, 0);
+        token.incrementGauge(gauge2, 100e18);
+        vm.stopPrank();
+
+        assertEq(token.userGauges(bob).length, 2);
+
+        vm.prank(bob);
+        token.transfer(alice, 100e18); // will loop forever without the fix
+        assertEq(token.balanceOf(alice), 100e18);
+        assertEq(token.balanceOf(bob), 0);
+    }
+
+    function testDecrementWeightDeprecatedOnlyGauge() public {
+        // grant role to test contract
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.GAUGE_ADD, address(this));
+        core.grantRole(CoreRoles.GAUGE_REMOVE, address(this));
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, address(this));
+        core.grantRole(CoreRoles.GUILD_MINTER, address(this));
+        vm.stopPrank();
+
+        // gauge config
+        token.setMaxGauges(10);
+        token.addGauge(1, gauge1);
+
+        // allocate weight to gauge
+        token.mint(bob, 100e18);
+        vm.prank(bob);
+        token.incrementGauge(gauge1, 100e18);
+
+        assertEq(token.totalWeight(), 100e18);
+        assertEq(token.totalTypeWeight(1), 100e18);
+        assertEq(token.getUserGaugeWeight(bob, gauge1), 100e18);
+
+        // deprecate gauge
+        token.removeGauge(gauge1);
+
+        assertEq(token.totalWeight(), 0);
+        assertEq(token.totalTypeWeight(1), 0);
+        assertEq(token.getUserGaugeWeight(bob, gauge1), 100e18);
+        
+        // decrement weight
+        vm.prank(bob);
+        token.decrementGauge(gauge1, 100e18);
+
+        assertEq(token.getUserGaugeWeight(bob, gauge1), 0);
     }
 }

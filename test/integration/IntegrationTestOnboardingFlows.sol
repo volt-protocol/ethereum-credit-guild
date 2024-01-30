@@ -37,7 +37,9 @@ contract IntegrationTestOnboardingFlows is PostProposalCheckFixture {
         /// new term so that onboard succeeds
         term = LendingTerm(
             onboarder.createTerm(
+                1,
                 AddressLib.get("LENDING_TERM_V1"),
+                AddressLib.get("AUCTION_HOUSE"),
                 LendingTerm.LendingTermParams({
                     collateralToken: AddressLib.get("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,

@@ -6,6 +6,7 @@ import {SafeCastLib} from "@solmate/src/utils/SafeCastLib.sol";
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
+import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
@@ -124,6 +125,14 @@ contract SurplusGuildMinter is CoreRef {
         );
         require(amount >= MIN_STAKE, "SurplusGuildMinter: min stake");
 
+        // check that the term is from the same market
+        // if this test passes, the GUILD token will still check that the term is an active
+        // gauge, so a forged term that would return the same creditToken address cannot be passed.
+        require(
+            LendingTerm(term).creditToken() == credit,
+            "SurplusGuildMinter: invalid term"
+        );
+
         // pull CREDIT from user & transfer it to surplus buffer
         CreditToken(credit).transferFrom(msg.sender, address(this), amount);
         CreditToken(credit).approve(address(profitManager), amount);
@@ -226,17 +235,17 @@ contract SurplusGuildMinter is CoreRef {
     {
         bool updateState;
         lastGaugeLoss = GuildToken(guild).lastGaugeLoss(term);
+        userStake = _stakes[user][term];
         if (lastGaugeLoss > uint256(userStake.lastGaugeLoss)) {
             slashed = true;
         }
 
         // if the user is not staking, do nothing
-        userStake = _stakes[user][term];
         if (userStake.stakeTime == 0)
             return (lastGaugeLoss, userStake, slashed);
 
         // compute CREDIT rewards
-        ProfitManager(profitManager).claimRewards(address(this)); // this will update profit indexes
+        ProfitManager(profitManager).claimGaugeRewards(address(this), term); // this will update profit indexes
         uint256 _profitIndex = ProfitManager(profitManager)
             .userGaugeProfitIndex(address(this), term);
         uint256 _userProfitIndex = uint256(userStake.profitIndex);

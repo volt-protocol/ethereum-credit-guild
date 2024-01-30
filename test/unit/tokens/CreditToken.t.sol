@@ -64,6 +64,25 @@ contract CreditTokenUnitTest is Test {
         assertEq(token.totalSupply(), 100);
     }
 
+    function testBurn() public {
+        // without role, burn reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.burn(100);
+
+        // mint tokens for alice
+        vm.prank(governor);
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        token.mint(alice, 100);
+        assertEq(token.balanceOf(alice), 100);
+
+        // burn tokens
+        vm.prank(governor);
+        core.grantRole(CoreRoles.CREDIT_BURNER, alice);
+        vm.prank(alice);
+        token.burn(60);
+        assertEq(token.balanceOf(alice), 40);
+    }
+
     function testSetMaxDelegates() public {
         assertEq(token.maxDelegates(), 0);
 
@@ -189,5 +208,71 @@ contract CreditTokenUnitTest is Test {
         assertEq(token.nonRebasingSupply(), 0);
         assertEq(token.balanceOf(alice), 4000e18);
         assertEq(token.balanceOf(bob), 2000e18);
+    }
+
+    function testSetDelegateLockupPeriod() public {
+        assertEq(token.delegateLockupPeriod(), 0);
+
+        // without role, reverts
+        vm.expectRevert("UNAUTHORIZED");
+        token.setDelegateLockupPeriod(7 days);
+
+        // grant role
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+
+        // set max delegates
+        token.setDelegateLockupPeriod(7 days);
+        assertEq(token.delegateLockupPeriod(), 7 days);
+    }
+
+    function testDelegateLockupPeriod() public {
+        // setup
+        address other = address(12345);
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(this));
+        core.grantRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, address(this));
+        vm.stopPrank();
+        token.mint(address(this), 100);
+        token.setMaxDelegates(2);
+
+        // before lockup, can do movements
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
+        // even after delegate
+        token.incrementDelegation(address(this), 10);
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
+
+        // set a delegate lockup period
+        assertEq(token.delegateLockupPeriod(), 0);
+        token.setDelegateLockupPeriod(1 days);
+        assertEq(token.delegateLockupPeriod(), 1 days);
+
+        // cannot do movements anymore
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.transfer(other, 1);
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        token.transferFrom(address(this), other, 1);
+
+        // after lockup period, can transfer again
+        vm.warp(block.timestamp + 1 days + 1);
+        token.transfer(other, 1);
+        token.burn(1);
+        token.approve(other, 1);
+        vm.prank(other);
+        token.transferFrom(address(this), other, 1);
     }
 }

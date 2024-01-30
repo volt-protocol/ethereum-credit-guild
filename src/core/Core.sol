@@ -18,6 +18,7 @@ contract Core is AccessControlEnumerable {
         _setRoleAdmin(CoreRoles.GOVERNOR, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GUARDIAN, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.CREDIT_MINTER, CoreRoles.GOVERNOR);
+        _setRoleAdmin(CoreRoles.CREDIT_BURNER, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.RATE_LIMITED_CREDIT_MINTER, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.GUILD_MINTER, CoreRoles.GOVERNOR);
         _setRoleAdmin(CoreRoles.RATE_LIMITED_GUILD_MINTER, CoreRoles.GOVERNOR);

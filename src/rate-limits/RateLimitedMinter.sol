@@ -5,15 +5,11 @@ import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {RateLimitedV2} from "@src/utils/RateLimitedV2.sol";
 
-import {CreditToken} from "@src/tokens/CreditToken.sol";
-
 interface IERC20Mintable {
     function mint(address to, uint256 amount) external;
 }
 
 /// @notice contract to mint tokens on a rate limit.
-/// All minting should flow through this smart contract, as it should be the only one with
-/// minting capabilities.
 contract RateLimitedMinter is RateLimitedV2 {
     /// @notice the reference to token
     address public immutable token;
@@ -46,10 +42,7 @@ contract RateLimitedMinter is RateLimitedV2 {
     /// Pausable and depletes the buffer, reverts if buffer is used.
     /// @param to the recipient address of the minted tokens.
     /// @param amount the amount of tokens to mint.
-    function mint(
-        address to,
-        uint256 amount
-    ) external onlyCoreRole(role) whenNotPaused {
+    function mint(address to, uint256 amount) external onlyCoreRole(role) {
         _depleteBuffer(amount); /// check and effects
         IERC20Mintable(token).mint(to, amount); /// interactions
     }

@@ -19,7 +19,7 @@ contract LendingTermUnitTest is Test {
     address private governor = address(1);
     address private guardian = address(2);
     Core private core;
-    ProfitManager private profitManager;
+    ProfitManager public profitManager;
     CreditToken credit;
     GuildToken guild;
     MockERC20 collateral;
@@ -45,10 +45,7 @@ contract LendingTermUnitTest is Test {
         profitManager = new ProfitManager(address(core));
         collateral = new MockERC20();
         credit = new CreditToken(address(core), "name", "symbol");
-        guild = new GuildToken(
-            address(core),
-            address(profitManager)
-        );
+        guild = new GuildToken(address(core));
         rlcm = new RateLimitedMinter(
             address(core) /*_core*/,
             address(credit) /*_token*/,
@@ -57,7 +54,7 @@ contract LendingTermUnitTest is Test {
             type(uint128).max /*_rateLimitPerSecond*/,
             type(uint128).max /*_bufferCap*/
         );
-        auctionHouse = new AuctionHouse(address(core), 650, 1800);
+        auctionHouse = new AuctionHouse(address(core), 650, 1800, 0);
         term = LendingTerm(Clones.clone(address(new LendingTerm())));
         term.initialize(
             address(core),
@@ -84,7 +81,7 @@ contract LendingTermUnitTest is Test {
             address(credit),
             address(collateral)
         );
-        profitManager.initializeReferences(address(credit), address(guild), address(psm));
+        profitManager.initializeReferences(address(credit), address(guild));
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -97,6 +94,10 @@ contract LendingTermUnitTest is Test {
         core.grantRole(CoreRoles.CREDIT_MINTER, address(rlcm));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(term));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(profitManager));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(psm));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(this));
         core.renounceRole(CoreRoles.GOVERNOR, address(this));
 
         // add gauge and vote for it
@@ -125,6 +126,9 @@ contract LendingTermUnitTest is Test {
         assertEq(refs.auctionHouse, address(auctionHouse));
         assertEq(refs.creditMinter, address(rlcm));
         assertEq(refs.creditToken, address(credit));
+        assertEq(term.creditToken(), address(credit));
+        assertEq(term.profitManager(), address(profitManager));
+        assertEq(term.auctionHouse(), address(auctionHouse));
 
         LendingTerm.LendingTermParams memory params = term.getParameters();
         assertEq(params.collateralToken, address(collateral));
@@ -279,6 +283,7 @@ contract LendingTermUnitTest is Test {
         vm.startPrank(governor);
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term2));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term2));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(term2));
         vm.stopPrank();
 
         // prepare
@@ -393,19 +398,22 @@ contract LendingTermUnitTest is Test {
     // borrow fail because debt ceiling is reached
     function testBorrowFailDebtCeilingReached() public {
         uint256 _weight = guild.getGaugeWeight(address(term));
-        // debt ceiling = min(_HARDCAP, buffer) if there is only one term
-        assertEq(term.debtCeiling(), _HARDCAP);
-        vm.prank(governor);
-        rlcm.setBufferCap(uint128(_HARDCAP / 2));
-        assertEq(term.debtCeiling(), _HARDCAP / 2);
-        vm.prank(governor);
-        rlcm.setBufferCap(type(uint128).max);
-        vm.roll(block.number + 1);
-        vm.warp(block.timestamp + 3 days);
-        assertEq(term.debtCeiling(), _HARDCAP);
+
+        // set weight to 0
+        guild.decrementGauge(address(term), _weight);
+        assertEq(term.debtCeiling(), 0);
+        guild.incrementGauge(address(term), _weight);
+
+        // debt ceiling = max if there is only one term
+        assertEq(term.debtCeiling(), type(uint256).max);
 
         // if no weight is given to the term, debt ceiling is 0
-        assertEq(term.debtCeiling(-int256(_weight)), 0);
+        assertEq(term.debtCeiling(-int256(_weight + 1)), 0);
+
+        // if there is only one term and it's deprecated, debt ceiling is 0
+        guild.removeGauge(address(term));
+        assertEq(term.debtCeiling(), 0);
+        guild.addGauge(1, address(term));
 
         // add another gauge, equal voting weight for the 2nd gauge
         guild.addGauge(1, address(this));
@@ -413,9 +421,9 @@ contract LendingTermUnitTest is Test {
         guild.mint(address(this), _weight);
         guild.incrementGauge(address(this), _weight);
 
-        // debt ceiling is _HARDCAP because credit totalSupply is 0
+        // debt ceiling = max because credit totalSupply is 0
         // and first-ever mint does not check relative debt ceilings
-        assertEq(term.debtCeiling(), _HARDCAP);
+        assertEq(term.debtCeiling(), type(uint256).max);
 
         // prepare
         uint256 borrowAmount = 20_000e18;
@@ -428,41 +436,27 @@ contract LendingTermUnitTest is Test {
         vm.warp(block.timestamp + 10);
         vm.roll(block.number + 1);
 
-        // debt ceiling is 50% of totalSupply
+        // debt ceiling is 50% of total borrows
         // + 20% of tolerance (10_000e18 + 2_000e18)
         assertEq(term.debtCeiling(), 12_000e18);
 
         // if the term's weight is above 100% when we include tolerance,
-        // the debt ceiling is the hardCap
+        // the debt ceiling = max
         guild.decrementGauge(address(this), _weight * 9 / 10);
-        assertEq(term.debtCeiling(), _HARDCAP);
+        assertEq(term.debtCeiling(), type(uint256).max);
         guild.incrementGauge(address(this), _weight * 9 / 10);
 
         // second borrow fails because of relative debt ceilings
         vm.expectRevert("LendingTerm: debt ceiling reached");
         term.borrow(borrowAmount, collateralAmount);
 
-        // mint more CREDIT, so that debt ceiling of all terms is increased
-        // new totalSupply is 100_000e18, with 20_000e18 already borrowed on this term.
-        credit.mint(address(this), 80_000e18);
-        // if someone borrows 100_000e18, new totalSupply is 200_000e18, and debt ceiling
-        // of this term is 50% of the new totalSupply, i.e. 100_000e18.
+        // +80_000e18 issuance from somewhere
+        // new total borrows is 100_000e18, with 20_000e18 already borrowed on this term.
+        vm.prank(address(term));
+        profitManager.notifyPnL(address(term), 0, 80_000e18);
+        // if someone borrowed 100_000e18, new total borrows would be 200_000e18, and debt ceiling
+        // of this term is 50% of the new total borrows, i.e. 100_000e18.
         // add 20% of tolerance (20_000e18) => 120_000e18
-        assertEq(term.debtCeiling(), 120_000e18);
-
-        vm.prank(governor);
-        rlcm.setBufferCap(uint128(70_000e18));
-        assertEq(term.debtCeiling(), 70_000e18);
-        vm.prank(governor);
-        rlcm.setBufferCap(type(uint128).max);
-        vm.roll(block.number + 1);
-        vm.warp(block.timestamp + 3 days);
-        assertEq(term.debtCeiling(), 120_000e18);
-        vm.prank(governor);
-        term.setHardCap(60_000e18);
-        assertEq(term.debtCeiling(), 60_000e18);
-        vm.prank(governor);
-        term.setHardCap(_HARDCAP);
         assertEq(term.debtCeiling(), 120_000e18);
 
         // borrow max
@@ -471,6 +465,7 @@ contract LendingTermUnitTest is Test {
         collateral.mint(address(this), 9999e18);
         collateral.approve(address(term), 9999e18);
         uint256 maxBorrow = term.debtCeiling() - term.issuance();
+        assertEq(maxBorrow, 100_000e18);
         term.borrow(maxBorrow, 9999e18);
         assertEq(term.issuance(), term.debtCeiling());
 
@@ -523,8 +518,8 @@ contract LendingTermUnitTest is Test {
         uint256 interestTime
     ) public {
         // fuzz conditions
-        collateralAmount = bound(collateralAmount, 1, 1e32);
-        borrowAmount = bound(borrowAmount, 1, 1e32);
+        collateralAmount = bound(collateralAmount, 1, 1e29);
+        borrowAmount = bound(borrowAmount, 1, 1e29);
         interestTime = bound(interestTime, 1, 10 * 365 * 24 * 3600);
 
         // do not fuzz reverting conditions (below MIN_BORROW or above maxBorrow)
@@ -943,6 +938,41 @@ contract LendingTermUnitTest is Test {
         assertEq(collateral.balanceOf(address(term)), collateralAmount);
     }
 
+    // if loan accrues interest above maxDebtForCollateral, can call it
+    function testCallAfterInterestAccrue() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        bytes32 loanId = term.borrow(borrowAmount, collateralAmount);
+
+        uint256 maxDebt = term.maxDebtForCollateral(collateralAmount);
+        assertEq(maxDebt, 30_000e18);
+
+        // wait that interest accrue
+        uint256 loanDebt = term.getLoanDebt(loanId);
+        while(loanDebt < maxDebt) {
+            vm.warp(block.timestamp + 1 weeks);
+            vm.roll(block.number + 1);
+            loanDebt = term.getLoanDebt(loanId);
+        }
+
+        // call
+        term.call(loanId);
+
+        // loan is called
+        assertEq(term.getLoan(loanId).callTime, block.timestamp);
+        assertEq(term.getLoan(loanId).callDebt, loanDebt);
+
+        // issuance not yet decremented
+        assertEq(term.issuance(), borrowAmount);
+
+        // borrower kept credit, collateral still escrowed
+        assertEq(credit.balanceOf(address(this)), borrowAmount);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+    }
+
     function testForgiveFailLoanNotFound() public {
         // forgive
         vm.prank(governor);
@@ -1252,7 +1282,7 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        profitManager.notifyPnL(address(term), int256(-10_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1276,9 +1306,11 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         credit.mint(address(this), 100e18);
         assertEq(profitManager.creditMultiplier(), 1e18);
+        assertEq(term.maxDebtForCollateral(15e18), 15 * 2000e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-50e18));
+        profitManager.notifyPnL(address(term), int256(-50e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
+        assertEq(term.maxDebtForCollateral(15e18), 15 * 2000e18 * 2);
         credit.burn(100e18);
 
         // borrow
@@ -1365,7 +1397,7 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        profitManager.notifyPnL(address(term), int256(-10_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1406,7 +1438,7 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        profitManager.notifyPnL(address(term), int256(-10_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1449,7 +1481,7 @@ contract LendingTermUnitTest is Test {
         // all loans by 2x.
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-10_000e18));
+        profitManager.notifyPnL(address(term), int256(-10_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1498,7 +1530,7 @@ contract LendingTermUnitTest is Test {
         assertEq(profitManager.creditMultiplier(), 1e18);
         credit.mint(address(this), 20_000e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-20_000e18));
+        profitManager.notifyPnL(address(term), int256(-20_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1523,7 +1555,7 @@ contract LendingTermUnitTest is Test {
         credit.mint(address(this), 100e18);
         assertEq(profitManager.creditMultiplier(), 1e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-50e18));
+        profitManager.notifyPnL(address(term), int256(-50e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
         credit.burn(100e18);
 
@@ -1554,7 +1586,7 @@ contract LendingTermUnitTest is Test {
         assertEq(profitManager.creditMultiplier(), 1e18);
         credit.mint(address(this), 20_000e18);
         vm.prank(address(term));
-        profitManager.notifyPnL(address(term), int256(-20_000e18));
+        profitManager.notifyPnL(address(term), int256(-20_000e18), 0);
         assertEq(profitManager.creditMultiplier(), 0.5e18);
 
         // active loan debt is marked up 2x
@@ -1565,5 +1597,56 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.balanceOf(address(this)), 44_000e18);
         credit.approve(address(term), 41_000e18);
         term.partialRepay(loanId, 41_000e18);
+    }
+
+    // partialRepay when term has 0% interest rate
+    function testPartialRepay0InterestRate() public {
+        // create a similar term but with 0% interest rate
+        LendingTerm term2 = LendingTerm(
+            Clones.clone(address(new LendingTerm()))
+        );
+        term2.initialize(
+            address(core),
+            term.getReferences(),
+            LendingTerm.LendingTermParams({
+                collateralToken: address(collateral),
+                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                interestRate: 0,
+                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                openingFee: 0,
+                hardCap: _HARDCAP
+            })
+        );
+        assertEq(term2.debtCeiling(), 0);
+        vm.label(address(term2), "term2");
+        guild.addGauge(1, address(term2));
+        guild.decrementGauge(address(term), _HARDCAP / 2);
+        guild.incrementGauge(address(term2), _HARDCAP / 2);
+        vm.startPrank(governor);
+        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term2));
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term2));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(term2));
+        vm.stopPrank();
+        assertEq(term2.debtCeiling(), type(uint256).max);
+
+        // borrow
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 15e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term2), collateralAmount);
+        bytes32 loanId = term2.borrow(borrowAmount, collateralAmount);
+
+        // 1 year later, no interest accrued
+        vm.warp(block.timestamp + term2.YEAR());
+        vm.roll(block.number + 1);
+        assertEq(term2.getLoanDebt(loanId), 20_000e18);
+        assertEq(credit.totalSupply(), 20_000e18);
+
+        // do partialRepay
+        credit.approve(address(term2), 10_000e18);
+        term2.partialRepay(loanId, 10_000e18);
+        
+        assertEq(term2.getLoanDebt(loanId), 10_000e18);
     }
 }

@@ -122,7 +122,7 @@ Total SLOC: 3739
 
 - **Isolated markets:** by default, each lending asset is risk isolated and has its own set of available lending terms, so bad debt in the ETH market will not affect USDC lenders. It's possible to link the markets by accepting each others' deposit receipts as collateral (gUSDC, gETH, etc).
 - **Auction mechanism:** at first, offer 0% collateral, ask 100% debt. Then, over time, offer a larger % of the collateral and still 100% debt. At 'midpoint', 100% collateral is offered asking for 100% debt, and if nobody has bid, bad debt will be realized. In the second phase, 100% collateral is offered and less and less debt is asked. When we reach the end of the auction (100% collateral offered, 0% debt asked), nobody can bid in the auction anymore, and the loans can be automatically forgiven (marking it as a 100% loss). The first to bid wins the auction, making it a race to arbitrage (onchain MEV or otherwise).
-- **Collateral tokens**: The protocol is expected to handle properly most widely used ERC20 tokens as collateral. The collateral tokens are the least trusted external calls in the system. At launch, we expect to interact with RWA tokens, LSD tokens, and yield-bearing tokens in general, but **no rebasing tokens** and **no fee on transfer**.
+- **Collateral tokens**: The protocol is expected to handle properly most widely used ERC20 tokens as collateral. The collateral tokens are the least trusted external calls in the system. At launch, we expect to interact with RWA tokens, LSD tokens, and yield-bearing tokens in general, but **no rebasing tokens**, **no fee on transfer**, and **no hooks on transfer (à la ERC777)**. These tokens would need a wrapper before being listed in a market, or they could revert arbitrarily and mess up with the internal accounting.
 - **Deployment**: we anticipate to launch on Ethereum mainnet & L2s like Arbitrum.
 - **Trusted actors**: The addresses with `GOVERNOR` and `GUARDIAN` role are trusted. DAO timelock can execute arbitrary calls and impersonate all protocol contracts, as it holds the `GOVERNOR` role. The team multisig has the `GUARDIAN` role, and it is expected to be able to freeze new usage of the protocol, but not prevent users from withdrawing their funds.
 - **Trust minimization**: we expect most roles to be "burnt" (especially `GOVERNOR` and `GUARDIAN`), by deploying automated governance processes that use these privilege but can only make pre-determined calls. Lending term onboarding & offboarding could be done with a simple timelock, but we wrote helper contracts to automate these governance processes, and most governance processes like parameter tuning will be secured like this in the future.
@@ -197,8 +197,8 @@ The set of actions possible in the system are tightly constrained.
 In several cases, a certain quorum of `GUILD` holders can perform a system action or make a parameter change, and another quorum veto it. Each action may have distinct quorums and voting periods or other delays. All of these actions are currently subject to veto except for lending term offboarding.
 
   * adjust the global debt ceiling of any credit token
-  * approve a new `LendingTerm`, which defines collateral ratios, interest rates, etc
-  * remove an existing `LendingTerm`
+  * onboarding a new `LendingTerm`, which defines collateral ratios, interest rates, etc
+  * offboarding an existing `LendingTerm`
   * adjust the split of interest between `GUILD` stakers, the `gUSDC` savings rate, and the surplus buffer
   * adjust the voting duration or quorum threshold for any of the above processes
 

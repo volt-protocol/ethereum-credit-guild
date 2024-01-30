@@ -5,6 +5,15 @@ import {CoreRef} from "@src/core/CoreRef.sol";
 
 contract MockLendingTerm is CoreRef {
     uint256 public issuance;
+    address public profitManager;
+    address public creditToken;
 
-    constructor(address core) CoreRef(core) {}
+    constructor(
+        address core,
+        address _profitManager,
+        address _creditToken
+    ) CoreRef(core) {
+        profitManager = _profitManager;
+        creditToken = _creditToken;
+    }
 }

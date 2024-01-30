@@ -33,7 +33,7 @@ contract LendingTermOffboarding is CoreRef {
     /// @notice maximum age of polls for them to be considered valid.
     /// This offboarding mechanism is meant to be used in a reactive fashion, and
     /// polls should not stay open for a long time.
-    uint256 public constant POLL_DURATION_BLOCKS = 46523; // ~7 days @ 13s/block
+    uint256 public constant POLL_DURATION_BLOCKS = 50400; // ~7 days @ 12s/block
 
     /// @notice quorum for offboarding a lending term
     uint256 public quorum;
@@ -58,7 +58,12 @@ contract LendingTermOffboarding is CoreRef {
     mapping(address => uint256) public lastPollBlock;
 
     /// @notice mapping of terms that can be offboarded.
-    mapping(address => bool) public canOffboard;
+    mapping(address => OffboardStatus) public canOffboard;
+    enum OffboardStatus {
+        UNSET,
+        CAN_OFFBOARD,
+        CAN_CLEANUP
+    }
 
     /// @notice number of offboardings in progress.
     uint256 public nOffboardingsInProgress;
@@ -100,6 +105,11 @@ contract LendingTermOffboarding is CoreRef {
             GuildToken(guildToken).isGauge(term),
             "LendingTermOffboarding: not an active term"
         );
+        // Check that another offboarding is not in progress
+        require(
+            canOffboard[term] == OffboardStatus.UNSET,
+            "LendingTermOffboarding: offboard in progress"
+        );
 
         polls[block.number][term] = 1; // voting power
         lastPollBlock[term] = block.number;
@@ -136,7 +146,7 @@ contract LendingTermOffboarding is CoreRef {
         userPollVotes[msg.sender][snapshotBlock][term] = userWeight;
         polls[snapshotBlock][term] = _weight + userWeight;
         if (_weight + userWeight >= quorum) {
-            canOffboard[term] = true;
+            canOffboard[term] = OffboardStatus.CAN_OFFBOARD;
         }
         emit OffboardSupport(
             block.timestamp,
@@ -151,14 +161,20 @@ contract LendingTermOffboarding is CoreRef {
     /// This will prevent new loans from being open, and will prevent GUILD holders to vote for the term.
     /// @param term LendingTerm to offboard from the system.
     function offboard(address term) external whenNotPaused {
-        require(canOffboard[term], "LendingTermOffboarding: quorum not met");
+        require(
+            canOffboard[term] == OffboardStatus.CAN_OFFBOARD,
+            "LendingTermOffboarding: cannot offboard"
+        );
+        canOffboard[term] = OffboardStatus.CAN_CLEANUP;
+        lastPollBlock[term] = 1; // not 0 to reduce gas cost of next offboard
 
         // update protocol config
         // this will revert if the term has already been offboarded
         // through another mean.
         GuildToken(guildToken).removeGauge(term);
 
-        // pause psm redemptions
+        // if there are no other offboardings in progress, this is the
+        // first offboarding to start, so we pause psm redemptions
         if (
             nOffboardingsInProgress++ == 0 &&
             !SimplePSM(psm).redemptionsPaused()
@@ -173,28 +189,68 @@ contract LendingTermOffboarding is CoreRef {
     /// This is only callable after a term has been offboarded and all its loans have been closed.
     /// @param term LendingTerm to cleanup.
     function cleanup(address term) external whenNotPaused {
-        require(canOffboard[term], "LendingTermOffboarding: quorum not met");
         require(
             LendingTerm(term).issuance() == 0,
             "LendingTermOffboarding: not all loans closed"
         );
         require(
-            GuildToken(guildToken).isDeprecatedGauge(term),
+            GuildToken(guildToken).isDeprecatedGauge(term) &&
+                core().hasRole(CoreRoles.CREDIT_BURNER, term) &&
+                core().hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term) &&
+                core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, term),
             "LendingTermOffboarding: re-onboarded"
         );
+        require(
+            canOffboard[term] == OffboardStatus.CAN_CLEANUP,
+            "LendingTermOffboarding: cannot cleanup"
+        );
+        canOffboard[term] = OffboardStatus.UNSET;
 
         // update protocol config
+        core().revokeRole(CoreRoles.CREDIT_BURNER, term);
         core().revokeRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term);
         core().revokeRole(CoreRoles.GAUGE_PNL_NOTIFIER, term);
 
-        // unpause psm redemptions
+        // if there are no other offboardings in progress, this is the
+        // last offboarding to end, so we unpause psm redemptions
         if (
             --nOffboardingsInProgress == 0 && SimplePSM(psm).redemptionsPaused()
         ) {
             SimplePSM(psm).setRedemptionsPaused(false);
         }
 
-        canOffboard[term] = false;
         emit Cleanup(block.timestamp, term);
+    }
+
+    /// @notice Can reset an offboarding process if the term has been re-onboarded
+    /// The offboard flow looks like the following :
+    /// - 1) proposeOffboard()
+    /// - 2) supportOffboard()
+    /// - 3) offboard()
+    /// - 3a) if not re-onboarded before cleanup, cleanup()
+    /// - 3b) if re-onboarded before cleanup, resetOffboarding()
+    /// @param term LendingTerm to reset offboarding for.
+    function resetOffboarding(address term) external whenNotPaused {
+        require(
+            canOffboard[term] != OffboardStatus.UNSET,
+            "LendingTermOffboarding: cannot reset"
+        );
+        require(
+            GuildToken(guildToken).isGauge(term) &&
+                core().hasRole(CoreRoles.CREDIT_BURNER, term) &&
+                core().hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, term) &&
+                core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, term),
+            "LendingTermOffboarding: not re-onboarded"
+        );
+
+        // if there are no other offboardings in progress, this is the
+        // last offboarding to end, so we unpause psm redemptions
+        if (
+            --nOffboardingsInProgress == 0 && SimplePSM(psm).redemptionsPaused()
+        ) {
+            SimplePSM(psm).setRedemptionsPaused(false);
+        }
+
+        canOffboard[term] = OffboardStatus.UNSET;
     }
 }

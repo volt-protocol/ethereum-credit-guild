@@ -3,7 +3,6 @@ pragma solidity 0.8.13;
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 
@@ -33,9 +32,6 @@ contract ProfitManager is CoreRef {
 
     /// @notice reference to CREDIT token.
     address public credit;
-
-    /// @notice reference to CREDIT token PSM.
-    address public psm;
 
     /// @notice profit index of a given gauge
     mapping(address => uint256) public gaugeProfitIndex;
@@ -103,6 +99,15 @@ contract ProfitManager is CoreRef {
     /// can result in a deadlock situation where no new borrows are allowed.
     uint256 public gaugeWeightTolerance = 1.2e18; // 120%
 
+    /// @notice total amount of CREDIT issued in the lending terms of this market.
+    /// Should be equal to the sum of all LendingTerm.issuance().
+    uint256 public totalIssuance;
+
+    /// @notice maximum total amount of CREDIT allowed to be issued in this market.
+    /// This value is adjusted up when the creditMultiplier goes down.
+    /// This is set to a very large value by default to not restrict usage by default.
+    uint256 public _maxTotalIssuance = 1e30;
+
     constructor(address _core) CoreRef(_core) {
         emit MinBorrowUpdate(block.timestamp, 100e18);
     }
@@ -144,6 +149,9 @@ contract ProfitManager is CoreRef {
     /// @notice emitted when minBorrow is updated
     event MinBorrowUpdate(uint256 indexed when, uint256 newValue);
 
+    /// @notice emitted when maxTotalIssuance is updated
+    event MaxTotalIssuanceUpdate(uint256 indexed when, uint256 newValue);
+
     /// @notice emitted when gaugeWeightTolerance is updated
     event GaugeWeightToleranceUpdate(uint256 indexed when, uint256 newValue);
 
@@ -152,27 +160,19 @@ contract ProfitManager is CoreRef {
         return (_minBorrow * 1e18) / creditMultiplier;
     }
 
+    /// @notice get the maximum total issuance
+    function maxTotalIssuance() external view returns (uint256) {
+        return (_maxTotalIssuance * 1e18) / creditMultiplier;
+    }
+
     /// @notice initialize references to GUILD & CREDIT tokens.
     function initializeReferences(
         address _credit,
-        address _guild,
-        address _psm
+        address _guild
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
-        assert(
-            credit == address(0) && guild == address(0) && psm == address(0)
-        );
+        assert(credit == address(0) && guild == address(0));
         credit = _credit;
         guild = _guild;
-        psm = _psm;
-    }
-
-    /// @notice returns the sum of all borrowed CREDIT, not including unpaid interests
-    /// and creditMultiplier changes that could make debt amounts higher than the initial
-    /// borrowed CREDIT amounts.
-    function totalBorrowedCredit() external view returns (uint256) {
-        return
-            CreditToken(credit).targetTotalSupply() -
-            SimplePSM(psm).redeemableCredit();
     }
 
     /// @notice set the minimum borrow amount
@@ -183,10 +183,19 @@ contract ProfitManager is CoreRef {
         emit MinBorrowUpdate(block.timestamp, newValue);
     }
 
+    /// @notice set the maximum total issuance
+    function setMaxTotalIssuance(
+        uint256 newValue
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        _maxTotalIssuance = newValue;
+        emit MaxTotalIssuanceUpdate(block.timestamp, newValue);
+    }
+
     /// @notice set the gauge weight tolerance
     function setGaugeWeightTolerance(
         uint256 newValue
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        require(newValue >= 1e18, "ProfitManager: invalid tolerance");
         gaugeWeightTolerance = newValue;
         emit GaugeWeightToleranceUpdate(block.timestamp, newValue);
     }
@@ -249,9 +258,9 @@ contract ProfitManager is CoreRef {
 
     /// @notice donate to surplus buffer
     function donateToSurplusBuffer(uint256 amount) external {
-        CreditToken(credit).transferFrom(msg.sender, address(this), amount);
         uint256 newSurplusBuffer = surplusBuffer + amount;
         surplusBuffer = newSurplusBuffer;
+        CreditToken(credit).transferFrom(msg.sender, address(this), amount);
         emit SurplusBufferUpdate(block.timestamp, newSurplusBuffer);
     }
 
@@ -291,11 +300,27 @@ contract ProfitManager is CoreRef {
     /// before `notifyPnL` is called.
     function notifyPnL(
         address gauge,
-        int256 amount
+        int256 amount,
+        int256 issuanceDelta
     ) external onlyCoreRole(CoreRoles.GAUGE_PNL_NOTIFIER) {
         uint256 _surplusBuffer = surplusBuffer;
         uint256 _termSurplusBuffer = termSurplusBuffer[gauge];
         address _credit = credit;
+
+        // underflow should not be possible because the issuance() in the
+        // lending terms are all unsigned integers and they all notify on
+        // increment/decrement.
+        totalIssuance = uint256(int256(totalIssuance) + issuanceDelta);
+
+        // check the maximum total issuance if the issuance is changing
+        if (issuanceDelta > 0) {
+            uint256 __maxTotalIssuance = (_maxTotalIssuance * 1e18) /
+                creditMultiplier;
+            require(
+                totalIssuance <= __maxTotalIssuance,
+                "ProfitManager: global debt ceiling reached"
+            );
+        }
 
         // handling loss
         if (amount < 0) {
@@ -328,7 +353,8 @@ contract ProfitManager is CoreRef {
                 emit SurplusBufferUpdate(block.timestamp, 0);
 
                 // update the CREDIT multiplier
-                uint256 creditTotalSupply = CreditToken(_credit).totalSupply();
+                uint256 creditTotalSupply = CreditToken(_credit)
+                    .targetTotalSupply();
                 uint256 newCreditMultiplier = (creditMultiplier *
                     (creditTotalSupply - loss)) / creditTotalSupply;
                 creditMultiplier = newCreditMultiplier;
@@ -352,11 +378,6 @@ contract ProfitManager is CoreRef {
             uint256 amountForOther = (uint256(amount) *
                 uint256(_profitSharingConfig.otherSplit)) / 1e9;
 
-            uint256 amountForCredit = uint256(amount) -
-                amountForSurplusBuffer -
-                amountForGuild -
-                amountForOther;
-
             // distribute to surplus buffer
             if (amountForSurplusBuffer != 0) {
                 surplusBuffer = _surplusBuffer + amountForSurplusBuffer;
@@ -375,8 +396,14 @@ contract ProfitManager is CoreRef {
             }
 
             // distribute to lenders
-            if (amountForCredit != 0) {
-                CreditToken(_credit).distribute(amountForCredit);
+            {
+                uint256 amountForCredit = uint256(amount) -
+                    amountForSurplusBuffer -
+                    amountForGuild -
+                    amountForOther;
+                if (amountForCredit != 0) {
+                    CreditToken(_credit).distribute(amountForCredit);
+                }
             }
 
             // distribute to the guild
@@ -413,23 +440,21 @@ contract ProfitManager is CoreRef {
         uint256 _userGaugeWeight = uint256(
             GuildToken(guild).getUserGaugeWeight(user, gauge)
         );
-        if (_userGaugeWeight == 0) {
-            return 0;
+        uint256 _userGaugeProfitIndex = userGaugeProfitIndex[user][gauge];
+        if (_userGaugeProfitIndex == 0) {
+            _userGaugeProfitIndex = 1e18;
         }
         uint256 _gaugeProfitIndex = gaugeProfitIndex[gauge];
-        uint256 _userGaugeProfitIndex = userGaugeProfitIndex[user][gauge];
         if (_gaugeProfitIndex == 0) {
             _gaugeProfitIndex = 1e18;
         }
-        if (_userGaugeProfitIndex == 0) {
-            _userGaugeProfitIndex = 1e18;
+        userGaugeProfitIndex[user][gauge] = _gaugeProfitIndex;
+        if (_userGaugeWeight == 0) {
+            return 0;
         }
         uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
         if (deltaIndex != 0) {
             creditEarned = (_userGaugeWeight * deltaIndex) / 1e18;
-            userGaugeProfitIndex[user][gauge] = _gaugeProfitIndex;
-        }
-        if (creditEarned != 0) {
             emit ClaimRewards(block.timestamp, user, gauge, creditEarned);
             CreditToken(credit).transfer(user, creditEarned);
         }
@@ -472,9 +497,11 @@ contract ProfitManager is CoreRef {
             if (_gaugeProfitIndex == 0) {
                 _gaugeProfitIndex = 1e18;
             }
-            if (_userGaugeProfitIndex == 0) {
-                _userGaugeProfitIndex = 1e18;
-            }
+
+            // this should never fail, because when the user increment weight
+            // a call to claimGaugeRewards() is made that initializes this value
+            assert(_userGaugeProfitIndex != 0);
+
             uint256 deltaIndex = _gaugeProfitIndex - _userGaugeProfitIndex;
             if (deltaIndex != 0) {
                 uint256 _userGaugeWeight = uint256(

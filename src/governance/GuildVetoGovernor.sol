@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 
 import {Governor, IGovernor} from "@openzeppelin/contracts/governance/Governor.sol";
+import {GovernorSettings} from "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
 import {GovernorTimelockControl} from "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 import {GovernorVotes, IERC165} from "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
@@ -22,7 +23,13 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 /// After the action has been queued in the linked TimelockController for enough time to be
 /// executed, the veto vote is considered failed and the action cannot be cancelled anymore.
 /// @author eswak
-contract GuildVetoGovernor is CoreRef, Governor, GovernorVotes {
+contract GuildVetoGovernor is
+    CoreRef,
+    Governor,
+    GovernorVotes,
+    GovernorSettings,
+    GovernorCountingSimple
+{
     /// @notice Private storage variable for quorum (the minimum number of votes needed for a vote to pass).
     uint256 private _quorum;
 
@@ -38,6 +45,11 @@ contract GuildVetoGovernor is CoreRef, Governor, GovernorVotes {
         CoreRef(_core)
         Governor("ECG Veto Governor")
         GovernorVotes(IVotes(_token))
+        GovernorSettings(
+            0, // no voting delay
+            2628000, // voting period ~1 year with 1 block every 12s
+            0 // tokens not needed to propose
+        )
     {
         _setQuorum(initialQuorum);
         _updateTimelock(initialTimelock);
@@ -105,77 +117,30 @@ contract GuildVetoGovernor is CoreRef, Governor, GovernorVotes {
     /// Vote counting
     /// ------------------------------------------------------------------------
 
-    /**
-     * @dev Supported vote types. Matches Governor Bravo ordering.
-     */
-    enum VoteType {
-        Against,
-        For,
-        Abstain
-    }
-
-    struct ProposalVote {
-        uint256 againstVotes;
-        uint256 forVotes;
-        uint256 abstainVotes;
-        mapping(address => bool) hasVoted;
-    }
-
-    mapping(uint256 => ProposalVote) private _proposalVotes;
-
-    /**
-     * @dev See {IGovernor-COUNTING_MODE}.
-     */
-    // solhint-disable-next-line func-name-mixedcase
+    // in GovernorCountingSimple: support=bravo&quorum=for,abstain
     function COUNTING_MODE()
         public
         pure
         virtual
-        override
+        override(IGovernor, GovernorCountingSimple)
         returns (string memory)
     {
         return "support=bravo&quorum=against";
     }
 
-    /**
-     * @dev See {IGovernor-hasVoted}.
-     */
-    function hasVoted(
-        uint256 proposalId,
-        address account
-    ) public view virtual override returns (bool) {
-        return _proposalVotes[proposalId].hasVoted[account];
-    }
-
-    /**
-     * @dev Accessor to the internal vote counts.
-     */
-    function proposalVotes(
-        uint256 proposalId
-    )
-        public
-        view
-        virtual
-        returns (uint256 againstVotes, uint256 forVotes, uint256 abstainVotes)
-    {
-        // againstVotes are supporting the execution of Veto
-        againstVotes = _proposalVotes[proposalId].againstVotes;
-        // no forVotes can be cast in the Veto module, keep 0 value
-        forVotes = 0;
-        // no abstainVotes can be cast in the Veto module, keep 0 value
-        abstainVotes = 0;
-    }
-
-    /**
-     * @dev See {Governor-_quorumReached}.
-     */
+    // in GovernorCountingSimple, this returns forVotes + abstainVotes
     function _quorumReached(
         uint256 proposalId
-    ) internal view virtual override returns (bool) {
-        ProposalVote storage proposalvote = _proposalVotes[proposalId];
-
-        return
-            quorum(proposalSnapshot(proposalId)) <= proposalvote.againstVotes;
+    )
+        internal
+        view
+        virtual
+        override(Governor, GovernorCountingSimple)
+        returns (bool)
+    {
+        (uint256 againstVotes, , ) = proposalVotes(proposalId);
+        uint256 proposalQuorum = quorum(proposalSnapshot(proposalId));
+        return proposalQuorum <= againstVotes;
     }
 
     /**
@@ -183,53 +148,50 @@ contract GuildVetoGovernor is CoreRef, Governor, GovernorVotes {
      * between 'for' and 'against' votes, since people cannot vote 'for'. For a veto to be considered successful,
      * it only needs to reach quorum.
      */
+    // in GovernorCountingSimple, this returns forVotes > againstVotes
     function _voteSucceeded(
         uint256 /* proposalId*/
-    ) internal pure virtual override returns (bool) {
+    )
+        internal
+        pure
+        virtual
+        override(Governor, GovernorCountingSimple)
+        returns (bool)
+    {
         return true;
     }
 
     /**
      * @dev See {Governor-_countVote}. In this module, the support follows the `VoteType` enum (from Governor Bravo).
      */
+    /// @dev in Veto governor, only allow 'against' votes.
     function _countVote(
         uint256 proposalId,
         address account,
         uint8 support,
         uint256 weight,
-        bytes memory // params
-    ) internal virtual override {
-        ProposalVote storage proposalvote = _proposalVotes[proposalId];
-
+        bytes memory params
+    ) internal virtual override(Governor, GovernorCountingSimple) {
         require(
-            !proposalvote.hasVoted[account],
-            "GuildVetoGovernor: vote already cast"
+            support == uint8(VoteType.Against),
+            "GuildVetoGovernor: can only vote against in veto proposals"
         );
-        proposalvote.hasVoted[account] = true;
+        super._countVote(proposalId, account, support, weight, params);
+    }
 
-        if (support == uint8(VoteType.Against)) {
-            proposalvote.againstVotes += weight;
-        } else {
-            revert("GuildVetoGovernor: can only vote against in veto proposals");
-        }
+    // inheritance reconciliation
+    function proposalThreshold()
+        public
+        view
+        override(Governor, GovernorSettings)
+        returns (uint256)
+    {
+        return super.proposalThreshold();
     }
 
     /// ------------------------------------------------------------------------
     /// Public functions override
     /// ------------------------------------------------------------------------
-
-    /// @dev no voting delay between veto proposal and veto voting period.
-    function votingDelay() public pure override returns (uint256) {
-        return 0;
-    }
-
-    /// @dev voting period is unused, it is a duration in blocks for the vote
-    /// but the timestamp of the action in the timelock is used to know if the
-    /// vote period is over (after action is ready in the timelock, the veto
-    /// vote failed).
-    function votingPeriod() public pure override returns (uint256) {
-        return 2425847; // ~1 year with 1 block every 13s
-    }
 
     /// @notice State of a given proposal
     /// The state can be one of:
@@ -282,10 +244,7 @@ contract GuildVetoGovernor is CoreRef, Governor, GovernorVotes {
         // proposal still in waiting period in the timelock
         if (timelockOperationTimestamp > block.timestamp) {
             // ready to veto
-            // no need for "&& _voteSucceeded(proposalId)" in condition because
-            // veto votes are always succeeded (there is no tallying for 'for'
-            // votes against 'against' votes), the only condition is the quorum.
-            if (_quorumReached(proposalId)) {
+            if (_quorumReached(proposalId) && _voteSucceeded(proposalId)) {
                 return ProposalState.Succeeded;
             }
             // need more votes to veto
@@ -308,6 +267,16 @@ contract GuildVetoGovernor is CoreRef, Governor, GovernorVotes {
         string memory /* description*/
     ) public pure override returns (uint256) {
         revert("GuildVetoGovernor: cannot propose arbitrary actions");
+    }
+
+    /// @dev override to prevent cancellation from the proposer
+    function cancel(
+        address[] memory /* targets*/,
+        uint256[] memory /* values*/,
+        bytes[] memory /* calldatas*/,
+        bytes32 /* descriptionHash*/
+    ) public pure override(Governor) returns (uint256) {
+        revert("LendingTermOnboarding: cannot cancel proposals");
     }
 
     /// @notice Propose a governance action to veto (cancel) a target action ID in the

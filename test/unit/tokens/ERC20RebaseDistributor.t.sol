@@ -527,6 +527,105 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.nonRebasingSupply(), 100);
     }
 
+    // if this is not reverting, the rounding error is fixed
+    function testBugRoundingError() public {
+        vm.prank(alice);
+        token.enterRebase();
+        token.mint(alice, 100e18);
+
+        vm.warp(block.timestamp + 5);
+        token.mint(bobby, 633761756280);
+        vm.prank(bobby);
+        token.distribute(633761756280);
+
+        vm.warp(block.timestamp + 1);
+        token.mint(bobby, 316880878140);
+        vm.prank(bobby);
+        token.distribute(316880878140);
+
+        vm.warp(block.timestamp + 1);
+        token.mint(carol, 100000000316880878140);
+
+        vm.prank(carol);
+        token.transfer(alice, 100000000316880878140);
+    }
+
+    // if this is passing, the rebase rewards stealing is fixed
+    function testBugSelfSendAfterDistributeStealRewards() public {
+        token.mint(bobby, 1e18);
+        vm.prank(bobby);
+        token.enterRebase();
+
+        token.mint(alice, 1e18);
+        vm.prank(alice);
+        token.enterRebase();
+
+        assertEq(token.balanceOf(alice), 1e18);
+        assertEq(token.balanceOf(bobby), 1e18);
+
+        token.mint(address(this), 1e18);
+        token.distribute(1e18);
+
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
+
+        assertEq(token.balanceOf(alice), 1.25e18);
+        assertEq(token.balanceOf(bobby), 1.25e18);
+
+        vm.prank(alice);
+        token.transfer(alice, 0.5e18);
+
+        assertEq(token.balanceOf(alice), 1.25e18);
+        assertEq(token.balanceOf(bobby), 1.25e18);
+
+        token.mint(address(this), 1e18);
+        token.distribute(1e18);
+
+        vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD());
+
+        assertEq(token.balanceOf(alice), 2e18);
+        assertEq(token.balanceOf(bobby), 2e18);
+    }
+
+    // if this is passing, the bug of rounding revert is fixed
+    function testBugRevertOnReceive() external {
+        address from = address(uint160(1));
+        address to = address(uint160(2));
+
+        token.mint(to, 100 ether);
+
+        vm.startPrank(to);
+        token.enterRebase();
+        token.distribute(1 ether);
+
+        vm.warp(block.timestamp + 1);
+        vm.startPrank(from);
+
+        token.transfer(to, 0);
+
+        token.transferFrom(from, to, 0);
+    }
+
+    // reach the underflow condition in nonRebasingSupply() for coverage
+    function testNonRebasingSupplyRounding() public {
+        token.mint(bobby, 1);
+        vm.prank(bobby);
+        token.enterRebase();
+
+        // distribute 1
+        token.mint(address(this), 379);
+        token.distribute(379);
+        vm.warp(block.timestamp + 64);
+
+        // distribute 2
+        token.mint(address(this), 542);
+        token.distribute(542);
+        vm.warp(block.timestamp + 5622);
+
+        assertEq(token.totalSupply(), 2);
+        assertEq(token.rebasingSupply(), 3);
+        assertEq(token.nonRebasingSupply(), 0); // return 0 to prevent underflow
+    }
+
     function testDistributeFuzz(uint256 distributionAmount, uint256[3] memory userBalances) public {
         // fuzz values in the plausibility range
         distributionAmount = bound(distributionAmount, 0, 10_000e18);

@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 
 /// @notice Auction House contract of the Ethereum Credit Guild,
 /// where collateral of borrowers is auctioned to cover their CREDIT debt.
@@ -37,12 +38,17 @@ contract AuctionHouse is CoreRef {
     /// every block will ask 1/((1800-650)/13)=1.13% less CREDIT in each block.
     uint256 public immutable auctionDuration;
 
+    /// @notice starting percentage of collateral offered, expressed as a percentage
+    /// with 18 decimals.
+    uint256 public immutable startCollateralOffered;
+
     struct Auction {
-        uint256 startTime;
-        uint256 endTime;
+        uint48 startTime;
+        uint48 endTime;
         address lendingTerm;
         uint256 collateralAmount;
         uint256 callDebt;
+        uint256 callCreditMultiplier;
     }
 
     /// @notice the list of all auctions that existed or are still active.
@@ -56,11 +62,13 @@ contract AuctionHouse is CoreRef {
     constructor(
         address _core,
         uint256 _midPoint,
-        uint256 _auctionDuration
+        uint256 _auctionDuration,
+        uint256 _startCollateralOffered
     ) CoreRef(_core) {
         require(_midPoint < _auctionDuration, "AuctionHouse: invalid params");
         midPoint = _midPoint;
         auctionDuration = _auctionDuration;
+        startCollateralOffered = _startCollateralOffered;
     }
 
     /// @notice get a full auction structure from storage
@@ -71,8 +79,7 @@ contract AuctionHouse is CoreRef {
     /// @notice start the auction of the collateral of a loan, to be exchanged for CREDIT,
     /// in order to pay the debt of a loan.
     /// @param loanId the ID of the loan which collateral is auctioned
-    /// @param callDebt the amount of CREDIT debt to recover from the collateral auction
-    function startAuction(bytes32 loanId, uint256 callDebt) external {
+    function startAuction(bytes32 loanId) external {
         // check that caller is a lending term that still has PnL reporting role
         require(
             core().hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, msg.sender),
@@ -94,11 +101,14 @@ contract AuctionHouse is CoreRef {
 
         // save auction in state
         auctions[loanId] = Auction({
-            startTime: block.timestamp,
+            startTime: uint48(block.timestamp),
             endTime: 0,
             lendingTerm: msg.sender,
             collateralAmount: loan.collateralAmount,
-            callDebt: callDebt
+            callDebt: loan.callDebt,
+            callCreditMultiplier: ProfitManager(
+                LendingTerm(msg.sender).profitManager()
+            ).creditMultiplier()
         });
         nAuctionsInProgress++;
 
@@ -108,7 +118,7 @@ contract AuctionHouse is CoreRef {
             loanId,
             LendingTerm(msg.sender).collateralToken(),
             loan.collateralAmount,
-            callDebt
+            loan.callDebt
         );
     }
 
@@ -138,7 +148,14 @@ contract AuctionHouse is CoreRef {
             // compute amount of collateral received
             uint256 elapsed = block.timestamp - _startTime; // [0, midPoint[
             uint256 _collateralAmount = auctions[loanId].collateralAmount; // SLOAD
-            collateralReceived = (_collateralAmount * elapsed) / midPoint;
+            uint256 minCollateralReceived = (startCollateralOffered *
+                _collateralAmount) / 1e18;
+            uint256 remainingCollateral = _collateralAmount -
+                minCollateralReceived;
+            collateralReceived =
+                minCollateralReceived +
+                (remainingCollateral * elapsed) /
+                midPoint;
         }
         // second phase of the auction, where less and less CREDIT is asked
         else if (block.timestamp < _startTime + auctionDuration) {
@@ -152,12 +169,21 @@ contract AuctionHouse is CoreRef {
             creditAsked = _callDebt - (_callDebt * elapsed) / PHASE_2_DURATION;
         }
         // second phase fully elapsed, anyone can receive the full collateral and give 0 CREDIT
-        // in practice, somebody should have taken the arb before we reach this condition.
+        // in practice, somebody should have taken the arb before we reach this condition, and
+        // there are conditions in bid() & forgive() to prevent this from happening.
         else {
             // receive the full collateral
             collateralReceived = auctions[loanId].collateralAmount;
             //creditAsked = 0; // implicit
         }
+
+        // apply eventual creditMultiplier updates
+        uint256 creditMultiplier = ProfitManager(
+            LendingTerm(auctions[loanId].lendingTerm).profitManager()
+        ).creditMultiplier();
+        creditAsked =
+            (creditAsked * auctions[loanId].callCreditMultiplier) /
+            creditMultiplier;
     }
 
     /// @notice bid for an active auction
@@ -172,7 +198,7 @@ contract AuctionHouse is CoreRef {
         require(creditAsked != 0, "AuctionHouse: cannot bid 0");
 
         // close the auction in state
-        auctions[loanId].endTime = block.timestamp;
+        auctions[loanId].endTime = uint48(block.timestamp);
         nAuctionsInProgress--;
 
         // notify LendingTerm of auction result
@@ -206,7 +232,7 @@ contract AuctionHouse is CoreRef {
         require(creditAsked == 0, "AuctionHouse: ongoing auction");
 
         // close the auction in state
-        auctions[loanId].endTime = block.timestamp;
+        auctions[loanId].endTime = uint48(block.timestamp);
         nAuctionsInProgress--;
 
         // notify LendingTerm of auction result

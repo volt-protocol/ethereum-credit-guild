@@ -11,6 +11,11 @@
     "RATE_LIMITED_CREDIT_MINTER",
     "PSM_USDC"
   ],
+  "CREDIT_BURNER": [
+    "PROFIT_MANAGER",
+    "PSM_USDC",
+    "TERM_SDAI_1"
+  ],
   "RATE_LIMITED_CREDIT_MINTER": [
     "TERM_SDAI_1"
   ],
