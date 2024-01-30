@@ -15,6 +15,7 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
+import {LendingTermFactory} from "@src/governance/LendingTermFactory.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
@@ -31,6 +32,7 @@ contract LendingTermOnboardingUnitTest is Test {
     AuctionHouse public auctionHouse;
     RateLimitedMinter rlcm;
     GuildTimelockController private timelock;
+    LendingTermFactory private factory;
     LendingTermOnboarding private onboarder;
     address private constant alice = address(0x616c696365);
     address private constant bob = address(0xB0B);
@@ -79,6 +81,7 @@ contract LendingTermOnboardingUnitTest is Test {
             address(core),
             _TIMELOCK_MIN_DELAY
         );
+        factory = new LendingTermFactory(address(core), address(guild));
         onboarder = new LendingTermOnboarding(
             address(core), // _core
             address(timelock), // _timelock
@@ -86,13 +89,14 @@ contract LendingTermOnboardingUnitTest is Test {
             _VOTING_DELAY, // initialVotingDelay
             _VOTING_PERIOD, // initialVotingPeriod
             _PROPOSAL_THRESHOLD, // initialProposalThreshold
-            _QUORUM // initialQuorum
+            _QUORUM, // initialQuorum
+            address(factory)
         );
-        onboarder.allowImplementation(address(termImplementation), true);
-        onboarder.allowAuctionHouse(address(auctionHouse), true);
-        onboarder.setMarketReferences(
+        factory.allowImplementation(address(termImplementation), true);
+        factory.allowAuctionHouse(address(auctionHouse), true);
+        factory.setMarketReferences(
             1,
-            LendingTermOnboarding.MarketReferences({
+            LendingTermFactory.MarketReferences({
                 profitManager: address(profitManager),
                 creditMinter: address(rlcm),
                 creditToken: address(credit)
@@ -137,7 +141,7 @@ contract LendingTermOnboardingUnitTest is Test {
     }
 
     function testInitialState() public {
-        assertEq(onboarder.implementations(address(termImplementation)), true);
+        assertEq(factory.implementations(address(termImplementation)), true);
 
         assertEq(onboarder.timelock(), address(timelock));
         assertEq(onboarder.votingDelay(), _VOTING_DELAY);
@@ -160,23 +164,23 @@ contract LendingTermOnboardingUnitTest is Test {
     }
 
     function testAllowImplementation() public {
-        assertEq(onboarder.implementations(address(this)), false);
+        assertEq(factory.implementations(address(this)), false);
 
         vm.expectRevert("UNAUTHORIZED");
-        onboarder.allowImplementation(address(this), true);
+        factory.allowImplementation(address(this), true);
 
         vm.prank(governor);
-        onboarder.allowImplementation(address(this), true);
-        assertEq(onboarder.implementations(address(this)), true);
+        factory.allowImplementation(address(this), true);
+        assertEq(factory.implementations(address(this)), true);
 
         vm.prank(governor);
-        onboarder.allowImplementation(address(this), false);
-        assertEq(onboarder.implementations(address(this)), false);
+        factory.allowImplementation(address(this), false);
+        assertEq(factory.implementations(address(this)), false);
     }
 
     function testCreateTerm() public {
         LendingTerm term = LendingTerm(
-            onboarder.createTerm(
+            factory.createTerm(
                 1,
                 address(termImplementation),
                 address(auctionHouse),
@@ -213,12 +217,12 @@ contract LendingTermOnboardingUnitTest is Test {
         assertEq(params.openingFee, 789);
         assertEq(params.hardCap, _HARDCAP);
 
-        assertEq(onboarder.gaugeTypes(address(term)), 1);
+        assertEq(factory.gaugeTypes(address(term)), 1);
     }
 
     function testCreateCheckParams() public {
-        vm.expectRevert("LendingTermOnboarding: invalid implementation");
-        onboarder.createTerm(
+        vm.expectRevert("LendingTermFactory: invalid implementation");
+        factory.createTerm(
             1,
             address(this),
             address(auctionHouse),
@@ -232,8 +236,8 @@ contract LendingTermOnboardingUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        vm.expectRevert("LendingTermOnboarding: invalid collateralToken");
-        onboarder.createTerm(
+        vm.expectRevert("LendingTermFactory: invalid collateralToken");
+        factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
@@ -248,9 +252,9 @@ contract LendingTermOnboardingUnitTest is Test {
             })
         );
         vm.expectRevert(
-            "LendingTermOnboarding: invalid maxDebtPerCollateralToken"
+            "LendingTermFactory: invalid maxDebtPerCollateralToken"
         );
-        onboarder.createTerm(
+        factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
@@ -264,8 +268,8 @@ contract LendingTermOnboardingUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        vm.expectRevert("LendingTermOnboarding: invalid interestRate");
-        onboarder.createTerm(
+        vm.expectRevert("LendingTermFactory: invalid interestRate");
+        factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
@@ -280,9 +284,9 @@ contract LendingTermOnboardingUnitTest is Test {
             })
         );
         vm.expectRevert(
-            "LendingTermOnboarding: invalid maxDelayBetweenPartialRepay"
+            "LendingTermFactory: invalid maxDelayBetweenPartialRepay"
         );
-        onboarder.createTerm(
+        factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
@@ -297,9 +301,9 @@ contract LendingTermOnboardingUnitTest is Test {
             })
         );
         vm.expectRevert(
-            "LendingTermOnboarding: invalid minPartialRepayPercent"
+            "LendingTermFactory: invalid minPartialRepayPercent"
         );
-        onboarder.createTerm(
+        factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
@@ -313,8 +317,8 @@ contract LendingTermOnboardingUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        vm.expectRevert("LendingTermOnboarding: invalid openingFee");
-        onboarder.createTerm(
+        vm.expectRevert("LendingTermFactory: invalid openingFee");
+        factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
@@ -328,8 +332,8 @@ contract LendingTermOnboardingUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        vm.expectRevert("LendingTermOnboarding: invalid hardCap");
-        onboarder.createTerm(
+        vm.expectRevert("LendingTermFactory: invalid hardCap");
+        factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
@@ -344,9 +348,9 @@ contract LendingTermOnboardingUnitTest is Test {
             })
         );
         vm.expectRevert(
-            "LendingTermOnboarding: invalid periodic payment params"
+            "LendingTermFactory: invalid periodic payment params"
         );
-        onboarder.createTerm(
+        factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
@@ -360,8 +364,8 @@ contract LendingTermOnboardingUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        vm.expectRevert("LendingTermOnboarding: unknown market");
-        onboarder.createTerm(
+        vm.expectRevert("LendingTermFactory: unknown market");
+        factory.createTerm(
             12345,
             address(termImplementation),
             address(auctionHouse),
@@ -400,7 +404,7 @@ contract LendingTermOnboardingUnitTest is Test {
 
     function testProposeOnboard() public {
         LendingTerm term = LendingTerm(
-            onboarder.createTerm(
+            factory.createTerm(
                 1,
                 address(termImplementation),
                 address(auctionHouse),
@@ -423,11 +427,11 @@ contract LendingTermOnboardingUnitTest is Test {
 
         // cannot propose if implementation has been disallowed since
         vm.prank(governor);
-        onboarder.allowImplementation(address(termImplementation), false);
+        factory.allowImplementation(address(termImplementation), false);
         vm.expectRevert("LendingTermOnboarding: invalid term");
         onboarder.proposeOnboard(address(this));
         vm.prank(governor);
-        onboarder.allowImplementation(address(termImplementation), true);
+        factory.allowImplementation(address(termImplementation), true);
 
         // cannot propose if the user doesn't have enough GUILD
         vm.expectRevert("Governor: proposer votes below proposal threshold");
@@ -543,7 +547,7 @@ contract LendingTermOnboardingUnitTest is Test {
 
     function testOnboardAgainLater() public {
         LendingTerm term = LendingTerm(
-            onboarder.createTerm(
+            factory.createTerm(
                 1,
                 address(termImplementation),
                 address(auctionHouse),

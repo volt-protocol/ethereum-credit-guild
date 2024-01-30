@@ -22,7 +22,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
     function setUp() public override {
         super.setUp();
         term = LendingTerm(
-            onboarder.createTerm(
+            factory.createTerm(
                 1,
                 AddressLib.get("LENDING_TERM_V1"),
                 AddressLib.get("AUCTION_HOUSE"),

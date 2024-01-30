@@ -21,6 +21,7 @@ import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
+import {LendingTermFactory} from "@src/governance/LendingTermFactory.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
@@ -39,6 +40,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
 
     /// Lending
     LendingTerm public term;
+    LendingTermFactory public factory;
     LendingTermOnboarding public onboarder;
     LendingTermOffboarding public offboarder;
 
@@ -112,6 +114,9 @@ contract PostProposalCheckFixture is PostProposalCheck {
         );
 
         /// lending terms
+        factory = LendingTermFactory(
+            AddressLib.get("LENDING_TERM_FACTORY")
+        );
         onboarder = LendingTermOnboarding(
             payable(AddressLib.get("ONBOARD_GOVERNOR_GUILD"))
         );
