@@ -107,7 +107,10 @@ abstract contract Gateway is Ownable, Pausable {
         bytes32 r,
         bytes32 s
     ) public {
-        require(_originalSender != address(1), "Gateway: Original sender not set in consumePermit");
+        require(
+            _originalSender != address(1),
+            "Gateway: Original sender not set in consumePermit"
+        );
         IERC20Permit(token).permit(
             _originalSender,
             address(this),

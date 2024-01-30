@@ -498,7 +498,12 @@ contract LendingTerm is CoreRef {
         uint256 borrowAmount,
         uint256 collateralAmount
     ) external whenNotPaused returns (bytes32 loanId) {
-        loanId = _borrow(msg.sender, msg.sender, borrowAmount, collateralAmount);
+        loanId = _borrow(
+            msg.sender,
+            msg.sender,
+            borrowAmount,
+            collateralAmount
+        );
     }
 
     /// @notice initiate a new loan on behalf of someone else
@@ -507,7 +512,12 @@ contract LendingTerm is CoreRef {
         uint256 collateralAmount,
         address onBehalfOf
     ) external whenNotPaused returns (bytes32 loanId) {
-        loanId = _borrow(msg.sender, onBehalfOf, borrowAmount, collateralAmount);
+        loanId = _borrow(
+            msg.sender,
+            onBehalfOf,
+            borrowAmount,
+            collateralAmount
+        );
     }
 
     /// @notice add collateral on an open loan.
