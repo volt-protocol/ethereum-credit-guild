@@ -53,11 +53,11 @@ contract LendingTermOffboardingUnitTest is Test {
         guild = new GuildToken(address(core));
         collateral = new MockERC20();
         rlcm = new RateLimitedMinter(
-            address(core), /*_core*/
-            address(credit), /*_token*/
-            CoreRoles.RATE_LIMITED_CREDIT_MINTER, /*_role*/
-            type(uint256).max, /*_maxRateLimitPerSecond*/
-            type(uint128).max, /*_rateLimitPerSecond*/
+            address(core) /*_core*/,
+            address(credit) /*_token*/,
+            CoreRoles.RATE_LIMITED_CREDIT_MINTER /*_role*/,
+            type(uint256).max /*_maxRateLimitPerSecond*/,
+            type(uint128).max /*_rateLimitPerSecond*/,
             type(uint128).max /*_bufferCap*/
         );
         psm = new SimplePSM(
@@ -73,12 +73,7 @@ contract LendingTermOffboardingUnitTest is Test {
             address(psm),
             _QUORUM
         );
-        auctionHouse = new AuctionHouse(
-            address(core),
-            650,
-            1800,
-            0
-        );
+        auctionHouse = new AuctionHouse(address(core), 650, 1800, 0);
         term = LendingTerm(Clones.clone(address(new LendingTerm())));
         term.initialize(
             address(core),
@@ -99,7 +94,7 @@ contract LendingTermOffboardingUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        
+
         // permissions
         core.grantRole(CoreRoles.GOVERNOR, governor);
         core.grantRole(CoreRoles.CREDIT_MINTER, address(this));
@@ -169,7 +164,7 @@ contract LendingTermOffboardingUnitTest is Test {
 
     function testProposeOffboard() public {
         offboarder.proposeOffboard(address(term));
-        
+
         assertEq(offboarder.polls(block.number, address(term)), 1);
         assertEq(offboarder.lastPollBlock(address(term)), block.number);
 
@@ -209,7 +204,10 @@ contract LendingTermOffboardingUnitTest is Test {
         // cannot attempt to support old polls
         uint256 POLL_DURATION_BLOCKS = offboarder.POLL_DURATION_BLOCKS();
         vm.expectRevert("LendingTermOffboarding: poll expired");
-        offboarder.supportOffboard(block.number - POLL_DURATION_BLOCKS - 1, address(term));
+        offboarder.supportOffboard(
+            block.number - POLL_DURATION_BLOCKS - 1,
+            address(term)
+        );
 
         // cannot vote for a poll that doesn't exist
         vm.expectRevert("LendingTermOffboarding: poll not found");
@@ -223,7 +221,7 @@ contract LendingTermOffboardingUnitTest is Test {
         // cannot vote for a poll created in the same block
         vm.expectRevert("ERC20MultiVotes: not a past block");
         offboarder.supportOffboard(block.number, address(term));
-    
+
         // cannot vote for a poll if we don't have tokens
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 13);
@@ -233,7 +231,10 @@ contract LendingTermOffboardingUnitTest is Test {
         // bob supports offboard
         vm.prank(bob);
         offboarder.supportOffboard(snapshotBlock, address(term));
-        assertEq(offboarder.polls(snapshotBlock, address(term)), _QUORUM / 2 + 1);
+        assertEq(
+            offboarder.polls(snapshotBlock, address(term)),
+            _QUORUM / 2 + 1
+        );
         assertEq(uint8(offboarder.canOffboard(address(term))), 0);
 
         // carol supports offboard
@@ -271,7 +272,7 @@ contract LendingTermOffboardingUnitTest is Test {
         assertEq(psm.redemptionsPaused(), true);
         assertEq(offboarder.nOffboardingsInProgress(), 1);
         assertEq(uint8(offboarder.canOffboard(address(term))), 2);
-        
+
         // get enough CREDIT to pack back interests
         vm.stopPrank();
         vm.roll(block.number + 1);
@@ -332,8 +333,14 @@ contract LendingTermOffboardingUnitTest is Test {
         assertEq(offboarder.nOffboardingsInProgress(), 0);
 
         assertEq(uint8(offboarder.canOffboard(address(term))), 0);
-        assertEq(core.hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term)), false);
-        assertEq(core.hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term)), false);
+        assertEq(
+            core.hasRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term)),
+            false
+        );
+        assertEq(
+            core.hasRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term)),
+            false
+        );
     }
 
     function testCannotVoteTwice() public {
@@ -352,13 +359,19 @@ contract LendingTermOffboardingUnitTest is Test {
 
         // vote once
         offboarder.supportOffboard(snapshotBlock, address(term));
-        assertEq(offboarder.polls(snapshotBlock, address(term)), _QUORUM / 2 + 1);
+        assertEq(
+            offboarder.polls(snapshotBlock, address(term)),
+            _QUORUM / 2 + 1
+        );
         assertEq(uint8(offboarder.canOffboard(address(term))), 0);
-    
+
         // cannot vote twice
         vm.expectRevert("LendingTermOffboarding: already voted");
         offboarder.supportOffboard(snapshotBlock, address(term));
-        assertEq(offboarder.polls(snapshotBlock, address(term)), _QUORUM / 2 + 1);
+        assertEq(
+            offboarder.polls(snapshotBlock, address(term)),
+            _QUORUM / 2 + 1
+        );
         assertEq(uint8(offboarder.canOffboard(address(term))), 0);
     }
 
@@ -434,7 +447,7 @@ contract LendingTermOffboardingUnitTest is Test {
         snapshotBlock = block.number;
         vm.expectRevert("LendingTermOffboarding: offboard in progress");
         offboarder.proposeOffboard(address(term));
-        
+
         // cannot cleanup because re-onboarded
         vm.expectRevert("LendingTermOffboarding: re-onboarded");
         offboarder.cleanup(address(term));

@@ -214,7 +214,7 @@ contract ERC20GaugesUnitTest is Test {
         token.setMaxGauges(3);
         token.addGauge(1, gauge1);
         token.addGauge(1, gauge2);
-    
+
         require(token.calculateGaugeAllocation(gauge1, 100e18) == 0);
         require(token.calculateGaugeAllocation(gauge2, 100e18) == 0);
 

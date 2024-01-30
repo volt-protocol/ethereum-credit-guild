@@ -6,7 +6,6 @@ import {MockERC20} from "@test/mock/MockERC20.sol";
 import {ERC20RebaseDistributor} from "@src/tokens/ERC20RebaseDistributor.sol";
 
 contract MockERC20RebaseDistributor is ERC20RebaseDistributor, MockERC20 {
-
     function decimals() public view override(ERC20, MockERC20) returns (uint8) {
         return MockERC20.decimals();
     }
@@ -35,7 +34,12 @@ contract MockERC20RebaseDistributor is ERC20RebaseDistributor, MockERC20 {
         return super.balanceOf(account);
     }
 
-    function totalSupply() public view override(ERC20, ERC20RebaseDistributor) returns (uint256) {
+    function totalSupply()
+        public
+        view
+        override(ERC20, ERC20RebaseDistributor)
+        returns (uint256)
+    {
         return super.totalSupply();
     }
 

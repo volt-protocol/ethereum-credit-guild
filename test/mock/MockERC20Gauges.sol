@@ -6,7 +6,6 @@ import {MockERC20} from "@test/mock/MockERC20.sol";
 import {ERC20Gauges} from "@src/tokens/ERC20Gauges.sol";
 
 contract MockERC20Gauges is ERC20Gauges, MockERC20 {
-
     function decimals() public view override(ERC20, MockERC20) returns (uint8) {
         return MockERC20.decimals();
     }
@@ -15,7 +14,10 @@ contract MockERC20Gauges is ERC20Gauges, MockERC20 {
     /// Open access to internal functions.
     /// ------------------------------------------------------------------------
 
-    function addGauge(uint256 gaugeType, address gauge) external returns (uint256) {
+    function addGauge(
+        uint256 gaugeType,
+        address gauge
+    ) external returns (uint256) {
         return _addGauge(gaugeType, gauge);
     }
 

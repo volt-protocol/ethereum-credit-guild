@@ -45,11 +45,11 @@ contract AuctionHouseUnitTest is Test {
         credit = new CreditToken(address(core), "name", "symbol");
         guild = new GuildToken(address(core));
         rlcm = new RateLimitedMinter(
-            address(core), /*_core*/
-            address(credit), /*_token*/
-            CoreRoles.RATE_LIMITED_CREDIT_MINTER, /*_role*/
-            type(uint256).max, /*_maxRateLimitPerSecond*/
-            type(uint128).max, /*_rateLimitPerSecond*/
+            address(core) /*_core*/,
+            address(credit) /*_token*/,
+            CoreRoles.RATE_LIMITED_CREDIT_MINTER /*_role*/,
+            type(uint256).max /*_maxRateLimitPerSecond*/,
+            type(uint128).max /*_rateLimitPerSecond*/,
             type(uint128).max /*_bufferCap*/
         );
         psm = new SimplePSM(
@@ -140,7 +140,7 @@ contract AuctionHouseUnitTest is Test {
         uint256 borrowAmount = 20_000e18;
         uint256 collateralAmount = 15e18;
         collateral.mint(address(borrower), collateralAmount);
-    
+
         // borrow
         vm.startPrank(borrower);
         collateral.approve(address(term), collateralAmount);
@@ -193,7 +193,7 @@ contract AuctionHouseUnitTest is Test {
         vm.expectRevert("AuctionHouse: loan previously called");
         auctionHouse.startAuction(loanId);
     }
-    
+
     // startAuction fail if the auction already exists
     function testStartAuctionFailAlreadyAuctioned() public {
         bytes32 loanId = _setupAndCallLoan();
@@ -211,11 +211,13 @@ contract AuctionHouseUnitTest is Test {
         assertEq(auctionHouse.getAuction(loanId).collateralAmount, 15e18);
         assertEq(auctionHouse.getAuction(loanId).callDebt, 22_000e18);
         uint256 PHASE_1_DURATION = auctionHouse.midPoint();
-        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() - auctionHouse.midPoint();
+        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() -
+            auctionHouse.midPoint();
 
         // right at the start of auction
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 0);
             assertEq(creditAsked, 22_000e18);
         }
@@ -224,25 +226,28 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 1.5e18);
             assertEq(creditAsked, 22_000e18);
         }
 
         // 50% of first phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_1_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_1_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 7.5e18);
             assertEq(creditAsked, 22_000e18);
         }
-    
+
         // 90% of first phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_1_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_1_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 13.5e18);
             assertEq(creditAsked, 22_000e18);
         }
@@ -252,7 +257,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 22_000e18);
         }
@@ -261,25 +267,28 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_2_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 19_800e18);
         }
 
         // 50% of second phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_2_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_2_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 11_000e18);
         }
 
         // 90% of second phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_2_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_2_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 2_200e18);
         }
@@ -288,7 +297,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_2_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 0);
         }
@@ -297,7 +307,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 123456);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 0);
         }
@@ -319,11 +330,13 @@ contract AuctionHouseUnitTest is Test {
         assertEq(auctionHouse.getAuction(loanId).collateralAmount, 15e18);
         assertEq(auctionHouse.getAuction(loanId).callDebt, 22_000e18);
         uint256 PHASE_1_DURATION = auctionHouse.midPoint();
-        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() - auctionHouse.midPoint();
+        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() -
+            auctionHouse.midPoint();
 
         // right at the start of auction
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 7.5e18);
             assertEq(creditAsked, 22_000e18);
         }
@@ -332,25 +345,28 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 7.5e18 + 0.75e18);
             assertEq(creditAsked, 22_000e18);
         }
 
         // 50% of first phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_1_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_1_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 7.5e18 + 3.75e18);
             assertEq(creditAsked, 22_000e18);
         }
-    
+
         // 90% of first phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_1_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_1_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 7.5e18 + 6.75e18);
             assertEq(creditAsked, 22_000e18);
         }
@@ -360,7 +376,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 22_000e18);
         }
@@ -369,7 +386,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_2_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 19_800e18);
         }
@@ -386,7 +404,7 @@ contract AuctionHouseUnitTest is Test {
     // getBidDetail fail if auction is ended
     function testGetBidDetailFailAuctionConcluded() public {
         bytes32 loanId = _setupAndCallLoan();
-        ( , uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+        (, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
         credit.mint(address(this), creditAsked);
         credit.approve(address(term), creditAsked);
         auctionHouse.bid(loanId);
@@ -404,7 +422,7 @@ contract AuctionHouseUnitTest is Test {
     // bid fail if auction has already concluded for this loan
     function testBidFailAuctionConcluded() public {
         bytes32 loanId = _setupAndCallLoan();
-        ( , uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+        (, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
         credit.mint(address(this), creditAsked);
         credit.approve(address(term), creditAsked);
         auctionHouse.bid(loanId);
@@ -421,7 +439,7 @@ contract AuctionHouseUnitTest is Test {
         bytes32 loanId = _setupAndCallLoan();
 
         vm.warp(block.timestamp + auctionHouse.auctionDuration() + 1);
-        ( , uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+        (, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
         assertEq(creditAsked, 0);
         assertEq(auctionHouse.getAuction(loanId).endTime, 0);
 
@@ -436,12 +454,14 @@ contract AuctionHouseUnitTest is Test {
     function testBidSuccessBadDebt() public {
         bytes32 loanId = _setupAndCallLoan();
         uint256 PHASE_1_DURATION = auctionHouse.midPoint();
-        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() - auctionHouse.midPoint();
+        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() -
+            auctionHouse.midPoint();
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION + PHASE_2_DURATION / 2);
 
         // At this time, get full collateral, repay half debt
-        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+            .getBidDetail(loanId);
         assertEq(collateralReceived, 15e18);
         assertEq(creditAsked, 11_000e18);
 
@@ -472,7 +492,8 @@ contract AuctionHouseUnitTest is Test {
 
         // trust getBidDetail's returned values
         bytes32 loanId = _setupAndCallLoan();
-        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+            .getBidDetail(loanId);
         uint256 collateralReturnedToBorrower = 15e18 - collateralReceived;
 
         // check token locations
@@ -515,7 +536,8 @@ contract AuctionHouseUnitTest is Test {
     function testForgive() public {
         bytes32 loanId = _setupAndCallLoan();
         uint256 PHASE_1_DURATION = auctionHouse.midPoint();
-        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() - auctionHouse.midPoint();
+        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() -
+            auctionHouse.midPoint();
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION + PHASE_2_DURATION / 2);
 
@@ -526,7 +548,8 @@ contract AuctionHouseUnitTest is Test {
         // At this time, get full collateral, repay 0 debt
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_2_DURATION / 2);
-        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+        (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+            .getBidDetail(loanId);
         assertEq(collateralReceived, 15e18);
         assertEq(creditAsked, 0);
 
@@ -551,7 +574,8 @@ contract AuctionHouseUnitTest is Test {
         assertEq(auctionHouse.getAuction(loanId).collateralAmount, 15e18);
         assertEq(auctionHouse.getAuction(loanId).callDebt, 22_000e18);
         uint256 PHASE_1_DURATION = auctionHouse.midPoint();
-        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() - auctionHouse.midPoint();
+        uint256 PHASE_2_DURATION = auctionHouse.auctionDuration() -
+            auctionHouse.midPoint();
 
         // divide credit value by 2
         assertEq(profitManager.creditMultiplier(), 1e18);
@@ -561,7 +585,8 @@ contract AuctionHouseUnitTest is Test {
 
         // right at the start of auction
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 0);
             assertEq(creditAsked, 22_000e18 * 2);
         }
@@ -570,16 +595,18 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 1.5e18);
             assertEq(creditAsked, 22_000e18 * 2);
         }
 
         // 50% of first phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_1_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_1_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 7.5e18);
             assertEq(creditAsked, 22_000e18 * 2);
         }
@@ -589,12 +616,13 @@ contract AuctionHouseUnitTest is Test {
         vm.prank(address(term));
         profitManager.notifyPnL(address(term), -10_000e18, 0);
         assertEq(profitManager.creditMultiplier(), 0.25e18);
-    
+
         // 90% of first phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_1_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_1_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 13.5e18);
             assertEq(creditAsked, 22_000e18 * 4);
         }
@@ -604,7 +632,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_1_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 22_000e18 * 4);
         }
@@ -613,25 +642,28 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_2_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 19_800e18 * 4);
         }
 
         // 50% of second phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_2_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_2_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 11_000e18 * 4);
         }
 
         // 90% of second phase
         vm.roll(block.number + 1);
-        vm.warp(block.timestamp + PHASE_2_DURATION * 4 / 10);
+        vm.warp(block.timestamp + (PHASE_2_DURATION * 4) / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 2_200e18 * 4);
         }
@@ -640,7 +672,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + PHASE_2_DURATION / 10);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 0);
         }
@@ -649,7 +682,8 @@ contract AuctionHouseUnitTest is Test {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 123456);
         {
-            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             assertEq(collateralReceived, 15e18);
             assertEq(creditAsked, 0);
         }

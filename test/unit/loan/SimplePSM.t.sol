@@ -115,7 +115,10 @@ contract SimplePSMUnitTest is Test {
 
         assertEq(psm.getRedeemAmountOut(0), 0);
         assertEq(psm.getRedeemAmountOut(2 * 100_000_000 * 1e12), 100_000_000);
-        assertEq(psm.getRedeemAmountOut(111_111_111_111_111_111_111), 55_555_555);
+        assertEq(
+            psm.getRedeemAmountOut(111_111_111_111_111_111_111),
+            55_555_555
+        );
         assertEq(psm.getRedeemAmountOut(12345), 0);
     }
 
@@ -124,14 +127,14 @@ contract SimplePSMUnitTest is Test {
     // - redeem moves a number of token equal to getRedeemAmountOut() i/o
     // - rounding errors are within 1 wei for a mint/redeem round-trip
     function testMintRedeem(uint256 input) public {
-        uint256 mintIn = input % 1e15 + 1; // [1, 1_000_000_000e6]
+        uint256 mintIn = (input % 1e15) + 1; // [1, 1_000_000_000e6]
 
         // update creditMultiplier
         // this ensures that some fuzz entries will result in uneven divisions
         // and will create a min/redeem round-trip error of 1 wei.
         credit.mint(address(this), 100e18);
         assertEq(profitManager.creditMultiplier(), 1e18);
-        profitManager.notifyPnL(address(this), -int256(input % 90e18 + 1), 0); // [0-90%] loss
+        profitManager.notifyPnL(address(this), -int256((input % 90e18) + 1), 0); // [0-90%] loss
         assertLt(profitManager.creditMultiplier(), 1.0e18 + 1);
         assertGt(profitManager.creditMultiplier(), 0.1e18 - 1);
         credit.burn(100e18);

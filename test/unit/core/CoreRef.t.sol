@@ -60,7 +60,7 @@ contract UnitTestCoreRef is Test {
 
         assertEq(address(coreRef.core()), address(0));
 
-        // cannot check role because core doesn't respond 
+        // cannot check role because core doesn't respond
         vm.expectRevert();
         coreRef.pause();
     }

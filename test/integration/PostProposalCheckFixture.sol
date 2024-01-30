@@ -121,11 +121,11 @@ contract PostProposalCheckFixture is PostProposalCheck {
 
         term = LendingTerm(AddressLib.get("TERM_SDAI_1"));
         collateralToken = ERC20(term.getParameters().collateralToken);
-        
+
         vm.label(userOne, "user one");
         vm.label(userTwo, "user two");
         vm.label(userThree, "user three");
-        
+
         // Mint the first CREDIT tokens and enter rebase
         // Doing this with a non-dust balance ensures the share price internally
         // to the CreditToken has a reasonable size.
@@ -133,7 +133,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
             /// @notice USDC mint amount
             uint256 INITIAL_USDC_MINT_AMOUNT = 100 * 1e6;
             deal(address(usdc), userThree, INITIAL_USDC_MINT_AMOUNT);
-            
+
             vm.startPrank(userThree);
             usdc.approve(address(psm), INITIAL_USDC_MINT_AMOUNT);
             psm.mint(userThree, INITIAL_USDC_MINT_AMOUNT);

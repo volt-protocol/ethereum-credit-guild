@@ -205,7 +205,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // minting should keep rebasing status
         assertEq(token.isRebasing(alice), true);
         assertEq(token.isRebasing(bobby), false);
-        
+
         // check balances
         assertEq(token.balanceOf(alice), 100);
         assertEq(token.balanceOf(bobby), 100);
@@ -233,7 +233,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
 
         assertEq(token.isRebasing(alice), true);
         assertEq(token.isRebasing(bobby), false);
-        
+
         vm.prank(alice);
         token.burn(100);
         vm.prank(bobby);
@@ -242,11 +242,11 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // burning should keep rebasing status
         assertEq(token.isRebasing(alice), true);
         assertEq(token.isRebasing(bobby), false);
-        
+
         // check balances
         assertEq(token.balanceOf(alice), 0);
         assertEq(token.balanceOf(bobby), 0);
-        
+
         // test burn with pending rebase rewards
         token.mint(alice, 100);
         assertEq(token.balanceOf(alice), 100);
@@ -276,7 +276,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.totalSupply(), 200);
         assertEq(token.rebasingSupply(), 100);
         assertEq(token.nonRebasingSupply(), 100);
-        
+
         vm.prank(alice);
         token.transfer(bobby, 50);
 
@@ -347,7 +347,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
 
         assertEq(token.isRebasing(alice), true);
         assertEq(token.isRebasing(bobby), false);
-        
+
         vm.prank(alice);
         token.transferFrom(bobby, alice, 50);
 
@@ -480,7 +480,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         vm.prank(bobby);
         token.transfer(alice, 200);
 
-       // check balances
+        // check balances
         assertEq(token.balanceOf(alice), 500);
         assertEq(token.balanceOf(bobby), 100);
         assertEq(token.totalSupply(), 600);
@@ -626,7 +626,10 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.nonRebasingSupply(), 0); // return 0 to prevent underflow
     }
 
-    function testDistributeFuzz(uint256 distributionAmount, uint256[3] memory userBalances) public {
+    function testDistributeFuzz(
+        uint256 distributionAmount,
+        uint256[3] memory userBalances
+    ) public {
         // fuzz values in the plausibility range
         distributionAmount = bound(distributionAmount, 0, 10_000e18);
         userBalances[0] = bound(userBalances[0], 0, 1_000_000e18);
@@ -648,7 +651,9 @@ contract ERC20RebaseDistributorUnitTest is Test {
         assertEq(token.isRebasing(carol), false);
 
         // check balances
-        uint256 totalSupplyBefore = userBalances[0] + userBalances[1] + userBalances[2];
+        uint256 totalSupplyBefore = userBalances[0] +
+            userBalances[1] +
+            userBalances[2];
         uint256 rebasingSupplyBefore = userBalances[0] + userBalances[1];
         uint256 nonRebasingSupplyBefore = userBalances[2];
         assertEq(token.balanceOf(alice), userBalances[0]);
@@ -673,12 +678,36 @@ contract ERC20RebaseDistributorUnitTest is Test {
         // check balances
         // max error is due to rounding down on number of shares & share price
         uint256 maxError = 1;
-        assertApproxEqAbs(token.balanceOf(alice), userBalances[0] + distributionAmount * userBalances[0] / rebasingSupplyBefore, maxError);
-        assertApproxEqAbs(token.balanceOf(bobby), userBalances[1] + distributionAmount * userBalances[1] / rebasingSupplyBefore, maxError);
+        assertApproxEqAbs(
+            token.balanceOf(alice),
+            userBalances[0] +
+                (distributionAmount * userBalances[0]) /
+                rebasingSupplyBefore,
+            maxError
+        );
+        assertApproxEqAbs(
+            token.balanceOf(bobby),
+            userBalances[1] +
+                (distributionAmount * userBalances[1]) /
+                rebasingSupplyBefore,
+            maxError
+        );
         assertEq(token.balanceOf(carol), userBalances[2]);
-        assertApproxEqAbs(token.totalSupply(), totalSupplyBefore + distributionAmount, maxError);
-        assertApproxEqAbs(token.rebasingSupply(), rebasingSupplyBefore + distributionAmount, maxError);
-        assertApproxEqAbs(token.nonRebasingSupply(), nonRebasingSupplyBefore, maxError);
+        assertApproxEqAbs(
+            token.totalSupply(),
+            totalSupplyBefore + distributionAmount,
+            maxError
+        );
+        assertApproxEqAbs(
+            token.rebasingSupply(),
+            rebasingSupplyBefore + distributionAmount,
+            maxError
+        );
+        assertApproxEqAbs(
+            token.nonRebasingSupply(),
+            nonRebasingSupplyBefore,
+            maxError
+        );
 
         // do more distribute to study rounding errors
         for (uint256 i = 2; i < 10; i++) {
@@ -691,12 +720,36 @@ contract ERC20RebaseDistributorUnitTest is Test {
             maxError++; // each distribute can add up to 1 wei of error
 
             // check balances
-            assertApproxEqAbs(token.balanceOf(alice), userBalances[0] + distributionAmount * i * userBalances[0] / rebasingSupplyBefore, maxError);
-            assertApproxEqAbs(token.balanceOf(bobby), userBalances[1] + distributionAmount * i * userBalances[1] / rebasingSupplyBefore, maxError);
+            assertApproxEqAbs(
+                token.balanceOf(alice),
+                userBalances[0] +
+                    (distributionAmount * i * userBalances[0]) /
+                    rebasingSupplyBefore,
+                maxError
+            );
+            assertApproxEqAbs(
+                token.balanceOf(bobby),
+                userBalances[1] +
+                    (distributionAmount * i * userBalances[1]) /
+                    rebasingSupplyBefore,
+                maxError
+            );
             assertEq(token.balanceOf(carol), userBalances[2]);
-            assertApproxEqAbs(token.totalSupply(), totalSupplyBefore + distributionAmount * i, maxError);
-            assertApproxEqAbs(token.rebasingSupply(), rebasingSupplyBefore + distributionAmount * i, maxError);
-            assertApproxEqAbs(token.nonRebasingSupply(), nonRebasingSupplyBefore, maxError);
+            assertApproxEqAbs(
+                token.totalSupply(),
+                totalSupplyBefore + distributionAmount * i,
+                maxError
+            );
+            assertApproxEqAbs(
+                token.rebasingSupply(),
+                rebasingSupplyBefore + distributionAmount * i,
+                maxError
+            );
+            assertApproxEqAbs(
+                token.nonRebasingSupply(),
+                nonRebasingSupplyBefore,
+                maxError
+            );
         }
     }
 
@@ -705,7 +758,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
-        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        token.enterRebase(); // distrubte will not recalculate the share price unless some account is rebasing
         assertEq(token.totalSupply(), 155e18);
         assertEq(token.nonRebasingSupply(), 100e18);
         assertEq(token.rebasingSupply(), 55e18);
@@ -733,7 +786,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
-        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        token.enterRebase(); // distrubte will not recalculate the share price unless some account is rebasing
         assertEq(token.totalSupply(), 155e18);
         assertEq(token.nonRebasingSupply(), 100e18);
         assertEq(token.rebasingSupply(), 55e18);
@@ -762,7 +815,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
-        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        token.enterRebase(); // distrubte will not recalculate the share price unless some account is rebasing
         assertEq(token.totalSupply(), 155e18);
         assertEq(token.nonRebasingSupply(), 100e18);
         assertEq(token.rebasingSupply(), 55e18);
@@ -792,7 +845,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
-        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        token.enterRebase(); // distrubte will not recalculate the share price unless some account is rebasing
         assertEq(token.totalSupply(), 155e18);
         assertEq(token.nonRebasingSupply(), 100e18);
         assertEq(token.rebasingSupply(), 55e18);
@@ -823,7 +876,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
-        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        token.enterRebase(); // distrubte will not recalculate the share price unless some account is rebasing
         assertEq(token.totalSupply(), 155e18);
         assertEq(token.nonRebasingSupply(), 100e18);
         assertEq(token.rebasingSupply(), 55e18);
@@ -847,7 +900,11 @@ contract ERC20RebaseDistributorUnitTest is Test {
         vm.prank(bobby);
         token.transferFrom(alice, bobby, 100e18);
 
-        assertApproxEqAbs(token.balanceOf(bobby), 55e18 + distributionAmount + 100e18, 1);
+        assertApproxEqAbs(
+            token.balanceOf(bobby),
+            55e18 + distributionAmount + 100e18,
+            1
+        );
         assertEq(token.balanceOf(alice), 0);
     }
 
@@ -856,7 +913,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
-        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        token.enterRebase(); // distrubte will not recalculate the share price unless some account is rebasing
         assertEq(token.totalSupply(), 155e18);
         assertEq(token.nonRebasingSupply(), 100e18);
         assertEq(token.rebasingSupply(), 55e18);
@@ -889,7 +946,7 @@ contract ERC20RebaseDistributorUnitTest is Test {
         token.mint(alice, 100e18);
         token.mint(bobby, 55e18);
         vm.prank(bobby);
-        token.enterRebase();  // distrubte will not recalculate the share price unless some account is rebasing
+        token.enterRebase(); // distrubte will not recalculate the share price unless some account is rebasing
         assertEq(token.totalSupply(), 155e18);
         assertEq(token.nonRebasingSupply(), 100e18);
         assertEq(token.rebasingSupply(), 55e18);
@@ -1210,11 +1267,26 @@ contract ERC20RebaseDistributorUnitTest is Test {
         vm.warp(block.timestamp + token.DISTRIBUTION_PERIOD() / 2);
 
         // check new balances and supply
-        assertEq(token.balanceOf(alice), uint256(125 + expectedAliceBalanceChange));
-        assertEq(token.balanceOf(bobby), uint256(125 + expectedBobbyBalanceChange));
-        assertEq(token.balanceOf(carol), uint256(100 + expectedCarolBalanceChange));
+        assertEq(
+            token.balanceOf(alice),
+            uint256(125 + expectedAliceBalanceChange)
+        );
+        assertEq(
+            token.balanceOf(bobby),
+            uint256(125 + expectedBobbyBalanceChange)
+        );
+        assertEq(
+            token.balanceOf(carol),
+            uint256(100 + expectedCarolBalanceChange)
+        );
         assertEq(token.totalSupply(), uint256(350 + expectedTotalSupplyChange));
-        assertEq(token.nonRebasingSupply(), uint256(100 + expectedNonRebasingSupplyChange));
-        assertEq(token.rebasingSupply(), uint256(250 + expectedRebasingSupplyChange));
+        assertEq(
+            token.nonRebasingSupply(),
+            uint256(100 + expectedNonRebasingSupplyChange)
+        );
+        assertEq(
+            token.rebasingSupply(),
+            uint256(250 + expectedRebasingSupplyChange)
+        );
     }
 }

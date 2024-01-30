@@ -39,11 +39,11 @@ contract SurplusGuildMinterUnitTest is Test {
         credit = new CreditToken(address(core), "name", "symbol");
         guild = new GuildToken(address(core));
         rlgm = new RateLimitedMinter(
-            address(core), /*_core*/
-            address(guild), /*_token*/
-            CoreRoles.RATE_LIMITED_GUILD_MINTER, /*_role*/
-            type(uint256).max, /*_maxRateLimitPerSecond*/
-            type(uint128).max, /*_rateLimitPerSecond*/
+            address(core) /*_core*/,
+            address(guild) /*_token*/,
+            CoreRoles.RATE_LIMITED_GUILD_MINTER /*_role*/,
+            type(uint256).max /*_maxRateLimitPerSecond*/,
+            type(uint128).max /*_rateLimitPerSecond*/,
             type(uint128).max /*_bufferCap*/
         );
         sgm = new SurplusGuildMinter(
@@ -56,7 +56,13 @@ contract SurplusGuildMinterUnitTest is Test {
             REWARD_RATIO
         );
         profitManager.initializeReferences(address(credit), address(guild));
-        term = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        term = address(
+            new MockLendingTerm(
+                address(core),
+                address(profitManager),
+                address(credit)
+            )
+        );
 
         // roles
         core.grantRole(CoreRoles.GOVERNOR, governor);
@@ -116,13 +122,16 @@ contract SurplusGuildMinterUnitTest is Test {
         credit.mint(address(this), 100e18);
         credit.approve(address(sgm), 100e18);
         sgm.stake(term, 100e18);
-        
+
         // check after-stake state
         assertEq(credit.balanceOf(address(this)), 0);
         assertEq(profitManager.termSurplusBuffer(term), 100e18);
         assertEq(guild.balanceOf(address(sgm)), 200e18);
         assertEq(guild.getGaugeWeight(term), 250e18);
-        SurplusGuildMinter.UserStake memory stake = sgm.getUserStake(address(this), term);
+        SurplusGuildMinter.UserStake memory stake = sgm.getUserStake(
+            address(this),
+            term
+        );
         assertEq(uint256(stake.stakeTime), block.timestamp);
         assertEq(stake.lastGaugeLoss, 0);
         assertEq(stake.profitIndex, 1e18);
@@ -135,7 +144,7 @@ contract SurplusGuildMinterUnitTest is Test {
         credit.mint(address(this), 150e18);
         credit.approve(address(sgm), 150e18);
         sgm.stake(term, 150e18);
-        
+
         // check after-stake state
         assertEq(credit.balanceOf(address(this)), 0);
         assertEq(profitManager.termSurplusBuffer(term), 250e18);
@@ -168,13 +177,16 @@ contract SurplusGuildMinterUnitTest is Test {
         credit.mint(address(this), 100e18);
         credit.approve(address(sgm), 100e18);
         sgm.stake(term, 100e18);
-        
+
         // check after-stake state
         assertEq(credit.balanceOf(address(this)), 0);
         assertEq(profitManager.termSurplusBuffer(term), 100e18);
         assertEq(guild.balanceOf(address(sgm)), 200e18);
         assertEq(guild.getGaugeWeight(term), 250e18);
-        SurplusGuildMinter.UserStake memory stake = sgm.getUserStake(address(this), term);
+        SurplusGuildMinter.UserStake memory stake = sgm.getUserStake(
+            address(this),
+            term
+        );
         assertEq(uint256(stake.stakeTime), block.timestamp);
         assertEq(stake.lastGaugeLoss, 0);
         assertEq(stake.profitIndex, 1e18);
@@ -200,7 +212,7 @@ contract SurplusGuildMinterUnitTest is Test {
         assertEq(stake.profitIndex, 1e18);
         assertEq(stake.credit, 150e18);
         assertEq(stake.guild, 300e18);
-        
+
         // unstake
         sgm.unstake(term, 150e18);
         assertEq(credit.balanceOf(address(this)), 150e18);
@@ -232,8 +244,12 @@ contract SurplusGuildMinterUnitTest is Test {
         profitManager.notifyPnL(term, 35e18, 0);
         assertEq(profitManager.surplusBuffer(), 17.5e18);
         assertEq(profitManager.termSurplusBuffer(term), 150e18);
-        (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
-        (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
+        (, , uint256 rewardsThis) = profitManager.getPendingRewards(
+            address(this)
+        );
+        (, , uint256 rewardsSgm) = profitManager.getPendingRewards(
+            address(sgm)
+        );
         assertEq(rewardsThis, 2.5e18);
         assertEq(rewardsSgm, 15e18);
 
@@ -244,7 +260,10 @@ contract SurplusGuildMinterUnitTest is Test {
         // unstake half (sgm)
         sgm.unstake(term, 75e18);
         assertEq(credit.balanceOf(address(this)), 75e18 + rewardsSgm);
-        assertEq(guild.balanceOf(address(this)), rewardsSgm * REWARD_RATIO / 1e18 + 50e18);
+        assertEq(
+            guild.balanceOf(address(this)),
+            (rewardsSgm * REWARD_RATIO) / 1e18 + 50e18
+        );
         assertEq(credit.balanceOf(address(sgm)), 0);
         assertEq(guild.balanceOf(address(sgm)), 150e18);
         assertEq(profitManager.surplusBuffer(), 17.5e18);
@@ -263,7 +282,10 @@ contract SurplusGuildMinterUnitTest is Test {
         // unstake 2nd half (sgm)
         sgm.unstake(term, 75e18);
         assertEq(credit.balanceOf(address(this)), 150e18 + rewardsSgm);
-        assertEq(guild.balanceOf(address(this)), rewardsSgm * REWARD_RATIO / 1e18 + 50e18);
+        assertEq(
+            guild.balanceOf(address(this)),
+            (rewardsSgm * REWARD_RATIO) / 1e18 + 50e18
+        );
         assertEq(credit.balanceOf(address(sgm)), 0);
         assertEq(guild.balanceOf(address(sgm)), 0);
         assertEq(profitManager.surplusBuffer(), 17.5e18);
@@ -302,8 +324,12 @@ contract SurplusGuildMinterUnitTest is Test {
         profitManager.notifyPnL(term, 35e18, 0);
         assertEq(profitManager.surplusBuffer(), 17.5e18);
         assertEq(profitManager.termSurplusBuffer(term), 150e18);
-        (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
-        (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
+        (, , uint256 rewardsThis) = profitManager.getPendingRewards(
+            address(this)
+        );
+        (, , uint256 rewardsSgm) = profitManager.getPendingRewards(
+            address(sgm)
+        );
         assertEq(rewardsThis, 2.5e18);
         assertEq(rewardsSgm, 15e18);
 
@@ -361,8 +387,12 @@ contract SurplusGuildMinterUnitTest is Test {
         profitManager.notifyPnL(term, 35e18, 0);
         assertEq(profitManager.surplusBuffer(), 17.5e18);
         assertEq(profitManager.termSurplusBuffer(term), 150e18);
-        (,, uint256 rewardsThis) = profitManager.getPendingRewards(address(this));
-        (,, uint256 rewardsSgm) = profitManager.getPendingRewards(address(sgm));
+        (, , uint256 rewardsThis) = profitManager.getPendingRewards(
+            address(this)
+        );
+        (, , uint256 rewardsSgm) = profitManager.getPendingRewards(
+            address(sgm)
+        );
         assertEq(rewardsThis, 2.5e18);
         assertEq(rewardsSgm, 15e18);
 
@@ -433,8 +463,20 @@ contract SurplusGuildMinterUnitTest is Test {
     // test with multiple users, some gauges with losses and some not
     function testMultipleUsers() public {
         // add a 2 terms with equal weight
-        address term1 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
-        address term2 = address(new MockLendingTerm(address(core), address(profitManager), address(credit)));
+        address term1 = address(
+            new MockLendingTerm(
+                address(core),
+                address(profitManager),
+                address(credit)
+            )
+        );
+        address term2 = address(
+            new MockLendingTerm(
+                address(core),
+                address(profitManager),
+                address(credit)
+            )
+        );
         guild.addGauge(1, term1);
         guild.addGauge(1, term2);
         guild.mint(address(this), 100e18);

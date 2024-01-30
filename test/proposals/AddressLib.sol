@@ -6,17 +6,22 @@ import {console} from "@forge-std/console.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 library AddressLib {
+    string internal constant ADDR_PATH =
+        "/protocol-configuration/addresses.json";
 
-    string internal constant ADDR_PATH = "/protocol-configuration/addresses.json";
-
-    Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+    Vm internal constant vm =
+        Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     struct RecordedAddress {
         address addr;
         string name;
     }
 
-    function _read() internal view returns (RecordedAddress[] memory addresses) {
+    function _read()
+        internal
+        view
+        returns (RecordedAddress[] memory addresses)
+    {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, ADDR_PATH);
         string memory json = vm.readFile(path);
@@ -28,20 +33,25 @@ library AddressLib {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, ADDR_PATH);
 
-        string memory json = '[';
+        string memory json = "[";
         for (uint256 i = 0; i < addresses.length; i++) {
-            json = string.concat(json, '{');
+            json = string.concat(json, "{");
             json = string.concat(json, '"addr":');
-            json = string.concat(json, '"', Strings.toHexString(addresses[i].addr), '"');
-            json = string.concat(json, ',');
+            json = string.concat(
+                json,
+                '"',
+                Strings.toHexString(addresses[i].addr),
+                '"'
+            );
+            json = string.concat(json, ",");
             json = string.concat(json, '"name":');
             json = string.concat(json, '"', addresses[i].name, '"');
-            json = string.concat(json, '}');
+            json = string.concat(json, "}");
             if (i < addresses.length - 1) {
-                json = string.concat(json, ',');
+                json = string.concat(json, ",");
             }
         }
-        json = string.concat(json, ']');
+        json = string.concat(json, "]");
 
         vm.writeJson(json, path);
     }
@@ -50,18 +60,14 @@ library AddressLib {
         RecordedAddress[] memory addresses = _read();
 
         for (uint256 i = 0; i < addresses.length; i++) {
-            bool sameName = keccak256(abi.encodePacked(addresses[i].name)) == keccak256(abi.encodePacked(name));
+            bool sameName = keccak256(abi.encodePacked(addresses[i].name)) ==
+                keccak256(abi.encodePacked(name));
             if (sameName) {
                 return addresses[i].addr;
             }
         }
 
-        revert(
-            string.concat(
-                "[AddressLib] Getting unknown address ",
-                name
-            )
-        );
+        revert(string.concat("[AddressLib] Getting unknown address ", name));
     }
 
     function set(string memory name, address addr) external {
@@ -70,7 +76,8 @@ library AddressLib {
         bool replaced = false;
         for (uint256 i = 0; i < addresses.length; i++) {
             bool sameAddress = addresses[i].addr == addr;
-            bool sameName = keccak256(abi.encodePacked(addresses[i].name)) == keccak256(abi.encodePacked(name));
+            bool sameName = keccak256(abi.encodePacked(addresses[i].name)) ==
+                keccak256(abi.encodePacked(name));
 
             // check if address is duplicate
             if (sameAddress && !sameName) {
@@ -88,7 +95,12 @@ library AddressLib {
 
             // check if name is duplicate
             if (sameName) {
-                console.log(string.concat("[AddressLib] Overriding address with name: ", name));
+                console.log(
+                    string.concat(
+                        "[AddressLib] Overriding address with name: ",
+                        name
+                    )
+                );
                 replaced = true;
                 addresses[i].addr = addr;
             }
@@ -99,11 +111,16 @@ library AddressLib {
             return;
         }
 
-        RecordedAddress[] memory newAddresses = new RecordedAddress[](addresses.length + 1);
+        RecordedAddress[] memory newAddresses = new RecordedAddress[](
+            addresses.length + 1
+        );
         for (uint256 i = 0; i < addresses.length; i++) {
             newAddresses[i] = addresses[i];
         }
-        newAddresses[addresses.length] = RecordedAddress({name: name, addr: addr});
+        newAddresses[addresses.length] = RecordedAddress({
+            name: name,
+            addr: addr
+        });
         console.log(
             string.concat(
                 "[AddressLib] Add address ",
