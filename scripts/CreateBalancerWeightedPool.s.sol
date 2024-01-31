@@ -48,9 +48,9 @@ contract DeployBalancerPool is Script {
     // REPLACE WITH YOUR DATA
     string name = "50ecgUSDC-50ecgsDAI";
     string symbol = "50ecgUSDC-50ecgsDAI";
-    address token0 = 0xe9248437489bC542c68aC90E178f6Ca3699C3F6b;
+    address token0 = 0x7b8b4418990e4Daf35F5c7f0165DC487b1963641;
     uint256 amount0 = 50000000000000;
-    address token1 = 0xeeF0AB67262046d5bED00CE9C447e08D92b8dA61;
+    address token1 = 0x9F07498d9f4903B10dB57a3Bd1D91b6B64AEd61e;
     uint256 amount1 = 50000000000000000000000000;
 
     function _parseEnv() internal {
