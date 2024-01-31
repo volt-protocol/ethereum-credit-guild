@@ -165,7 +165,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         );
 
         /// assert that term borrowable amount is 0
-        assertEq(guild.calculateGaugeAllocation(address(term), 100_000_000), 0);
+        assertEq(term.debtCeiling(), 0);
     }
 
     /// This test will pass once a nonce is added to onboarder
@@ -224,6 +224,6 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         );
 
         /// assert that term borrowable amount is 0
-        assertEq(guild.calculateGaugeAllocation(address(term), 100_000_000), 0);
+        assertEq(term.debtCeiling(), 0);
     }
 }

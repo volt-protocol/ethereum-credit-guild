@@ -41,8 +41,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         ... Add internal _setMaxGauges(uint256) method
     - Remove public setContractExceedMaxGauges(address, bool) requiresAuth method
         ... Add internal _setCanExceedMaxGauges(address, bool) method
-    - Rename `calculateGaugeAllocation` to `calculateGaugeStoredAllocation` to make clear that it reads from stored weights.
-    - Add `calculateGaugeAllocation` helper function that reads from current weight.
+    - Remove `calculateGaugeAllocation` helper function
     - Add `isDeprecatedGauge(address)->bool` view function that returns true if gauge is deprecated.
     - Consistency: make incrementGauges return a uint112 instead of uint256
     - Import OpenZeppelin ERC20 & EnumerableSet instead of Solmate's
@@ -169,25 +168,6 @@ abstract contract ERC20Gauges is ERC20 {
     /// @notice helper function exposing the amount of weight available to allocate for a user
     function userUnusedWeight(address user) external view returns (uint256) {
         return balanceOf(user) - getUserWeight[user];
-    }
-
-    /** 
-    @notice helper function for calculating the proportion of a `quantity` allocated to a gauge
-    @param gauge the gauge to calculate allocation of
-    @param quantity a representation of a resource to be shared among all gauges
-    @return the proportion of `quantity` allocated to `gauge`. Returns 0 if gauge is not live, even if it has weight.
-    */
-    function calculateGaugeAllocation(
-        address gauge,
-        uint256 quantity
-    ) external view returns (uint256) {
-        if (_deprecatedGauges.contains(gauge)) return 0;
-
-        uint256 total = totalTypeWeight[gaugeType[gauge]];
-        if (total == 0) return 0;
-        uint256 weight = getGaugeWeight[gauge];
-
-        return (quantity * weight) / total;
     }
 
     /*///////////////////////////////////////////////////////////////

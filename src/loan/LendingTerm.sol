@@ -378,7 +378,7 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice returns the debt ceiling without change to gauge weight
-    function debtCeiling() external view returns (uint256) {
+    function debtCeiling() public view returns (uint256) {
         return debtCeiling(0);
     }
 
@@ -425,26 +425,11 @@ contract LendingTerm is CoreRef {
         );
 
         // check the debt ceiling
-        uint256 totalIssuance = ProfitManager(refs.profitManager)
-            .totalIssuance();
-        uint256 gaugeWeightTolerance = ProfitManager(refs.profitManager)
-            .gaugeWeightTolerance();
-        uint256 _debtCeiling = (GuildToken(refs.guildToken)
-            .calculateGaugeAllocation(
-                address(this),
-                totalIssuance + borrowAmount
-            ) * gaugeWeightTolerance) / 1e18;
-        if (totalIssuance == 0) {
-            // if the lending term is deprecated, `calculateGaugeAllocation` will return 0, and the borrow
-            // should revert because the debt ceiling is reached (no borrows should be allowed anymore).
-            // first borrow in the system does not check proportions of issuance, just that the term is not deprecated.
-            require(_debtCeiling != 0, "LendingTerm: debt ceiling reached");
-        } else {
-            require(
-                _postBorrowIssuance <= _debtCeiling,
-                "LendingTerm: debt ceiling reached"
-            );
-        }
+        uint256 _debtCeiling = debtCeiling();
+        require(
+            _postBorrowIssuance <= _debtCeiling,
+            "LendingTerm: debt ceiling reached"
+        );
 
         // save loan in state
         loans[loanId] = Loan({
