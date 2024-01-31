@@ -8,103 +8,103 @@
     "name": "TEAM_MULTISIG"
   },
   {
-    "addr": "0x242a6f09adef0cf19d32f5fe78a7b2c30c63fd4a",
+    "addr": "0xfc2290dbf4db882b6d3d07ecb1e00d0531b45680",
     "name": "CORE"
   },
   {
-    "addr": "0xe7a21ce9ddc03fa5cc43f4f1c57a9b0acd5034b3",
+    "addr": "0x7b8b4418990e4daf35f5c7f0165dc487b1963641",
     "name": "ERC20_USDC"
   },
   {
-    "addr": "0xe94bef636067afc06b3679d3c58dd5c9d771733e",
+    "addr": "0x1ced1eb530b5e71e6db9221a22c725e862fc0e60",
     "name": "ERC20_WBTC"
   },
   {
-    "addr": "0x5b4a67e937325e375364d2c05eb743cecb462a36",
+    "addr": "0x9f07498d9f4903b10db57a3bd1d91b6b64aed61e",
     "name": "ERC20_SDAI"
   },
   {
-    "addr": "0xb23fceb8f29d2d161596b917439e11b7b81fec62",
+    "addr": "0x8738c00828c8e6883326ea5ba104cacff95808e0",
     "name": "PROFIT_MANAGER"
   },
   {
-    "addr": "0x72621c0447ab798e201448e8bd4e36ec49df395f",
+    "addr": "0x7dff544f61b262d7218811f78c94c3b2f4e3dca1",
     "name": "ERC20_GUSDC"
   },
   {
-    "addr": "0xb022b6e8aa613d0bde8d6fba30f0242a14ef16e5",
+    "addr": "0x79e2b8553da5361d90ed08a9e3f2f3e5e5ff2f8f",
     "name": "ERC20_GUILD"
   },
   {
-    "addr": "0x85ccf5a305125b1aaec3a7b1b2a2f7ee52fbd19e",
+    "addr": "0x81aa07eb1b22e3d3b9c7cc728640721064cad4a9",
     "name": "RATE_LIMITED_CREDIT_MINTER"
   },
   {
-    "addr": "0xfc2290dbf4db882b6d3d07ecb1e00d0531b45680",
+    "addr": "0x9594af6eea97b43673bb046db152428b13c48377",
     "name": "RATE_LIMITED_GUILD_MINTER"
   },
   {
-    "addr": "0x7b8b4418990e4daf35f5c7f0165dc487b1963641",
+    "addr": "0x7386c5ffbb710e543a0f3c40c1e7ee1ddcaedf51",
     "name": "SURPLUS_GUILD_MINTER"
   },
   {
-    "addr": "0x1ced1eb530b5e71e6db9221a22c725e862fc0e60",
+    "addr": "0x912e76518b318c209ef7ff04d119967acae3569e",
     "name": "AUCTION_HOUSE"
   },
   {
-    "addr": "0x9f07498d9f4903b10db57a3bd1d91b6b64aed61e",
+    "addr": "0x87b22b22666c15c11b8632c8a132ee820b783061",
     "name": "LENDING_TERM_V1"
   },
   {
-    "addr": "0x8738c00828c8e6883326ea5ba104cacff95808e0",
+    "addr": "0xc19d710f13a725fd67021e8c45bdedffe95202e3",
     "name": "PSM_USDC"
   },
   {
-    "addr": "0x79e2b8553da5361d90ed08a9e3f2f3e5e5ff2f8f",
+    "addr": "0x14025e6f3ac44d6d2212605bce695b7d379c2350",
     "name": "DAO_GOVERNOR_GUILD"
   },
   {
-    "addr": "0x7dff544f61b262d7218811f78c94c3b2f4e3dca1",
+    "addr": "0x34badf7afe7c981d7b399f092f4557bef09c1b6f",
     "name": "DAO_TIMELOCK"
   },
   {
-    "addr": "0x81aa07eb1b22e3d3b9c7cc728640721064cad4a9",
+    "addr": "0x76b513119671176a87fa538e5814c50dd49e3e66",
     "name": "DAO_VETO_CREDIT"
   },
   {
-    "addr": "0x9594af6eea97b43673bb046db152428b13c48377",
+    "addr": "0x6ef90254dd61782ead7d95974d1d47f4f7d2d377",
     "name": "DAO_VETO_GUILD"
   },
   {
-    "addr": "0x87b22b22666c15c11b8632c8a132ee820b783061",
+    "addr": "0x3274ebe53c4fa1d0a59ad8fadbc6f944186b408e",
     "name": "ONBOARD_GOVERNOR_GUILD"
   },
   {
-    "addr": "0x7386c5ffbb710e543a0f3c40c1e7ee1ddcaedf51",
+    "addr": "0x1026847b30385606d3a22e62d5ede3b1b8e2448a",
     "name": "ONBOARD_TIMELOCK"
   },
   {
-    "addr": "0xc19d710f13a725fd67021e8c45bdedffe95202e3",
+    "addr": "0xd09195208a829990b0b72ef6d08d9637779338c8",
     "name": "ONBOARD_VETO_CREDIT"
   },
   {
-    "addr": "0x34badf7afe7c981d7b399f092f4557bef09c1b6f",
+    "addr": "0x68e47e70f66a484fcb0cef215a46d76300b2e2b2",
     "name": "ONBOARD_VETO_GUILD"
   },
   {
-    "addr": "0x14025e6f3ac44d6d2212605bce695b7d379c2350",
+    "addr": "0xb2aed7b9dce6826d510a2559da83afd5a2af9405",
     "name": "OFFBOARD_GOVERNOR_GUILD"
   },
   {
-    "addr": "0x340c183277c9a641069c3e2588708db6a2c59714",
+    "addr": "0x938998fca53d8bfd91bc1726d26238e9eada596c",
     "name": "TERM_SDAI_1"
   },
   {
-    "addr": "0xaa3b5307640a29de4ed7eea8a0ec2dc9c8c30434",
+    "addr": "0x820e8f9399514264fd8cb21cee5f282c723131f6",
     "name": "TERM_WBTC_1"
   },
   {
-    "addr": "0x912e76518b318c209ef7ff04d119967acae3569e",
+    "addr": "0xd3ecfc72fe299b58764e12ac38d59f20fc287052",
     "name": "LENDING_TERM_FACTORY"
   }
 ]

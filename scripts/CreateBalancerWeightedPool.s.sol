@@ -141,7 +141,7 @@ contract DeployBalancerPool is Script {
         vault.joinPool(poolId, deployerAddress, deployerAddress, request);
     }
 
-    function randomBytes32() public returns (bytes32) {
+    function randomBytes32() public view returns (bytes32) {
         return keccak256(abi.encodePacked(block.timestamp, msg.sender));
     }
 }

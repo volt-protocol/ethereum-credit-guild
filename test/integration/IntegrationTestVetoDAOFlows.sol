@@ -10,7 +10,6 @@ import "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
-import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
@@ -36,10 +35,10 @@ contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
         term = LendingTerm(
             factory.createTerm(
                 1,
-                AddressLib.get("LENDING_TERM_V1"),
-                AddressLib.get("AUCTION_HOUSE"),
+                getAddr("LENDING_TERM_V1"),
+                getAddr("AUCTION_HOUSE"),
                 LendingTerm.LendingTermParams({
-                    collateralToken: AddressLib.get("ERC20_SDAI"),
+                    collateralToken: getAddr("ERC20_SDAI"),
                     maxDebtPerCollateralToken: 1e18,
                     interestRate: 0.04e18,
                     maxDelayBetweenPartialRepay: 0,

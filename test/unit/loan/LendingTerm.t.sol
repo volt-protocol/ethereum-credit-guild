@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
@@ -15,7 +15,7 @@ import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
-contract LendingTermUnitTest is Test {
+contract LendingTermUnitTest is ECGTest {
     address private governor = address(1);
     address private guardian = address(2);
     Core private core;

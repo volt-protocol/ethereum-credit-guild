@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
@@ -11,7 +11,7 @@ import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
-contract SimplePSMUnitTest is Test {
+contract SimplePSMUnitTest is ECGTest {
     address private governor = address(1);
     address private guardian = address(2);
 

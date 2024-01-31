@@ -7,7 +7,6 @@ import {Core} from "@src/core/Core.sol";
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
-import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
@@ -120,365 +119,345 @@ contract GIP_0 is Proposal {
         // Core
         {
             Core core = new Core();
-            AddressLib.set("CORE", address(core));
+            setAddr("CORE", address(core));
         }
 
-        //     if (IS_SEPOLIA) {
-        //         address core = AddressLib.get("CORE");
-        //         TestnetToken usdc = new TestnetToken(
-        //             core,
-        //             "ECG Testnet USDC",
-        //             "USDC",
-        //             6
-        //         );
-        //         TestnetToken wbtc = new TestnetToken(
-        //             core,
-        //             "ECG Testnet WBTC",
-        //             "WBTC",
-        //             8
-        //         );
-        //         TestnetToken sdai = new TestnetToken(
-        //             core,
-        //             "ECG Testnet sDAI",
-        //             "sDAI",
-        //             18
-        //         );
-        //         AddressLib.set("ERC20_USDC", address(usdc));
-        //         AddressLib.set("ERC20_WBTC", address(wbtc));
-        //         AddressLib.set("ERC20_SDAI", address(sdai));
-        //     }
+        if (IS_SEPOLIA) {
+            address core = getAddr("CORE");
+            TestnetToken usdc = new TestnetToken(
+                core,
+                "ECG Testnet USDC",
+                "USDC",
+                6
+            );
+            TestnetToken wbtc = new TestnetToken(
+                core,
+                "ECG Testnet WBTC",
+                "WBTC",
+                8
+            );
+            TestnetToken sdai = new TestnetToken(
+                core,
+                "ECG Testnet sDAI",
+                "sDAI",
+                18
+            );
+            setAddr("ERC20_USDC", address(usdc));
+            setAddr("ERC20_WBTC", address(wbtc));
+            setAddr("ERC20_SDAI", address(sdai));
+        }
 
-        //     // ProfitManager
-        //     {
-        //         ProfitManager profitManager = new ProfitManager(
-        //             AddressLib.get("CORE")
-        //         );
-        //         AddressLib.set("PROFIT_MANAGER", address(profitManager));
-        //     }
+        // ProfitManager
+        {
+            ProfitManager profitManager = new ProfitManager(getAddr("CORE"));
+            setAddr("PROFIT_MANAGER", address(profitManager));
+        }
 
-        //     // Tokens & minting
-        //     {
-        //         CreditToken credit = new CreditToken(
-        //             AddressLib.get("CORE"),
-        //             "Ethereum Credit Guild - gUSDC",
-        //             "gUSDC"
-        //         );
-        //         GuildToken guild = new GuildToken(AddressLib.get("CORE"));
-        //         RateLimitedMinter rateLimitedCreditMinter = new RateLimitedMinter(
-        //             AddressLib.get("CORE"),
-        //             address(credit),
-        //             CoreRoles.RATE_LIMITED_CREDIT_MINTER,
-        //             type(uint256).max, // maxRateLimitPerSecond
-        //             uint128(RLCM_BUFFER_REPLENISH), // rateLimitPerSecond
-        //             uint128(CREDIT_HARDCAP) // bufferCap
-        //         );
-        //         RateLimitedMinter rateLimitedGuildMinter = new RateLimitedMinter(
-        //             AddressLib.get("CORE"),
-        //             address(guild),
-        //             CoreRoles.RATE_LIMITED_GUILD_MINTER,
-        //             0, // maxRateLimitPerSecond
-        //             0, // rateLimitPerSecond
-        //             uint128(GUILD_SUPPLY) // 1b
-        //         );
-        //         SurplusGuildMinter guildMinter = new SurplusGuildMinter(
-        //             AddressLib.get("CORE"),
-        //             AddressLib.get("PROFIT_MANAGER"),
-        //             address(credit),
-        //             address(guild),
-        //             address(rateLimitedGuildMinter),
-        //             GUILD_MINT_RATIO, // ratio of GUILD minted per CREDIT staked
-        //             GUILD_CREDIT_REWARD_RATIO // amount of GUILD received per CREDIT earned from staking in Gauges
-        //         );
+        // Tokens & minting
+        {
+            CreditToken credit = new CreditToken(
+                getAddr("CORE"),
+                "Ethereum Credit Guild - gUSDC",
+                "gUSDC"
+            );
+            GuildToken guild = new GuildToken(getAddr("CORE"));
+            RateLimitedMinter rateLimitedCreditMinter = new RateLimitedMinter(
+                getAddr("CORE"),
+                address(credit),
+                CoreRoles.RATE_LIMITED_CREDIT_MINTER,
+                type(uint256).max, // maxRateLimitPerSecond
+                uint128(RLCM_BUFFER_REPLENISH), // rateLimitPerSecond
+                uint128(CREDIT_HARDCAP) // bufferCap
+            );
+            RateLimitedMinter rateLimitedGuildMinter = new RateLimitedMinter(
+                getAddr("CORE"),
+                address(guild),
+                CoreRoles.RATE_LIMITED_GUILD_MINTER,
+                0, // maxRateLimitPerSecond
+                0, // rateLimitPerSecond
+                uint128(GUILD_SUPPLY) // 1b
+            );
+            SurplusGuildMinter guildMinter = new SurplusGuildMinter(
+                getAddr("CORE"),
+                getAddr("PROFIT_MANAGER"),
+                address(credit),
+                address(guild),
+                address(rateLimitedGuildMinter),
+                GUILD_MINT_RATIO, // ratio of GUILD minted per CREDIT staked
+                GUILD_CREDIT_REWARD_RATIO // amount of GUILD received per CREDIT earned from staking in Gauges
+            );
 
-        //         AddressLib.set("ERC20_GUSDC", address(credit));
-        //         AddressLib.set("ERC20_GUILD", address(guild));
-        //         AddressLib.set(
-        //             "RATE_LIMITED_CREDIT_MINTER",
-        //             address(rateLimitedCreditMinter)
-        //         );
-        //         AddressLib.set(
-        //             "RATE_LIMITED_GUILD_MINTER",
-        //             address(rateLimitedGuildMinter)
-        //         );
-        //         AddressLib.set("SURPLUS_GUILD_MINTER", address(guildMinter));
-        //     }
+            setAddr("ERC20_GUSDC", address(credit));
+            setAddr("ERC20_GUILD", address(guild));
+            setAddr(
+                "RATE_LIMITED_CREDIT_MINTER",
+                address(rateLimitedCreditMinter)
+            );
+            setAddr(
+                "RATE_LIMITED_GUILD_MINTER",
+                address(rateLimitedGuildMinter)
+            );
+            setAddr("SURPLUS_GUILD_MINTER", address(guildMinter));
+        }
 
-        //     // Auction House & LendingTerm Implementation V1 & PSM
-        //     {
-        //         AuctionHouse auctionHouse = new AuctionHouse(
-        //             AddressLib.get("CORE"),
-        //             650, // midPoint = 10m50s
-        //             1800, // auctionDuration = 30m
-        //             0 // 0% collateral offered at start
-        //         );
+        // Auction House & LendingTerm Implementation V1 & PSM
+        {
+            AuctionHouse auctionHouse = new AuctionHouse(
+                getAddr("CORE"),
+                650, // midPoint = 10m50s
+                1800, // auctionDuration = 30m
+                0 // 0% collateral offered at start
+            );
 
-        //         LendingTerm termV1 = new LendingTerm();
+            LendingTerm termV1 = new LendingTerm();
 
-        //         SimplePSM psm = new SimplePSM(
-        //             AddressLib.get("CORE"),
-        //             AddressLib.get("PROFIT_MANAGER"),
-        //             AddressLib.get("ERC20_GUSDC"),
-        //             AddressLib.get("ERC20_USDC")
-        //         );
+            SimplePSM psm = new SimplePSM(
+                getAddr("CORE"),
+                getAddr("PROFIT_MANAGER"),
+                getAddr("ERC20_GUSDC"),
+                getAddr("ERC20_USDC")
+            );
 
-        //         AddressLib.set("AUCTION_HOUSE", address(auctionHouse));
-        //         AddressLib.set("LENDING_TERM_V1", address(termV1));
-        //         AddressLib.set("PSM_USDC", address(psm));
-        //     }
+            setAddr("AUCTION_HOUSE", address(auctionHouse));
+            setAddr("LENDING_TERM_V1", address(termV1));
+            setAddr("PSM_USDC", address(psm));
+        }
 
-        //     // Governance
-        //     {
-        //         GuildTimelockController daoTimelock = new GuildTimelockController(
-        //             AddressLib.get("CORE"),
-        //             DAO_TIMELOCK_DELAY
-        //         );
-        //         GuildGovernor daoGovernorGuild = new GuildGovernor(
-        //             AddressLib.get("CORE"),
-        //             address(daoTimelock),
-        //             AddressLib.get("ERC20_GUILD"),
-        //             DAO_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
-        //             DAO_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
-        //             DAO_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
-        //             DAO_GOVERNOR_GUILD_QUORUM // initialQuorum
-        //         );
-        //         GuildVetoGovernor daoVetoCredit = new GuildVetoGovernor(
-        //             AddressLib.get("CORE"),
-        //             address(daoTimelock),
-        //             AddressLib.get("ERC20_GUSDC"),
-        //             DAO_VETO_CREDIT_QUORUM // initialQuorum
-        //         );
-        //         GuildVetoGovernor daoVetoGuild = new GuildVetoGovernor(
-        //             AddressLib.get("CORE"),
-        //             address(daoTimelock),
-        //             AddressLib.get("ERC20_GUILD"),
-        //             DAO_VETO_GUILD_QUORUM // initialQuorum
-        //         );
+        // Governance
+        {
+            GuildTimelockController daoTimelock = new GuildTimelockController(
+                getAddr("CORE"),
+                DAO_TIMELOCK_DELAY
+            );
+            GuildGovernor daoGovernorGuild = new GuildGovernor(
+                getAddr("CORE"),
+                address(daoTimelock),
+                getAddr("ERC20_GUILD"),
+                DAO_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
+                DAO_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
+                DAO_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
+                DAO_GOVERNOR_GUILD_QUORUM // initialQuorum
+            );
+            GuildVetoGovernor daoVetoCredit = new GuildVetoGovernor(
+                getAddr("CORE"),
+                address(daoTimelock),
+                getAddr("ERC20_GUSDC"),
+                DAO_VETO_CREDIT_QUORUM // initialQuorum
+            );
+            GuildVetoGovernor daoVetoGuild = new GuildVetoGovernor(
+                getAddr("CORE"),
+                address(daoTimelock),
+                getAddr("ERC20_GUILD"),
+                DAO_VETO_GUILD_QUORUM // initialQuorum
+            );
 
-        //         GuildTimelockController onboardTimelock = new GuildTimelockController(
-        //                 AddressLib.get("CORE"),
-        //                 ONBOARD_TIMELOCK_DELAY
-        //             );
-        //         LendingTermFactory termFactory = new LendingTermFactory(
-        //             AddressLib.get("CORE"), // _core
-        //             AddressLib.get("ERC20_GUILD") // _guildToken
-        //         );
-        //         LendingTermOnboarding onboardGovernorGuild = new LendingTermOnboarding(
-        //             AddressLib.get("CORE"), // _core
-        //             address(onboardTimelock), // _timelock
-        //             AddressLib.get("ERC20_GUILD"), // _guildToken
-        //             ONBOARD_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
-        //             ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
-        //             ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
-        //             ONBOARD_GOVERNOR_GUILD_QUORUM, // initialQuorum
-        //             address(termFactory)
-        //         );
-        //         GuildVetoGovernor onboardVetoCredit = new GuildVetoGovernor(
-        //             AddressLib.get("CORE"),
-        //             address(onboardTimelock),
-        //             AddressLib.get("ERC20_GUSDC"),
-        //             ONBOARD_VETO_CREDIT_QUORUM // initialQuorum
-        //         );
-        //         GuildVetoGovernor onboardVetoGuild = new GuildVetoGovernor(
-        //             AddressLib.get("CORE"),
-        //             address(onboardTimelock),
-        //             AddressLib.get("ERC20_GUILD"),
-        //             ONBOARD_VETO_GUILD_QUORUM // initialQuorum
-        //         );
+            GuildTimelockController onboardTimelock = new GuildTimelockController(
+                    getAddr("CORE"),
+                    ONBOARD_TIMELOCK_DELAY
+                );
+            LendingTermFactory termFactory = new LendingTermFactory(
+                getAddr("CORE"), // _core
+                getAddr("ERC20_GUILD") // _guildToken
+            );
+            LendingTermOnboarding onboardGovernorGuild = new LendingTermOnboarding(
+                getAddr("CORE"), // _core
+                address(onboardTimelock), // _timelock
+                getAddr("ERC20_GUILD"), // _guildToken
+                ONBOARD_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
+                ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
+                ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
+                ONBOARD_GOVERNOR_GUILD_QUORUM, // initialQuorum
+                address(termFactory)
+            );
+            GuildVetoGovernor onboardVetoCredit = new GuildVetoGovernor(
+                getAddr("CORE"),
+                address(onboardTimelock),
+                getAddr("ERC20_GUSDC"),
+                ONBOARD_VETO_CREDIT_QUORUM // initialQuorum
+            );
+            GuildVetoGovernor onboardVetoGuild = new GuildVetoGovernor(
+                getAddr("CORE"),
+                address(onboardTimelock),
+                getAddr("ERC20_GUILD"),
+                ONBOARD_VETO_GUILD_QUORUM // initialQuorum
+            );
 
-        //         LendingTermOffboarding termOffboarding = new LendingTermOffboarding(
-        //             AddressLib.get("CORE"),
-        //             AddressLib.get("ERC20_GUILD"),
-        //             AddressLib.get("PSM_USDC"),
-        //             OFFBOARD_QUORUM // quorum
-        //         );
+            LendingTermOffboarding termOffboarding = new LendingTermOffboarding(
+                getAddr("CORE"),
+                getAddr("ERC20_GUILD"),
+                getAddr("PSM_USDC"),
+                OFFBOARD_QUORUM // quorum
+            );
 
-        //         AddressLib.set("LENDING_TERM_FACTORY", address(termFactory));
-        //         AddressLib.set("DAO_GOVERNOR_GUILD", address(daoGovernorGuild));
-        //         AddressLib.set("DAO_TIMELOCK", address(daoTimelock));
-        //         AddressLib.set("DAO_VETO_CREDIT", address(daoVetoCredit));
-        //         AddressLib.set("DAO_VETO_GUILD", address(daoVetoGuild));
-        //         AddressLib.set(
-        //             "ONBOARD_GOVERNOR_GUILD",
-        //             address(onboardGovernorGuild)
-        //         );
-        //         AddressLib.set("ONBOARD_TIMELOCK", address(onboardTimelock));
-        //         AddressLib.set("ONBOARD_VETO_CREDIT", address(onboardVetoCredit));
-        //         AddressLib.set("ONBOARD_VETO_GUILD", address(onboardVetoGuild));
-        //         AddressLib.set("OFFBOARD_GOVERNOR_GUILD", address(termOffboarding));
-        //     }
+            setAddr("LENDING_TERM_FACTORY", address(termFactory));
+            setAddr("DAO_GOVERNOR_GUILD", address(daoGovernorGuild));
+            setAddr("DAO_TIMELOCK", address(daoTimelock));
+            setAddr("DAO_VETO_CREDIT", address(daoVetoCredit));
+            setAddr("DAO_VETO_GUILD", address(daoVetoGuild));
+            setAddr("ONBOARD_GOVERNOR_GUILD", address(onboardGovernorGuild));
+            setAddr("ONBOARD_TIMELOCK", address(onboardTimelock));
+            setAddr("ONBOARD_VETO_CREDIT", address(onboardVetoCredit));
+            setAddr("ONBOARD_VETO_GUILD", address(onboardVetoGuild));
+            setAddr("OFFBOARD_GOVERNOR_GUILD", address(termOffboarding));
+        }
 
-        //     // Terms
-        //     {
-        //         LendingTermFactory termFactory = LendingTermFactory(
-        //             payable(AddressLib.get("LENDING_TERM_FACTORY"))
-        //         );
-        //         address _lendingTermV1 = AddressLib.get("LENDING_TERM_V1");
-        //         address _auctionHouse = AddressLib.get("AUCTION_HOUSE");
-        //         termFactory.setMarketReferences(
-        //             1,
-        //             LendingTermFactory.MarketReferences({
-        //                 profitManager: AddressLib.get("PROFIT_MANAGER"),
-        //                 creditMinter: AddressLib.get("RATE_LIMITED_CREDIT_MINTER"),
-        //                 creditToken: AddressLib.get("ERC20_GUSDC")
-        //             })
-        //         );
-        //         termFactory.allowImplementation(_lendingTermV1, true);
-        //         termFactory.allowAuctionHouse(_auctionHouse, true);
+        // Terms
+        {
+            LendingTermFactory termFactory = LendingTermFactory(
+                payable(getAddr("LENDING_TERM_FACTORY"))
+            );
+            address _lendingTermV1 = getAddr("LENDING_TERM_V1");
+            address _auctionHouse = getAddr("AUCTION_HOUSE");
+            termFactory.setMarketReferences(
+                1,
+                LendingTermFactory.MarketReferences({
+                    profitManager: getAddr("PROFIT_MANAGER"),
+                    creditMinter: getAddr("RATE_LIMITED_CREDIT_MINTER"),
+                    creditToken: getAddr("ERC20_GUSDC")
+                })
+            );
+            termFactory.allowImplementation(_lendingTermV1, true);
+            termFactory.allowAuctionHouse(_auctionHouse, true);
 
-        //         address termSDAI1 = termFactory.createTerm(
-        //             1, // gauge type,
-        //             _lendingTermV1, // implementation
-        //             _auctionHouse, // auctionHouse
-        //             LendingTerm.LendingTermParams({
-        //                 collateralToken: AddressLib.get("ERC20_SDAI"),
-        //                 maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
-        //                 interestRate: SDAI_RATE, // 4%
-        //                 maxDelayBetweenPartialRepay: 0, // no periodic partial repay needed
-        //                 minPartialRepayPercent: 0, // no minimum size for partial repay
-        //                 openingFee: 0, // 0%
-        //                 hardCap: CREDIT_HARDCAP // max 2m CREDIT issued
-        //             })
-        //         );
-        //         AddressLib.set("TERM_SDAI_1", termSDAI1);
+            address termSDAI1 = termFactory.createTerm(
+                1, // gauge type,
+                _lendingTermV1, // implementation
+                _auctionHouse, // auctionHouse
+                LendingTerm.LendingTermParams({
+                    collateralToken: getAddr("ERC20_SDAI"),
+                    maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
+                    interestRate: SDAI_RATE, // 4%
+                    maxDelayBetweenPartialRepay: 0, // no periodic partial repay needed
+                    minPartialRepayPercent: 0, // no minimum size for partial repay
+                    openingFee: 0, // 0%
+                    hardCap: CREDIT_HARDCAP // max 2m CREDIT issued
+                })
+            );
+            setAddr("TERM_SDAI_1", termSDAI1);
 
-        //         if (IS_SEPOLIA) {
-        //             address termWBTC1 = termFactory.createTerm(
-        //                 1, // gauge type,
-        //                 _lendingTermV1, // implementation
-        //                 _auctionHouse, // auctionHouse
-        //                 LendingTerm.LendingTermParams({
-        //                     collateralToken: AddressLib.get("ERC20_WBTC"),
-        //                     maxDebtPerCollateralToken: 20000e28, // 20k CREDIT per WBTC collateral + 10 decimals correction
-        //                     interestRate: 0.06e18, // 6%
-        //                     maxDelayBetweenPartialRepay: 2629800, // monthly payments
-        //                     minPartialRepayPercent: 0.005e18, // 6% / 12
-        //                     openingFee: 0.02e18, // 2%
-        //                     hardCap: 2_000_000e18 // max 2m CREDIT issued
-        //                 })
-        //             );
+            if (IS_SEPOLIA) {
+                address termWBTC1 = termFactory.createTerm(
+                    1, // gauge type,
+                    _lendingTermV1, // implementation
+                    _auctionHouse, // auctionHouse
+                    LendingTerm.LendingTermParams({
+                        collateralToken: getAddr("ERC20_WBTC"),
+                        maxDebtPerCollateralToken: 20000e28, // 20k CREDIT per WBTC collateral + 10 decimals correction
+                        interestRate: 0.06e18, // 6%
+                        maxDelayBetweenPartialRepay: 2629800, // monthly payments
+                        minPartialRepayPercent: 0.005e18, // 6% / 12
+                        openingFee: 0.02e18, // 2%
+                        hardCap: 2_000_000e18 // max 2m CREDIT issued
+                    })
+                );
 
-        //             AddressLib.set("TERM_WBTC_1", termWBTC1);
-        //         }
-        //     }
+                setAddr("TERM_WBTC_1", termWBTC1);
+            }
+        }
     }
 
     function afterDeploy(address deployer) public {
-        Core core = Core(AddressLib.get("CORE"));
+        Core core = Core(getAddr("CORE"));
 
         // grant roles to smart contracts
         // GOVERNOR
-        core.grantRole(CoreRoles.GOVERNOR, AddressLib.get("DAO_TIMELOCK"));
-        core.grantRole(CoreRoles.GOVERNOR, AddressLib.get("ONBOARD_TIMELOCK"));
-        core.grantRole(
-            CoreRoles.GOVERNOR,
-            AddressLib.get("OFFBOARD_GOVERNOR_GUILD")
-        );
+        core.grantRole(CoreRoles.GOVERNOR, getAddr("DAO_TIMELOCK"));
+        core.grantRole(CoreRoles.GOVERNOR, getAddr("ONBOARD_TIMELOCK"));
+        core.grantRole(CoreRoles.GOVERNOR, getAddr("OFFBOARD_GOVERNOR_GUILD"));
 
         // GUARDIAN
-        core.grantRole(CoreRoles.GUARDIAN, AddressLib.get("TEAM_MULTISIG"));
+        core.grantRole(CoreRoles.GUARDIAN, getAddr("TEAM_MULTISIG"));
 
         // CREDIT_MINTER
         core.grantRole(
             CoreRoles.CREDIT_MINTER,
-            AddressLib.get("RATE_LIMITED_CREDIT_MINTER")
+            getAddr("RATE_LIMITED_CREDIT_MINTER")
         );
-        core.grantRole(CoreRoles.CREDIT_MINTER, AddressLib.get("PSM_USDC"));
+        core.grantRole(CoreRoles.CREDIT_MINTER, getAddr("PSM_USDC"));
 
         // CREDIT_BURNER
-        core.grantRole(
-            CoreRoles.CREDIT_BURNER,
-            AddressLib.get("PROFIT_MANAGER")
-        );
-        core.grantRole(CoreRoles.CREDIT_BURNER, AddressLib.get("PSM_USDC"));
-        core.grantRole(CoreRoles.CREDIT_BURNER, AddressLib.get("TERM_SDAI_1"));
+        core.grantRole(CoreRoles.CREDIT_BURNER, getAddr("PROFIT_MANAGER"));
+        core.grantRole(CoreRoles.CREDIT_BURNER, getAddr("PSM_USDC"));
+        core.grantRole(CoreRoles.CREDIT_BURNER, getAddr("TERM_SDAI_1"));
 
         // RATE_LIMITED_CREDIT_MINTER
         core.grantRole(
             CoreRoles.RATE_LIMITED_CREDIT_MINTER,
-            AddressLib.get("TERM_SDAI_1")
+            getAddr("TERM_SDAI_1")
         );
 
         // GUILD_MINTER
         core.grantRole(
             CoreRoles.GUILD_MINTER,
-            AddressLib.get("RATE_LIMITED_GUILD_MINTER")
+            getAddr("RATE_LIMITED_GUILD_MINTER")
         );
 
         // RATE_LIMITED_GUILD_MINTER
         core.grantRole(
             CoreRoles.RATE_LIMITED_GUILD_MINTER,
-            AddressLib.get("SURPLUS_GUILD_MINTER")
+            getAddr("SURPLUS_GUILD_MINTER")
         );
 
         /// Grant Multisig Guild Rate Limited Minter
         core.grantRole(
             CoreRoles.RATE_LIMITED_GUILD_MINTER,
-            AddressLib.get("TEAM_MULTISIG")
+            getAddr("TEAM_MULTISIG")
         );
 
         // GAUGE_ADD
-        core.grantRole(CoreRoles.GAUGE_ADD, AddressLib.get("DAO_TIMELOCK"));
-        core.grantRole(CoreRoles.GAUGE_ADD, AddressLib.get("ONBOARD_TIMELOCK"));
+        core.grantRole(CoreRoles.GAUGE_ADD, getAddr("DAO_TIMELOCK"));
+        core.grantRole(CoreRoles.GAUGE_ADD, getAddr("ONBOARD_TIMELOCK"));
         core.grantRole(CoreRoles.GAUGE_ADD, deployer);
 
         // GAUGE_REMOVE
-        core.grantRole(CoreRoles.GAUGE_REMOVE, AddressLib.get("DAO_TIMELOCK"));
+        core.grantRole(CoreRoles.GAUGE_REMOVE, getAddr("DAO_TIMELOCK"));
         core.grantRole(
             CoreRoles.GAUGE_REMOVE,
-            AddressLib.get("OFFBOARD_GOVERNOR_GUILD")
+            getAddr("OFFBOARD_GOVERNOR_GUILD")
         );
 
         // GAUGE_PARAMETERS
-        core.grantRole(
-            CoreRoles.GAUGE_PARAMETERS,
-            AddressLib.get("DAO_TIMELOCK")
-        );
+        core.grantRole(CoreRoles.GAUGE_PARAMETERS, getAddr("DAO_TIMELOCK"));
         core.grantRole(CoreRoles.GAUGE_PARAMETERS, deployer);
 
         // GAUGE_PNL_NOTIFIER
-        core.grantRole(
-            CoreRoles.GAUGE_PNL_NOTIFIER,
-            AddressLib.get("TERM_SDAI_1")
-        );
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, getAddr("TERM_SDAI_1"));
 
         // GUILD_GOVERNANCE_PARAMETERS
         core.grantRole(
             CoreRoles.GUILD_GOVERNANCE_PARAMETERS,
-            AddressLib.get("DAO_TIMELOCK")
+            getAddr("DAO_TIMELOCK")
         );
         core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, deployer);
 
         // GUILD_SURPLUS_BUFFER_WITHDRAW
         core.grantRole(
             CoreRoles.GUILD_SURPLUS_BUFFER_WITHDRAW,
-            AddressLib.get("SURPLUS_GUILD_MINTER")
+            getAddr("SURPLUS_GUILD_MINTER")
         );
 
         // CREDIT_GOVERNANCE_PARAMETERS
         core.grantRole(
             CoreRoles.CREDIT_GOVERNANCE_PARAMETERS,
-            AddressLib.get("DAO_TIMELOCK")
+            getAddr("DAO_TIMELOCK")
         );
         core.grantRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, deployer);
 
         // CREDIT_REBASE_PARAMETERS
         core.grantRole(
             CoreRoles.CREDIT_REBASE_PARAMETERS,
-            AddressLib.get("DAO_TIMELOCK")
+            getAddr("DAO_TIMELOCK")
         );
-        core.grantRole(
-            CoreRoles.CREDIT_REBASE_PARAMETERS,
-            AddressLib.get("PSM_USDC")
-        );
+        core.grantRole(CoreRoles.CREDIT_REBASE_PARAMETERS, getAddr("PSM_USDC"));
 
         // TIMELOCK_PROPOSER
         core.grantRole(
             CoreRoles.TIMELOCK_PROPOSER,
-            AddressLib.get("DAO_GOVERNOR_GUILD")
+            getAddr("DAO_GOVERNOR_GUILD")
         );
         core.grantRole(
             CoreRoles.TIMELOCK_PROPOSER,
-            AddressLib.get("ONBOARD_GOVERNOR_GUILD")
+            getAddr("ONBOARD_GOVERNOR_GUILD")
         );
 
         // TIMELOCK_EXECUTOR
@@ -488,78 +467,68 @@ contract GIP_0 is Proposal {
 
         core.grantRole(
             CoreRoles.TIMELOCK_CANCELLER,
-            AddressLib.get("DAO_VETO_CREDIT")
+            getAddr("DAO_VETO_CREDIT")
+        );
+        core.grantRole(CoreRoles.TIMELOCK_CANCELLER, getAddr("DAO_VETO_GUILD"));
+        core.grantRole(
+            CoreRoles.TIMELOCK_CANCELLER,
+            getAddr("ONBOARD_VETO_CREDIT")
         );
         core.grantRole(
             CoreRoles.TIMELOCK_CANCELLER,
-            AddressLib.get("DAO_VETO_GUILD")
+            getAddr("ONBOARD_VETO_GUILD")
         );
         core.grantRole(
             CoreRoles.TIMELOCK_CANCELLER,
-            AddressLib.get("ONBOARD_VETO_CREDIT")
+            getAddr("DAO_GOVERNOR_GUILD")
         );
         core.grantRole(
             CoreRoles.TIMELOCK_CANCELLER,
-            AddressLib.get("ONBOARD_VETO_GUILD")
-        );
-        core.grantRole(
-            CoreRoles.TIMELOCK_CANCELLER,
-            AddressLib.get("DAO_GOVERNOR_GUILD")
-        );
-        core.grantRole(
-            CoreRoles.TIMELOCK_CANCELLER,
-            AddressLib.get("ONBOARD_GOVERNOR_GUILD")
+            getAddr("ONBOARD_GOVERNOR_GUILD")
         );
 
         if (IS_SEPOLIA) {
             core.grantRole(
                 CoreRoles.RATE_LIMITED_CREDIT_MINTER,
-                AddressLib.get("TERM_WBTC_1")
+                getAddr("TERM_WBTC_1")
             );
             core.grantRole(
                 CoreRoles.GAUGE_PNL_NOTIFIER,
-                AddressLib.get("TERM_WBTC_1")
+                getAddr("TERM_WBTC_1")
             );
-            GuildToken(AddressLib.get("ERC20_GUILD")).addGauge(
+            GuildToken(getAddr("ERC20_GUILD")).addGauge(
                 1,
-                AddressLib.get("TERM_WBTC_1")
+                getAddr("TERM_WBTC_1")
             );
         }
 
         // Configuration
-        ProfitManager(AddressLib.get("PROFIT_MANAGER")).initializeReferences(
-            AddressLib.get("ERC20_GUSDC"),
-            AddressLib.get("ERC20_GUILD")
+        ProfitManager(getAddr("PROFIT_MANAGER")).initializeReferences(
+            getAddr("ERC20_GUSDC"),
+            getAddr("ERC20_GUILD")
         );
-        ProfitManager(AddressLib.get("PROFIT_MANAGER")).setProfitSharingConfig(
+        ProfitManager(getAddr("PROFIT_MANAGER")).setProfitSharingConfig(
             SURPLUS_BUFFER_SPLIT, // 9% surplusBufferSplit
             CREDIT_SPLIT, // 90% creditSplit
             GUILD_SPLIT, // 1% guildSplit
             OTHER_SPLIT, // otherSplit
             OTHER_ADDRESS // otherRecipient
         );
-        ProfitManager(AddressLib.get("PROFIT_MANAGER")).setMaxTotalIssuance(
+        ProfitManager(getAddr("PROFIT_MANAGER")).setMaxTotalIssuance(
             CREDIT_HARDCAP
         );
-        GuildToken(AddressLib.get("ERC20_GUILD")).setCanExceedMaxGauges(
-            AddressLib.get("SURPLUS_GUILD_MINTER"),
+        GuildToken(getAddr("ERC20_GUILD")).setCanExceedMaxGauges(
+            getAddr("SURPLUS_GUILD_MINTER"),
             true
         );
-        GuildToken(AddressLib.get("ERC20_GUILD")).setMaxGauges(10);
-        GuildToken(AddressLib.get("ERC20_GUILD")).addGauge(
-            1,
-            AddressLib.get("TERM_SDAI_1")
-        );
-        GuildToken(AddressLib.get("ERC20_GUILD")).setMaxDelegates(
-            MAX_DELEGATES
-        );
-        GuildToken(AddressLib.get("ERC20_GUILD")).setDelegateLockupPeriod(
+        GuildToken(getAddr("ERC20_GUILD")).setMaxGauges(10);
+        GuildToken(getAddr("ERC20_GUILD")).addGauge(1, getAddr("TERM_SDAI_1"));
+        GuildToken(getAddr("ERC20_GUILD")).setMaxDelegates(MAX_DELEGATES);
+        GuildToken(getAddr("ERC20_GUILD")).setDelegateLockupPeriod(
             DELEGATE_LOCKUP_PERIOD
         );
-        CreditToken(AddressLib.get("ERC20_GUSDC")).setMaxDelegates(
-            MAX_DELEGATES
-        );
-        CreditToken(AddressLib.get("ERC20_GUSDC")).setDelegateLockupPeriod(
+        CreditToken(getAddr("ERC20_GUSDC")).setMaxDelegates(MAX_DELEGATES);
+        CreditToken(getAddr("ERC20_GUSDC")).setDelegateLockupPeriod(
             DELEGATE_LOCKUP_PERIOD
         );
 
@@ -580,94 +549,85 @@ contract GIP_0 is Proposal {
 
     function validate(address deployer) public {
         /// CORE Verification
-        Core core = Core(AddressLib.get("CORE"));
+        Core core = Core(getAddr("CORE"));
         {
             assertEq(
                 address(core),
-                address(SimplePSM(AddressLib.get("PSM_USDC")).core()),
+                address(SimplePSM(getAddr("PSM_USDC")).core()),
                 "USDC PSM Incorrect Core Address"
             );
             assertEq(
                 address(core),
-                address(LendingTerm(AddressLib.get("TERM_SDAI_1")).core()),
+                address(LendingTerm(getAddr("TERM_SDAI_1")).core()),
                 "sDAI Term Incorrect Core Address"
             );
             if (IS_SEPOLIA) {
                 assertEq(
                     address(core),
-                    address(LendingTerm(AddressLib.get("TERM_WBTC_1")).core()),
+                    address(LendingTerm(getAddr("TERM_WBTC_1")).core()),
                     "WBTC Term Incorrect Core Address"
                 );
             }
             assertEq(
                 address(core),
-                address(
-                    LendingTerm(AddressLib.get("ONBOARD_VETO_GUILD")).core()
-                ),
+                address(LendingTerm(getAddr("ONBOARD_VETO_GUILD")).core()),
                 "ONBOARD_VETO_GUILD Incorrect Core Address"
             );
             assertEq(
                 address(core),
-                address(
-                    LendingTerm(AddressLib.get("OFFBOARD_GOVERNOR_GUILD"))
-                        .core()
-                ),
+                address(LendingTerm(getAddr("OFFBOARD_GOVERNOR_GUILD")).core()),
                 "OFFBOARD_GOVERNOR_GUILD Incorrect Core Address"
             );
             assertEq(
                 address(core),
-                address(LendingTerm(AddressLib.get("ONBOARD_TIMELOCK")).core()),
+                address(LendingTerm(getAddr("ONBOARD_TIMELOCK")).core()),
                 "ONBOARD_TIMELOCK Incorrect Core Address"
             );
             assertEq(
                 address(core),
-                address(
-                    LendingTerm(AddressLib.get("ONBOARD_GOVERNOR_GUILD")).core()
-                ),
+                address(LendingTerm(getAddr("ONBOARD_GOVERNOR_GUILD")).core()),
                 "ONBOARD_GOVERNOR_GUILD Incorrect Core Address"
             );
             assertEq(
                 address(core),
-                address(LendingTerm(AddressLib.get("DAO_VETO_GUILD")).core()),
+                address(LendingTerm(getAddr("DAO_VETO_GUILD")).core()),
                 "DAO_VETO_GUILD Incorrect Core Address"
             );
             assertEq(
                 address(core),
-                address(LendingTerm(AddressLib.get("DAO_VETO_CREDIT")).core()),
+                address(LendingTerm(getAddr("DAO_VETO_CREDIT")).core()),
                 "DAO_VETO_CREDIT Incorrect Core Address"
             );
 
-            CreditToken credit = CreditToken(AddressLib.get("ERC20_GUSDC"));
-            GuildToken guild = GuildToken(AddressLib.get("ERC20_GUILD"));
+            CreditToken credit = CreditToken(getAddr("ERC20_GUSDC"));
+            GuildToken guild = GuildToken(getAddr("ERC20_GUILD"));
             LendingTermOnboarding onboarder = LendingTermOnboarding(
-                payable(AddressLib.get("ONBOARD_GOVERNOR_GUILD"))
+                payable(getAddr("ONBOARD_GOVERNOR_GUILD"))
             );
             LendingTermOffboarding offboarding = LendingTermOffboarding(
-                payable(AddressLib.get("OFFBOARD_GOVERNOR_GUILD"))
+                payable(getAddr("OFFBOARD_GOVERNOR_GUILD"))
             );
             GuildTimelockController timelock = GuildTimelockController(
-                payable(AddressLib.get("DAO_TIMELOCK"))
+                payable(getAddr("DAO_TIMELOCK"))
             );
             SurplusGuildMinter sgm = SurplusGuildMinter(
-                AddressLib.get("SURPLUS_GUILD_MINTER")
+                getAddr("SURPLUS_GUILD_MINTER")
             );
             ProfitManager profitManager = ProfitManager(
-                AddressLib.get("PROFIT_MANAGER")
+                getAddr("PROFIT_MANAGER")
             );
             RateLimitedMinter rateLimitedCreditMinter = RateLimitedMinter(
-                AddressLib.get("RATE_LIMITED_CREDIT_MINTER")
+                getAddr("RATE_LIMITED_CREDIT_MINTER")
             );
             RateLimitedMinter rateLimitedGuildMinter = RateLimitedMinter(
-                AddressLib.get("RATE_LIMITED_GUILD_MINTER")
+                getAddr("RATE_LIMITED_GUILD_MINTER")
             );
-            AuctionHouse auctionHouse = AuctionHouse(
-                AddressLib.get("AUCTION_HOUSE")
-            );
+            AuctionHouse auctionHouse = AuctionHouse(getAddr("AUCTION_HOUSE"));
             GuildGovernor governor = GuildGovernor(
-                payable(AddressLib.get("DAO_GOVERNOR_GUILD"))
+                payable(getAddr("DAO_GOVERNOR_GUILD"))
             );
             GuildVetoGovernor vetoGovernorCredit = GuildVetoGovernor(
-                payable(AddressLib.get("ONBOARD_VETO_CREDIT"))
+                payable(getAddr("ONBOARD_VETO_CREDIT"))
             );
 
             assertEq(
@@ -734,11 +694,11 @@ contract GIP_0 is Proposal {
 
         /// PSM Verification
         {
-            SimplePSM psm = SimplePSM(AddressLib.get("PSM_USDC"));
+            SimplePSM psm = SimplePSM(getAddr("PSM_USDC"));
 
             assertEq(
                 psm.pegToken(),
-                AddressLib.get("ERC20_USDC"),
+                getAddr("ERC20_USDC"),
                 "USDC PSM Incorrect Peg Token Address"
             );
             assertEq(
@@ -748,12 +708,12 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 psm.credit(),
-                AddressLib.get("ERC20_GUSDC"),
+                getAddr("ERC20_GUSDC"),
                 "USDC PSM Incorrect Credit Token Address"
             );
             assertEq(
                 psm.profitManager(),
-                AddressLib.get("PROFIT_MANAGER"),
+                getAddr("PROFIT_MANAGER"),
                 "USDC PSM Incorrect Profit Manager Address"
             );
         }
@@ -761,7 +721,7 @@ contract GIP_0 is Proposal {
         /// Rate Limited Minter Verification
         {
             RateLimitedMinter rateLimitedCreditMinter = RateLimitedMinter(
-                AddressLib.get("RATE_LIMITED_CREDIT_MINTER")
+                getAddr("RATE_LIMITED_CREDIT_MINTER")
             );
             assertEq(
                 rateLimitedCreditMinter.MAX_RATE_LIMIT_PER_SECOND(),
@@ -770,7 +730,7 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 rateLimitedCreditMinter.token(),
-                AddressLib.get("ERC20_GUSDC"),
+                getAddr("ERC20_GUSDC"),
                 "credit token incorrect"
             );
             assertEq(
@@ -796,7 +756,7 @@ contract GIP_0 is Proposal {
         }
         {
             RateLimitedMinter rateLimitedGuildMinter = RateLimitedMinter(
-                AddressLib.get("RATE_LIMITED_GUILD_MINTER")
+                getAddr("RATE_LIMITED_GUILD_MINTER")
             );
             assertEq(
                 rateLimitedGuildMinter.MAX_RATE_LIMIT_PER_SECOND(),
@@ -805,7 +765,7 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 rateLimitedGuildMinter.token(),
-                AddressLib.get("ERC20_GUILD"),
+                getAddr("ERC20_GUILD"),
                 "guild token incorrect address rl guild minter"
             );
             assertEq(
@@ -833,41 +793,39 @@ contract GIP_0 is Proposal {
         /// GUILD and CREDIT Token Total Supply and balances
         {
             assertEq(
-                ERC20MultiVotes(AddressLib.get("ERC20_GUSDC")).maxDelegates(),
+                ERC20MultiVotes(getAddr("ERC20_GUSDC")).maxDelegates(),
                 MAX_DELEGATES,
                 "max delegates incorrect"
             );
             /// guild token starts non-transferrable
             assertFalse(
-                GuildToken(AddressLib.get("ERC20_GUILD")).transferable(),
+                GuildToken(getAddr("ERC20_GUILD")).transferable(),
                 "guild token should not be transferable"
             );
             assertEq(
-                ERC20MultiVotes(AddressLib.get("ERC20_GUILD")).maxDelegates(),
+                ERC20MultiVotes(getAddr("ERC20_GUILD")).maxDelegates(),
                 MAX_DELEGATES,
                 "max delegates incorrect"
             );
             assertEq(
-                ERC20MultiVotes(AddressLib.get("ERC20_GUILD")).totalSupply(),
+                ERC20MultiVotes(getAddr("ERC20_GUILD")).totalSupply(),
                 0,
                 "guild total supply not 0 after deployment"
             );
             assertEq(
-                ERC20MultiVotes(AddressLib.get("ERC20_GUILD")).balanceOf(
-                    AddressLib.get("TEAM_MULTISIG")
+                ERC20MultiVotes(getAddr("ERC20_GUILD")).balanceOf(
+                    getAddr("TEAM_MULTISIG")
                 ),
                 0,
                 "balance of team multisig not 0 after deployment"
             );
             assertEq(
-                ERC20MultiVotes(AddressLib.get("ERC20_GUSDC")).totalSupply(),
+                ERC20MultiVotes(getAddr("ERC20_GUSDC")).totalSupply(),
                 0,
                 "credit total supply not 0 after deployment"
             );
             assertEq(
-                ERC20MultiVotes(AddressLib.get("ERC20_GUSDC")).balanceOf(
-                    deployer
-                ),
+                ERC20MultiVotes(getAddr("ERC20_GUSDC")).balanceOf(deployer),
                 0,
                 "balance of deployer not 0 after deployment"
             );
@@ -875,17 +833,17 @@ contract GIP_0 is Proposal {
         /// PROFIT MANAGER Verification
         {
             assertEq(
-                ProfitManager(AddressLib.get("PROFIT_MANAGER")).credit(),
-                AddressLib.get("ERC20_GUSDC"),
+                ProfitManager(getAddr("PROFIT_MANAGER")).credit(),
+                getAddr("ERC20_GUSDC"),
                 "Profit Manager credit token incorrect"
             );
             assertEq(
-                ProfitManager(AddressLib.get("PROFIT_MANAGER")).guild(),
-                AddressLib.get("ERC20_GUILD"),
+                ProfitManager(getAddr("PROFIT_MANAGER")).guild(),
+                getAddr("ERC20_GUILD"),
                 "Profit Manager guild token incorrect"
             );
             assertEq(
-                ProfitManager(AddressLib.get("PROFIT_MANAGER")).surplusBuffer(),
+                ProfitManager(getAddr("PROFIT_MANAGER")).surplusBuffer(),
                 0,
                 "Profit Manager surplus buffer incorrect"
             );
@@ -896,7 +854,7 @@ contract GIP_0 is Proposal {
                 uint256 guildSplit,
                 uint256 otherSplit,
                 address otherRecipient
-            ) = ProfitManager(AddressLib.get("PROFIT_MANAGER"))
+            ) = ProfitManager(getAddr("PROFIT_MANAGER"))
                     .getProfitSharingConfig();
 
             assertEq(
@@ -928,7 +886,7 @@ contract GIP_0 is Proposal {
         /// TIMELOCK Verification
         {
             GuildTimelockController timelock = GuildTimelockController(
-                payable(AddressLib.get("DAO_TIMELOCK"))
+                payable(getAddr("DAO_TIMELOCK"))
             );
 
             assertEq(
@@ -938,7 +896,7 @@ contract GIP_0 is Proposal {
             );
 
             GuildTimelockController onboardingTimelock = GuildTimelockController(
-                    payable(AddressLib.get("ONBOARD_TIMELOCK"))
+                    payable(getAddr("ONBOARD_TIMELOCK"))
                 );
 
             assertEq(
@@ -949,9 +907,7 @@ contract GIP_0 is Proposal {
         }
         /// Auction House Verification
         {
-            AuctionHouse auctionHouse = AuctionHouse(
-                AddressLib.get("AUCTION_HOUSE")
-            );
+            AuctionHouse auctionHouse = AuctionHouse(getAddr("AUCTION_HOUSE"));
 
             assertEq(
                 auctionHouse.midPoint(),
@@ -972,7 +928,7 @@ contract GIP_0 is Proposal {
 
         {
             ProfitManager profitManager = ProfitManager(
-                AddressLib.get("PROFIT_MANAGER")
+                getAddr("PROFIT_MANAGER")
             );
             assertEq(
                 profitManager.surplusBuffer(),
@@ -981,12 +937,12 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 profitManager.credit(),
-                AddressLib.get("ERC20_GUSDC"),
+                getAddr("ERC20_GUSDC"),
                 "credit address incorrect"
             );
             assertEq(
                 profitManager.guild(),
-                AddressLib.get("ERC20_GUILD"),
+                getAddr("ERC20_GUILD"),
                 "guild address incorrect"
             );
             assertEq(
@@ -1016,7 +972,7 @@ contract GIP_0 is Proposal {
         /// Governor Verification
         {
             GuildGovernor governor = GuildGovernor(
-                payable(AddressLib.get("DAO_GOVERNOR_GUILD"))
+                payable(getAddr("DAO_GOVERNOR_GUILD"))
             );
             assertEq(
                 governor.votingDelay(),
@@ -1040,7 +996,7 @@ contract GIP_0 is Proposal {
             );
 
             GuildVetoGovernor vetoGovernorCredit = GuildVetoGovernor(
-                payable(AddressLib.get("DAO_VETO_CREDIT"))
+                payable(getAddr("DAO_VETO_CREDIT"))
             );
 
             assertEq(
@@ -1060,12 +1016,12 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 address(vetoGovernorCredit.token()),
-                AddressLib.get("ERC20_GUSDC"),
+                getAddr("ERC20_GUSDC"),
                 "veto governor token incorrect"
             );
 
             GuildVetoGovernor vetoGovernorGuild = GuildVetoGovernor(
-                payable(AddressLib.get("DAO_VETO_GUILD"))
+                payable(getAddr("DAO_VETO_GUILD"))
             );
             assertEq(
                 vetoGovernorGuild.quorum(0),
@@ -1084,23 +1040,23 @@ contract GIP_0 is Proposal {
             );
             assertEq(
                 address(vetoGovernorGuild.token()),
-                AddressLib.get("ERC20_GUILD"),
+                getAddr("ERC20_GUILD"),
                 "veto governor token incorrect"
             );
         }
         {
-            LendingTerm term = LendingTerm(AddressLib.get("TERM_SDAI_1"));
+            LendingTerm term = LendingTerm(getAddr("TERM_SDAI_1"));
             {
                 LendingTerm.LendingTermParams memory params = term
                     .getParameters();
                 assertEq(
                     term.collateralToken(),
-                    AddressLib.get("ERC20_SDAI"),
+                    getAddr("ERC20_SDAI"),
                     "SDAI token incorrect"
                 );
                 assertEq(
                     params.collateralToken,
-                    AddressLib.get("ERC20_SDAI"),
+                    getAddr("ERC20_SDAI"),
                     "SDAI token incorrect from params"
                 );
                 assertEq(params.openingFee, 0, "Opening fee not 0");
@@ -1131,27 +1087,27 @@ contract GIP_0 is Proposal {
 
                 assertEq(
                     params.profitManager,
-                    AddressLib.get("PROFIT_MANAGER"),
+                    getAddr("PROFIT_MANAGER"),
                     "Profit Manager address incorrect"
                 );
                 assertEq(
                     params.guildToken,
-                    AddressLib.get("ERC20_GUILD"),
+                    getAddr("ERC20_GUILD"),
                     "Guild Token address incorrect"
                 );
                 assertEq(
                     params.auctionHouse,
-                    AddressLib.get("AUCTION_HOUSE"),
+                    getAddr("AUCTION_HOUSE"),
                     "Auction House address incorrect"
                 );
                 assertEq(
                     params.creditMinter,
-                    AddressLib.get("RATE_LIMITED_CREDIT_MINTER"),
+                    getAddr("RATE_LIMITED_CREDIT_MINTER"),
                     "Credit Minter address incorrect"
                 );
                 assertEq(
                     params.creditToken,
-                    AddressLib.get("ERC20_GUSDC"),
+                    getAddr("ERC20_GUSDC"),
                     "Credit Token address incorrect"
                 );
             }

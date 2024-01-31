@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {GatewayV1} from "@src/gateway/GatewayV1.sol";
@@ -13,7 +13,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // /// @title Test suite for the AccountFactory contract
 // /// @notice Implements various test cases to validate the functionality of AccountFactory contract
-contract UnitTestGatewayV1 is Test {
+contract UnitTestGatewayV1 is ECGTest {
     uint256 public alicePrivateKey = uint256(0x42);
     address public alice = vm.addr(alicePrivateKey);
 

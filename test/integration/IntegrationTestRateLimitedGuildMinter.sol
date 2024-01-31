@@ -5,7 +5,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "@forge-std/Test.sol";
 
-import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
 contract IntegrationTestRateLimitedGuildMinter is PostProposalCheckFixture {
@@ -19,7 +18,7 @@ contract IntegrationTestRateLimitedGuildMinter is PostProposalCheckFixture {
     function testGovernanceUpdatesBufferCap() public {
         uint128 newBufferCap = 100_000_000 * 1e18;
 
-        vm.prank(AddressLib.get("DAO_TIMELOCK"));
+        vm.prank(getAddr("DAO_TIMELOCK"));
         rateLimitedGuildMinter.setBufferCap(newBufferCap);
 
         assertEq(rateLimitedGuildMinter.bufferCap(), newBufferCap);
@@ -29,7 +28,7 @@ contract IntegrationTestRateLimitedGuildMinter is PostProposalCheckFixture {
     function testGovernanceUpdatesRateLimitPerSecond() public {
         uint128 newRateLimitPerSecond = 1;
 
-        vm.prank(AddressLib.get("DAO_TIMELOCK"));
+        vm.prank(getAddr("DAO_TIMELOCK"));
         vm.expectRevert("RateLimited: rateLimitPerSecond too high");
         rateLimitedGuildMinter.setRateLimitPerSecond(newRateLimitPerSecond);
     }

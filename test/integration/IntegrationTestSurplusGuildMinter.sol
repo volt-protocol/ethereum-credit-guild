@@ -3,7 +3,6 @@ pragma solidity 0.8.13;
 
 import "@forge-std/Test.sol";
 
-import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
 import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
@@ -658,7 +657,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     }
 
     function _testSetMintRatio(uint256 mintRatio) private {
-        vm.prank(AddressLib.get("DAO_TIMELOCK"));
+        vm.prank(getAddr("DAO_TIMELOCK"));
 
         surplusGuildMinter.setMintRatio(mintRatio);
         assertEq(
@@ -669,7 +668,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     }
 
     function _testSetRewardRatio(uint256 rewardRatio) private {
-        vm.prank(AddressLib.get("DAO_TIMELOCK"));
+        vm.prank(getAddr("DAO_TIMELOCK"));
 
         surplusGuildMinter.setRewardRatio(rewardRatio);
 

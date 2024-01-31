@@ -3,7 +3,6 @@ pragma solidity 0.8.13;
 
 import "@forge-std/Test.sol";
 
-import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
 contract IntegrationTestGuildToken is PostProposalCheckFixture {
@@ -97,7 +96,7 @@ contract IntegrationTestGuildToken is PostProposalCheckFixture {
         uint256 startingGaugeWeight = guild.getGaugeWeight(address(term));
         uint256 startingTotalWeight = guild.totalWeight();
 
-        vm.prank(AddressLib.get("DAO_TIMELOCK"));
+        vm.prank(getAddr("DAO_TIMELOCK"));
         guild.removeGauge(address(term));
 
         uint256 endingTotalWeight = guild.totalWeight();

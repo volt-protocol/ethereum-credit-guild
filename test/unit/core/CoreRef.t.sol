@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockCoreRef} from "@test/mock/MockCoreRef.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 
-contract UnitTestCoreRef is Test {
+contract UnitTestCoreRef is ECGTest {
     address private governor = address(1);
     address private guardian = address(2);
     Core private core;

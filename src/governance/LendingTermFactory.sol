@@ -10,7 +10,6 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 
 /// @notice LendingTerm factory.
 contract LendingTermFactory is CoreRef {
-
     /// @notice mapping of allowed LendingTerm implementations
     mapping(address => bool) public implementations;
 
@@ -56,12 +55,7 @@ contract LendingTermFactory is CoreRef {
         LendingTerm.LendingTermParams params
     );
 
-    constructor(
-        address _core,
-        address _guildToken
-    )
-        CoreRef(_core)
-    {
+    constructor(address _core, address _guildToken) CoreRef(_core) {
         guildToken = _guildToken;
     }
 

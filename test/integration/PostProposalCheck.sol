@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 
-import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {TestProposals} from "@test/proposals/TestProposals.sol";
 
-contract PostProposalCheck is Test {
+contract PostProposalCheck is ECGTest {
     TestProposals public proposals;
 
     uint256 preProposalsSnapshot;

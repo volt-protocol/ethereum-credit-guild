@@ -33,8 +33,8 @@ contract DeployProposal is Script, proposal {
 
         vm.startBroadcast(PRIVATE_KEY);
         if (DO_DEPLOY) deploy();
-        // if (DO_AFTERDEPLOY) afterDeploy(deployerAddress);
-        // if (DO_TEARDOWN) teardown(deployerAddress);
+        if (DO_AFTERDEPLOY) afterDeploy(deployerAddress);
+        if (DO_TEARDOWN) teardown(deployerAddress);
         vm.stopBroadcast();
     }
 }

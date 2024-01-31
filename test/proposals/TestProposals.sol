@@ -2,7 +2,7 @@ pragma solidity 0.8.13;
 
 import {console} from "@forge-std/console.sol";
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
 
 import {GIP_0} from "@test/proposals/gips/GIP_0.sol";
@@ -18,7 +18,7 @@ Or, from another Solidity file (for post-proposal integration testing):
     proposals.testProposals();
 */
 
-contract TestProposals is Test {
+contract TestProposals is ECGTest {
     Proposal[] public proposals;
     uint256 public nProposals;
     bool public DEBUG;

@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import {Governor, IGovernor} from "@openzeppelin/contracts/governance/Governor.sol";
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
@@ -19,7 +19,7 @@ import {LendingTermFactory} from "@src/governance/LendingTermFactory.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
-contract LendingTermOnboardingUnitTest is Test {
+contract LendingTermOnboardingUnitTest is ECGTest {
     address private governor = address(1);
     address private guardian = address(2);
     Core private core;
@@ -300,9 +300,7 @@ contract LendingTermOnboardingUnitTest is Test {
                 hardCap: _HARDCAP
             })
         );
-        vm.expectRevert(
-            "LendingTermFactory: invalid minPartialRepayPercent"
-        );
+        vm.expectRevert("LendingTermFactory: invalid minPartialRepayPercent");
         factory.createTerm(
             1,
             address(termImplementation),
@@ -347,9 +345,7 @@ contract LendingTermOnboardingUnitTest is Test {
                 hardCap: 0 // hardCap of 0 makes no debt available
             })
         );
-        vm.expectRevert(
-            "LendingTermFactory: invalid periodic payment params"
-        );
+        vm.expectRevert("LendingTermFactory: invalid periodic payment params");
         factory.createTerm(
             1,
             address(termImplementation),

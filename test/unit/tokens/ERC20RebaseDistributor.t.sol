@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {MockERC20RebaseDistributor} from "@test/mock/MockERC20RebaseDistributor.sol";
 
-contract ERC20RebaseDistributorUnitTest is Test {
+contract ERC20RebaseDistributorUnitTest is ECGTest {
     MockERC20RebaseDistributor token;
 
     address constant alice = address(0x616c696365);

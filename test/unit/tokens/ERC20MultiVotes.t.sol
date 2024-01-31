@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 import {MockERC20MultiVotes} from "@test/mock/MockERC20MultiVotes.sol";
 
-contract ERC20MultiVotesUnitTest is Test {
+contract ERC20MultiVotesUnitTest is ECGTest {
     MockERC20MultiVotes token;
     address constant delegate1 = address(0xDEAD);
     address constant delegate2 = address(0xBEEF);
