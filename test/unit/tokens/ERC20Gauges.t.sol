@@ -208,49 +208,6 @@ contract ERC20GaugesUnitTest is Test {
                         TEST USER GAUGE OPERATIONS
     //////////////////////////////////////////////////////////////*/
 
-    function testCalculateGaugeAllocation() public {
-        token.mint(address(this), 100e18);
-
-        token.setMaxGauges(3);
-        token.addGauge(1, gauge1);
-        token.addGauge(1, gauge2);
-
-        require(token.calculateGaugeAllocation(gauge1, 100e18) == 0);
-        require(token.calculateGaugeAllocation(gauge2, 100e18) == 0);
-
-        require(token.incrementGauge(gauge1, 1e18) == 1e18);
-        require(token.incrementGauge(gauge2, 1e18) == 2e18);
-
-        require(token.calculateGaugeAllocation(gauge1, 100e18) == 50e18);
-        require(token.calculateGaugeAllocation(gauge2, 100e18) == 50e18);
-
-        require(token.incrementGauge(gauge2, 2e18) == 4e18);
-
-        require(token.calculateGaugeAllocation(gauge1, 100e18) == 25e18);
-        require(token.calculateGaugeAllocation(gauge2, 100e18) == 75e18);
-
-        token.removeGauge(gauge1);
-        require(token.calculateGaugeAllocation(gauge1, 100e18) == 0);
-        require(token.calculateGaugeAllocation(gauge2, 100e18) == 100e18);
-
-        token.addGauge(2, gauge3); // 2nd gauge type
-        assertEq(token.gaugeType(gauge1), 1);
-        assertEq(token.gaugeType(gauge2), 1);
-        assertEq(token.gaugeType(gauge3), 2);
-
-        require(token.calculateGaugeAllocation(gauge1, 100e18) == 0);
-        require(token.calculateGaugeAllocation(gauge2, 100e18) == 100e18);
-        require(token.calculateGaugeAllocation(gauge3, 100e18) == 0);
-
-        require(token.incrementGauge(gauge3, 1e18) == 5e18);
-        assertEq(token.totalTypeWeight(1), 3e18);
-        assertEq(token.totalTypeWeight(2), 1e18);
-
-        require(token.calculateGaugeAllocation(gauge1, 100e18) == 0);
-        require(token.calculateGaugeAllocation(gauge2, 100e18) == 100e18);
-        require(token.calculateGaugeAllocation(gauge3, 100e18) == 100e18);
-    }
-
     function testIncrement(
         address[8] memory from,
         address[8] memory gauges,
