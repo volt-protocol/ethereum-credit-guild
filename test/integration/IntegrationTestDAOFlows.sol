@@ -36,7 +36,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
 
         /// new term so that onboard succeeds
         term = LendingTerm(
-            onboarder.createTerm(
+            factory.createTerm(
                 1,
                 AddressLib.get("LENDING_TERM_V1"),
                 AddressLib.get("AUCTION_HOUSE"),

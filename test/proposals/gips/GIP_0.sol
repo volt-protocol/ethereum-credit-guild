@@ -18,6 +18,7 @@ import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {SurplusGuildMinter} from "@src/loan/SurplusGuildMinter.sol";
+import {LendingTermFactory} from "@src/governance/LendingTermFactory.sol";
 import {LendingTermOnboarding} from "@src/governance/LendingTermOnboarding.sol";
 import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
@@ -251,6 +252,10 @@ contract GIP_0 is Proposal {
                     AddressLib.get("CORE"),
                     ONBOARD_TIMELOCK_DELAY
                 );
+            LendingTermFactory termFactory = new LendingTermFactory(
+                AddressLib.get("CORE"), // _core
+                AddressLib.get("ERC20_GUILD") // _guildToken
+            );
             LendingTermOnboarding onboardGovernorGuild = new LendingTermOnboarding(
                 AddressLib.get("CORE"), // _core
                 address(onboardTimelock), // _timelock
@@ -258,7 +263,8 @@ contract GIP_0 is Proposal {
                 ONBOARD_GOVERNOR_GUILD_VOTING_DELAY, // initialVotingDelay
                 ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD, // initialVotingPeriod
                 ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD, // initialProposalThreshold
-                ONBOARD_GOVERNOR_GUILD_QUORUM // initialQuorum
+                ONBOARD_GOVERNOR_GUILD_QUORUM, // initialQuorum
+                address(termFactory)
             );
             GuildVetoGovernor onboardVetoCredit = new GuildVetoGovernor(
                 AddressLib.get("CORE"),
@@ -280,6 +286,7 @@ contract GIP_0 is Proposal {
                 OFFBOARD_QUORUM // quorum
             );
 
+            AddressLib.set("LENDING_TERM_FACTORY", address(termFactory));
             AddressLib.set("DAO_GOVERNOR_GUILD", address(daoGovernorGuild));
             AddressLib.set("DAO_TIMELOCK", address(daoTimelock));
             AddressLib.set("DAO_VETO_CREDIT", address(daoVetoCredit));
@@ -296,23 +303,23 @@ contract GIP_0 is Proposal {
 
         // Terms
         {
-            LendingTermOnboarding termOnboarding = LendingTermOnboarding(
-                payable(AddressLib.get("ONBOARD_GOVERNOR_GUILD"))
+            LendingTermFactory termFactory = LendingTermFactory(
+                payable(AddressLib.get("LENDING_TERM_FACTORY"))
             );
             address _lendingTermV1 = AddressLib.get("LENDING_TERM_V1");
             address _auctionHouse = AddressLib.get("AUCTION_HOUSE");
-            termOnboarding.setMarketReferences(
+            termFactory.setMarketReferences(
                 1,
-                LendingTermOnboarding.MarketReferences({
+                LendingTermFactory.MarketReferences({
                     profitManager: AddressLib.get("PROFIT_MANAGER"),
                     creditMinter: AddressLib.get("RATE_LIMITED_CREDIT_MINTER"),
                     creditToken: AddressLib.get("ERC20_GUSDC")
                 })
             );
-            termOnboarding.allowImplementation(_lendingTermV1, true);
-            termOnboarding.allowAuctionHouse(_auctionHouse, true);
+            termFactory.allowImplementation(_lendingTermV1, true);
+            termFactory.allowAuctionHouse(_auctionHouse, true);
 
-            address termSDAI1 = termOnboarding.createTerm(
+            address termSDAI1 = termFactory.createTerm(
                 1, // gauge type,
                 _lendingTermV1, // implementation
                 _auctionHouse, // auctionHouse
