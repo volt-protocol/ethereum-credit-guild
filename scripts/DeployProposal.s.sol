@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Script} from "@forge-std/Script.sol";
+import {Script, console} from "@forge-std/Script.sol";
 
 import {GIP_0 as proposal} from "@test/proposals/gips/GIP_0.sol";
 
@@ -29,11 +29,12 @@ contract DeployProposal is Script, proposal {
     function run() public {
         _parseEnv();
         address deployerAddress = vm.addr(PRIVATE_KEY);
+        console.log("DEPLOYER: %s", deployerAddress);
 
         vm.startBroadcast(PRIVATE_KEY);
         if (DO_DEPLOY) deploy();
-        if (DO_AFTERDEPLOY) afterDeploy(deployerAddress);
-        if (DO_TEARDOWN) teardown(deployerAddress);
+        // if (DO_AFTERDEPLOY) afterDeploy(deployerAddress);
+        // if (DO_TEARDOWN) teardown(deployerAddress);
         vm.stopBroadcast();
     }
 }

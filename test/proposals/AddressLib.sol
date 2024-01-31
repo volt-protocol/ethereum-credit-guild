@@ -28,7 +28,7 @@ library AddressLib {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, ADDR_PATH);
 
-        if (block.chainid != 1) {
+        if (block.chainid == 11155111) {
             path = string.concat(root, ADDR_PATH_SEPOLIA);
         }
 
@@ -41,7 +41,7 @@ library AddressLib {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, ADDR_PATH);
 
-        if (block.chainid != 1) {
+        if (block.chainid == 11155111) {
             path = string.concat(root, ADDR_PATH_SEPOLIA);
         }
 
