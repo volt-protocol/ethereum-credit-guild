@@ -24,6 +24,12 @@ contract IntegrationTestRoles is PostProposalCheck {
             root,
             "/protocol-configuration/roles.json"
         );
+        if (block.chainid == 11155111) {
+            path = string.concat(
+                root,
+                "/protocol-configuration/roles.sepolia.json"
+            );
+        }
         string memory json = vm.readFile(path);
 
         string[] memory roles = vm.parseJsonKeys(json, "$");

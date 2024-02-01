@@ -8,6 +8,14 @@
     "name": "TEAM_MULTISIG"
   },
   {
+    "addr": "0xb027658e189F9814663631b12B9CDF8dd7CC977C",
+    "name": "ESWAK"
+  },
+  {
+    "addr": "0xbad06297eB7878502E045319a7c4a8904b49BEEF",
+    "name": "BADBEEF"
+  },
+  {
     "addr": "0xfc2290dbf4db882b6d3d07ecb1e00d0531b45680",
     "name": "CORE"
   },
