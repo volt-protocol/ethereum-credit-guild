@@ -379,6 +379,9 @@ contract GIP_0 is Proposal {
         core.grantRole(CoreRoles.CREDIT_BURNER, getAddr("PROFIT_MANAGER"));
         core.grantRole(CoreRoles.CREDIT_BURNER, getAddr("PSM_USDC"));
         core.grantRole(CoreRoles.CREDIT_BURNER, getAddr("TERM_SDAI_1"));
+        if (IS_SEPOLIA) {
+            core.grantRole(CoreRoles.CREDIT_BURNER, getAddr("TERM_WBTC_1"));
+        }
 
         // RATE_LIMITED_CREDIT_MINTER
         core.grantRole(
