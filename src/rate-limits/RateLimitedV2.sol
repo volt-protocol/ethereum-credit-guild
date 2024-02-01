@@ -6,7 +6,7 @@ import {SafeCastLib} from "@solmate/src/utils/SafeCastLib.sol";
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {IRateLimitedV2} from "@src/utils/IRateLimitedV2.sol";
+import {IRateLimitedV2} from "@src/rate-limits/IRateLimitedV2.sol";
 
 /// @title abstract contract for putting a rate limit on how fast a contract
 /// can perform an action e.g. Minting
