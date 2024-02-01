@@ -440,16 +440,17 @@ abstract contract ERC20RebaseDistributor is ERC20 {
     function balanceOf(
         address account
     ) public view virtual override returns (uint256) {
+        uint256 _rawBalance = ERC20.balanceOf(account);
         RebasingState memory _rebasingState = rebasingState[account];
         if (_rebasingState.isRebasing == 0) {
-            return ERC20.balanceOf(account);
+            return _rawBalance;
         } else {
             return
                 _shares2balance(
                     _rebasingState.nShares,
                     rebasingSharePrice(),
                     0,
-                    ERC20.balanceOf(account)
+                    _rawBalance
                 );
         }
     }
