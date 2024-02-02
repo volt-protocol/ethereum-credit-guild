@@ -82,8 +82,8 @@ abstract contract Gateway is Ownable, Pausable {
     }
 
     /// @notice Executes multiple calls in a single transaction.
-    /// and if amount > 0, tries to transfer From the sender
     /// @param calls An array of call data to execute.
+    /// @dev can be paused
     function multicall(bytes[] calldata calls) public whenNotPaused {
         require(
             _originalSender == address(1),
@@ -97,7 +97,7 @@ abstract contract Gateway is Ownable, Pausable {
         _originalSender = address(1);
     }
 
-    /// @notice
+    /// @notice function to consume a permit allowanced
     /// @dev can only be used from the multicall function that sets "_originalSender"
     function consumePermit(
         address token,
@@ -122,7 +122,7 @@ abstract contract Gateway is Ownable, Pausable {
         );
     }
 
-    /// @notice
+    /// @notice function to consume an allowance (transferFrom) from msg.sender to the gateway
     /// @dev can only be used from the multicall function that sets "_originalSender"
     function consumeAllowance(address token, uint256 amount) public {
         require(
@@ -135,7 +135,7 @@ abstract contract Gateway is Ownable, Pausable {
     /// @notice allows sweeping remaining token on the gateway
     ///         should be used at the end of a multicall
     /// @dev can only be used from the multicall function that sets "_originalSender"
-    /// @dev anyone can sweep any token from this contract
+    /// @dev it means anyone can sweep any token left on this contract
     function sweep(address token) public {
         require(
             _originalSender != address(1),
@@ -149,6 +149,7 @@ abstract contract Gateway is Ownable, Pausable {
 
     /// @dev Executes a series of calls using call on this contract.
     /// @param calls An array of call data to execute.
+    /// @dev this is only executed by the multicall function
     function _executeCalls(bytes[] memory calls) internal {
         for (uint256 i = 0; i < calls.length; i++) {
             (bool success, bytes memory result) = address(this).call(calls[i]);

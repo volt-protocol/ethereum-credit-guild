@@ -114,20 +114,22 @@ contract PostProposalCheckFixture is PostProposalCheck {
 
         // create and onboard a new term for the integration tests
         collateralToken = new MockERC20();
-        term = LendingTerm(factory.createTerm(
-            1, // gauge type,
-            getAddr("LENDING_TERM_V1"), // implementation
-            getAddr("AUCTION_HOUSE"), // auctionHouse
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateralToken),
-                maxDebtPerCollateralToken: 1e18,
-                interestRate: 0.04e18,
-                maxDelayBetweenPartialRepay: 0,
-                minPartialRepayPercent: 0,
-                openingFee: 0,
-                hardCap: 1e27
-            })
-        ));
+        term = LendingTerm(
+            factory.createTerm(
+                1, // gauge type,
+                getAddr("LENDING_TERM_V1"), // implementation
+                getAddr("AUCTION_HOUSE"), // auctionHouse
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateralToken),
+                    maxDebtPerCollateralToken: 1e18,
+                    interestRate: 0.04e18,
+                    maxDelayBetweenPartialRepay: 0,
+                    minPartialRepayPercent: 0,
+                    openingFee: 0,
+                    hardCap: 1e27
+                })
+            )
+        );
         vm.startPrank(getAddr("ONBOARD_TIMELOCK"));
         guild.addGauge(1, address(term));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));

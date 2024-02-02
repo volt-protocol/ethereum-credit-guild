@@ -32,7 +32,11 @@ contract IntegrationTestGuildToken is PostProposalCheckFixture {
         _stakeOnGauge(to, amount);
         uint256 totalWeightAfter = guild.totalWeight();
 
-        assertEq(totalWeightAfter - totalWeightBefore, amount, "total weight ne guild amt");
+        assertEq(
+            totalWeightAfter - totalWeightBefore,
+            amount,
+            "total weight ne guild amt"
+        );
     }
 
     function _stakeOnGauge(address to, uint96 amount) private {

@@ -39,7 +39,7 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
 
     function testSupplyCollateralUserOne() public returns (bytes32, uint128) {
         testAllocateGauge();
-        uint128 amount = uint128(profitManager.minBorrow()) * 314159 / 100000;
+        uint128 amount = (uint128(profitManager.minBorrow()) * 314159) / 100000;
         return _supplyCollateralUserOne(amount);
     }
 
@@ -53,7 +53,9 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
         deal(address(collateralToken), userOne, supplyAmount);
 
         uint256 startingTotalSupply = credit.totalSupply();
-        uint256 startingCollateralBalance = collateralToken.balanceOf(address(term));
+        uint256 startingCollateralBalance = collateralToken.balanceOf(
+            address(term)
+        );
         uint256 startingBuffer = rateLimitedCreditMinter.buffer();
 
         vm.startPrank(userOne);
@@ -63,7 +65,8 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
 
         assertEq(term.getLoanDebt(loanId), supplyAmount, "incorrect loan debt");
         assertEq(
-            collateralToken.balanceOf(address(term)) - startingCollateralBalance,
+            collateralToken.balanceOf(address(term)) -
+                startingCollateralBalance,
             supplyAmount,
             "collateralToken balance of term incorrect"
         );
@@ -262,7 +265,11 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
             0,
             "incorrect number of auctions post bid"
         );
-        assertEq(collateralToken.balanceOf(userTwo), 0, "incorrect collateralToken balance userTwo");
+        assertEq(
+            collateralToken.balanceOf(userTwo),
+            0,
+            "incorrect collateralToken balance userTwo"
+        );
         assertEq(
             collateralToken.balanceOf(userOne),
             loanAmount,

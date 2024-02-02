@@ -216,7 +216,9 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         assertEq(creditAsked, 0, "incorrect credit asked");
         assertEq(auctionHouse.nAuctionsInProgress(), 1);
 
-        uint256 startingCollateralBalance = collateralToken.balanceOf(address(this));
+        uint256 startingCollateralBalance = collateralToken.balanceOf(
+            address(this)
+        );
         uint256 startingCreditSupply = credit.totalSupply();
         uint256 startingCreditMultiplier = profitManager.creditMultiplier();
         uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();
@@ -224,7 +226,9 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
 
         auctionHouse.forgive(loanId);
 
-        uint256 endingCollateralBalance = collateralToken.balanceOf(address(this));
+        uint256 endingCollateralBalance = collateralToken.balanceOf(
+            address(this)
+        );
 
         assertEq(auctionHouse.nAuctionsInProgress(), 0);
         assertEq(
