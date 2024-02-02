@@ -45,7 +45,8 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     }
 
     function testStake() public {
-        uint256 stakeAmount = surplusGuildMinter.MIN_STAKE() * 314159 / 100000;
+        uint256 stakeAmount = (surplusGuildMinter.MIN_STAKE() * 314159) /
+            100000;
         _testStake(stakeAmount);
     }
 
@@ -504,7 +505,11 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
             supplyAmount,
             "incorrect credit balance"
         );
-        assertEq(term.issuance(), issuanceBefore + supplyAmount, "incorrect supply issuance");
+        assertEq(
+            term.issuance(),
+            issuanceBefore + supplyAmount,
+            "incorrect supply issuance"
+        );
     }
 
     function _repayLoan(
