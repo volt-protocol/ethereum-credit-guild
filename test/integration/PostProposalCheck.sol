@@ -6,20 +6,11 @@ import {ECGTest} from "@test/ECGTest.sol";
 import {TestProposals} from "@test/proposals/TestProposals.sol";
 
 contract PostProposalCheck is ECGTest {
-    TestProposals public proposals;
-
-    uint256 preProposalsSnapshot;
-    uint256 postProposalsSnapshot;
-
     function setUp() public virtual {
-        preProposalsSnapshot = vm.snapshot();
-
         // Run all pending proposals before doing e2e tests
-        proposals = new TestProposals();
+        TestProposals proposals = new TestProposals();
         proposals.setUp();
         proposals.setDebug(false);
         proposals.testProposals();
-
-        postProposalsSnapshot = vm.snapshot();
     }
 }

@@ -168,7 +168,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
     }
 
     /// This test will pass once a nonce is added to onboarder
-    function testOnboardOffBoardOnboard() public {
+    function testOnboardOffBoardOnboardReset() public {
         testOnboarding();
 
         vm.warp(block.timestamp + onboarder.MIN_DELAY_BETWEEN_PROPOSALS() + 1);
@@ -206,23 +206,12 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         vm.expectRevert("LendingTermOffboarding: re-onboarded");
         offboarder.cleanup(address(term));
 
-        /// offboard again as offboard vote already passed before but did not finalize
-        assertTrue(guild.isGauge(address(term)));
+        /// reset
+        offboarder.resetOffboarding(address(term));
 
-        offboarder.offboard(address(term));
-
-        assertEq(uint8(offboarder.canOffboard(address(term))), 1);
-        assertFalse(guild.isGauge(address(term)));
-        offboarder.cleanup(address(term));
-
-        assertEq(uint8(offboarder.canOffboard(address(term))), 0);
-
-        assertFalse(core.hasRole(roles.GAUGE_PNL_NOTIFIER, address(term)));
-        assertFalse(
+        assertTrue(core.hasRole(roles.GAUGE_PNL_NOTIFIER, address(term)));
+        assertTrue(
             core.hasRole(roles.RATE_LIMITED_CREDIT_MINTER, address(term))
         );
-
-        /// assert that term borrowable amount is 0
-        assertEq(term.debtCeiling(), 0);
     }
 }

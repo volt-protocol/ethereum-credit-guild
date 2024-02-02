@@ -74,7 +74,7 @@ contract IntegrationTestOnboardingFlows is PostProposalCheckFixture {
     }
 
     function testProposeOnboardFailsInvalidTerm() public {
-        vm.expectRevert("LendingTermOnboarding: invalid term");
+        vm.expectRevert(); // cannot get term's auctionHouse()
         onboarder.proposeOnboard(address(0));
     }
 }

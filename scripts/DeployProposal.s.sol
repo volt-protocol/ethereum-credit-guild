@@ -29,7 +29,6 @@ contract DeployProposal is Script, proposal {
     function run() public {
         _parseEnv();
         address deployerAddress = vm.addr(PRIVATE_KEY);
-        console.log("DEPLOYER: %s", deployerAddress);
 
         vm.startBroadcast(PRIVATE_KEY);
         if (DO_DEPLOY) deploy();

@@ -3,10 +3,8 @@ pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {ECGTest} from "@test/ECGTest.sol";
-
 import {Core} from "@src/core/Core.sol";
-import {MockERC20} from "@test/mock/MockERC20.sol";
+import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
@@ -14,8 +12,6 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
-import {TestProposals} from "@test/proposals/TestProposals.sol";
-import {ERC20MultiVotes} from "@src/tokens/ERC20MultiVotes.sol";
 import {GuildVetoGovernor} from "@src/governance/GuildVetoGovernor.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
@@ -117,8 +113,22 @@ contract PostProposalCheckFixture is PostProposalCheck {
         );
         offboarder = LendingTermOffboarding(getAddr("OFFBOARD_GOVERNOR_GUILD"));
 
-        term = LendingTerm(getAddr("TERM_SDAI_1"));
-        collateralToken = ERC20(term.getParameters().collateralToken);
+        LendingTerm existingTerm = LendingTerm(getAddr("TERM_SDAI_1"));
+        collateralToken = ERC20(existingTerm.getParameters().collateralToken);
+
+        // create and onboard a new term for the integration tests
+        term = LendingTerm(factory.createTerm(
+            guild.gaugeType(address(existingTerm)), // gauge type,
+            getAddr("LENDING_TERM_V1"), // implementation
+            existingTerm.getReferences().auctionHouse, // auctionHouse
+            existingTerm.getParameters()
+        ));
+        vm.startPrank(getAddr("ONBOARD_TIMELOCK"));
+        guild.addGauge(guild.gaugeType(address(existingTerm)), address(term));
+        core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
+        core.grantRole(CoreRoles.CREDIT_BURNER, address(term));
+        core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
+        vm.stopPrank();
 
         vm.label(userOne, "user one");
         vm.label(userTwo, "user two");
@@ -138,5 +148,20 @@ contract PostProposalCheckFixture is PostProposalCheck {
             credit.enterRebase();
             vm.stopPrank();
         }
+    }
+
+    function dealCredit(address who, uint256 amount, bool adjust) public {
+        uint256 balance = credit.balanceOf(who);
+        if (adjust && balance < amount) {
+            amount -= balance;
+        }
+
+        uint256 usdcAmount = amount / 1e12 + 1;
+        deal(address(usdc), who, usdcAmount);
+        vm.startPrank(who);
+        usdc.approve(address(psm), usdcAmount);
+        psm.mint(who, usdcAmount);
+        vm.stopPrank();
+        assertGt(credit.balanceOf(who), amount);
     }
 }

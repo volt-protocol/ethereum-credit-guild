@@ -196,7 +196,7 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
             keccak256(bytes(description))
         );
 
-        deal(address(credit), address(this), veto.quorum(0));
+        dealCredit(address(this), veto.quorum(0), true);
 
         credit.delegate(address(this)); /// delegate to self
 

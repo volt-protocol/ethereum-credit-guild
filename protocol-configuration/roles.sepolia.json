@@ -4,7 +4,8 @@
     "DAO_TIMELOCK",
     "ONBOARD_TIMELOCK",
     "ESWAK",
-    "BADBEEF"
+    "BADBEEF",
+    "TOMTOM"
   ],
   "GUARDIAN": [
     "TEAM_MULTISIG"
