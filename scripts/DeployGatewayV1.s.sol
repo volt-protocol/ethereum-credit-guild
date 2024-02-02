@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Script} from "@forge-std/Script.sol";
+import {Script, console} from "@forge-std/Script.sol";
 import {GatewayV1} from "@src/gateway/GatewayV1.sol";
 
 /// @notice
@@ -78,7 +78,7 @@ contract DeployGatewayV1 is Script {
             true
         );
 
-        // allow partial repay on various terms
+        // allow repay / partial repay on various terms
         gatewayv1.allowCall(
             SDAI_TERM,
             getSelector("partialRepay(bytes32,uint256)"),
@@ -89,6 +89,8 @@ contract DeployGatewayV1 is Script {
             getSelector("partialRepay(bytes32,uint256)"),
             true
         );
+        gatewayv1.allowCall(SDAI_TERM, getSelector("repay(bytes32)"), true);
+        gatewayv1.allowCall(WBTC_TERM, getSelector("repay(bytes32)"), true);
 
         // allow redeem and mint on the psm
         gatewayv1.allowCall(PSM, getSelector("redeem(address,uint256)"), true);
@@ -109,6 +111,50 @@ contract DeployGatewayV1 is Script {
             ),
             true
         );
+    }
+
+    function getSelector(
+        bytes memory functionStr
+    ) public pure returns (bytes4) {
+        return bytes4(keccak256(functionStr));
+    }
+}
+
+contract UpdateGatewayV1 is Script {
+    uint256 public PRIVATE_KEY;
+    GatewayV1 public gatewayv1 =
+        GatewayV1(0x6b00C1ac7a1680dd5326bcd9DC735514419F7A33);
+
+    // ADDRESSES ON SEPOLIA
+
+    function _parseEnv() internal {
+        // Default behavior: use Anvil 0 private key
+        PRIVATE_KEY = vm.envOr(
+            "ETH_PRIVATE_KEY",
+            77814517325470205911140941194401928579557062014761831930645393041380819009408
+        );
+    }
+
+    function run() public {
+        _parseEnv();
+
+        address deployerAddress = vm.addr(PRIVATE_KEY);
+        console.log("DEPLOYER: %s", deployerAddress);
+
+        vm.startBroadcast(PRIVATE_KEY);
+
+        gatewayv1.allowCall(
+            0x938998fca53D8BFD91BC1726D26238e9Eada596C,
+            getSelector("repay(bytes32)"),
+            true
+        );
+        gatewayv1.allowCall(
+            0x820E8F9399514264Fd8CB21cEE5F282c723131f6,
+            getSelector("repay(bytes32)"),
+            true
+        );
+
+        vm.stopBroadcast();
     }
 
     function getSelector(
