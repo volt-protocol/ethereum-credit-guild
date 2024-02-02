@@ -35,7 +35,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         assertTrue(guild.isGauge(address(term)));
     }
 
-    function _allocateGaugeToSDAI() private {
+    function _allocateGauge() private {
         _mintQuorumGuildAmount();
 
         guild.incrementGauge(address(term), guild.balanceOf(address(this)));
@@ -116,7 +116,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
             uint256 warpTime = 365 days;
 
             /// create loan
-            /// supply 1000 SDAI Collateral and receive 1000 credit as user one
+            /// supply 1000 Collateral and receive 1000 credit as user one
             bytes32 loanId = _supplyCollateralUserOne(uint128(supplyAmount));
 
             /// stake credit in surplus guild minter on that term before interest accrues
@@ -230,7 +230,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
             uint256 warpTime = 365 days;
 
             /// create loan
-            /// supply 1000 SDAI Collateral and receive 1000 credit as user one
+            /// supply 1000 Collateral and receive 1000 credit as user one
             loanId = _supplyCollateralUserOne(uint128(supplyAmount));
 
             /// stake credit in surplus guild minter on that term before interest accrues
@@ -476,7 +476,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     function _supplyCollateralUserOne(
         uint128 supplyAmount
     ) private returns (bytes32 loanId) {
-        _allocateGaugeToSDAI();
+        _allocateGauge();
 
         deal(address(collateralToken), userOne, supplyAmount);
 
@@ -484,15 +484,15 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         uint256 issuanceBefore = term.issuance();
 
         vm.startPrank(userOne);
-        sdai.approve(address(term), supplyAmount);
+        collateralToken.approve(address(term), supplyAmount);
         loanId = term.borrow(supplyAmount, supplyAmount);
         vm.stopPrank();
 
         assertEq(term.getLoanDebt(loanId), supplyAmount, "incorrect loan debt");
         assertEq(
-            sdai.balanceOf(address(term)),
+            collateralToken.balanceOf(address(term)),
             supplyAmount,
-            "sdai balance of term incorrect"
+            "collateralToken balance of term incorrect"
         );
         assertEq(
             credit.totalSupply(),
@@ -529,9 +529,9 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
         assertEq(term.getLoanDebt(loanId), 0, "incorrect loan debt");
 
         assertEq(
-            sdai.balanceOf(address(term)),
+            collateralToken.balanceOf(address(term)),
             0,
-            "sdai balance of term incorrect"
+            "collateralToken balance of term incorrect"
         );
         assertEq(
             startingIssuance - term.issuance(),

@@ -36,15 +36,15 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         uint256 startingBuffer = rateLimitedCreditMinter.buffer();
 
         vm.startPrank(userOne);
-        sdai.approve(address(term), supplyAmount);
+        collateralToken.approve(address(term), supplyAmount);
         loanId = term.borrow(borrowAmount, supplyAmount);
         vm.stopPrank();
 
         assertEq(term.getLoanDebt(loanId), borrowAmount, "incorrect loan debt");
         assertEq(
-            sdai.balanceOf(address(term)),
+            collateralToken.balanceOf(address(term)),
             supplyAmount,
-            "sdai balance of term incorrect"
+            "collateralToken balance of term incorrect"
         );
         assertEq(
             credit.totalSupply(),
@@ -216,7 +216,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         assertEq(creditAsked, 0, "incorrect credit asked");
         assertEq(auctionHouse.nAuctionsInProgress(), 1);
 
-        uint256 startingSdaiBalance = sdai.balanceOf(address(this));
+        uint256 startingCollateralBalance = collateralToken.balanceOf(address(this));
         uint256 startingCreditSupply = credit.totalSupply();
         uint256 startingCreditMultiplier = profitManager.creditMultiplier();
         uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();
@@ -224,13 +224,13 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
 
         auctionHouse.forgive(loanId);
 
-        uint256 endingSdaiBalance = sdai.balanceOf(address(this));
+        uint256 endingCollateralBalance = collateralToken.balanceOf(address(this));
 
         assertEq(auctionHouse.nAuctionsInProgress(), 0);
         assertEq(
-            endingSdaiBalance,
-            startingSdaiBalance,
-            "incorrect sdai balance after liquidation"
+            endingCollateralBalance,
+            startingCollateralBalance,
+            "incorrect collateralToken balance after liquidation"
         );
 
         /// ensure credit reprices

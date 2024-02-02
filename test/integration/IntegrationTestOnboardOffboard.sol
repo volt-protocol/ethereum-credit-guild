@@ -22,18 +22,10 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         super.setUp();
         term = LendingTerm(
             factory.createTerm(
-                1,
-                getAddr("LENDING_TERM_V1"),
-                getAddr("AUCTION_HOUSE"),
-                LendingTerm.LendingTermParams({
-                    collateralToken: getAddr("ERC20_SDAI"),
-                    maxDebtPerCollateralToken: 1e18,
-                    interestRate: 0.04e18,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: rateLimitedCreditMinter.buffer()
-                })
+                factory.gaugeTypes(address(term)),
+                factory.termImplementations(address(term)),
+                term.getReferences().auctionHouse,
+                term.getParameters()
             )
         );
 

@@ -6,6 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
+import {MockERC20} from "@test/mock/MockERC20.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
@@ -39,7 +40,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
     LendingTermOnboarding public onboarder;
     LendingTermOffboarding public offboarder;
 
-    ERC20 public collateralToken;
+    MockERC20 public collateralToken;
 
     AuctionHouse public auctionHouse;
 
@@ -51,7 +52,6 @@ contract PostProposalCheckFixture is PostProposalCheck {
     GuildToken public guild;
     CreditToken public credit;
     ERC20 public usdc;
-    ERC20 public sdai;
 
     /// Governor
     GuildGovernor public governor;
@@ -78,7 +78,6 @@ contract PostProposalCheckFixture is PostProposalCheck {
         core = Core(getAddr("CORE"));
 
         usdc = ERC20(getAddr("ERC20_USDC"));
-        sdai = ERC20(getAddr("ERC20_SDAI"));
         guild = GuildToken(getAddr("ERC20_GUILD"));
         credit = CreditToken(getAddr("ERC20_GUSDC"));
 
@@ -113,18 +112,24 @@ contract PostProposalCheckFixture is PostProposalCheck {
         );
         offboarder = LendingTermOffboarding(getAddr("OFFBOARD_GOVERNOR_GUILD"));
 
-        LendingTerm existingTerm = LendingTerm(getAddr("TERM_SDAI_1"));
-        collateralToken = ERC20(existingTerm.getParameters().collateralToken);
-
         // create and onboard a new term for the integration tests
+        collateralToken = new MockERC20();
         term = LendingTerm(factory.createTerm(
-            guild.gaugeType(address(existingTerm)), // gauge type,
+            1, // gauge type,
             getAddr("LENDING_TERM_V1"), // implementation
-            existingTerm.getReferences().auctionHouse, // auctionHouse
-            existingTerm.getParameters()
+            getAddr("AUCTION_HOUSE"), // auctionHouse
+            LendingTerm.LendingTermParams({
+                collateralToken: address(collateralToken),
+                maxDebtPerCollateralToken: 1e18,
+                interestRate: 0.04e18,
+                maxDelayBetweenPartialRepay: 0,
+                minPartialRepayPercent: 0,
+                openingFee: 0,
+                hardCap: 1e27
+            })
         ));
         vm.startPrank(getAddr("ONBOARD_TIMELOCK"));
-        guild.addGauge(guild.gaugeType(address(existingTerm)), address(term));
+        guild.addGauge(1, address(term));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
         core.grantRole(CoreRoles.CREDIT_BURNER, address(term));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));

@@ -8,8 +8,8 @@ import "@forge-std/Test.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
-contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
-    function testVoteForSDAIGauge() public {
+contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
+    function testVoteForGauge() public {
         uint256 mintAmount = governor.quorum(0);
         /// setup
         vm.prank(teamMultisig);
@@ -19,8 +19,8 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         assertTrue(guild.isGauge(address(term)));
     }
 
-    function testAllocateGaugeToSDAI() public {
-        testVoteForSDAIGauge();
+    function testAllocateGauge() public {
+        testVoteForGauge();
         uint256 mintAmount = governor.quorum(0);
         uint256 startingTotalWeight = guild.totalWeight();
 
@@ -38,7 +38,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     }
 
     function testSupplyCollateralUserOne() public returns (bytes32, uint128) {
-        testAllocateGaugeToSDAI();
+        testAllocateGauge();
         uint128 amount = uint128(profitManager.minBorrow()) * 314159 / 100000;
         return _supplyCollateralUserOne(amount);
     }
@@ -46,26 +46,26 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
     function _supplyCollateralUserOne(
         uint128 supplyAmount
     ) private returns (bytes32 loanId, uint128 suppliedAmount) {
-        testAllocateGaugeToSDAI();
+        testAllocateGauge();
 
         suppliedAmount = supplyAmount;
 
         deal(address(collateralToken), userOne, supplyAmount);
 
         uint256 startingTotalSupply = credit.totalSupply();
-        uint256 startingSDaiBalance = sdai.balanceOf(address(term));
+        uint256 startingCollateralBalance = collateralToken.balanceOf(address(term));
         uint256 startingBuffer = rateLimitedCreditMinter.buffer();
 
         vm.startPrank(userOne);
-        sdai.approve(address(term), supplyAmount);
+        collateralToken.approve(address(term), supplyAmount);
         loanId = term.borrow(supplyAmount, supplyAmount); /// borrow amount equals supply amount
         vm.stopPrank();
 
         assertEq(term.getLoanDebt(loanId), supplyAmount, "incorrect loan debt");
         assertEq(
-            sdai.balanceOf(address(term)) - startingSDaiBalance,
+            collateralToken.balanceOf(address(term)) - startingCollateralBalance,
             supplyAmount,
-            "sdai balance of term incorrect"
+            "collateralToken balance of term incorrect"
         );
         assertEq(
             credit.totalSupply(),
@@ -112,9 +112,9 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         assertEq(term.getLoanDebt(loanId), 0, "incorrect loan debt");
 
         assertEq(
-            sdai.balanceOf(address(term)),
+            collateralToken.balanceOf(address(term)),
             0,
-            "sdai balance of term incorrect"
+            "collateralToken balance of term incorrect"
         );
 
         assertEq(
@@ -143,7 +143,7 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
     function testTermOffboarding() public {
         if (guild.balanceOf(address(this)) == 0) {
-            testVoteForSDAIGauge();
+            testVoteForGauge();
         }
 
         vm.roll(block.number + 2);
@@ -262,11 +262,11 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
             0,
             "incorrect number of auctions post bid"
         );
-        assertEq(sdai.balanceOf(userTwo), 0, "incorrect sdai balance userTwo");
+        assertEq(collateralToken.balanceOf(userTwo), 0, "incorrect collateralToken balance userTwo");
         assertEq(
-            sdai.balanceOf(userOne),
+            collateralToken.balanceOf(userOne),
             loanAmount,
-            "incorrect sdai balance userOne"
+            "incorrect collateralToken balance userOne"
         );
         assertEq(
             credit.balanceOf(userOne),
