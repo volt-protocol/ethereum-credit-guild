@@ -409,7 +409,77 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     }
 
     // multicall scenario with without permit
+    function testLoanWithoutPermit() public {
+        // alice will get a loan with a permit
+        deal(address(collateralToken), alice, 1000e18);
+        uint256 collateralAmount = 100e18; // 100 collateral
+        uint256 debtAmount = getBorrowAmountFromCollateralAmount(
+            collateralAmount
+        );
 
+        vm.startPrank(alice);
+        collateralToken.approve(address(gatewayv1), collateralAmount);
+        credit.approve(address(gatewayv1), debtAmount);
+        vm.stopPrank();
+
+        bytes[] memory calls = new bytes[](6);
+        calls[0] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)",
+            collateralToken,
+            collateralAmount
+        );
+
+        calls[1] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            collateralToken,
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                term,
+                collateralAmount
+            )
+        );
+
+        calls[2] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            term,
+            abi.encodeWithSignature(
+                "borrowOnBehalf(uint256,uint256,address)",
+                debtAmount,
+                collateralAmount,
+                alice
+            )
+        );
+
+        calls[3] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)",
+            credit,
+            debtAmount
+        );
+
+        calls[4] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            credit,
+            abi.encodeWithSignature("approve(address,uint256)", psm, debtAmount)
+        );
+
+        calls[5] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            psm,
+            abi.encodeWithSignature(
+                "redeem(address,uint256)",
+                alice,
+                debtAmount
+            )
+        );
+
+        // call multicall on the gateway
+        vm.prank(alice);
+        gatewayv1.multicall(calls);
+
+        // alice should now have 100 USDC after creating a loan and redeeming the
+        // credits to USDC via the psm
+        assertEq(usdc.balanceOf(alice), 100e6);
+    }
     // multicall with flashloan
 }
 
