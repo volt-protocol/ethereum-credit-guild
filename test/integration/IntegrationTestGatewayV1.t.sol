@@ -81,7 +81,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     IWeightedPoolFactory public balancerFactory =
         IWeightedPoolFactory(0x7920BFa1b2041911b354747CA7A6cDD2dfC50Cfd);
 
-    uint256 public alice_private_key = 0x42;
+    uint256 public alice_private_key = 0x42424242421111111;
     address public alice = vm.addr(alice_private_key);
 
     function deployGatewayV1() public {
@@ -289,6 +289,9 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         } else if (block.chainid == 11155111) {
             UNISWAPV2_ROUTER_ADDR = 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008;
         }
+        vm.label(UNISWAPV2_ROUTER_ADDR, "Uniswap_Router");
+        vm.label(address(usdc), "USDC");
+        vm.label(address(collateralToken), "COLLATERAL_TOKEN");
 
         // give tokens to the team multisig
         deal(address(usdc), teamMultisig, 100_000_000e6);
@@ -302,10 +305,11 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
 
     function testSetUp() public {
         assertTrue(UNISWAPV2_ROUTER_ADDR != address(0));
+        assertEq(usdc.balanceOf(alice), 0);
     }
 
     // multicall scenario with permit
-    function testLoanWithPermit() public {
+    function testGatewayLoanWithPermit() public {
         // alice will get a loan with a permit
         deal(address(collateralToken), alice, 1000e18);
         uint256 collateralAmount = 100e18; // 100 collateral
@@ -409,7 +413,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     }
 
     // multicall scenario with without permit
-    function testLoanWithoutPermit() public {
+    function testGatewayLoanWithoutPermit() public {
         // alice will get a loan with a permit
         deal(address(collateralToken), alice, 1000e18);
         uint256 collateralAmount = 100e18; // 100 collateral
@@ -480,7 +484,169 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         // credits to USDC via the psm
         assertEq(usdc.balanceOf(alice), 100e6);
     }
+
     // multicall with flashloan
+    function testGatewayLoanWithBalancerFlasloan() public {
+        // alice will get a loan with a permit
+        deal(address(collateralToken), alice, 1000e18);
+        uint256 collateralAmount = 25e18; // 25 collateral
+        uint256 flashloanAmount = 75e18; // 75 flashloan collateral
+        uint256 debtAmount = getBorrowAmountFromCollateralAmount(
+            collateralAmount + flashloanAmount
+        );
+        // sign permit collateral -> Gateway
+        PermitData memory permitCollateral = getPermitData(
+            ERC20Permit(collateralToken),
+            collateralAmount,
+            address(gatewayv1),
+            alice,
+            alice_private_key
+        );
+        // sign permit gUSDC -> gateway
+        PermitData memory permitDataCredit = getPermitData(
+            ERC20Permit(credit),
+            debtAmount,
+            address(gatewayv1),
+            alice,
+            alice_private_key
+        );
+
+        bytes[] memory calls = new bytes[](12);
+        calls[0] = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            collateralToken,
+            collateralAmount,
+            permitCollateral.deadline,
+            permitCollateral.v,
+            permitCollateral.r,
+            permitCollateral.s
+        );
+
+        calls[1] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)",
+            collateralToken,
+            collateralAmount
+        );
+
+        calls[2] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            collateralToken,
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                term,
+                collateralAmount + flashloanAmount
+            )
+        );
+
+        calls[3] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            term,
+            abi.encodeWithSignature(
+                "borrowOnBehalf(uint256,uint256,address)",
+                debtAmount,
+                collateralAmount + flashloanAmount,
+                alice
+            )
+        );
+
+        calls[4] = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            credit,
+            debtAmount,
+            permitDataCredit.deadline,
+            permitDataCredit.v,
+            permitDataCredit.r,
+            permitDataCredit.s
+        );
+
+        calls[5] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)",
+            credit,
+            debtAmount
+        );
+
+        calls[6] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            credit,
+            abi.encodeWithSignature("approve(address,uint256)", psm, debtAmount)
+        );
+
+        // redeem credit token => USDC to the gateway (not the user !!)
+        calls[7] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            psm,
+            abi.encodeWithSignature(
+                "redeem(address,uint256)",
+                address(gatewayv1),
+                debtAmount
+            )
+        );
+
+        // compute the amount USDC we should have received
+        uint256 amountUSDC = psm.getRedeemAmountOut(debtAmount);
+
+        // here we have the full value in USDC after redeeming, need to change to collateral
+        // doing a swap on the univ2 pool
+        // approve uniswap router
+        calls[8] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            usdc,
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                UNISWAPV2_ROUTER_ADDR,
+                amountUSDC
+            )
+        );
+
+        // perform the swap
+        address[] memory path = new address[](2);
+        path[0] = address(usdc);
+        path[1] = address(collateralToken);
+        calls[9] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            UNISWAPV2_ROUTER_ADDR,
+            abi.encodeWithSignature(
+                "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
+                flashloanAmount, // amount out
+                amountUSDC, // amount in max
+                path, // path USDC->collateral
+                address(gatewayv1), // to
+                uint256(block.timestamp + 3600) // deadline
+            )
+        );
+
+        // reset approval on the uniswap router
+        calls[10] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            usdc,
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                UNISWAPV2_ROUTER_ADDR,
+                0
+            )
+        );
+
+        // sweep any usdc from the gateway
+        calls[11] = abi.encodeWithSignature("sweep(address)", usdc);
+
+        // call multicall with flashloan on the gateway
+        address[] memory flashLoanTokens = new address[](1);
+        flashLoanTokens[0] = address(collateralToken);
+        uint256[] memory flashloanAmounts = new uint256[](1);
+        flashloanAmounts[0] = flashloanAmount;
+        vm.prank(alice);
+        gatewayv1.multicallWithBalancerFlashLoan(
+            flashLoanTokens,
+            flashloanAmounts,
+            calls
+        );
+
+        // alice should now have a bit less than her starting collateral, redeemed to USDC
+        // after the swap, so allow 5% diff
+        assertLt(usdc.balanceOf(alice), 25e6);
+        assertApproxEqRel(usdc.balanceOf(alice), 25e6, 0.05e18);
+        console.log("Alice usdc balance: %s", usdc.balanceOf(alice));
+    }
 }
 
 //     // function setUpAccountFactory() public {
