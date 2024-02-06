@@ -50,7 +50,7 @@ contract GIP_0 is Proposal {
     uint256 internal constant MAX_DELEGATES = 10;
 
     /// @notice delegate lockup period for CREDIT & GUILD
-    uint256 internal constant DELEGATE_LOCKUP_PERIOD = 7 days;
+    uint256 internal DELEGATE_LOCKUP_PERIOD = 7 days;
 
     /// @notice for each SDAI collateral, up to 1 credit can be borrowed
     uint256 internal constant MAX_SDAI_CREDIT_RATIO = 1e18;
@@ -114,6 +114,7 @@ contract GIP_0 is Proposal {
             ONBOARD_TIMELOCK_DELAY = 5 minutes;
             DAO_GOVERNOR_GUILD_VOTING_PERIOD = 5 minutes / 12; // assume 12 sec per block
             ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD = 5 minutes / 12; // assume 12 sec per block
+            DELEGATE_LOCKUP_PERIOD = 10 minutes;
         }
 
         // Core
