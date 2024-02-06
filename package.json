@@ -13,7 +13,7 @@
     "test": "npm run test:unit",
     "test:unit": "forge test --match-path './test/unit/**' -vvv",
     "test:proposals": "forge test --match-path './test/proposals/**' --fork-url $ETH_RPC_URL -vvv",
-    "test:integration": "forge test --match-path './test/integration/**' --fork-url $ETH_RPC_URL -vvv",
+    "test:integration": "DO_DEPLOY=false DO_AFTER_DEPLOY=false DO_VALIDATE=false forge test --match-path './test/integration/**' --fork-url $ETH_RPC_URL -vvv",
     "coverage": "forge coverage --fork-url $ETH_RPC_URL --match-path './test/**' --report lcov --report summary",
     "coverage:unit": "forge coverage --match-path './test/unit/**' --report summary --report lcov",
     "coverage:integration": "forge coverage --match-path './test/integration/**' --fork-url $ETH_RPC_URL --report lcov --report summary",
