@@ -200,8 +200,6 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
             salt
         );
 
-        console.log("balancer pool address: %s", poolAddress);
-
         bytes32 poolId = IPool(poolAddress).getPoolId();
 
         ERC20(token0).approve(gatewayv1.balancerVault(), amount0);
@@ -263,13 +261,11 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         uint256 creditMultiplier = ProfitManager(
             LendingTerm(term).profitManager()
         ).creditMultiplier();
-        console.log("creditMultiplier: %s", creditMultiplier);
         LendingTerm.LendingTermParams memory params = LendingTerm(term)
             .getParameters();
         borrowAmount =
             (collateralAmount * params.maxDebtPerCollateralToken) /
             creditMultiplier;
-        console.log("borrowAmount: %s", borrowAmount);
     }
 
     function setUp() public virtual override {
