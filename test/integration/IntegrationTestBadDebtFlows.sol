@@ -219,12 +219,20 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         uint256 startingCollateralBalance = collateralToken.balanceOf(
             address(this)
         );
-        uint256 startingCreditSupply = credit.totalSupply();
+        uint256 startingCreditSupply = credit.targetTotalSupply();
         uint256 startingCreditMultiplier = profitManager.creditMultiplier();
         uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();
         uint256 startingIssuance = term.issuance();
-
+        uint256 absorbedLoss = profitManager.surplusBuffer() + profitManager.termSurplusBuffer(
+            address(term)
+        );
         auctionHouse.forgive(loanId);
+        uint256 loss = borrowAmount;
+        if (absorbedLoss >= loss) {
+            loss = 0;
+        } else {
+            loss -= absorbedLoss;
+        }
 
         uint256 endingCollateralBalance = collateralToken.balanceOf(
             address(this)
@@ -240,7 +248,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         /// ensure credit reprices
 
         uint256 expectedCreditMultiplier = (startingCreditMultiplier *
-            (startingCreditSupply - borrowAmount)) / startingCreditSupply;
+            (startingCreditSupply - absorbedLoss - loss)) / (startingCreditSupply - absorbedLoss);
 
         assertEq(
             startingCreditBuffer,

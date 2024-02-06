@@ -226,20 +226,21 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
         return loanId;
     }
 
-    function testBid() public {
+    function testIntegrationBid() public {
         bytes32 loanId = testCallLoan();
         uint256 creditRepayAmount = term.getLoanDebt(loanId);
-        uint256 loanAmount = 10_000e18;
 
-        uint256 profit = creditRepayAmount - loanAmount;
+        uint256 profit = creditRepayAmount - 10_000e18;
 
         uint256 usdcMintAmount = creditRepayAmount / 1e12 + 1;
         uint256 startingDeployerBalance = credit.balanceOf(userThree);
 
         _doMint(userTwo, uint128(usdcMintAmount)); /// round amount of credit up
 
-        uint256 startingCreditSupply = credit.totalSupply();
+        uint256 startingCreditSupply = credit.targetTotalSupply();
         uint256 userTwoStartingCreditBalance = credit.balanceOf(userTwo);
+        uint256 startingSurplusBuffer = profitManager.surplusBuffer();
+        uint256 creditProfitManagerBalanceBefore = credit.balanceOf(address(profitManager));
 
         /// bid at start of auction, so receive 0 collateral
 
@@ -253,13 +254,15 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
 
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
-        uint256 endingDeployerBalance = credit.balanceOf(userThree);
-        LendingTerm.Loan memory loan = term.getLoan(loanId);
+        {
+            uint256 endingDeployerBalance = credit.balanceOf(userThree);
+            LendingTerm.Loan memory loan = term.getLoan(loanId);
 
-        // lender received non zero interests
-        assertGt(endingDeployerBalance, startingDeployerBalance);
+            // lender received non zero interests
+            assertGt(endingDeployerBalance, startingDeployerBalance);
 
-        assertEq(loan.closeTime, loanCloseTime, "incorrect close time");
+            assertEq(loan.closeTime, loanCloseTime, "incorrect close time");
+        }
         assertEq(
             auctionHouse.nAuctionsInProgress(),
             0,
@@ -272,12 +275,12 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
         );
         assertEq(
             collateralToken.balanceOf(userOne),
-            loanAmount,
+            10_000e18,
             "incorrect collateralToken balance userOne"
         );
         assertEq(
             credit.balanceOf(userOne),
-            loanAmount,
+            10_000e18,
             "incorrect credit balance userOne"
         );
         assertEq(
@@ -292,8 +295,8 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
         );
         assertEq(term.issuance(), 0, "incorrect issuance");
         assertEq(
-            startingCreditSupply - loanAmount, /// creditRepayAmount and burned amount got taken out of supply
-            credit.totalSupply(),
+            startingCreditSupply - 10_000e18, /// creditRepayAmount and burned amount got taken out of supply
+            credit.targetTotalSupply(),
             "incorrect credit token amount burned"
         ); /// burned 9/10ths of profit
 
@@ -316,13 +319,13 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
 
         assertEq(
             profitManager.surplusBuffer(),
-            expectedSurplusBuffer,
+            startingSurplusBuffer + expectedSurplusBuffer,
             "incorrect surplus buffer"
         );
         /// credit balance in profit manager is sum of surplus, other and guild amount
         /// credit amount gets burned in the Credit Token by calling distribute
         assertEq(
-            expectedSurplusBuffer + expectedOtherAmount + expectedGuildAmount,
+            creditProfitManagerBalanceBefore + expectedSurplusBuffer + expectedOtherAmount + expectedGuildAmount,
             credit.balanceOf(address(profitManager)),
             "incorrect credit amount in profit manager"
         );
@@ -333,7 +336,7 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
 
         _doMint(userOne, creditAmount);
 
-        uint256 startingCreditSupply = credit.totalSupply();
+        uint256 startingCreditSupply = credit.targetTotalSupply();
 
         assertFalse(credit.isRebasing(userOne));
 
