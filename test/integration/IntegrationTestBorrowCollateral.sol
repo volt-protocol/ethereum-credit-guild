@@ -240,7 +240,9 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
         uint256 startingCreditSupply = credit.targetTotalSupply();
         uint256 userTwoStartingCreditBalance = credit.balanceOf(userTwo);
         uint256 startingSurplusBuffer = profitManager.surplusBuffer();
-        uint256 creditProfitManagerBalanceBefore = credit.balanceOf(address(profitManager));
+        uint256 creditProfitManagerBalanceBefore = credit.balanceOf(
+            address(profitManager)
+        );
 
         /// bid at start of auction, so receive 0 collateral
 
@@ -325,7 +327,10 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
         /// credit balance in profit manager is sum of surplus, other and guild amount
         /// credit amount gets burned in the Credit Token by calling distribute
         assertEq(
-            creditProfitManagerBalanceBefore + expectedSurplusBuffer + expectedOtherAmount + expectedGuildAmount,
+            creditProfitManagerBalanceBefore +
+                expectedSurplusBuffer +
+                expectedOtherAmount +
+                expectedGuildAmount,
             credit.balanceOf(address(profitManager)),
             "incorrect credit amount in profit manager"
         );

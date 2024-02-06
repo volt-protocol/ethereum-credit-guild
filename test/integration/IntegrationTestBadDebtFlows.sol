@@ -223,9 +223,8 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         uint256 startingCreditMultiplier = profitManager.creditMultiplier();
         uint256 startingCreditBuffer = rateLimitedCreditMinter.buffer();
         uint256 startingIssuance = term.issuance();
-        uint256 absorbedLoss = profitManager.surplusBuffer() + profitManager.termSurplusBuffer(
-            address(term)
-        );
+        uint256 absorbedLoss = profitManager.surplusBuffer() +
+            profitManager.termSurplusBuffer(address(term));
         auctionHouse.forgive(loanId);
         uint256 loss = borrowAmount;
         if (absorbedLoss >= loss) {
@@ -248,7 +247,8 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         /// ensure credit reprices
 
         uint256 expectedCreditMultiplier = (startingCreditMultiplier *
-            (startingCreditSupply - absorbedLoss - loss)) / (startingCreditSupply - absorbedLoss);
+            (startingCreditSupply - absorbedLoss - loss)) /
+            (startingCreditSupply - absorbedLoss);
 
         assertEq(
             startingCreditBuffer,
