@@ -200,8 +200,6 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
             salt
         );
 
-        console.log("balancer pool address: %s", poolAddress);
-
         bytes32 poolId = IPool(poolAddress).getPoolId();
 
         ERC20(token0).approve(gatewayv1.balancerVault(), amount0);
@@ -263,13 +261,11 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         uint256 creditMultiplier = ProfitManager(
             LendingTerm(term).profitManager()
         ).creditMultiplier();
-        console.log("creditMultiplier: %s", creditMultiplier);
         LendingTerm.LendingTermParams memory params = LendingTerm(term)
             .getParameters();
         borrowAmount =
             (collateralAmount * params.maxDebtPerCollateralToken) /
             creditMultiplier;
-        console.log("borrowAmount: %s", borrowAmount);
     }
 
     function setUp() public virtual override {
@@ -645,213 +641,5 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         // after the swap, so allow 5% diff
         assertLt(usdc.balanceOf(alice), 25e6);
         assertApproxEqRel(usdc.balanceOf(alice), 25e6, 0.05e18);
-        console.log("Alice usdc balance: %s", usdc.balanceOf(alice));
     }
 }
-
-//     // function setUpAccountFactory() public {
-//     //     vm.startPrank(factoryOwner);
-//     //     // deploy the factory
-//     //     accountFactory = AccountFactory(new AccountFactory());
-//     //     // deploy the account implementation
-//     //     allowedImplementation = AccountImplementation(
-//     //         new AccountImplementation()
-//     //     );
-//     //     // whitelist account implementation
-//     //     accountFactory.allowImplementation(
-//     //         address(allowedImplementation),
-//     //         true
-//     //     );
-//     //     // allow approve on sDAI token
-//     //     accountFactory.allowCall(
-//     //         address(SDAI_TOKEN),
-//     //         bytes4(keccak256("approve(address,uint256)")),
-//     //         true
-//     //     );
-//     //     // allow approve on USDC token
-//     //     accountFactory.allowCall(
-//     //         address(USDC_TOKEN),
-//     //         bytes4(keccak256("approve(address,uint256)")),
-//     //         true
-//     //     );
-//     //     // allow borrow on CREDIT token
-//     //     accountFactory.allowCall(
-//     //         address(CREDIT_TOKEN),
-//     //         bytes4(keccak256("approve(address,uint256)")),
-//     //         true
-//     //     );
-//     //     // allow borrow on sDAI lending term
-//     //     accountFactory.allowCall(
-//     //         address(SDAI_TERM),
-//     //         bytes4(keccak256("borrow(uint256,uint256)")),
-//     //         true
-//     //     );
-//     //     // allow redeem on psm
-//     //     accountFactory.allowCall(
-//     //         address(psm),
-//     //         bytes4(keccak256("redeem(address,uint256)")),
-//     //         true
-//     //     );
-//     //     // allow swap on uniswap router
-//     //     accountFactory.allowCall(
-//     //         address(UNISWAP_ROUTER),
-//     //         bytes4(
-//     //             keccak256(
-//     //                 "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)"
-//     //             )
-//     //         ),
-//     //         true
-//     //     );
-//     //     vm.stopPrank();
-//     // }
-//     // function labelUp() public {
-//     //     vm.label(address(SDAI_TERM), "SDAI_TERM");
-//     //     vm.label(address(GOVERNOR), "GOVERNOR");
-//     //     vm.label(address(SDAI_TOKEN), "SDAI_TOKEN");
-//     //     vm.label(address(USDC_TOKEN), "USDC_TOKEN");
-//     //     vm.label(address(CREDIT_TOKEN), "CREDIT_TOKEN");
-//     //     vm.label(address(alice), "alice");
-//     //     vm.label(address(factoryOwner), "factoryOwner");
-//     //     vm.label(address(psm), "psm");
-//     //     vm.label(address(allowedImplementation), "allowedImplementation");
-//     //     vm.label(address(alicesAccount), "alicesAccount");
-//     //     vm.label(address(accountFactory), "accountFactory");
-//     //     vm.label(address(UNISWAP_ROUTER), "UNISWAP_ROUTER");
-//     // }
-//     // // should test the following scenario with a balancer flashloan and the new multicall account feature:
-//     // // - have an account with 10k sDAI
-//     // // - flashloan 200k sDAI from balancer
-//     // // - approve 210k sDAI to the lending term
-//     // // - borrow with 210k sDAI collateral
-//     // // - get X gUSDC
-//     // // - PSM.redeem X gUSDC for Y USDC
-//     // // - swap Y USDC for Z sDAI on uniswapv2
-//     // // - reimburse balancer flashloan
-//     // // REQUIREMENTS: have enough token in the balancer vault (for the flashloan) and a large enough liquidity in univ2 for the swap without too much slippage.
-//     // function testFlashLoanWithBalancer() public {
-//     //     // - have an account with 10k sDAI
-//     //     vm.prank(GOVERNOR);
-//     //     SDAI_TOKEN.mint(alice, 10_000e18);
-//     //     assertEq(SDAI_TOKEN.balanceOf(alice), 10_000e18);
-//     //     // alice will send 10k sDAI to her account
-//     //     vm.prank(alice);
-//     //     SDAI_TOKEN.transfer(address(alicesAccount), 10_000e18);
-//     //     assertEq(SDAI_TOKEN.balanceOf(address(alicesAccount)), 10_000e18);
-//     //     // - flashloan 200k sDAI from balancer
-//     //     uint256 flashloanAmount = 200_000e18;
-//     //     // this is done when calling the 'multicallWithBalancerFlashLoan' function on alice's Account
-//     //     // compute the loanId that will be generated
-//     //     bytes32 expectedLoanId = keccak256(
-//     //         abi.encode(
-//     //             address(alicesAccount),
-//     //             address(SDAI_TERM),
-//     //             block.timestamp
-//     //         )
-//     //     );
-//     //     // now we will prepare the call list to be sent as the "postCalls" to the 'multicallWithBalancerFlashLoan' function
-//     //     bytes[] memory postCalls = new bytes[](6);
-//     //     // - approve 210k sDAI to the lending term, this will be the max
-//     //     postCalls[0] = abi.encodeWithSignature(
-//     //         "callExternal(address,bytes)",
-//     //         address(SDAI_TOKEN),
-//     //         abi.encodeWithSignature(
-//     //             "approve(address,uint256)",
-//     //             address(SDAI_TERM),
-//     //             uint256(210_000e18)
-//     //         )
-//     //     );
-//     //     // compute the borrowAmount and collateral amount
-//     //     uint256 borrowAmount = getBorrowAmountFromCollateralAmount(210_000e18);
-//     //     // - borrow with 210k sDAI collateral, get X gUSDC
-//     //     postCalls[1] = abi.encodeWithSignature(
-//     //         "callExternal(address,bytes)",
-//     //         address(SDAI_TERM),
-//     //         abi.encodeWithSignature(
-//     //             "borrow(uint256,uint256)",
-//     //             borrowAmount,
-//     //             uint256(210_000e18)
-//     //         )
-//     //     );
-//     //     // - PSM.redeem X gUSDC for Y USDC
-//     //     // approve gUSDC from the PSM
-//     //     postCalls[2] = abi.encodeWithSignature(
-//     //         "callExternal(address,bytes)",
-//     //         address(CREDIT_TOKEN),
-//     //         abi.encodeWithSignature(
-//     //             "approve(address,uint256)",
-//     //             address(psm),
-//     //             borrowAmount
-//     //         )
-//     //     );
-//     //     // call redeem
-//     //     postCalls[3] = abi.encodeWithSignature(
-//     //         "callExternal(address,bytes)",
-//     //         address(psm),
-//     //         abi.encodeWithSignature(
-//     //             "redeem(address,uint256)",
-//     //             address(alicesAccount),
-//     //             borrowAmount
-//     //         )
-//     //     );
-//     //     // approve USDC spending by the uniswap router
-//     //     postCalls[4] = abi.encodeWithSignature(
-//     //         "callExternal(address,bytes)",
-//     //         address(USDC_TOKEN),
-//     //         abi.encodeWithSignature(
-//     //             "approve(address,uint256)",
-//     //             address(UNISWAP_ROUTER),
-//     //             uint256(210_000e6)
-//     //         )
-//     //     );
-//     //     address[] memory path = new address[](2);
-//     //     path[0] = address(USDC_TOKEN);
-//     //     path[1] = address(SDAI_TOKEN);
-//     //     // - swap Y USDC for Z sDAI on uniswapv2
-//     //     postCalls[5] = abi.encodeWithSignature(
-//     //         "callExternal(address,bytes)",
-//     //         address(UNISWAP_ROUTER),
-//     //         abi.encodeWithSignature(
-//     //             "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
-//     //             flashloanAmount, // amount out
-//     //             uint256(210_000e6), // amount in max
-//     //             path, // path USDC->SDAI
-//     //             address(alicesAccount), // to
-//     //             uint256(block.timestamp + 3600) // deadline
-//     //         )
-//     //     );
-//     //     // - reimburse balancer flashloan
-//     //     // automatically done by the account implementation
-//     //     IERC20[] memory tokensArray = new IERC20[](1);
-//     //     tokensArray[0] = IERC20(SDAI_TOKEN);
-//     //     uint256[] memory amountsArray = new uint256[](1);
-//     //     amountsArray[0] = flashloanAmount;
-//     //     // call the multicallWithBalancerFlashLoan as alice
-//     //     vm.prank(alice);
-//     //     alicesAccount.multicallWithBalancerFlashLoan(
-//     //         tokensArray,
-//     //         amountsArray,
-//     //         new bytes[](0), // precalls is empty
-//     //         postCalls
-//     //     );
-//     //     // check that the loan exists
-//     //     LendingTerm.Loan memory loan = SDAI_TERM.getLoan(expectedLoanId);
-//     //     assertEq(loan.borrower, address(alicesAccount));
-//     //     assertEq(loan.collateralAmount, 210_000e18);
-//     //     assertEq(loan.borrowAmount, borrowAmount);
-//     //     console.log(
-//     //         "Remaining USDC in Alice's account: %s",
-//     //         USDC_TOKEN.balanceOf(address(alicesAccount))
-//     //     );
-//     // }
-//     // function getBorrowAmountFromCollateralAmount(
-//     //     uint256 collateralAmount
-//     // ) public view returns (uint256 borrowAmount) {
-//     //     uint256 creditMultiplier = profitManager.creditMultiplier();
-//     //     console.log("creditMultiplier: %s", creditMultiplier);
-//     //     LendingTerm.LendingTermParams memory params = SDAI_TERM.getParameters();
-//     //     borrowAmount =
-//     //         (collateralAmount * params.maxDebtPerCollateralToken) /
-//     //         creditMultiplier;
-//     //     console.log("borrowAmount: %s", borrowAmount);
-//     // }
-// }
