@@ -65,7 +65,7 @@ contract LendingTerm is CoreRef {
     /// @notice emitted when the hardCap is updated
     event SetHardCap(
         uint256 indexed when,
-        address hardCap
+        uint256 hardCap
     );
 
     struct Signature {
