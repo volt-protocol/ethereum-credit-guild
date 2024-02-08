@@ -57,6 +57,16 @@ contract LendingTerm is CoreRef {
         address indexed repayer,
         uint256 repayAmount
     );
+    /// @notice emitted when the auctionHouse reference is updated
+    event SetAuctionHouse(
+        uint256 indexed when,
+        address auctionHouse
+    );
+    /// @notice emitted when the hardCap is updated
+    event SetHardCap(
+        uint256 indexed when,
+        address hardCap
+    );
 
     struct Signature {
         uint8 v;
@@ -167,6 +177,10 @@ contract LendingTerm is CoreRef {
         _setCore(_core);
         refs = _refs;
         params = _params;
+
+        // events
+        emit SetAuctionHouse(block.timestamp, _refs.auctionHouse);
+        emit SetHardCap(block.timestamp, _params.hardCap);
     }
 
     /// @notice get references of this term to other protocol contracts
@@ -920,6 +934,7 @@ contract LendingTerm is CoreRef {
         );
 
         refs.auctionHouse = _newValue;
+        emit SetAuctionHouse(block.timestamp, _newValue);
     }
 
     /// @notice set the hardcap of CREDIT mintable in this term.
@@ -928,5 +943,6 @@ contract LendingTerm is CoreRef {
         uint256 _newValue
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         params.hardCap = _newValue;
+        emit SetHardCap(block.timestamp, _newValue);
     }
 }
