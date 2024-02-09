@@ -642,4 +642,132 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         assertLt(usdc.balanceOf(alice), 25e6);
         assertApproxEqRel(usdc.balanceOf(alice), 25e6, 0.05e18);
     }
+
+    // borrow with flashloan
+    function testBorrowWithBalancerFlashLoan() public {
+        // alice will get a loan with a permit, 10x leverage on collateral
+        uint256 collateralAmount = 1000e18;
+        uint256 flashloanCollateralAmount = 9000e18;
+        deal(address(collateralToken), alice, 1000e18);
+
+        // sign permit collateral -> Gateway
+        PermitData memory permitCollateral = getPermitData(
+            ERC20Permit(collateralToken),
+            collateralAmount,
+            address(gatewayv1),
+            alice,
+            alice_private_key
+        );
+        // sign permit gUSDC -> gateway
+        PermitData memory permitDataCredit = getPermitData(
+            ERC20Permit(credit),
+            collateralAmount + flashloanCollateralAmount,
+            address(gatewayv1),
+            alice,
+            alice_private_key
+        );
+
+        bytes[] memory pullCollateralCalls = new bytes[](2);
+        pullCollateralCalls[0] = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            collateralToken,
+            collateralAmount,
+            permitCollateral.deadline,
+            permitCollateral.v,
+            permitCollateral.r,
+            permitCollateral.s
+        );
+        pullCollateralCalls[1] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)",
+            collateralToken,
+            collateralAmount
+        );
+
+        
+        bytes memory allowBorrowedCreditCall = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            credit,
+            collateralAmount + flashloanCollateralAmount,
+            permitDataCredit.deadline,
+            permitDataCredit.v,
+            permitDataCredit.r,
+            permitDataCredit.s
+        );
+
+        // call borrowWithBalancerFlashLoan
+        vm.prank(alice);
+        gatewayv1.borrowWithBalancerFlashLoan(
+            address(term),
+            address(psm),
+            UNISWAPV2_ROUTER_ADDR,
+            address(collateralToken),
+            address(usdc),
+            collateralAmount,
+            flashloanCollateralAmount,
+            9_900e18, // maxLoanDebt
+            pullCollateralCalls,
+            allowBorrowedCreditCall
+        );
+
+        // check results
+        bytes32 loanId = keccak256(
+            abi.encode(alice, address(term), block.timestamp)
+        );
+        LendingTerm.Loan memory loan = LendingTerm(term).getLoan(loanId);
+        assertEq(collateralToken.balanceOf(alice), 0);
+        assertEq(usdc.balanceOf(alice), 0);
+        assertLt(collateralToken.balanceOf(address(gatewayv1)), 1e13);
+        assertLt(usdc.balanceOf(address(gatewayv1)), 1e7);
+        assertEq(loan.collateralAmount, 10_000e18);
+        assertLt(loan.borrowAmount, 9_900e18);
+    }
+
+    // repay with flashloan
+    function testRepayWithBalancerFlashLoan() public {
+        testBorrowWithBalancerFlashLoan();
+        bytes32 loanId = keccak256(
+            abi.encode(alice, address(term), block.timestamp)
+        );
+        vm.warp(block.timestamp + 3 days);
+        vm.roll(block.number + 1);
+
+        uint256 collateralAmount = LendingTerm(term).getLoan(loanId).collateralAmount;
+        uint256 maxCollateralSold = collateralAmount * 95 / 100;
+
+        // sign permit collateral -> Gateway
+        PermitData memory permitCollateral = getPermitData(
+            ERC20Permit(collateralToken),
+            maxCollateralSold,
+            address(gatewayv1),
+            alice,
+            alice_private_key
+        );
+        bytes memory allowCollateralTokenCall = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            collateralToken,
+            maxCollateralSold,
+            permitCollateral.deadline,
+            permitCollateral.v,
+            permitCollateral.r,
+            permitCollateral.s
+        );
+
+        // call repayWithBalancerFlashLoan
+        vm.prank(alice);
+        gatewayv1.repayWithBalancerFlashLoan(
+            loanId,
+            address(term),
+            address(psm),
+            UNISWAPV2_ROUTER_ADDR,
+            address(collateralToken),
+            address(usdc),
+            maxCollateralSold,
+            allowCollateralTokenCall
+        );
+
+        assertGt(collateralToken.balanceOf(alice), 900e18);
+        assertEq(usdc.balanceOf(alice), 0);
+        assertLt(collateralToken.balanceOf(address(gatewayv1)), 1e13);
+        assertLt(usdc.balanceOf(address(gatewayv1)), 1e7);
+    }
 }
