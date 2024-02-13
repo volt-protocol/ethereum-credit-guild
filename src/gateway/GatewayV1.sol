@@ -5,6 +5,7 @@ import "./Gateway.sol";
 
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
+import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 
 /// @notice simple interface for flashloaning from balancer
@@ -22,6 +23,13 @@ interface IUniswapRouter {
     function swapTokensForExactTokens(
         uint256 amountOut,
         uint256 amountInMax,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
         uint256 deadline
@@ -376,7 +384,7 @@ contract GatewayV1 is Gateway {
                     "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
                     flashloanPegTokenAmount, // amount out
                     collateralTokenAmount, // amount in max
-                    path, // path pegToken->collateralToken
+                    path, // path collateralToken->pegToken
                     address(this), // to
                     uint256(block.timestamp + 1) // deadline
                 )
@@ -402,5 +410,127 @@ contract GatewayV1 is Gateway {
         delete _storedCalls;
         // clear _originalSender
         _originalSender = address(1);
+    }
+
+    /// @notice bid in an auction with a balancer flashloan.
+    /// Example flow :
+    /// - flashloan USDC from Balancer
+    /// - mint gUSDC in PSM
+    /// - approve gUSDC on the LendingTerm
+    /// - bid in the auction
+    /// - swap sDAI to USDC on Uniswap
+    /// - repay USDC flashloan
+    /// Slippage protection of minPegTokenProfit during swap to ensure auction bid profitability
+    /// @dev up to 1e12 gUSDC might be left in the gateway after execution (<0.000001$).
+    function bidWithBalancerFlashLoan(
+        bytes32 loanId,
+        address term,
+        address psm,
+        address uniswapRouter,
+        address collateralToken,
+        address pegToken,
+        uint256 minPegTokenProfit
+    ) public whenNotPaused returns(uint256) {
+        require(
+            _originalSender == address(1),
+            "GatewayV1: original sender already set"
+        );
+
+        _originalSender = msg.sender;
+
+        // compute amount of pegTokens needed to cover the debt
+        address _auctionHouse = LendingTerm(term).auctionHouse();
+        (
+            uint256 collateralReceived,
+            uint256 creditAsked
+        ) = AuctionHouse(_auctionHouse).getBidDetail(loanId);
+        uint256 flashloanPegTokenAmount = SimplePSM(psm).getRedeemAmountOut(creditAsked) + 1;
+
+        // approve the psm & mint creditTokens
+        _storedCalls.push(abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            pegToken,
+            abi.encodeWithSignature("approve(address,uint256)", psm, flashloanPegTokenAmount)
+        ));
+        _storedCalls.push(abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            psm,
+            abi.encodeWithSignature(
+                "mint(address,uint256)",
+                address(this),
+                flashloanPegTokenAmount
+            )
+        ));
+
+        // bid in auction
+        address _creditToken = LendingTerm(term).creditToken();
+        _storedCalls.push(abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            _creditToken,
+            abi.encodeWithSignature("approve(address,uint256)", term, creditAsked)
+        ));
+        _storedCalls.push(abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            _auctionHouse,
+            abi.encodeWithSignature("bid(bytes32)", loanId)
+        ));
+
+        // swap received collateralTokens to pegTokens
+        _storedCalls.push(abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            collateralToken,
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                uniswapRouter,
+                collateralReceived
+            )
+        ));
+        {
+            address[] memory path = new address[](2);
+            path[0] = address(collateralToken);
+            path[1] = address(pegToken);
+            _storedCalls.push(abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                uniswapRouter,
+                abi.encodeWithSignature(
+                    "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
+                    collateralReceived, // amount in
+                    0, // amount out min
+                    path, // path collateralToken->pegToken
+                    address(this), // to
+                    uint256(block.timestamp + 1) // deadline
+                )
+            ));
+        }
+
+        // Initiate the flash loan
+        // the balancer vault will call receiveFlashloan function on this contract before returning
+        IERC20[] memory ierc20Tokens = new IERC20[](1);
+        ierc20Tokens[0] = IERC20(pegToken);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = flashloanPegTokenAmount;
+        IBalancerFlashLoan(balancerVault).flashLoan(
+            address(this),
+            ierc20Tokens,
+            amounts,
+            ""
+        );
+
+        // here, the flashloan have been successfully reimbursed otherwise it would have reverted
+
+        // send surplus pegTokens to msg.sender
+        uint256 pegTokenBalance = IERC20(pegToken).balanceOf(address(this));
+        require(pegTokenBalance > minPegTokenProfit, "GatewayV1: profit too low");
+        IERC20(pegToken).transfer(
+            msg.sender,
+            pegTokenBalance
+        );
+
+        // clear stored calls
+        delete _storedCalls;
+        // clear _originalSender
+        _originalSender = address(1);
+
+        return pegTokenBalance;
     }
 }

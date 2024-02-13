@@ -24,6 +24,7 @@ contract DeployGatewayV1 is Script {
 
     // OTHERS
     address public PSM = 0xC19D710f13a725FD67021e8c45bDedFfE95202e3;
+    address public AUCTION_HOUSE = 0x912e76518b318c209eF7FF04D119967AcAe3569e;
     address public UNISWAP_ROUTER = 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008;
 
     function _parseEnv() internal {
@@ -95,6 +96,9 @@ contract DeployGatewayV1 is Script {
         // allow redeem and mint on the psm
         gatewayv1.allowCall(PSM, getSelector("redeem(address,uint256)"), true);
         gatewayv1.allowCall(PSM, getSelector("mint(address,uint256)"), true);
+
+        // allow auction house bid
+        gatewayv1.allowCall(AUCTION_HOUSE, getSelector("bid(bytes32)"), true);
 
         // allow two types of swap on the uniswap router
         gatewayv1.allowCall(

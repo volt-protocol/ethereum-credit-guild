@@ -145,6 +145,13 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
             ),
             true
         );
+
+        // allow bids on the auction house
+        gatewayv1.allowCall(
+            address(auctionHouse),
+            getSelector("bid(bytes32)"),
+            true
+        );
     }
 
     function getSelector(bytes memory f) public pure returns (bytes4) {
@@ -769,5 +776,51 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         assertEq(usdc.balanceOf(alice), 0);
         assertLt(collateralToken.balanceOf(address(gatewayv1)), 1e13);
         assertLt(usdc.balanceOf(address(gatewayv1)), 1e7);
+    }
+
+    // bid with flashloan
+    function testBidWithBalancerFlashLoan() public {
+        testBorrowWithBalancerFlashLoan();
+        bytes32 loanId = keccak256(
+            abi.encode(alice, address(term), block.timestamp)
+        );
+
+        // fast-forward time for loan to become insolvent
+        uint256 collateralAmount = LendingTerm(term).getLoan(loanId).collateralAmount;
+        uint256 loanDebt = LendingTerm(term).getLoanDebt(loanId);
+        while (loanDebt < collateralAmount) {
+            vm.warp(block.timestamp + 365 days);
+            vm.roll(block.number + 1);
+            loanDebt = LendingTerm(term).getLoanDebt(loanId);
+        }
+
+        // call loan
+        term.call(loanId);
+
+        // wait for a good time to bid, and bid
+        uint256 profit = 0;
+        uint256 timeStep = auctionHouse.auctionDuration() / 10 - 1;
+        uint256 stop = block.timestamp + auctionHouse.auctionDuration();
+        uint256 minProfit = 25e6; // min 25 USDC of profit
+        while (profit == 0 && block.timestamp < stop) {
+            try gatewayv1.bidWithBalancerFlashLoan(
+                loanId,
+                address(term),
+                address(psm),
+                UNISWAPV2_ROUTER_ADDR,
+                address(collateralToken),
+                address(usdc),
+                minProfit
+            ) returns (uint256 _profit) {
+                profit = _profit;
+            } catch {
+                vm.warp(block.timestamp + timeStep);
+                vm.roll(block.number + 1);
+            }
+        }
+
+        assertGt(profit, minProfit);
+        assertEq(usdc.balanceOf(address(this)), profit);
+        assertEq(LendingTerm(term).getLoan(loanId).closeTime, block.timestamp);
     }
 }
