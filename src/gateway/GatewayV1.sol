@@ -27,6 +27,7 @@ interface IUniswapRouter {
         address to,
         uint256 deadline
     ) external returns (uint256[] memory amounts);
+
     function swapExactTokensForTokens(
         uint256 amountIn,
         uint256 amountOutMin,
@@ -34,10 +35,12 @@ interface IUniswapRouter {
         address to,
         uint256 deadline
     ) external returns (uint256[] memory amounts);
+
     function getAmountsIn(
         uint256 amountOut,
         address[] calldata path
     ) external view returns (uint256[] memory amounts);
+
     function getAmountsOut(
         uint256 amountIn,
         address[] calldata path
@@ -169,15 +172,17 @@ contract GatewayV1 is Gateway {
         }
 
         // approve the term before borrow
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            collateralToken,
+        _storedCalls.push(
             abi.encodeWithSignature(
-                "approve(address,uint256)",
-                term,
-                collateralAmount + flashloanCollateralAmount
+                "callExternal(address,bytes)",
+                collateralToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    term,
+                    collateralAmount + flashloanCollateralAmount
+                )
             )
-        ));
+        );
 
         // do borrow in order to have, after psm redeem, exactly the amount of pegTokens
         // needed to swap back to {flashloanCollateralAmount} collateralTokens
@@ -186,76 +191,92 @@ contract GatewayV1 is Gateway {
             address[] memory path = new address[](2);
             path[0] = pegToken;
             path[1] = collateralToken;
-            uint256[] memory amountsIn = IUniswapRouter(uniswapRouter).getAmountsIn(
-                flashloanCollateralAmount,
-                path
-            );
+            uint256[] memory amountsIn = IUniswapRouter(uniswapRouter)
+                .getAmountsIn(flashloanCollateralAmount, path);
             pegTokenAmount = amountsIn[0];
         }
-        uint256 creditToBorrow = SimplePSM(psm).getMintAmountOut(pegTokenAmount + 1);
+        uint256 creditToBorrow = SimplePSM(psm).getMintAmountOut(
+            pegTokenAmount + 1
+        );
         require(creditToBorrow < maxLoanDebt, "GatewayV1: loan debt too high");
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            term,
+        _storedCalls.push(
             abi.encodeWithSignature(
-                "borrowOnBehalf(uint256,uint256,address)",
-                creditToBorrow,
-                collateralAmount + flashloanCollateralAmount,
-                msg.sender
+                "callExternal(address,bytes)",
+                term,
+                abi.encodeWithSignature(
+                    "borrowOnBehalf(uint256,uint256,address)",
+                    creditToBorrow,
+                    collateralAmount + flashloanCollateralAmount,
+                    msg.sender
+                )
             )
-        ));
+        );
 
         // pull borrowed credit to the gateway
         address _creditToken = LendingTerm(term).creditToken();
         _storedCalls.push(allowBorrowedCreditCall);
-        _storedCalls.push(abi.encodeWithSignature(
-            "consumeAllowance(address,uint256)",
-            _creditToken,
-            creditToBorrow
-        ));
-
-        // redeem credit tokens to pegTokens in the PSM
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            _creditToken,
-            abi.encodeWithSignature("approve(address,uint256)", psm, creditToBorrow)
-        ));
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            psm,
+        _storedCalls.push(
             abi.encodeWithSignature(
-                "redeem(address,uint256)",
-                address(this),
+                "consumeAllowance(address,uint256)",
+                _creditToken,
                 creditToBorrow
             )
-        ));
+        );
+
+        // redeem credit tokens to pegTokens in the PSM
+        _storedCalls.push(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                _creditToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    psm,
+                    creditToBorrow
+                )
+            )
+        );
+        _storedCalls.push(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                psm,
+                abi.encodeWithSignature(
+                    "redeem(address,uint256)",
+                    address(this),
+                    creditToBorrow
+                )
+            )
+        );
 
         // swap pegTokens for collateralTokens in order to be able to repay the flashloan
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            pegToken,
+        _storedCalls.push(
             abi.encodeWithSignature(
-                "approve(address,uint256)",
-                uniswapRouter,
-                pegTokenAmount
+                "callExternal(address,bytes)",
+                pegToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    uniswapRouter,
+                    pegTokenAmount
+                )
             )
-        ));
+        );
         {
             address[] memory path = new address[](2);
             path[0] = address(pegToken);
             path[1] = address(collateralToken);
-            _storedCalls.push(abi.encodeWithSignature(
-                "callExternal(address,bytes)",
-                uniswapRouter,
+            _storedCalls.push(
                 abi.encodeWithSignature(
-                    "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
-                    flashloanCollateralAmount, // amount out
-                    pegTokenAmount, // amount in max
-                    path, // path pegToken->collateralToken
-                    address(this), // to
-                    uint256(block.timestamp + 1) // deadline
+                    "callExternal(address,bytes)",
+                    uniswapRouter,
+                    abi.encodeWithSignature(
+                        "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
+                        flashloanCollateralAmount, // amount out
+                        pegTokenAmount, // amount in max
+                        path, // path pegToken->collateralToken
+                        address(this), // to
+                        uint256(block.timestamp + 1) // deadline
+                    )
                 )
-            ));
+            );
         }
 
         // Initiate the flash loan
@@ -310,36 +331,50 @@ contract GatewayV1 is Gateway {
 
         // compute amount of pegTokens needed to cover the debt
         uint256 debt = LendingTerm(term).getLoanDebt(loanId);
-        uint256 flashloanPegTokenAmount = SimplePSM(psm).getRedeemAmountOut(debt) + 1;
+        uint256 flashloanPegTokenAmount = SimplePSM(psm).getRedeemAmountOut(
+            debt
+        ) + 1;
 
         // approve the psm & mint creditTokens
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            pegToken,
-            abi.encodeWithSignature("approve(address,uint256)", psm, flashloanPegTokenAmount)
-        ));
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            psm,
+        _storedCalls.push(
             abi.encodeWithSignature(
-                "mint(address,uint256)",
-                address(this),
-                flashloanPegTokenAmount
+                "callExternal(address,bytes)",
+                pegToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    psm,
+                    flashloanPegTokenAmount
+                )
             )
-        ));
+        );
+        _storedCalls.push(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                psm,
+                abi.encodeWithSignature(
+                    "mint(address,uint256)",
+                    address(this),
+                    flashloanPegTokenAmount
+                )
+            )
+        );
 
         // repay the loan
         address _creditToken = LendingTerm(term).creditToken();
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            _creditToken,
-            abi.encodeWithSignature("approve(address,uint256)", term, debt)
-        ));
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            term,
-            abi.encodeWithSignature("repay(bytes32)", loanId)
-        ));
+        _storedCalls.push(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                _creditToken,
+                abi.encodeWithSignature("approve(address,uint256)", term, debt)
+            )
+        );
+        _storedCalls.push(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                term,
+                abi.encodeWithSignature("repay(bytes32)", loanId)
+            )
+        );
 
         // compute exactly the number of collateralTokens needed to repay the flashloan
         uint256 collateralTokenAmount;
@@ -347,48 +382,55 @@ contract GatewayV1 is Gateway {
             address[] memory path = new address[](2);
             path[0] = collateralToken;
             path[1] = pegToken;
-            uint256[] memory amountsIn = IUniswapRouter(uniswapRouter).getAmountsIn(
-                flashloanPegTokenAmount,
-                path
-            );
+            uint256[] memory amountsIn = IUniswapRouter(uniswapRouter)
+                .getAmountsIn(flashloanPegTokenAmount, path);
             collateralTokenAmount = amountsIn[0];
         }
-        require(collateralTokenAmount < maxCollateralSold, "GatewayV1: collateral left too low");
+        require(
+            collateralTokenAmount < maxCollateralSold,
+            "GatewayV1: collateral left too low"
+        );
 
         // pull collateralTokens to the gateway
         _storedCalls.push(allowCollateralTokenCall);
-        _storedCalls.push(abi.encodeWithSignature(
-            "consumeAllowance(address,uint256)",
-            collateralToken,
-            collateralTokenAmount
-        ));
-
-        // swap {collateralTokenAmount} collateralTokens to {flashloanPegTokenAmount} pegTokens 
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            collateralToken,
+        _storedCalls.push(
             abi.encodeWithSignature(
-                "approve(address,uint256)",
-                uniswapRouter,
+                "consumeAllowance(address,uint256)",
+                collateralToken,
                 collateralTokenAmount
             )
-        ));
+        );
+
+        // swap {collateralTokenAmount} collateralTokens to {flashloanPegTokenAmount} pegTokens
+        _storedCalls.push(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                collateralToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    uniswapRouter,
+                    collateralTokenAmount
+                )
+            )
+        );
         {
             address[] memory path = new address[](2);
             path[0] = address(collateralToken);
             path[1] = address(pegToken);
-            _storedCalls.push(abi.encodeWithSignature(
-                "callExternal(address,bytes)",
-                uniswapRouter,
+            _storedCalls.push(
                 abi.encodeWithSignature(
-                    "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
-                    flashloanPegTokenAmount, // amount out
-                    collateralTokenAmount, // amount in max
-                    path, // path collateralToken->pegToken
-                    address(this), // to
-                    uint256(block.timestamp + 1) // deadline
+                    "callExternal(address,bytes)",
+                    uniswapRouter,
+                    abi.encodeWithSignature(
+                        "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
+                        flashloanPegTokenAmount, // amount out
+                        collateralTokenAmount, // amount in max
+                        path, // path collateralToken->pegToken
+                        address(this), // to
+                        uint256(block.timestamp + 1) // deadline
+                    )
                 )
-            ));
+            );
         }
 
         // Initiate the flash loan
@@ -430,7 +472,7 @@ contract GatewayV1 is Gateway {
         address collateralToken,
         address pegToken,
         uint256 minPegTokenProfit
-    ) public whenNotPaused returns(uint256) {
+    ) public whenNotPaused returns (uint256) {
         require(
             _originalSender == address(1),
             "GatewayV1: original sender already set"
@@ -440,67 +482,88 @@ contract GatewayV1 is Gateway {
 
         // compute amount of pegTokens needed to cover the debt
         address _auctionHouse = LendingTerm(term).auctionHouse();
-        (
-            uint256 collateralReceived,
-            uint256 creditAsked
-        ) = AuctionHouse(_auctionHouse).getBidDetail(loanId);
-        uint256 flashloanPegTokenAmount = SimplePSM(psm).getRedeemAmountOut(creditAsked) + 1;
+        (uint256 collateralReceived, uint256 creditAsked) = AuctionHouse(
+            _auctionHouse
+        ).getBidDetail(loanId);
+        uint256 flashloanPegTokenAmount = SimplePSM(psm).getRedeemAmountOut(
+            creditAsked
+        ) + 1;
 
         // approve the psm & mint creditTokens
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            pegToken,
-            abi.encodeWithSignature("approve(address,uint256)", psm, flashloanPegTokenAmount)
-        ));
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            psm,
+        _storedCalls.push(
             abi.encodeWithSignature(
-                "mint(address,uint256)",
-                address(this),
-                flashloanPegTokenAmount
+                "callExternal(address,bytes)",
+                pegToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    psm,
+                    flashloanPegTokenAmount
+                )
             )
-        ));
+        );
+        _storedCalls.push(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                psm,
+                abi.encodeWithSignature(
+                    "mint(address,uint256)",
+                    address(this),
+                    flashloanPegTokenAmount
+                )
+            )
+        );
 
         // bid in auction
         address _creditToken = LendingTerm(term).creditToken();
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            _creditToken,
-            abi.encodeWithSignature("approve(address,uint256)", term, creditAsked)
-        ));
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            _auctionHouse,
-            abi.encodeWithSignature("bid(bytes32)", loanId)
-        ));
+        _storedCalls.push(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                _creditToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    term,
+                    creditAsked
+                )
+            )
+        );
+        _storedCalls.push(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                _auctionHouse,
+                abi.encodeWithSignature("bid(bytes32)", loanId)
+            )
+        );
 
         // swap received collateralTokens to pegTokens
-        _storedCalls.push(abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            collateralToken,
+        _storedCalls.push(
             abi.encodeWithSignature(
-                "approve(address,uint256)",
-                uniswapRouter,
-                collateralReceived
+                "callExternal(address,bytes)",
+                collateralToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    uniswapRouter,
+                    collateralReceived
+                )
             )
-        ));
+        );
         {
             address[] memory path = new address[](2);
             path[0] = address(collateralToken);
             path[1] = address(pegToken);
-            _storedCalls.push(abi.encodeWithSignature(
-                "callExternal(address,bytes)",
-                uniswapRouter,
+            _storedCalls.push(
                 abi.encodeWithSignature(
-                    "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
-                    collateralReceived, // amount in
-                    0, // amount out min
-                    path, // path collateralToken->pegToken
-                    address(this), // to
-                    uint256(block.timestamp + 1) // deadline
+                    "callExternal(address,bytes)",
+                    uniswapRouter,
+                    abi.encodeWithSignature(
+                        "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
+                        collateralReceived, // amount in
+                        0, // amount out min
+                        path, // path collateralToken->pegToken
+                        address(this), // to
+                        uint256(block.timestamp + 1) // deadline
+                    )
                 )
-            ));
+            );
         }
 
         // Initiate the flash loan
@@ -520,11 +583,11 @@ contract GatewayV1 is Gateway {
 
         // send surplus pegTokens to msg.sender
         uint256 pegTokenBalance = IERC20(pegToken).balanceOf(address(this));
-        require(pegTokenBalance > minPegTokenProfit, "GatewayV1: profit too low");
-        IERC20(pegToken).transfer(
-            msg.sender,
-            pegTokenBalance
+        require(
+            pegTokenBalance > minPegTokenProfit,
+            "GatewayV1: profit too low"
         );
+        IERC20(pegToken).transfer(msg.sender, pegTokenBalance);
 
         // clear stored calls
         delete _storedCalls;

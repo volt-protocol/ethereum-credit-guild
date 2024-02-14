@@ -147,8 +147,10 @@ contract LendingTermOffboarding is CoreRef {
             canOffboard[term] == OffboardStatus.UNSET,
             "LendingTermOffboarding: offboard vote ended"
         );
-        require(lastPollBlock[term] == snapshotBlock, "LendingTermOffboarding: new poll exists");
-
+        require(
+            lastPollBlock[term] == snapshotBlock,
+            "LendingTermOffboarding: new poll exists"
+        );
 
         userPollVotes[msg.sender][snapshotBlock][term] = userWeight;
         polls[snapshotBlock][term] = _weight + userWeight;

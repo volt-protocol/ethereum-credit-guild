@@ -690,7 +690,6 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
             collateralAmount
         );
 
-        
         bytes memory allowBorrowedCreditCall = abi.encodeWithSignature(
             "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
             credit,
@@ -738,8 +737,10 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         vm.warp(block.timestamp + 3 days);
         vm.roll(block.number + 1);
 
-        uint256 collateralAmount = LendingTerm(term).getLoan(loanId).collateralAmount;
-        uint256 maxCollateralSold = collateralAmount * 95 / 100;
+        uint256 collateralAmount = LendingTerm(term)
+            .getLoan(loanId)
+            .collateralAmount;
+        uint256 maxCollateralSold = (collateralAmount * 95) / 100;
 
         // sign permit collateral -> Gateway
         PermitData memory permitCollateral = getPermitData(
@@ -786,7 +787,9 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         );
 
         // fast-forward time for loan to become insolvent
-        uint256 collateralAmount = LendingTerm(term).getLoan(loanId).collateralAmount;
+        uint256 collateralAmount = LendingTerm(term)
+            .getLoan(loanId)
+            .collateralAmount;
         uint256 loanDebt = LendingTerm(term).getLoanDebt(loanId);
         while (loanDebt < collateralAmount) {
             vm.warp(block.timestamp + 365 days);
@@ -803,15 +806,17 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         uint256 stop = block.timestamp + auctionHouse.auctionDuration();
         uint256 minProfit = 25e6; // min 25 USDC of profit
         while (profit == 0 && block.timestamp < stop) {
-            try gatewayv1.bidWithBalancerFlashLoan(
-                loanId,
-                address(term),
-                address(psm),
-                UNISWAPV2_ROUTER_ADDR,
-                address(collateralToken),
-                address(usdc),
-                minProfit
-            ) returns (uint256 _profit) {
+            try
+                gatewayv1.bidWithBalancerFlashLoan(
+                    loanId,
+                    address(term),
+                    address(psm),
+                    UNISWAPV2_ROUTER_ADDR,
+                    address(collateralToken),
+                    address(usdc),
+                    minProfit
+                )
+            returns (uint256 _profit) {
                 profit = _profit;
             } catch {
                 vm.warp(block.timestamp + timeStep);

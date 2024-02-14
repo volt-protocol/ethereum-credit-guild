@@ -361,8 +361,9 @@ contract ProfitManager is CoreRef {
                     // debts being rounded up through the formula in lending terms :
                     // principal = borrowed * openCreditMultiplier / currentCreditMultiplier
                     // In this case, the creditMultiplier is set to 0.
-                    newCreditMultiplier = (creditMultiplier *
-                    (creditTotalSupply - loss)) / creditTotalSupply;
+                    newCreditMultiplier =
+                        (creditMultiplier * (creditTotalSupply - loss)) /
+                        creditTotalSupply;
                 }
                 creditMultiplier = newCreditMultiplier;
                 emit CreditMultiplierUpdate(

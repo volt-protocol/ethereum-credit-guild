@@ -58,15 +58,9 @@ contract LendingTerm is CoreRef {
         uint256 repayAmount
     );
     /// @notice emitted when the auctionHouse reference is updated
-    event SetAuctionHouse(
-        uint256 indexed when,
-        address auctionHouse
-    );
+    event SetAuctionHouse(uint256 indexed when, address auctionHouse);
     /// @notice emitted when the hardCap is updated
-    event SetHardCap(
-        uint256 indexed when,
-        uint256 hardCap
-    );
+    event SetHardCap(uint256 indexed when, uint256 hardCap);
 
     struct Signature {
         uint8 v;
