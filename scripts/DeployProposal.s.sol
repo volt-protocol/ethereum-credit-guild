@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Script, console} from "@forge-std/Script.sol";
+import {Script} from "@forge-std/Script.sol";
 
 import {GIP_0 as proposal} from "@test/proposals/gips/GIP_0.sol";
 
