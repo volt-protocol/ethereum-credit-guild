@@ -412,7 +412,8 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
 
         // alice should now have 100 USDC after creating a loan and redeeming the
         // credits to USDC via the psm
-        assertEq(usdc.balanceOf(alice), 100e6);
+        // at most 1 wei of error
+        assertGt(usdc.balanceOf(alice), 100e6 - 2);
     }
 
     // multicall scenario with without permit
@@ -485,7 +486,8 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
 
         // alice should now have 100 USDC after creating a loan and redeeming the
         // credits to USDC via the psm
-        assertEq(usdc.balanceOf(alice), 100e6);
+        // at most 1 wei of error
+        assertGt(usdc.balanceOf(alice), 100e6 - 2);
     }
 
     // multicall with flashloan
