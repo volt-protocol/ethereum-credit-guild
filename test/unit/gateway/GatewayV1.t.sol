@@ -7,7 +7,6 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {GatewayV1} from "@src/gateway/GatewayV1.sol";
 import {Gateway} from "@src/gateway/Gateway.sol";
 import {MockBalancerVault} from "../../mock/MockBalancerVault.sol";
-import {MockExternalContract} from "../../mock/MockExternalContract.sol";
 import {MockERC20} from "../../mock/MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -25,10 +24,10 @@ contract UnitTestGatewayV1 is ECGTest {
     /// @notice Address used as factory owner in tests
     address gatewayOwner = address(10101);
 
-    /// @notice Signature for an allowed function call (ThisFunctionWillRevert(uint256)
-    bytes4 allowedSig1 = bytes4(0xcfec160d);
-    /// @notice Signature for an allowed function call (ThisFunctionIsOk(uint256)
-    bytes4 allowedSig2 = bytes4(0x2af749ff);
+    /// @notice Signature for an allowed function call (revertingFunction(uint256)
+    bytes4 allowedSig1 = bytes4(0x826b700f);
+    /// @notice Signature for an allowed function call (successfulFunction(uint256)
+    bytes4 allowedSig2 = bytes4(0xb510fa5c);
 
     // /// @notice MockERC20 token instance used in tests
     MockERC20 mockToken;
@@ -53,9 +52,24 @@ contract UnitTestGatewayV1 is ECGTest {
         return code;
     }
 
+    // functions to be called by the gateway
+    uint256 public amountSaved;
+
+    function revertingFunction(uint256 /*amount*/) public pure {
+        revert("I told you I would revert");
+    }
+
+    function revertingFunctionWithoutMsg(uint256 /*amount*/) public pure {
+        revert();
+    }
+
+    function successfulFunction(uint256 amount) public {
+        amountSaved = amount;
+    }
+
     /// @notice Sets up the test by deploying the AccountFactory contract
     function setUp() public {
-        allowedTarget = address(new MockExternalContract());
+        allowedTarget = address(this);
 
         vm.startPrank(gatewayOwner);
         gatewayv1 = new GatewayV1();
@@ -162,7 +176,7 @@ contract UnitTestGatewayV1 is ECGTest {
     /// @notice Verifies that failing external calls revert as expected
     function testCallExternalFailingShouldRevert() public {
         bytes memory data = abi.encodeWithSignature(
-            "ThisFunctionWillRevert(uint256)",
+            "revertingFunction(uint256)",
             uint256(1000)
         );
         vm.expectRevert("I told you I would revert");
@@ -172,14 +186,14 @@ contract UnitTestGatewayV1 is ECGTest {
     /// @notice Tests that external calls without a revert message are handled correctly
     function testCallExternalFailingShouldRevertWithoutMsg() public {
         bytes memory data = abi.encodeWithSignature(
-            "ThisFunctionWillRevertWithoutMsg(uint256)",
+            "revertingFunctionWithoutMsg(uint256)",
             uint256(1000)
         );
         bytes4 functionSelector = bytes4(
-            keccak256("ThisFunctionWillRevertWithoutMsg(uint256)")
+            keccak256("revertingFunctionWithoutMsg(uint256)")
         );
         vm.prank(gatewayOwner);
-        // allow "ThisFunctionWillRevertWithoutMsg(uint256)"
+        // allow "revertingFunctionWithoutMsg(uint256)"
         gatewayv1.allowCall(allowedTarget, functionSelector, true);
 
         // then call that function that revert without msg
@@ -189,22 +203,22 @@ contract UnitTestGatewayV1 is ECGTest {
 
     /// @notice Confirms successful execution of allowed external calls
     function testCallExternalSuccessShouldWork() public {
-        assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
+        assertEq(0, amountSaved);
         bytes memory data = abi.encodeWithSignature(
-            "ThisFunctionIsOk(uint256)",
+            "successfulFunction(uint256)",
             uint256(1000)
         );
 
         vm.prank(alice);
         _singleCallExternal(allowedTarget, data);
-        assertEq(1000, MockExternalContract(allowedTarget).AmountSaved());
+        assertEq(1000, amountSaved);
     }
 
     /// @notice Confirms that call external cannot be called when paused
     function testCallExternalCannotWorkWhenPaused() public {
-        assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
+        assertEq(0, amountSaved);
         bytes memory data = abi.encodeWithSignature(
-            "ThisFunctionIsOk(uint256)",
+            "successfulFunction(uint256)",
             uint256(1000)
         );
         vm.prank(gatewayOwner);
@@ -228,9 +242,9 @@ contract UnitTestGatewayV1 is ECGTest {
     }
 
     function testCallExternalCanPauseUnpause() public {
-        assertEq(0, MockExternalContract(allowedTarget).AmountSaved());
+        assertEq(0, amountSaved);
         bytes memory data = abi.encodeWithSignature(
-            "ThisFunctionIsOk(uint256)",
+            "successfulFunction(uint256)",
             uint256(1000)
         );
         vm.prank(gatewayOwner);
@@ -473,11 +487,11 @@ contract UnitTestGatewayV1 is ECGTest {
         calls[0] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
             allowedTarget,
-            abi.encodeWithSignature("ThisFunctionIsOk(uint256)", uint256(750))
+            abi.encodeWithSignature("successfulFunction(uint256)", uint256(750))
         );
         vm.prank(alice);
         gatewayv1.multicallWithBalancerFlashLoan(tokens, amounts, calls);
-        assertEq(750, MockExternalContract(allowedTarget).AmountSaved());
+        assertEq(750, amountSaved);
     }
 
     /// @notice Ensures that unauthorized addresses cannot call the receiveFlashLoan function

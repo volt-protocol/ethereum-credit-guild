@@ -12,8 +12,7 @@ interface IFlashLoanRecipient {
     ) external;
 }
 
-/// @notice very simple contract that have some functions that are reverting and other that are not
-/// used to test external calls
+/// @notice a simpler version of the Balancer Vault that can do flashloans
 contract MockBalancerVault {
     function WhoAmI() public pure returns (string memory) {
         return "I am MockBalancerVault";
