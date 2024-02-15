@@ -69,14 +69,7 @@ contract GatewayV1 is Gateway {
         address[] calldata tokens,
         uint256[] calldata amounts,
         bytes[] calldata calls // Calls to be made after receiving the flash loan
-    ) public whenNotPaused {
-        require(
-            _originalSender == address(1),
-            "GatewayV1: original sender already set"
-        );
-
-        _originalSender = msg.sender;
-
+    ) public entryPoint whenNotPaused {
         // store the calls, they'll be executed in the 'receiveFlashloan' function later
         for (uint i = 0; i < calls.length; i++) {
             _storedCalls.push(calls[i]);
@@ -100,8 +93,6 @@ contract GatewayV1 is Gateway {
 
         // clear stored calls
         delete _storedCalls;
-        // clear _originalSender
-        _originalSender = address(1);
     }
 
     /// @notice Handles the receipt of a flash loan from balancer, executes stored calls, and repays the loan.
@@ -113,16 +104,10 @@ contract GatewayV1 is Gateway {
         uint256[] memory amounts,
         uint256[] memory feeAmounts,
         bytes memory /*userData*/
-    ) external whenNotPaused {
+    ) external afterEntry {
         require(
             msg.sender == balancerVault,
             "GatewayV1: sender is not balancer"
-        );
-
-        // ensure the originalSender is set (via the multicallWithBalancerFlashLoan function)
-        require(
-            _originalSender != address(1),
-            "GatewayV1: original sender must be set"
         );
 
         // execute the storedCalls stored in the multicallWithBalancerFlashLoan function
@@ -156,14 +141,7 @@ contract GatewayV1 is Gateway {
         uint256 maxLoanDebt,
         bytes[] memory pullCollateralCalls,
         bytes memory allowBorrowedCreditCall
-    ) public whenNotPaused {
-        require(
-            _originalSender == address(1),
-            "GatewayV1: original sender already set"
-        );
-
-        _originalSender = msg.sender;
-
+    ) public entryPoint whenNotPaused {
         // after flashloan tokens are received, first calls are to pull collateral
         // tokens from the user to the gateway, e.g. consumePermit + consumeAllowance
         // or just consumeAllowance if the user has already approved the gateway
@@ -296,8 +274,6 @@ contract GatewayV1 is Gateway {
 
         // clear stored calls
         delete _storedCalls;
-        // clear _originalSender
-        _originalSender = address(1);
     }
 
     /// @notice execute a repay with a balancer flashloan.
@@ -321,14 +297,7 @@ contract GatewayV1 is Gateway {
         address pegToken,
         uint256 maxCollateralSold,
         bytes memory allowCollateralTokenCall
-    ) public whenNotPaused {
-        require(
-            _originalSender == address(1),
-            "GatewayV1: original sender already set"
-        );
-
-        _originalSender = msg.sender;
-
+    ) public entryPoint whenNotPaused {
         // compute amount of pegTokens needed to cover the debt
         uint256 debt = LendingTerm(term).getLoanDebt(loanId);
         uint256 flashloanPegTokenAmount = SimplePSM(psm).getRedeemAmountOut(
@@ -450,8 +419,6 @@ contract GatewayV1 is Gateway {
 
         // clear stored calls
         delete _storedCalls;
-        // clear _originalSender
-        _originalSender = address(1);
     }
 
     /// @notice bid in an auction with a balancer flashloan.
@@ -472,14 +439,7 @@ contract GatewayV1 is Gateway {
         address collateralToken,
         address pegToken,
         uint256 minPegTokenProfit
-    ) public whenNotPaused returns (uint256) {
-        require(
-            _originalSender == address(1),
-            "GatewayV1: original sender already set"
-        );
-
-        _originalSender = msg.sender;
-
+    ) public entryPoint whenNotPaused returns (uint256) {
         // compute amount of pegTokens needed to cover the debt
         address _auctionHouse = LendingTerm(term).auctionHouse();
         (uint256 collateralReceived, uint256 creditAsked) = AuctionHouse(
@@ -591,8 +551,6 @@ contract GatewayV1 is Gateway {
 
         // clear stored calls
         delete _storedCalls;
-        // clear _originalSender
-        _originalSender = address(1);
 
         return pegTokenBalance;
     }

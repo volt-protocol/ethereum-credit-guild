@@ -15,7 +15,7 @@ abstract contract Gateway is Ownable, Pausable {
 
     // never allow transferFrom to be whitelisted
     // this avoid human error
-    bytes4 public immutable transferFromSelector =
+    bytes4 private constant TRANSFER_FROM_SELECTOR =
         bytes4(keccak256("transferFrom(address,address,uint256)"));
 
     /// @notice emitted when a call is allowed or not by the function allowCall
@@ -25,11 +25,27 @@ abstract contract Gateway is Ownable, Pausable {
         bool isAllowed
     );
 
-    address internal _originalSender = address(1);
-
     /// @notice mapping of allowed signatures per target address
     /// For example allowing "approve" on a token
     mapping(address => mapping(bytes4 => bool)) public allowedCalls;
+
+    address internal _originalSender = address(1);
+    modifier entryPoint() {
+        require(
+            _originalSender == address(1),
+            "Gateway: original sender already set"
+        );
+        _originalSender = msg.sender;
+        _;
+        _originalSender = address(1);
+    }
+    modifier afterEntry() {
+        require(
+            _originalSender != address(1),
+            "Gateway: originalSender not set"
+        );
+        _;
+    }
 
     constructor() Ownable() Pausable() {}
 
@@ -50,7 +66,7 @@ abstract contract Gateway is Ownable, Pausable {
         bool allowed
     ) public onlyOwner {
         require(
-            functionSelector != transferFromSelector,
+            functionSelector != TRANSFER_FROM_SELECTOR,
             "Gateway: cannot allow transferFrom"
         );
 
@@ -67,7 +83,7 @@ abstract contract Gateway is Ownable, Pausable {
     function callExternal(
         address target,
         bytes calldata data
-    ) public whenNotPaused {
+    ) public afterEntry {
         // Extract the function selector from the first 4 bytes of `data`
         bytes4 functionSelector = bytes4(data[:4]);
         require(
@@ -81,22 +97,6 @@ abstract contract Gateway is Ownable, Pausable {
         }
     }
 
-    /// @notice Executes multiple calls in a single transaction.
-    /// @param calls An array of call data to execute.
-    /// @dev can be paused
-    function multicall(bytes[] calldata calls) public whenNotPaused {
-        require(
-            _originalSender == address(1),
-            "Gateway: original sender already set"
-        );
-
-        _originalSender = msg.sender;
-
-        _executeCalls(calls);
-
-        _originalSender = address(1);
-    }
-
     /// @notice function to consume a permit allowanced
     /// @dev can only be used from the multicall function that sets "_originalSender"
     function consumePermit(
@@ -106,11 +106,7 @@ abstract contract Gateway is Ownable, Pausable {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) public {
-        require(
-            _originalSender != address(1),
-            "Gateway: Original sender not set in consumePermit"
-        );
+    ) public afterEntry {
         IERC20Permit(token).permit(
             _originalSender,
             address(this),
@@ -124,11 +120,7 @@ abstract contract Gateway is Ownable, Pausable {
 
     /// @notice function to consume an allowance (transferFrom) from msg.sender to the gateway
     /// @dev can only be used from the multicall function that sets "_originalSender"
-    function consumeAllowance(address token, uint256 amount) public {
-        require(
-            _originalSender != address(1),
-            "Gateway: Original sender not set in consumeAllowance"
-        );
+    function consumeAllowance(address token, uint256 amount) public afterEntry {
         IERC20(token).transferFrom(_originalSender, address(this), amount);
     }
 
@@ -136,15 +128,18 @@ abstract contract Gateway is Ownable, Pausable {
     ///         should be used at the end of a multicall
     /// @dev can only be used from the multicall function that sets "_originalSender"
     /// @dev it means anyone can sweep any token left on this contract
-    function sweep(address token) public {
-        require(
-            _originalSender != address(1),
-            "Gateway: Original sender not set in sweep"
-        );
+    function sweep(address token) public afterEntry {
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
             IERC20(token).transfer(_originalSender, balance);
         }
+    }
+
+    /// @notice Executes multiple calls in a single transaction.
+    /// @param calls An array of call data to execute.
+    /// @dev can be paused
+    function multicall(bytes[] calldata calls) public entryPoint whenNotPaused {
+        _executeCalls(calls);
     }
 
     /// @dev Executes a series of calls using call on this contract.

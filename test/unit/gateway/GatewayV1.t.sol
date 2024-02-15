@@ -127,6 +127,16 @@ contract UnitTestGatewayV1 is ECGTest {
         vm.stopPrank();
     }
 
+    function _singleCallExternal(address target, bytes memory data) internal {
+        bytes[] memory calls = new bytes[](1);
+        calls[0] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            target,
+            data
+        );
+        gatewayv1.multicall(calls);
+    }
+
     /// @notice Ensures that calls to non-allowed targets are properly restricted
     function testCallExternalShouldFailOnNonAllowedTarget() public {
         bytes memory data = abi.encodeWithSignature(
@@ -135,7 +145,7 @@ contract UnitTestGatewayV1 is ECGTest {
             "Hello"
         );
         vm.expectRevert("Gateway: cannot call target");
-        gatewayv1.callExternal(address(1), data);
+        _singleCallExternal(address(1), data);
     }
 
     /// @notice Checks that calls with non-allowed signatures are prohibited
@@ -146,7 +156,7 @@ contract UnitTestGatewayV1 is ECGTest {
             "Hello"
         );
         vm.expectRevert("Gateway: cannot call target");
-        gatewayv1.callExternal(allowedTarget, data);
+        _singleCallExternal(allowedTarget, data);
     }
 
     /// @notice Verifies that failing external calls revert as expected
@@ -156,7 +166,7 @@ contract UnitTestGatewayV1 is ECGTest {
             uint256(1000)
         );
         vm.expectRevert("I told you I would revert");
-        gatewayv1.callExternal(allowedTarget, data);
+        _singleCallExternal(allowedTarget, data);
     }
 
     /// @notice Tests that external calls without a revert message are handled correctly
@@ -173,13 +183,8 @@ contract UnitTestGatewayV1 is ECGTest {
         gatewayv1.allowCall(allowedTarget, functionSelector, true);
 
         // then call that function that revert without msg
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Gateway.CallExternalError.selector,
-                bytes("")
-            )
-        );
-        gatewayv1.callExternal(allowedTarget, data);
+        vm.expectRevert(bytes(""));
+        _singleCallExternal(allowedTarget, data);
     }
 
     /// @notice Confirms successful execution of allowed external calls
@@ -191,7 +196,7 @@ contract UnitTestGatewayV1 is ECGTest {
         );
 
         vm.prank(alice);
-        gatewayv1.callExternal(allowedTarget, data);
+        _singleCallExternal(allowedTarget, data);
         assertEq(1000, MockExternalContract(allowedTarget).AmountSaved());
     }
 
@@ -207,7 +212,7 @@ contract UnitTestGatewayV1 is ECGTest {
 
         vm.prank(alice);
         vm.expectRevert("Pausable: paused");
-        gatewayv1.callExternal(allowedTarget, data);
+        _singleCallExternal(allowedTarget, data);
     }
 
     function testPauseCanOnlyBeDoneByOwner() public {
@@ -233,13 +238,13 @@ contract UnitTestGatewayV1 is ECGTest {
 
         vm.prank(alice);
         vm.expectRevert("Pausable: paused");
-        gatewayv1.callExternal(allowedTarget, data);
+        _singleCallExternal(allowedTarget, data);
 
         vm.prank(gatewayOwner);
         gatewayv1.unpause();
 
         vm.prank(alice);
-        gatewayv1.callExternal(allowedTarget, data);
+        _singleCallExternal(allowedTarget, data);
     }
 
     function testMulticall() public {
@@ -483,8 +488,17 @@ contract UnitTestGatewayV1 is ECGTest {
         amounts[0] = 750;
         uint256[] memory feeAmounts = new uint256[](1);
         amounts[0] = 150;
+
+        bytes[] memory calls = new bytes[](1);
+        calls[0] = abi.encodeWithSignature(
+            "receiveFlashLoan(address[],uint256[],uint256[],bytes)",
+            tokens,
+            amounts,
+            feeAmounts,
+            ""
+        );
         vm.prank(bob);
         vm.expectRevert("GatewayV1: sender is not balancer");
-        gatewayv1.receiveFlashLoan(tokens, amounts, feeAmounts, "");
+        gatewayv1.multicall(calls);
     }
 }
