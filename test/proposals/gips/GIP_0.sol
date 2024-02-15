@@ -389,6 +389,12 @@ contract GIP_0 is Proposal {
             CoreRoles.RATE_LIMITED_CREDIT_MINTER,
             getAddr("TERM_SDAI_1")
         );
+        if (IS_SEPOLIA) {
+            core.grantRole(
+                CoreRoles.RATE_LIMITED_CREDIT_MINTER,
+                getAddr("TERM_WBTC_1")
+            );
+        }
 
         // GUILD_MINTER
         core.grantRole(
@@ -426,6 +432,12 @@ contract GIP_0 is Proposal {
 
         // GAUGE_PNL_NOTIFIER
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, getAddr("TERM_SDAI_1"));
+        if (IS_SEPOLIA) {
+            core.grantRole(
+                CoreRoles.GAUGE_PNL_NOTIFIER,
+                getAddr("TERM_WBTC_1")
+            );
+        }
 
         // GUILD_GOVERNANCE_PARAMETERS
         core.grantRole(
@@ -491,21 +503,6 @@ contract GIP_0 is Proposal {
             getAddr("ONBOARD_GOVERNOR_GUILD")
         );
 
-        if (IS_SEPOLIA) {
-            core.grantRole(
-                CoreRoles.RATE_LIMITED_CREDIT_MINTER,
-                getAddr("TERM_WBTC_1")
-            );
-            core.grantRole(
-                CoreRoles.GAUGE_PNL_NOTIFIER,
-                getAddr("TERM_WBTC_1")
-            );
-            GuildToken(getAddr("ERC20_GUILD")).addGauge(
-                1,
-                getAddr("TERM_WBTC_1")
-            );
-        }
-
         // Configuration
         ProfitManager(getAddr("PROFIT_MANAGER")).initializeReferences(
             getAddr("ERC20_GUSDC"),
@@ -527,6 +524,12 @@ contract GIP_0 is Proposal {
         );
         GuildToken(getAddr("ERC20_GUILD")).setMaxGauges(10);
         GuildToken(getAddr("ERC20_GUILD")).addGauge(1, getAddr("TERM_SDAI_1"));
+        if (IS_SEPOLIA) {
+            GuildToken(getAddr("ERC20_GUILD")).addGauge(
+                1,
+                getAddr("TERM_WBTC_1")
+            );
+        }
         GuildToken(getAddr("ERC20_GUILD")).setMaxDelegates(MAX_DELEGATES);
         GuildToken(getAddr("ERC20_GUILD")).setDelegateLockupPeriod(
             DELEGATE_LOCKUP_PERIOD
