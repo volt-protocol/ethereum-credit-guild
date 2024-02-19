@@ -205,8 +205,8 @@ contract GIP_0 is Proposal {
         {
             AuctionHouse auctionHouse = new AuctionHouse(
                 getAddr("CORE"),
-                650, // midPoint = 10m50s
-                1800, // auctionDuration = 30m
+                3600, // midPoint = 60m
+                7200, // auctionDuration = 120m
                 0 // 0% collateral offered at start
             );
 
