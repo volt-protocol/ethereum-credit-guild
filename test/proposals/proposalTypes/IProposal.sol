@@ -1,7 +1,5 @@
 pragma solidity 0.8.13;
 
-import {AddressLib} from "@test/proposals/AddressLib.sol";
-
 interface IProposal {
     // Proposal name, e.g. "VIP16"
     function name() external view returns (string memory);

@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {RateLimitedV2} from "@src/utils/RateLimitedV2.sol";
+import {RateLimitedV2} from "@src/rate-limits/RateLimitedV2.sol";
 
 interface IERC20Mintable {
     function mint(address to, uint256 amount) external;

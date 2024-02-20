@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
@@ -9,7 +9,7 @@ import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {MockLendingTerm} from "@test/mock/MockLendingTerm.sol";
 
-contract GuildTokenUnitTest is Test {
+contract GuildTokenUnitTest is ECGTest {
     address private governor = address(1);
     Core private core;
     ProfitManager public profitManager;

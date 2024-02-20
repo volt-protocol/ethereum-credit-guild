@@ -355,8 +355,16 @@ contract ProfitManager is CoreRef {
                 // update the CREDIT multiplier
                 uint256 creditTotalSupply = CreditToken(_credit)
                     .targetTotalSupply();
-                uint256 newCreditMultiplier = (creditMultiplier *
-                    (creditTotalSupply - loss)) / creditTotalSupply;
+                uint256 newCreditMultiplier = 0;
+                if (loss < creditTotalSupply) {
+                    // a loss greater than the total supply could occur due to outstanding loan
+                    // debts being rounded up through the formula in lending terms :
+                    // principal = borrowed * openCreditMultiplier / currentCreditMultiplier
+                    // In this case, the creditMultiplier is set to 0.
+                    newCreditMultiplier =
+                        (creditMultiplier * (creditTotalSupply - loss)) /
+                        creditTotalSupply;
+                }
                 creditMultiplier = newCreditMultiplier;
                 emit CreditMultiplierUpdate(
                     block.timestamp,

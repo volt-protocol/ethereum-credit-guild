@@ -1,29 +1,30 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
 import {Vm} from "@forge-std/Vm.sol";
+import {Test} from "@forge-std/Test.sol";
 import {console} from "@forge-std/console.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-library AddressLib {
+abstract contract ECGTest is Test {
     string internal constant ADDR_PATH =
         "/protocol-configuration/addresses.json";
 
-    Vm internal constant vm =
-        Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+    string internal constant ADDR_PATH_SEPOLIA =
+        "/protocol-configuration/addresses.sepolia.json";
 
     struct RecordedAddress {
         address addr;
         string name;
     }
 
-    function _read()
-        internal
-        view
-        returns (RecordedAddress[] memory addresses)
-    {
+    function _read() public view returns (RecordedAddress[] memory addresses) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, ADDR_PATH);
+
+        if (block.chainid == 11155111) {
+            path = string.concat(root, ADDR_PATH_SEPOLIA);
+        }
+
         string memory json = vm.readFile(path);
         bytes memory parsedJson = vm.parseJson(json);
         addresses = abi.decode(parsedJson, (RecordedAddress[]));
@@ -32,6 +33,10 @@ library AddressLib {
     function _write(RecordedAddress[] memory addresses) internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, ADDR_PATH);
+
+        if (block.chainid == 11155111) {
+            path = string.concat(root, ADDR_PATH_SEPOLIA);
+        }
 
         string memory json = "[";
         for (uint256 i = 0; i < addresses.length; i++) {
@@ -56,7 +61,7 @@ library AddressLib {
         vm.writeJson(json, path);
     }
 
-    function get(string memory name) external view returns (address) {
+    function getAddr(string memory name) public view returns (address) {
         RecordedAddress[] memory addresses = _read();
 
         for (uint256 i = 0; i < addresses.length; i++) {
@@ -70,7 +75,7 @@ library AddressLib {
         revert(string.concat("[AddressLib] Getting unknown address ", name));
     }
 
-    function set(string memory name, address addr) external {
+    function setAddr(string memory name, address addr) public {
         RecordedAddress[] memory addresses = _read();
 
         bool replaced = false;

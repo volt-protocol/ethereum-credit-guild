@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
@@ -16,7 +16,7 @@ import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 
-contract LendingTermOffboardingUnitTest is Test {
+contract LendingTermOffboardingUnitTest is ECGTest {
     address private governor = address(1);
     Core private core;
     ProfitManager private profitManager;

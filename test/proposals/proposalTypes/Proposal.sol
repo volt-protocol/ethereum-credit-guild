@@ -1,9 +1,9 @@
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {IProposal} from "@test/proposals/proposalTypes/IProposal.sol";
 
-abstract contract Proposal is IProposal, Test {
+abstract contract Proposal is IProposal, ECGTest {
     bool public DEBUG = true;
     uint256 public EXPECT_PCV_CHANGE = 0.003e18;
     bool public SKIP_PSM_ORACLE_TEST = false;

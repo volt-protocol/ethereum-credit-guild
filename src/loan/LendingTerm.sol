@@ -57,6 +57,10 @@ contract LendingTerm is CoreRef {
         address indexed repayer,
         uint256 repayAmount
     );
+    /// @notice emitted when the auctionHouse reference is updated
+    event SetAuctionHouse(uint256 indexed when, address auctionHouse);
+    /// @notice emitted when the hardCap is updated
+    event SetHardCap(uint256 indexed when, uint256 hardCap);
 
     struct Signature {
         uint8 v;
@@ -167,6 +171,10 @@ contract LendingTerm is CoreRef {
         _setCore(_core);
         refs = _refs;
         params = _params;
+
+        // events
+        emit SetAuctionHouse(block.timestamp, _refs.auctionHouse);
+        emit SetHardCap(block.timestamp, _params.hardCap);
     }
 
     /// @notice get references of this term to other protocol contracts
@@ -383,7 +391,12 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice initiate a new loan
+    /// @param payer address depositing the collateral
+    /// @param borrower address getting the borrowed funds
+    /// @param borrowAmount amount of gUSDC borrowed
+    /// @param collateralAmount the collateral amount deposited
     function _borrow(
+        address payer,
         address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount
@@ -458,7 +471,7 @@ contract LendingTerm is CoreRef {
 
         // pull the collateral from the borrower
         IERC20(params.collateralToken).safeTransferFrom(
-            borrower,
+            payer,
             address(this),
             collateralAmount
         );
@@ -478,7 +491,26 @@ contract LendingTerm is CoreRef {
         uint256 borrowAmount,
         uint256 collateralAmount
     ) external whenNotPaused returns (bytes32 loanId) {
-        loanId = _borrow(msg.sender, borrowAmount, collateralAmount);
+        loanId = _borrow(
+            msg.sender,
+            msg.sender,
+            borrowAmount,
+            collateralAmount
+        );
+    }
+
+    /// @notice initiate a new loan on behalf of someone else
+    function borrowOnBehalf(
+        uint256 borrowAmount,
+        uint256 collateralAmount,
+        address onBehalfOf
+    ) external whenNotPaused returns (bytes32 loanId) {
+        loanId = _borrow(
+            msg.sender,
+            onBehalfOf,
+            borrowAmount,
+            collateralAmount
+        );
     }
 
     /// @notice add collateral on an open loan.
@@ -896,6 +928,7 @@ contract LendingTerm is CoreRef {
         );
 
         refs.auctionHouse = _newValue;
+        emit SetAuctionHouse(block.timestamp, _newValue);
     }
 
     /// @notice set the hardcap of CREDIT mintable in this term.
@@ -904,5 +937,6 @@ contract LendingTerm is CoreRef {
         uint256 _newValue
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         params.hardCap = _newValue;
+        emit SetHardCap(block.timestamp, _newValue);
     }
 }

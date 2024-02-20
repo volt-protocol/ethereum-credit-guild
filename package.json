@@ -13,15 +13,16 @@
     "test": "npm run test:unit",
     "test:unit": "forge test --match-path './test/unit/**' -vvv",
     "test:proposals": "forge test --match-path './test/proposals/**' --fork-url $ETH_RPC_URL -vvv",
-    "test:integration": "forge test --match-path './test/integration/**' --fork-url $ETH_RPC_URL -vvv",
-    "coverage": "forge coverage --fork-url $ETH_RPC_URL --match-path './test/**' --report lcov --report summary",
-    "coverage:unit": "forge coverage --match-path './test/unit/**' --report lcov --report summary",
-    "coverage:integration": "forge coverage --match-path './test/integration/**' --fork-url $ETH_RPC_URL --report lcov --report summary",
+    "test:integration": "DO_DEPLOY=false DO_AFTER_DEPLOY=false DO_VALIDATE=false forge test --match-path './test/integration/**' --fork-url $ETH_RPC_URL -vvv",
+    "coverage": "forge coverage --fork-url $ETH_RPC_URL --match-path './test/**' --report summary --report lcov",
+    "coverage:unit": "forge coverage --match-path './test/unit/**' --report summary --report lcov",
+    "coverage:integration": "forge coverage --match-path './test/integration/**' --fork-url $ETH_RPC_URL --report summary --report lcov",
     "coverage:prune": "lcov --remove ./lcov.info -o ./lcov.info 'test/*'",
     "fork": "anvil --fork-url $ETH_RPC_URL --block-time 10 --chain-id 1337",
     "deploy:local": "ETH_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 forge script scripts/DeployProposal.s.sol:DeployProposal -vvvv --rpc-url http://127.0.0.1:8545 --broadcast",
-    "prettier": "npx prettier --check 'src/**/*.sol'",
-    "prettier:fix": "npx prettier --write 'src/**/*.sol'"
+    "prettier": "npx prettier --check \"(src|test|scripts)/**/*.sol\"",
+    "prettier:fix": "npx prettier --write \"(src|test|scripts)/**/*.sol\"",
+    "prettier:watch": "onchange \"(src|test|scripts)/**/*.sol\" -- prettier --write {{changed}}"
   },
   "authors": "elliotfriedman,eswak,joeysantoro,onetruekirk",
   "devDependencies": {
@@ -30,7 +31,8 @@
     "prettier": "2.5.1",
     "prettier-plugin-solidity": "1.0.0",
     "solhint": "2.0.0",
-    "solhint-plugin-prettier": "0.0.5"
+    "solhint-plugin-prettier": "0.0.5",
+    "onchange": "^7.1.0"
   },
   "lint-staged": {
     "*.{sol}": [

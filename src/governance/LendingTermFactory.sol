@@ -10,7 +10,6 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 
 /// @notice LendingTerm factory.
 contract LendingTermFactory is CoreRef {
-
     /// @notice mapping of allowed LendingTerm implementations
     mapping(address => bool) public implementations;
 
@@ -56,12 +55,7 @@ contract LendingTermFactory is CoreRef {
         LendingTerm.LendingTermParams params
     );
 
-    constructor(
-        address _core,
-        address _guildToken
-    )
-        CoreRef(_core)
-    {
+    constructor(address _core, address _guildToken) CoreRef(_core) {
         guildToken = _guildToken;
     }
 
@@ -169,7 +163,20 @@ contract LendingTermFactory is CoreRef {
             "LendingTermFactory: unknown market"
         );
 
-        address term = Clones.clone(implementation);
+        bytes32 salt = keccak256(
+            abi.encodePacked(
+                implementation,
+                auctionHouse,
+                params.collateralToken,
+                params.maxDebtPerCollateralToken,
+                params.interestRate,
+                params.maxDelayBetweenPartialRepay,
+                params.minPartialRepayPercent,
+                params.openingFee,
+                params.hardCap
+            )
+        );
+        address term = Clones.cloneDeterministic(implementation, salt);
         LendingTerm(term).initialize(
             address(core()),
             LendingTerm.LendingTermReferences({

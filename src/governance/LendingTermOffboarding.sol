@@ -142,6 +142,15 @@ contract LendingTermOffboarding is CoreRef {
             userPollVotes[msg.sender][snapshotBlock][term] == 0,
             "LendingTermOffboarding: already voted"
         );
+        // Check that offboarding vote is still ongoing
+        require(
+            canOffboard[term] == OffboardStatus.UNSET,
+            "LendingTermOffboarding: offboard vote ended"
+        );
+        require(
+            lastPollBlock[term] == snapshotBlock,
+            "LendingTermOffboarding: new poll exists"
+        );
 
         userPollVotes[msg.sender][snapshotBlock][term] = userWeight;
         polls[snapshotBlock][term] = _weight + userWeight;
@@ -252,5 +261,6 @@ contract LendingTermOffboarding is CoreRef {
         }
 
         canOffboard[term] = OffboardStatus.UNSET;
+        lastPollBlock[term] = 1; // not 0 to reduce gas cost of next offboard
     }
 }

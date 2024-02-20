@@ -9,7 +9,6 @@ import "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
-import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
@@ -23,22 +22,14 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         super.setUp();
         term = LendingTerm(
             factory.createTerm(
-                1,
-                AddressLib.get("LENDING_TERM_V1"),
-                AddressLib.get("AUCTION_HOUSE"),
-                LendingTerm.LendingTermParams({
-                    collateralToken: AddressLib.get("ERC20_SDAI"),
-                    maxDebtPerCollateralToken: 1e18,
-                    interestRate: 0.04e18,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: rateLimitedCreditMinter.buffer()
-                })
+                factory.gaugeTypes(address(term)),
+                factory.termImplementations(address(term)),
+                term.getReferences().auctionHouse,
+                term.getParameters()
             )
         );
 
-        vm.prank(AddressLib.get("DAO_TIMELOCK"));
+        vm.prank(getAddr("DAO_TIMELOCK"));
         guild.enableTransfer();
 
         uint256 mintAmount = onboarder.quorum(0);
@@ -54,7 +45,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
 
     function testCoreCorrectlySetOnLendingTermLogic() public {
         assertEq(
-            address(LendingTerm(AddressLib.get("LENDING_TERM_V1")).core()),
+            address(LendingTerm(getAddr("LENDING_TERM_V1")).core()),
             address(1)
         );
     }
@@ -169,7 +160,7 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
     }
 
     /// This test will pass once a nonce is added to onboarder
-    function testOnboardOffBoardOnboard() public {
+    function testOnboardOffBoardOnboardReset() public {
         testOnboarding();
 
         vm.warp(block.timestamp + onboarder.MIN_DELAY_BETWEEN_PROPOSALS() + 1);
@@ -207,23 +198,12 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         vm.expectRevert("LendingTermOffboarding: re-onboarded");
         offboarder.cleanup(address(term));
 
-        /// offboard again as offboard vote already passed before but did not finalize
-        assertTrue(guild.isGauge(address(term)));
+        /// reset
+        offboarder.resetOffboarding(address(term));
 
-        offboarder.offboard(address(term));
-
-        assertEq(uint8(offboarder.canOffboard(address(term))), 1);
-        assertFalse(guild.isGauge(address(term)));
-        offboarder.cleanup(address(term));
-
-        assertEq(uint8(offboarder.canOffboard(address(term))), 0);
-
-        assertFalse(core.hasRole(roles.GAUGE_PNL_NOTIFIER, address(term)));
-        assertFalse(
+        assertTrue(core.hasRole(roles.GAUGE_PNL_NOTIFIER, address(term)));
+        assertTrue(
             core.hasRole(roles.RATE_LIMITED_CREDIT_MINTER, address(term))
         );
-
-        /// assert that term borrowable amount is 0
-        assertEq(term.debtCeiling(), 0);
     }
 }

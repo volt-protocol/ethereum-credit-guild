@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
@@ -15,7 +15,7 @@ import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
-contract LendingTermUnitTest is Test {
+contract LendingTermUnitTest is ECGTest {
     address private governor = address(1);
     address private guardian = address(2);
     Core private core;
@@ -242,6 +242,45 @@ contract LendingTermUnitTest is Test {
         assertEq(credit.totalSupply(), borrowAmount);
 
         assertEq(term.getLoan(loanId).borrower, address(this));
+        assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
+        assertEq(term.getLoan(loanId).borrowAmount, borrowAmount);
+        assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);
+        assertEq(term.getLoan(loanId).caller, address(0));
+        assertEq(term.getLoan(loanId).callTime, 0);
+        assertEq(term.getLoan(loanId).closeTime, 0);
+
+        assertEq(term.issuance(), borrowAmount);
+        assertEq(term.getLoanDebt(loanId), borrowAmount);
+
+        // check interest accrued over time
+        vm.warp(block.timestamp + term.YEAR());
+        assertEq(term.getLoanDebt(loanId), (borrowAmount * 110) / 100); // 10% APR
+    }
+
+    // borrow on behalf success
+    function testBorrowOnBehalfSuccess() public {
+        // prepare
+        uint256 borrowAmount = 20_000e18;
+        uint256 collateralAmount = 12e18;
+        collateral.mint(address(this), collateralAmount);
+        collateral.approve(address(term), collateralAmount);
+        address onBehalfOf = address(0x987654321);
+
+        // borrow
+        bytes32 loanId = term.borrowOnBehalf(
+            borrowAmount,
+            collateralAmount,
+            onBehalfOf
+        );
+
+        // check loan creation
+        assertEq(collateral.balanceOf(address(this)), 0);
+        assertEq(collateral.balanceOf(address(term)), collateralAmount);
+        assertEq(credit.balanceOf(onBehalfOf), borrowAmount);
+        assertEq(credit.balanceOf(address(term)), 0);
+        assertEq(credit.totalSupply(), borrowAmount);
+
+        assertEq(term.getLoan(loanId).borrower, onBehalfOf);
         assertEq(term.getLoan(loanId).borrowTime, block.timestamp);
         assertEq(term.getLoan(loanId).borrowAmount, borrowAmount);
         assertEq(term.getLoan(loanId).collateralAmount, collateralAmount);

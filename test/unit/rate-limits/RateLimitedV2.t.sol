@@ -5,12 +5,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Vm} from "@forge-std/Vm.sol";
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockRateLimitedV2} from "@test/mock/MockRateLimitedV2.sol";
 
-contract UnitTestRateLimitedV2 is Test {
+contract UnitTestRateLimitedV2 is ECGTest {
     using SafeCastLib for *;
 
     address private governor = address(1);

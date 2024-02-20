@@ -10,7 +10,6 @@ import "@forge-std/Test.sol";
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
-import {AddressLib} from "@test/proposals/AddressLib.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
@@ -35,18 +34,10 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
         /// new term so that onboard succeeds
         term = LendingTerm(
             factory.createTerm(
-                1,
-                AddressLib.get("LENDING_TERM_V1"),
-                AddressLib.get("AUCTION_HOUSE"),
-                LendingTerm.LendingTermParams({
-                    collateralToken: AddressLib.get("ERC20_SDAI"),
-                    maxDebtPerCollateralToken: 1e18,
-                    interestRate: 0.04e18,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: rateLimitedCreditMinter.buffer()
-                })
+                factory.gaugeTypes(address(term)),
+                factory.termImplementations(address(term)),
+                term.getReferences().auctionHouse,
+                term.getParameters()
             )
         );
     }
@@ -128,7 +119,7 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
     function testSetOffboardingQuourumAsTimelock() public {
         uint256 newQuorum = 100_000_000 * 1e18;
 
-        vm.prank(AddressLib.get("DAO_TIMELOCK"));
+        vm.prank(getAddr("DAO_TIMELOCK"));
         offboarder.setQuorum(newQuorum);
 
         assertEq(offboarder.quorum(), newQuorum, "new quorum not set");

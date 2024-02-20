@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {MockERC20Gauges} from "@test/mock/MockERC20Gauges.sol";
 
-contract ERC20GaugesUnitTest is Test {
+contract ERC20GaugesUnitTest is ECGTest {
     MockERC20Gauges token;
     address constant gauge1 = address(0xDEAD);
     address constant gauge2 = address(0xBEEF);

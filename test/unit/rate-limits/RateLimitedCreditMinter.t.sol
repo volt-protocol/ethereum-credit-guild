@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
-contract RateLimitedCreditMinterUnitTest is Test {
+contract RateLimitedCreditMinterUnitTest is ECGTest {
     RateLimitedMinter public rlcm;
     MockERC20 private token;
     address private governor = address(1);

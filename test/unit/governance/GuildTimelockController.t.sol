@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {Test} from "@forge-std/Test.sol";
+import {ECGTest} from "@test/ECGTest.sol";
 import {Core} from "@src/core/Core.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
@@ -9,7 +9,7 @@ import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
-contract GuildTimelockControllerUnitTest is Test {
+contract GuildTimelockControllerUnitTest is ECGTest {
     address private governor = address(1);
     Core private core;
     MockERC20 private token;

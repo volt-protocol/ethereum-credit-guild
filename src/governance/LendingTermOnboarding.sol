@@ -19,7 +19,6 @@ import {LendingTermFactory} from "@src/governance/LendingTermFactory.sol";
 /// Only terms that have been deployed through this factory can be onboarded.
 /// A term can be onboarded for the first time, or re-onboarded after it has been offboarded.
 contract LendingTermOnboarding is GuildGovernor {
-
     /// @notice minimum delay between proposals of onboarding of a given term
     uint256 public constant MIN_DELAY_BETWEEN_PROPOSALS = 7 days;
     /// @notice time of last proposal of a given term

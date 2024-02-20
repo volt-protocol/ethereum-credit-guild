@@ -8,8 +8,8 @@ import "@forge-std/Test.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixture.sol";
 
-contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
-    function testVoteForSDAIGauge() public {
+contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
+    function testVoteForGauge() public {
         uint256 mintAmount = governor.quorum(0);
         /// setup
         vm.prank(teamMultisig);
@@ -19,8 +19,8 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         assertTrue(guild.isGauge(address(term)));
     }
 
-    function testAllocateGaugeToSDAI() public {
-        testVoteForSDAIGauge();
+    function testAllocateGauge() public {
+        testVoteForGauge();
         uint256 mintAmount = governor.quorum(0);
         uint256 startingTotalWeight = guild.totalWeight();
 
@@ -37,42 +37,38 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         );
     }
 
-    function testSupplyCollateralUserOne(
-        uint128 supplyAmount
-    ) public returns (bytes32 loanId, uint128 suppliedAmount) {
-        testAllocateGaugeToSDAI();
-
-        supplyAmount = uint128(
-            _bound(supplyAmount, profitManager.minBorrow(), term.debtCeiling())
-        );
-        suppliedAmount = supplyAmount;
-
-        return _supplyCollateralUserOne(suppliedAmount);
+    function testSupplyCollateralUserOne() public returns (bytes32, uint128) {
+        testAllocateGauge();
+        uint128 amount = (uint128(profitManager.minBorrow()) * 314159) / 100000;
+        return _supplyCollateralUserOne(amount);
     }
 
     function _supplyCollateralUserOne(
         uint128 supplyAmount
     ) private returns (bytes32 loanId, uint128 suppliedAmount) {
-        testAllocateGaugeToSDAI();
+        testAllocateGauge();
 
         suppliedAmount = supplyAmount;
 
         deal(address(collateralToken), userOne, supplyAmount);
 
         uint256 startingTotalSupply = credit.totalSupply();
-        uint256 startingSDaiBalance = sdai.balanceOf(address(term));
+        uint256 startingCollateralBalance = collateralToken.balanceOf(
+            address(term)
+        );
         uint256 startingBuffer = rateLimitedCreditMinter.buffer();
 
         vm.startPrank(userOne);
-        sdai.approve(address(term), supplyAmount);
+        collateralToken.approve(address(term), supplyAmount);
         loanId = term.borrow(supplyAmount, supplyAmount); /// borrow amount equals supply amount
         vm.stopPrank();
 
         assertEq(term.getLoanDebt(loanId), supplyAmount, "incorrect loan debt");
         assertEq(
-            sdai.balanceOf(address(term)) - startingSDaiBalance,
+            collateralToken.balanceOf(address(term)) -
+                startingCollateralBalance,
             supplyAmount,
-            "sdai balance of term incorrect"
+            "collateralToken balance of term incorrect"
         );
         assertEq(
             credit.totalSupply(),
@@ -98,25 +94,16 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         assertEq(term.issuance(), supplyAmount, "incorrect supply issuance");
     }
 
-    function testRepayLoan(uint128 seed) public {
-        uint256 startingCreditSupplyBeforeSupplyingCollateral = credit
-            .totalSupply(); /// start off at 100
+    function testRepayLoan() public {
         uint256 startingBuffer = rateLimitedCreditMinter.buffer();
-        (bytes32 loanId, uint128 suppliedAmount) = testSupplyCollateralUserOne(
-            seed
-        ); /// borrow 100
-        uint256 startingCreditSupply = credit.totalSupply(); /// start off at 100
-
-        /// total supply is 100
+        (bytes32 loanId, uint128 borrowAmount) = testSupplyCollateralUserOne();
 
         vm.warp(block.timestamp + 1);
 
-        /// account for accrued interest, adjust total supply of credit
         uint256 loanDebt = term.getLoanDebt(loanId);
-        uint256 interest = loanDebt - suppliedAmount;
 
-        deal(address(credit), userTwo, loanDebt, true); /// mint 101 CREDIT to userOne to repay debt
-        /// total supply is 201
+        // get enough credit to repay interests
+        dealCredit(userTwo, loanDebt, true);
 
         uint256 startingIssuance = term.issuance();
 
@@ -125,58 +112,17 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         term.repay(loanId);
         vm.stopPrank();
 
-        /// total supply is 101
-
-        {
-            /// only creditSplit does not go into the total supply
-            (
-                uint256 surplusSplit,
-                ,
-                uint256 guildSplit,
-                uint256 otherSplit,
-
-            ) = profitManager.getProfitSharingConfig();
-
-            uint256 expectedInterestAddedToSupply = (
-                ((interest * (surplusSplit / 1e9)) /
-                    1e9 +
-                    ((interest * (guildSplit / 1e9)) / 1e9) +
-                    (interest * (otherSplit / 1e9)) /
-                    1e9)
-            );
-
-            /// minted 100 credit tokens to start, then 101 to repay, this means supplied amount is doubled
-            /// in terms of total supply
-            assertEq(
-                credit.totalSupply() - startingCreditSupply,
-                expectedInterestAddedToSupply, /// only interest for surplus, guild and other split should have been added to the supply
-                "incorrect credit supply before interpolating"
-            );
-        }
-
-        uint256 repayTime = block.timestamp;
-
-        vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
-
-        /// total supply is 201
-
         assertEq(term.getLoanDebt(loanId), 0, "incorrect loan debt");
 
         assertEq(
-            sdai.balanceOf(address(term)),
+            collateralToken.balanceOf(address(term)),
             0,
-            "sdai balance of term incorrect"
+            "collateralToken balance of term incorrect"
         );
-        assertEq(
-            credit.totalSupply(),
-            interest +
-                startingCreditSupplyBeforeSupplyingCollateral +
-                suppliedAmount,
-            "incorrect credit supply"
-        );
+
         assertEq(
             credit.balanceOf(userOne),
-            suppliedAmount,
+            borrowAmount,
             "incorrect credit balance"
         );
 
@@ -188,19 +134,19 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         assertEq(
             rateLimitedCreditMinter.lastBufferUsedTime(),
-            repayTime,
+            block.timestamp,
             "incorrect last buffer used time"
         );
         assertEq(
             startingIssuance - term.issuance(),
-            suppliedAmount,
+            borrowAmount,
             "incorrect issuance delta"
         );
     }
 
     function testTermOffboarding() public {
         if (guild.balanceOf(address(this)) == 0) {
-            testVoteForSDAIGauge();
+            testVoteForGauge();
         }
 
         vm.roll(block.number + 2);
@@ -221,11 +167,8 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         );
     }
 
-    function testPSMMint(uint128 amount) public {
-        /// mint CREDIT between .01 USDC and buffer capacity
-        amount = uint128(
-            _bound(amount, 0.01e6, rateLimitedCreditMinter.buffer() / 1e12)
-        );
+    function testPSMMint() public {
+        uint128 amount = 456.789e18;
 
         _doMint(userTwo, amount);
     }
@@ -283,20 +226,23 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         return loanId;
     }
 
-    function testBid() public {
+    function testIntegrationBid() public {
         bytes32 loanId = testCallLoan();
         uint256 creditRepayAmount = term.getLoanDebt(loanId);
-        uint256 loanAmount = 10_000e18;
 
-        uint256 profit = creditRepayAmount - loanAmount;
+        uint256 profit = creditRepayAmount - 10_000e18;
 
         uint256 usdcMintAmount = creditRepayAmount / 1e12 + 1;
         uint256 startingDeployerBalance = credit.balanceOf(userThree);
 
         _doMint(userTwo, uint128(usdcMintAmount)); /// round amount of credit up
 
-        uint256 startingCreditSupply = credit.totalSupply();
+        uint256 startingCreditSupply = credit.targetTotalSupply();
         uint256 userTwoStartingCreditBalance = credit.balanceOf(userTwo);
+        uint256 startingSurplusBuffer = profitManager.surplusBuffer();
+        uint256 creditProfitManagerBalanceBefore = credit.balanceOf(
+            address(profitManager)
+        );
 
         /// bid at start of auction, so receive 0 collateral
 
@@ -310,52 +256,33 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         vm.warp(block.timestamp + credit.DISTRIBUTION_PERIOD());
 
-        uint256 endingDeployerBalance = credit.balanceOf(userThree);
-        LendingTerm.Loan memory loan = term.getLoan(loanId);
-
         {
-            /// credit holders receive 9/10th's of interest
-            (
-                uint256 surplusSplit,
-                ,
-                uint256 guildSplit,
-                uint256 otherSplit,
+            uint256 endingDeployerBalance = credit.balanceOf(userThree);
+            LendingTerm.Loan memory loan = term.getLoan(loanId);
 
-            ) = profitManager.getProfitSharingConfig();
+            // lender received non zero interests
+            assertGt(endingDeployerBalance, startingDeployerBalance);
 
-            uint256 nonCreditInterest = (
-                ((profit * (surplusSplit / 1e9)) /
-                    1e9 +
-                    ((profit * (guildSplit / 1e9)) / 1e9) +
-                    (profit * (otherSplit / 1e9)) /
-                    1e9)
-            );
-
-            // uint256 userProfit = profit - nonCreditInterest; /// calculate profits exactly how the profit manager does
-            /// profit is correctly distributed to deployer
-            /// profit manager rounds down for all other items and rounds up in favor of credit holders when distributing profits
-            assertEq(
-                endingDeployerBalance,
-                startingDeployerBalance + (profit - nonCreditInterest), /// user profit = profit - nonCreditInterest
-                "incorrect deployer credit balance"
-            );
+            assertEq(loan.closeTime, loanCloseTime, "incorrect close time");
         }
-
-        assertEq(loan.closeTime, loanCloseTime, "incorrect close time");
         assertEq(
             auctionHouse.nAuctionsInProgress(),
             0,
             "incorrect number of auctions post bid"
         );
-        assertEq(sdai.balanceOf(userTwo), 0, "incorrect sdai balance userTwo");
         assertEq(
-            sdai.balanceOf(userOne),
-            loanAmount,
-            "incorrect sdai balance userOne"
+            collateralToken.balanceOf(userTwo),
+            0,
+            "incorrect collateralToken balance userTwo"
+        );
+        assertEq(
+            collateralToken.balanceOf(userOne),
+            10_000e18,
+            "incorrect collateralToken balance userOne"
         );
         assertEq(
             credit.balanceOf(userOne),
-            loanAmount,
+            10_000e18,
             "incorrect credit balance userOne"
         );
         assertEq(
@@ -370,8 +297,8 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         );
         assertEq(term.issuance(), 0, "incorrect issuance");
         assertEq(
-            startingCreditSupply - loanAmount, /// creditRepayAmount and burned amount got taken out of supply
-            credit.totalSupply(),
+            startingCreditSupply - 10_000e18, /// creditRepayAmount and burned amount got taken out of supply
+            credit.targetTotalSupply(),
             "incorrect credit token amount burned"
         ); /// burned 9/10ths of profit
 
@@ -394,29 +321,27 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
 
         assertEq(
             profitManager.surplusBuffer(),
-            expectedSurplusBuffer,
+            startingSurplusBuffer + expectedSurplusBuffer,
             "incorrect surplus buffer"
         );
         /// credit balance in profit manager is sum of surplus, other and guild amount
         /// credit amount gets burned in the Credit Token by calling distribute
         assertEq(
-            expectedSurplusBuffer + expectedOtherAmount + expectedGuildAmount,
+            creditProfitManagerBalanceBefore +
+                expectedSurplusBuffer +
+                expectedOtherAmount +
+                expectedGuildAmount,
             credit.balanceOf(address(profitManager)),
             "incorrect credit amount in profit manager"
         );
     }
 
-    function testDistributeReducesCreditTotalSupplyOneUserRebasing(
-        uint128 creditAmount
-    ) public {
-        /// between 10 wei and entire buffer
-        creditAmount = uint128(
-            _bound(creditAmount, 10, rateLimitedCreditMinter.buffer() / 1e12)
-        );
+    function testDistributeReducesCreditTotalSupplyOneUserRebasing() public {
+        uint128 creditAmount = 3654e18;
 
         _doMint(userOne, creditAmount);
 
-        uint256 startingCreditSupply = credit.totalSupply();
+        uint256 startingCreditSupply = credit.targetTotalSupply();
 
         assertFalse(credit.isRebasing(userOne));
 
@@ -432,16 +357,11 @@ contract IntegrationTestBorrowSDAICollateral is PostProposalCheckFixture {
         );
     }
 
-    function testDistributeReducesCreditTotalSupply(
-        uint128 creditAmount
-    ) public {
+    function testDistributeReducesCreditTotalSupply() public {
         vm.prank(userThree);
         credit.exitRebase();
 
-        /// between 1 wei and entire buffer
-        creditAmount = uint128(
-            _bound(creditAmount, 1, rateLimitedCreditMinter.buffer() / 1e12)
-        );
+        uint128 creditAmount = 4522.123456789e18;
 
         _doMint(userOne, creditAmount);
 

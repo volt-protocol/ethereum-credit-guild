@@ -8,7 +8,7 @@ Dominant lending protocols like MakerDAO, Aave, and Compound rely on trusted ora
 
 Recent attempts to address these problems involve isolated markets, helping to silo risk but fragmenting liquidity, as well as peer to peer markets, which remove trust assumptions but impose complexity upon users.
 
-The Ethereum Credit Guild seeks to strike a new middle ground between honest-majority systems and pure peer to peer lending. Incentive alignment and appropriate checks and balances allow saving and credit operations without relying on trusted third parties, and responding on demand to changes in the market through an open parameter control process. The system makes an **honest minority assumption**, and if you possess sufficient tokens to constitute that minority, requires no trust assumptions at all. Its failure mode is to safely end lending operations (with borrowers compensated for the inconvenience), and one or several new iterations can be started with their own ownership distributions.
+The Ethereum Credit Guild seeks to strike a new middle ground between honest-majority systems and pure peer to peer lending. Incentive alignment and appropriate checks and balances allow saving and credit operations without relying on trusted third parties, and responding on demand to changes in the market through an open parameter control process. The system makes an **honest minority assumption**, and if you possess sufficient tokens to constitute that minority, requires no trust assumptions at all. Its failure mode is to safely end lending operations, and one or several new iterations can be started with their own ownership distributions.
 
 We hope to see a diversity of markets applying the same core principles as this the v1 market described in this document, as well as continued development of the core technology, especially in regards to scaling.
 
@@ -114,7 +114,7 @@ The deployment script of the protocol, located in `test/proposals/gips/GIP_0.sol
 | `loan/SimplePSM.sol` | 99 | [PSM_USDC](https://sepolia.etherscan.io/address/0x66839a9a16beba26af1c717e9c1d604dff9d91f7#code) | Used to maintain peg between credit tokens and a reference asset |
 | `loan/SurplusGuildMinter.sol` | 222  | [SURPLUS_GUILD_MINTER](https://sepolia.etherscan.io/address/0x3b5b95249b0a598a4347be4c2736ad4eb877b16d#code) | Used to provide first-loss capital in credit tokens to borrow `GUILD` and participate in the gauge system without exposure to `GUILD` token price |
 | `rate-limits/RateLimitedMinter.sol` | 36 | [RATE_LIMITED_GUILD_MINTER](https://sepolia.etherscan.io/address/0xa29b96371dec4edaac637ee721c16046ee0b7dff#code), [RATE_LIMITED_CREDIT_MINTER](https://sepolia.etherscan.io/address/0xc8197e8b9ffe1039761f56c41c6ce9cbc7c2d1d9#code) | Implements limitations on `GUILD` and credit tokens minting |
-| `utils/RateLimitedV2.sol` | 98 | n/a | Abstract class util for rate limits |
+| `rate-limits/RateLimitedV2.sol` | 98 | n/a | Abstract class util for rate limits |
 
 Total SLOC: 3739
 
