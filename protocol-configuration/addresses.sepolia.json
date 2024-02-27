@@ -36,6 +36,14 @@
     "name": "ERC20_SDAI"
   },
   {
+    "addr": "0xAaf5C19d38646d3f7D70F1C490AA987b85786e21",
+    "name": "GATEWAY"
+  },
+  {
+    "addr": "0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008",
+    "name": "UNISWAP_ROUTER"
+  },
+  {
     "addr": "0x8738c00828c8e6883326ea5ba104cacff95808e0",
     "name": "PROFIT_MANAGER"
   },
