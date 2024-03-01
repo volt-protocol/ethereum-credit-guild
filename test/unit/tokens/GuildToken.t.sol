@@ -272,7 +272,8 @@ contract GuildTokenUnitTest is ECGTest {
         // cannot do movements anymore
         vm.expectRevert("ERC20MultiVotes: delegate lockup period");
         token.transfer(other, 1);
-        vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        // vm.expectRevert("ERC20MultiVotes: delegate lockup period");
+        // burning can now be done during lockup period
         token.burn(1);
         token.approve(other, 1);
         vm.prank(other);
