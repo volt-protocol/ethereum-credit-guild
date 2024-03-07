@@ -93,7 +93,7 @@ contract ExitQueuePSM is SimplePSM {
     function withdrawTicket(
         uint256 amount,
         uint64 feePct,
-        uint64 timestamp
+        uint256 timestamp
     ) public {
         require(
             timestamp + MIN_WITHDRAW_DELAY < block.timestamp,
@@ -104,7 +104,7 @@ contract ExitQueuePSM is SimplePSM {
             ExitQueueTicket({
                 amountRemaining: amount,
                 owner: msg.sender,
-                timestamp: timestamp,
+                timestamp: uint64(timestamp),
                 feePercent: feePct
             })
         );
@@ -121,13 +121,16 @@ contract ExitQueuePSM is SimplePSM {
             "ExitQueuePSM: no amount to withdraw"
         );
 
+        // here we don't delete the ticket in the tickets mapping so that
+        // the delete can be done during the mint to get gas refund to the minter
+        uint256 amountToSend = storedTicket.amountRemaining;
         storedTicket.amountRemaining = 0;
-        ERC20(credit).safeTransfer(msg.sender, storedTicket.amountRemaining);
+        ERC20(credit).safeTransfer(msg.sender, amountToSend);
     }
 
     function enterExitQueue(uint256 creditAmount, uint64 feePct) public {
         require(creditAmount >= MIN_AMOUNT, "ExitQueuePSM: amount too low");
-        require(feePct <= 1e18, "ExitQueuePSM: max fee is 100%");
+        require(feePct < 1e18, "ExitQueuePSM: fee should be < 100%");
 
         ExitQueueTicket memory ticket = ExitQueueTicket({
             amountRemaining: creditAmount,
@@ -148,15 +151,15 @@ contract ExitQueuePSM is SimplePSM {
         // save the exit queue ticket to the tickets mapping
         tickets[ticketId] = ticket;
 
-        if (feePct == 0) {
-            // no fees, push to the back of the queue
+        if (feePct == 0 || queue.empty()) {
+            // no fees or queue empty, push to the back of the queue
             queue.pushBack(ticketId);
         } else {
             bytes32 frontTicketId = queue.front();
             ExitQueueTicket memory frontTicket = tickets[frontTicketId];
             require(
                 frontTicket.feePercent < feePct,
-                "ExitQueuePSM: Can only outbid current high bidder"
+                "ExitQueuePSM: Can only outdiscount current high discounter"
             );
 
             queue.pushFront(ticketId);
@@ -175,18 +178,15 @@ contract ExitQueuePSM is SimplePSM {
     function _mint(
         address to,
         uint256 amountIn
-    ) internal override returns (uint256 amountOut) {
+    ) internal override returns (uint256 targetAmountOut) {
         if (queue.empty()) {
             return super._mint(to, amountIn);
         }
 
-        uint256 creditMultiplier = ProfitManager(profitManager)
-            .creditMultiplier();
-
-        amountOut = (amountIn * decimalCorrection * 1e18) / creditMultiplier;
+        targetAmountOut = getMintAmountOut(amountIn);
         uint256 currentAmountOut = 0;
         uint256 totalAmountInCost = 0;
-        uint256 amountOutRemaining = amountOut;
+        uint256 amountOutRemaining = targetAmountOut;
 
         while (amountOutRemaining > 0 && !queue.empty()) {
             // get the first item in the exit queue
@@ -204,20 +204,12 @@ contract ExitQueuePSM is SimplePSM {
 
             frontTicket.amountRemaining -= amountFromTicket;
 
-            if (frontTicket.amountRemaining == 0) {
-                // remove ticketId from the queue
-                queue.popFront();
-                // get a bit of gas refund
-                delete tickets[frontTicketId];
-            }
-
             // compute the pegToken price for this amount of tokens, using the discounted value
-            uint256 realAmountInCost = (((amountFromTicket * creditMultiplier) /
-                1e18 /
-                decimalCorrection) * discount) / 1e18;
+            uint256 realAmountInCost = (getRedeemAmountOut(amountFromTicket) *
+                discount) / 1e18;
 
             currentAmountOut += amountFromTicket;
-            amountOutRemaining = amountOut - currentAmountOut;
+            amountOutRemaining = targetAmountOut - currentAmountOut;
 
             totalAmountInCost += realAmountInCost;
 
@@ -227,36 +219,34 @@ contract ExitQueuePSM is SimplePSM {
                 frontTicket.owner,
                 realAmountInCost
             );
+
+            // if ticket completely drained, remove from the queue and the tickets mapping
+            if (frontTicket.amountRemaining == 0) {
+                queue.popFront();
+                // get a bit of gas refund
+                delete tickets[frontTicketId];
+            }
         }
 
         // check if the currentAmountOut (from the exitQueue) is enough
         // for the user mint
-        if (currentAmountOut == amountOut) {
+        if (currentAmountOut == targetAmountOut) {
             // if so, just send the token as the user would have already paid the
             // pegToken to exitQueue owner(s)
-            ERC20(credit).safeTransfer(to, amountOut);
+            ERC20(credit).safeTransfer(to, currentAmountOut);
         } else {
             if (currentAmountOut > 0) {
+                // send the credits obtained from the exit queue, if any
                 ERC20(credit).safeTransfer(to, currentAmountOut);
             }
 
-            uint256 amountOutLeftToMint = amountOut - currentAmountOut;
-            uint256 amountInCost = ((amountOutLeftToMint * creditMultiplier) /
-                1e18 /
-                decimalCorrection);
-            totalAmountInCost += amountInCost;
-
-            // ensure not spending more than amountIn
-            require(totalAmountInCost <= amountIn, "");
-
-            pegTokenBalance += amountInCost;
-            ERC20(pegToken).safeTransferFrom(
-                msg.sender,
-                address(this),
-                amountInCost
+            // compute the amountIn using targetAmountOut minus currentAmountOut
+            // targetAmountOut being the amount the user needs, i.e the total amount to mint
+            // and currentAmountOut is the amount gotten from the exit queue
+            uint256 amountInToMint = getRedeemAmountOut(
+                targetAmountOut - currentAmountOut
             );
-            CreditToken(credit).mint(to, amountOutLeftToMint);
-            emit Mint(block.timestamp, to, amountInCost, amountOutLeftToMint);
+            super._mint(to, amountInToMint);
         }
     }
 

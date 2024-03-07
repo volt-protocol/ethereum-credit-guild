@@ -99,6 +99,8 @@ contract ExitQueuePSMUnitTest is ECGTest {
     // - mint moves a number of tokens equal to getMintAmountOut() i/o
     // - redeem moves a number of token equal to getRedeemAmountOut() i/o
     // - rounding errors are within 1 wei for a mint/redeem round-trip
+    // same test as the simplePSM exactly, checks that when the queue is empty
+    // the contracts performs just like the SimplePSM
     function testMintRedeem(uint256 input) public {
         uint256 mintIn = (input % 1e15) + 1; // [1, 1_000_000_000e6]
 
@@ -146,6 +148,8 @@ contract ExitQueuePSMUnitTest is ECGTest {
     }
 
     // test mintAndEnterRebase
+    // same test as the simplePSM exactly, checks that when the queue is empty
+    // the contracts performs just like the SimplePSM
     function testMintAndEnterRebase() public {
         uint256 mintIn = 20_000e6;
 
@@ -174,6 +178,11 @@ contract ExitQueuePSMUnitTest is ECGTest {
         psm.mintAndEnterRebase(mintIn);
     }
 
+    // this tests 3 successives enterExitQueue()
+    // the first with 100 credits and 0 fee
+    // the second with 200 credits and 10% fee
+    // the third with 300 credits and 0 fee
+    // and this checks that the 200 credit ticket is the first even after the third ticket arrived
     function testEnterExitQueue(uint256 input) public {
         uint256 creditAmount = (input % 1e15) + MIN_AMOUNT; // [MIN_AMOUNT, 1_000_000_000e6]
 
@@ -276,6 +285,219 @@ contract ExitQueuePSMUnitTest is ECGTest {
         assertEq(psm.getFirstTicket().amountRemaining, secondAmount);
         assertEq(psm.getQueueLength(), 3);
         assertEq(psm.getTicketById(thirdTicketId).amountRemaining, thirdAmount);
+    }
+
+    function testCannotEnterExitQueueWithAmountTooLow() public {
+        credit.mint(address(this), 1);
+        credit.approve(address(psm), 1);
+        vm.expectRevert("ExitQueuePSM: amount too low");
+        psm.enterExitQueue(1, 0);
+    }
+
+    function testCannotEnterExitQueueWithFeeHigherThan100Pct() public {
+        credit.mint(address(this), MIN_AMOUNT);
+        credit.approve(address(psm), MIN_AMOUNT);
+        vm.expectRevert("ExitQueuePSM: fee should be < 100%");
+        psm.enterExitQueue(MIN_AMOUNT, 1e18);
+    }
+
+    // test that you cannot create two ticket in the same block (with same timestamp)
+    // ensuring it would not make the internal accounting broken
+    function testCannotCreateSameTicketTwice() public {
+        credit.mint(address(this), 2 * MIN_AMOUNT);
+        credit.approve(address(psm), 2 * MIN_AMOUNT);
+        psm.enterExitQueue(MIN_AMOUNT, 0);
+        vm.expectRevert("ExitQueuePSM: exit queue ticket already saved");
+        psm.enterExitQueue(MIN_AMOUNT, 0);
+    }
+
+    // test that entering the exit queue with a fee must outbid the front of the queue
+    function testEnterExitQueueWithFeeMustOutdiscountHighest() public {
+        credit.mint(address(this), 2 * MIN_AMOUNT);
+        credit.approve(address(psm), 2 * MIN_AMOUNT);
+
+        // 1. enter the exit queue with 1% fee
+        psm.enterExitQueue(MIN_AMOUNT, 0.01e18);
+
+        // 2. try to enter again with 0.1% fee
+        vm.expectRevert(
+            "ExitQueuePSM: Can only outdiscount current high discounter"
+        );
+        psm.enterExitQueue(MIN_AMOUNT, 0.001e18);
+    }
+
+    function testWithdrawTicketFailBeforeWithdrawDelay() public {
+        credit.mint(address(this), MIN_AMOUNT);
+        credit.approve(address(psm), MIN_AMOUNT);
+
+        // 1. enter the exit queue
+        psm.enterExitQueue(MIN_AMOUNT, 0);
+
+        // 2. try to enter again with 0.1% fee
+        vm.expectRevert("ExitQueuePSM: withdraw delay not elapsed");
+        psm.withdrawTicket(MIN_AMOUNT, 0, block.timestamp);
+    }
+
+    function testWithdrawTicketWorksAfterDelay() public {
+        credit.mint(address(this), MIN_AMOUNT);
+        credit.approve(address(psm), MIN_AMOUNT);
+
+        // 1. enter the exit queue
+        psm.enterExitQueue(MIN_AMOUNT, 0);
+        uint256 enterTimestamp = block.timestamp;
+
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(psm)), MIN_AMOUNT);
+        assertEq(psm.getQueueLength(), 1);
+
+        // wait 100 blocks
+        vm.warp(block.timestamp + (100 * 13));
+        vm.roll(block.number + 100);
+
+        // 2. withdraw ticket
+        psm.withdrawTicket(MIN_AMOUNT, 0, enterTimestamp);
+        assertEq(credit.balanceOf(address(this)), MIN_AMOUNT);
+        assertEq(credit.balanceOf(address(psm)), 0);
+        // ticket is still in the queue, it's normal
+        assertEq(psm.getQueueLength(), 1);
+
+        // cannot withdraw it twice though
+        vm.expectRevert("ExitQueuePSM: no amount to withdraw");
+        psm.withdrawTicket(MIN_AMOUNT, 0, enterTimestamp);
+    }
+
+    function testMintWithAvailableTicket() public {
+        credit.mint(address(this), MIN_AMOUNT);
+        assertEq(credit.totalSupply(), MIN_AMOUNT);
+        credit.approve(address(psm), MIN_AMOUNT);
+
+        assertEq(token.balanceOf(address(this)), 0);
+
+        psm.enterExitQueue(MIN_AMOUNT, 0);
+        bytes32 ticketId = _getTicketId(
+            ExitQueuePSM.ExitQueueTicket({
+                amountRemaining: MIN_AMOUNT,
+                owner: address(this),
+                feePercent: 0,
+                timestamp: uint64(block.timestamp)
+            })
+        );
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(psm)), MIN_AMOUNT);
+        assertEq(psm.getQueueLength(), 1);
+
+        uint256 pegTokenAmount = psm.getRedeemAmountOut(MIN_AMOUNT / 2);
+        // here the exit queue have MIN_AMOUNT credit, will try to mint MIN_AMOUNT / 2
+        address anotherUser = address(456789);
+        token.mint(address(anotherUser), pegTokenAmount);
+        vm.startPrank(anotherUser);
+        token.approve(address(psm), pegTokenAmount);
+        psm.mint(anotherUser, pegTokenAmount);
+        vm.stopPrank();
+
+        // check that there is still a ticket remaining
+        assertEq(psm.getQueueLength(), 1);
+        // check that the ticket now holds MIN_AMOUNT/2 credit
+        assertEq(psm.getTicketById(ticketId).amountRemaining, MIN_AMOUNT / 2);
+        // checks that no new credit have been minted
+        assertEq(credit.totalSupply(), MIN_AMOUNT);
+        // checks that the user in the queue received the peg token
+        assertEq(token.balanceOf(address(this)), pegTokenAmount);
+    }
+
+    function testMintWithAvailableTicketButNotEnough() public {
+        credit.mint(address(this), MIN_AMOUNT);
+        assertEq(credit.totalSupply(), MIN_AMOUNT);
+        credit.approve(address(psm), MIN_AMOUNT);
+
+        assertEq(token.balanceOf(address(this)), 0);
+
+        psm.enterExitQueue(MIN_AMOUNT, 0);
+        uint256 enterTimestamp = block.timestamp;
+        bytes32 ticketId = _getTicketId(
+            ExitQueuePSM.ExitQueueTicket({
+                amountRemaining: MIN_AMOUNT,
+                owner: address(this),
+                feePercent: 0,
+                timestamp: uint64(block.timestamp)
+            })
+        );
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(psm)), MIN_AMOUNT);
+        assertEq(psm.getQueueLength(), 1);
+
+        uint256 delta = 10_000e18;
+
+        uint256 pegTokenAmount = psm.getRedeemAmountOut(MIN_AMOUNT + delta);
+        address anotherUser = address(456789);
+        token.mint(address(anotherUser), pegTokenAmount);
+        vm.startPrank(anotherUser);
+        token.approve(address(psm), pegTokenAmount);
+        psm.mint(anotherUser, pegTokenAmount);
+        vm.stopPrank();
+
+        // check that no ticket remains in the queue
+        assertEq(psm.getQueueLength(), 0);
+        // check that the ticket now deleted (by testing timestamp to be 0)
+        assertEq(psm.getTicketById(ticketId).timestamp, 0);
+        // checks that new credit have been minted
+        assertEq(credit.totalSupply(), MIN_AMOUNT + delta);
+        // checks that the user in the queue received the peg token
+        assertEq(
+            token.balanceOf(address(this)),
+            psm.getRedeemAmountOut(MIN_AMOUNT)
+        );
+
+        // check that the ticket cannot be withdrawn because it has been deleted
+        // wait 100 blocks
+        vm.warp(block.timestamp + (100 * 13));
+        vm.roll(block.number + 100);
+        vm.expectRevert("ExitQueuePSM: cannot find ticket");
+        psm.withdrawTicket(MIN_AMOUNT, 0, enterTimestamp);
+    }
+
+    function testMintWithAvailableTicketWithDiscount() public {
+        credit.mint(address(this), MIN_AMOUNT);
+        assertEq(credit.totalSupply(), MIN_AMOUNT);
+        credit.approve(address(psm), MIN_AMOUNT);
+
+        assertEq(token.balanceOf(address(this)), 0);
+
+        // 10% discount
+        uint64 fee = 0.1e18;
+        psm.enterExitQueue(MIN_AMOUNT, fee);
+        bytes32 ticketId = _getTicketId(
+            ExitQueuePSM.ExitQueueTicket({
+                amountRemaining: MIN_AMOUNT,
+                owner: address(this),
+                feePercent: fee,
+                timestamp: uint64(block.timestamp)
+            })
+        );
+        assertEq(credit.balanceOf(address(this)), 0);
+        assertEq(credit.balanceOf(address(psm)), MIN_AMOUNT);
+        assertEq(psm.getQueueLength(), 1);
+
+        uint256 pegTokenAmount = psm.getRedeemAmountOut(MIN_AMOUNT / 2);
+        // here the exit queue have MIN_AMOUNT credit, will try to mint MIN_AMOUNT / 2
+        address anotherUser = address(456789);
+        token.mint(address(anotherUser), pegTokenAmount);
+        vm.startPrank(anotherUser);
+        token.approve(address(psm), pegTokenAmount);
+        psm.mint(anotherUser, pegTokenAmount);
+        vm.stopPrank();
+
+        // check that there is still a ticket remaining
+        assertEq(psm.getQueueLength(), 1);
+        // check that the ticket now holds MIN_AMOUNT/2 credit
+        assertEq(psm.getTicketById(ticketId).amountRemaining, MIN_AMOUNT / 2);
+        // checks that no new credit have been minted
+        assertEq(credit.totalSupply(), MIN_AMOUNT);
+        // checks that the user in the queue received the peg token for 90% of the value
+        assertEq(
+            token.balanceOf(address(this)),
+            (pegTokenAmount * (1e18 - fee)) / 1e18
+        );
     }
 
     function _getTicketId(
