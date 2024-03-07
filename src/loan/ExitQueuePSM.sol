@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {CoreRef} from "@src/core/CoreRef.sol";
@@ -11,6 +12,8 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {CreditToken} from "@src/tokens/CreditToken.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
+
+import {console} from "@forge-std/console.sol";
 
 /// @notice Variation of the SimplePSM contract that allow users holding CREDIT to enter in the exit queue
 /// to have their CREDIT automatically redeemed when another user mint some CREDIT
@@ -37,7 +40,7 @@ contract ExitQueuePSM is SimplePSM {
         address indexed owner,
         uint256 amount,
         uint64 feePercent,
-        uint64 timestamp,
+        uint256 timestamp,
         bytes32 ticketId
     );
 
@@ -62,16 +65,28 @@ contract ExitQueuePSM is SimplePSM {
         return tickets[frontTicketId];
     }
 
+    function getQueueLength() public view returns (uint256) {
+        return queue.length();
+    }
+
     function getTicketById(
         bytes32 ticketId
     ) public view returns (ExitQueueTicket memory ticket) {
         return tickets[ticketId];
     }
 
-    function getTotalCreditInQueue() public view returns (uint256 totalCredit) {
-        for (uint i = queue._begin; i < queue._end; i++) {
+    function getTotalCreditInQueue()
+        public
+        view
+        returns (uint256 totalCredit, uint256 totalCostPegToken)
+    {
+        for (uint256 i = 0; i < queue.length(); i++) {
             bytes32 ticketId = queue.at(i);
-            totalCredit += tickets[ticketId].amountRemaining;
+            uint256 amount = tickets[ticketId].amountRemaining;
+            uint256 costPegToken = (getRedeemAmountOut(amount) *
+                (1e18 - tickets[ticketId].feePercent)) / 1e18;
+            totalCredit += amount;
+            totalCostPegToken += costPegToken;
         }
     }
 
@@ -85,7 +100,7 @@ contract ExitQueuePSM is SimplePSM {
             "ExitQueuePSM: withdraw delay not elapsed"
         );
 
-        bytes32 memory ticketId = _getTicketId(
+        bytes32 ticketId = _getTicketId(
             ExitQueueTicket({
                 amountRemaining: amount,
                 owner: msg.sender,
@@ -112,24 +127,28 @@ contract ExitQueuePSM is SimplePSM {
 
     function enterExitQueue(uint256 creditAmount, uint64 feePct) public {
         require(creditAmount >= MIN_AMOUNT, "ExitQueuePSM: amount too low");
+        require(feePct <= 1e18, "ExitQueuePSM: max fee is 100%");
 
         ExitQueueTicket memory ticket = ExitQueueTicket({
             amountRemaining: creditAmount,
             owner: msg.sender,
-            timestamp: block.timestamp,
+            timestamp: uint64(block.timestamp),
             feePercent: feePct
         });
 
-        bytes32 memory ticketId = _getTicketId(ticket);
+        bytes32 ticketId = _getTicketId(ticket);
         require(
             tickets[ticketId].timestamp == 0,
             "ExitQueuePSM: exit queue ticket already saved"
         );
 
+        // transfer tokens to the PSM
+        ERC20(credit).safeTransferFrom(msg.sender, address(this), creditAmount);
+
         // save the exit queue ticket to the tickets mapping
         tickets[ticketId] = ticket;
 
-        if (feeTier == 0) {
+        if (feePct == 0) {
             // no fees, push to the back of the queue
             queue.pushBack(ticketId);
         } else {
@@ -153,10 +172,14 @@ contract ExitQueuePSM is SimplePSM {
     }
 
     /// @notice mint `amountOut` CREDIT to address `to` for `amountIn` underlying tokens
-    function mint(
+    function _mint(
         address to,
         uint256 amountIn
-    ) external override whenNotPaused returns (uint256 amountOut) {
+    ) internal override returns (uint256 amountOut) {
+        if (queue.empty()) {
+            return super._mint(to, amountIn);
+        }
+
         uint256 creditMultiplier = ProfitManager(profitManager)
             .creditMultiplier();
 
@@ -189,10 +212,9 @@ contract ExitQueuePSM is SimplePSM {
             }
 
             // compute the pegToken price for this amount of tokens, using the discounted value
-            realAmountInCost =
-                (amountFromTicket * creditMultiplier * discount) /
+            uint256 realAmountInCost = (((amountFromTicket * creditMultiplier) /
                 1e18 /
-                (decimalCorrection * 1e18);
+                decimalCorrection) * discount) / 1e18;
 
             currentAmountOut += amountFromTicket;
             amountOutRemaining = amountOut - currentAmountOut;
@@ -218,9 +240,10 @@ contract ExitQueuePSM is SimplePSM {
                 ERC20(credit).safeTransfer(to, currentAmountOut);
             }
 
-            uint256 amountLeftToMint = amountOut - currentAmountOut;
-            uint256 amountInCost = (amountLeftToMint * creditMultiplier) /
-                (decimalCorrection * 1e18);
+            uint256 amountOutLeftToMint = amountOut - currentAmountOut;
+            uint256 amountInCost = ((amountOutLeftToMint * creditMultiplier) /
+                1e18 /
+                decimalCorrection);
             totalAmountInCost += amountInCost;
 
             // ensure not spending more than amountIn
@@ -232,8 +255,8 @@ contract ExitQueuePSM is SimplePSM {
                 address(this),
                 amountInCost
             );
-            CreditToken(credit).mint(to, amountToMint);
-            emit Mint(block.timestamp, to, amountInCost, amountLeftToMint);
+            CreditToken(credit).mint(to, amountOutLeftToMint);
+            emit Mint(block.timestamp, to, amountInCost, amountOutLeftToMint);
         }
     }
 
