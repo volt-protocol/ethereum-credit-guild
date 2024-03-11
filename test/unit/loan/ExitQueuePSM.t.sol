@@ -326,6 +326,7 @@ contract ExitQueuePSMUnitTest is ECGTest {
         psm.enterExitQueue(MIN_AMOUNT, 0.001e18);
     }
 
+    // tests that you cannot withdraw before waiting for the withdraw delay
     function testWithdrawTicketFailBeforeWithdrawDelay() public {
         credit.mint(address(this), MIN_AMOUNT);
         credit.approve(address(psm), MIN_AMOUNT);
@@ -338,6 +339,7 @@ contract ExitQueuePSMUnitTest is ECGTest {
         psm.withdrawTicket(MIN_AMOUNT, 0, block.timestamp);
     }
 
+    // tests you CAN withdraw your ticket after waiting for the withdraw delay
     function testWithdrawTicketWorksAfterDelay() public {
         credit.mint(address(this), MIN_AMOUNT);
         credit.approve(address(psm), MIN_AMOUNT);
@@ -366,6 +368,12 @@ contract ExitQueuePSMUnitTest is ECGTest {
         psm.withdrawTicket(MIN_AMOUNT, 0, enterTimestamp);
     }
 
+    // tests that you can mint some CREDIT from the exit queue
+    // this tests adds one MIN_AMOUNT ticket to the exit queue
+    // and checks that another user can mint "MIN_AMOUNT / 2" credit
+    // which will result in the ticket remaining in the exit queue, with its amount remaining
+    // being changed. This checks that the user that entered the exit queue received the pegToken
+    // and that the total supply of credit did not change (as no new token was minted)
     function testMintWithAvailableTicket() public {
         credit.mint(address(this), MIN_AMOUNT);
         assertEq(credit.totalSupply(), MIN_AMOUNT);
@@ -405,6 +413,19 @@ contract ExitQueuePSMUnitTest is ECGTest {
         assertEq(token.balanceOf(address(this)), pegTokenAmount);
     }
 
+    // same test as before but with an updated credit multiplier
+    function testMinWithAvailableTicketWithCreditMultiplier() public {
+        _updateCreditMultiplier();
+        testMintWithAvailableTicket();
+    }
+
+    // tests that a user can mint even if the exit queue does not have enough credit
+    // in this test, an exit queue ticket is created, containing MIN_AMOUNT of credit in it
+    // and another user tries to mint MIN_AMOUNT + 10k credit. This checks that the user that entered
+    // the exit queue received the pegToken for the MIN_AMOUNT of credit and that the remaining (10k) was minted
+    // by the PSM. Ensuring the new total supply of CREDIT is now increased by DELTA.
+    // also checks that the exit queue is now empty
+    // also checks that the user who entered the exit queue with its MIN_AMOUNT ticket cannot withdraw it anymore
     function testMintWithAvailableTicketButNotEnough() public {
         credit.mint(address(this), MIN_AMOUNT);
         assertEq(credit.totalSupply(), MIN_AMOUNT);
@@ -456,6 +477,14 @@ contract ExitQueuePSMUnitTest is ECGTest {
         psm.withdrawTicket(MIN_AMOUNT, 0, enterTimestamp);
     }
 
+    // same test as before but with an updated credit multiplier
+    function testMintWithAvailableTicketButNotEnoughWithCreditMultiplier() public {
+        _updateCreditMultiplier();
+        testMintWithAvailableTicketButNotEnough();
+    }
+
+    // tests that when a user enters the exit queue with a discount (here 10%), then the
+    // amount of pegToken used to mint CREDIT is lower than the normal price
     function testMintWithAvailableTicketWithDiscount() public {
         credit.mint(address(this), MIN_AMOUNT);
         assertEq(credit.totalSupply(), MIN_AMOUNT);
@@ -500,6 +529,12 @@ contract ExitQueuePSMUnitTest is ECGTest {
         );
     }
 
+    // same test as before but with an updated credit multiplier
+    function testMintWithAvailableTicketWithDiscountWithCreditMultiplier() public {
+        _updateCreditMultiplier();
+        testMintWithAvailableTicketWithDiscount();
+    }
+
     function _getTicketId(
         ExitQueuePSM.ExitQueueTicket memory ticket
     ) internal pure returns (bytes32 queueTicketId) {
@@ -511,5 +546,15 @@ contract ExitQueuePSMUnitTest is ECGTest {
                 ticket.timestamp
             )
         );
+    }
+
+    // this function updates the credit multiplier so that it reflects a loss of 12%
+    function _updateCreditMultiplier() internal {
+        // update creditMultiplier
+        credit.mint(address(this), 100e18);
+        assertEq(profitManager.creditMultiplier(), 1e18);
+        profitManager.notifyPnL(address(this), -12e18, 0); // 12% loss
+        assertEq(profitManager.creditMultiplier(), 0.88e18);
+        credit.burn(100e18);
     }
 }
