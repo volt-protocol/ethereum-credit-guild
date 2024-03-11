@@ -478,7 +478,9 @@ contract ExitQueuePSMUnitTest is ECGTest {
     }
 
     // same test as before but with an updated credit multiplier
-    function testMintWithAvailableTicketButNotEnoughWithCreditMultiplier() public {
+    function testMintWithAvailableTicketButNotEnoughWithCreditMultiplier()
+        public
+    {
         _updateCreditMultiplier();
         testMintWithAvailableTicketButNotEnough();
     }
@@ -530,7 +532,9 @@ contract ExitQueuePSMUnitTest is ECGTest {
     }
 
     // same test as before but with an updated credit multiplier
-    function testMintWithAvailableTicketWithDiscountWithCreditMultiplier() public {
+    function testMintWithAvailableTicketWithDiscountWithCreditMultiplier()
+        public
+    {
         _updateCreditMultiplier();
         testMintWithAvailableTicketWithDiscount();
     }
