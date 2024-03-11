@@ -117,8 +117,8 @@ contract ExitQueuePSM is SimplePSM {
     /// @notice Withdraws a ticket from the queue.
     /// @dev Parameters are used to determine the ticketId
     /// @param amount The initial amount when creating the ticket (used to generate the ticketId when entering the exit queue)
-    /// @param feePct The fee percentage for the withdrawal
-    /// @param timestamp The timestamp when the withdrawal is allowed
+    /// @param feePct The fee percentage of the ticket
+    /// @param timestamp The timestamp of the ticket creation
     function withdrawTicket(
         uint256 amount,
         uint64 feePct,
