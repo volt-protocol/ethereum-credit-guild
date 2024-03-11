@@ -224,7 +224,6 @@ contract ExitQueuePSM is SimplePSM {
 
         targetAmountOut = getMintAmountOut(amountIn);
         uint256 currentAmountOut = 0;
-        uint256 totalAmountInCost = 0;
         uint256 amountOutRemaining = targetAmountOut;
 
         while (amountOutRemaining > 0 && !queue.empty()) {
@@ -249,8 +248,6 @@ contract ExitQueuePSM is SimplePSM {
 
             currentAmountOut += amountFromTicket;
             amountOutRemaining = targetAmountOut - currentAmountOut;
-
-            totalAmountInCost += realAmountInCost;
 
             // send realAmountInCost to ticket owner
             ERC20(pegToken).safeTransferFrom(
