@@ -7,14 +7,6 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {CoreRef} from "@src/core/CoreRef.sol";
-import {CoreRoles} from "@src/core/CoreRoles.sol";
-import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {CreditToken} from "@src/tokens/CreditToken.sol";
-import {ProfitManager} from "@src/governance/ProfitManager.sol";
-
-import {console} from "@forge-std/console.sol";
-
 /// @notice Variation of the SimplePSM contract that allow users holding CREDIT to enter in the exit queue
 /// to have their CREDIT automatically redeemed when another user mint some CREDIT
 contract ExitQueuePSM is SimplePSM {
