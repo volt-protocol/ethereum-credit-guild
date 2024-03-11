@@ -289,7 +289,9 @@ contract GuildToken is CoreRef, ERC20Burnable, ERC20Gauges, ERC20MultiVotes {
     ) internal virtual override(ERC20, ERC20Gauges, ERC20MultiVotes) {
         _decrementWeightUntilFree(from, amount);
         _decrementVotesUntilFree(from, amount);
-        _checkDelegateLockupPeriod(from);
+        // do not check delegate lockup when burning token
+        // as this can be used to make it impossible for a user to be slashed
+        // _checkDelegateLockupPeriod(from);
         ERC20._burn(from, amount);
     }
 
