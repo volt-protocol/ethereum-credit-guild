@@ -324,15 +324,17 @@ contract GIP_0 is Proposal {
                 1, // gauge type,
                 _lendingTermV1, // implementation
                 _auctionHouse, // auctionHouse
-                LendingTerm.LendingTermParams({
-                    collateralToken: getAddr("ERC20_SDAI"),
-                    maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
-                    interestRate: SDAI_RATE, // 4%
-                    maxDelayBetweenPartialRepay: 0, // no periodic partial repay needed
-                    minPartialRepayPercent: 0, // no minimum size for partial repay
-                    openingFee: 0, // 0%
-                    hardCap: CREDIT_HARDCAP // max 2m CREDIT issued
-                })
+                abi.encode(
+                    LendingTerm.LendingTermParams({
+                        collateralToken: getAddr("ERC20_SDAI"),
+                        maxDebtPerCollateralToken: 1e18, // 1 CREDIT per SDAI collateral + no decimals correction
+                        interestRate: SDAI_RATE, // 4%
+                        maxDelayBetweenPartialRepay: 0, // no periodic partial repay needed
+                        minPartialRepayPercent: 0, // no minimum size for partial repay
+                        openingFee: 0, // 0%
+                        hardCap: CREDIT_HARDCAP // max 2m CREDIT issued
+                    })
+                )
             );
             setAddr("TERM_SDAI_1", termSDAI1);
 
@@ -341,15 +343,17 @@ contract GIP_0 is Proposal {
                     1, // gauge type,
                     _lendingTermV1, // implementation
                     _auctionHouse, // auctionHouse
-                    LendingTerm.LendingTermParams({
-                        collateralToken: getAddr("ERC20_WBTC"),
-                        maxDebtPerCollateralToken: 20000e28, // 20k CREDIT per WBTC collateral + 10 decimals correction
-                        interestRate: 0.06e18, // 6%
-                        maxDelayBetweenPartialRepay: 2629800, // monthly payments
-                        minPartialRepayPercent: 0.005e18, // 6% / 12
-                        openingFee: 0.02e18, // 2%
-                        hardCap: 2_000_000e18 // max 2m CREDIT issued
-                    })
+                    abi.encode(
+                        LendingTerm.LendingTermParams({
+                            collateralToken: getAddr("ERC20_WBTC"),
+                            maxDebtPerCollateralToken: 20000e28, // 20k CREDIT per WBTC collateral + 10 decimals correction
+                            interestRate: 0.06e18, // 6%
+                            maxDelayBetweenPartialRepay: 2629800, // monthly payments
+                            minPartialRepayPercent: 0.005e18, // 6% / 12
+                            openingFee: 0.02e18, // 2%
+                            hardCap: 2_000_000e18 // max 2m CREDIT issued
+                        })
+                    )
                 );
 
                 setAddr("TERM_WBTC_1", termWBTC1);

@@ -184,15 +184,17 @@ contract LendingTermOnboardingUnitTest is ECGTest {
                 1,
                 address(termImplementation),
                 address(auctionHouse),
-                LendingTerm.LendingTermParams({
-                    collateralToken: address(collateral),
-                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                    interestRate: _INTEREST_RATE,
-                    maxDelayBetweenPartialRepay: 123,
-                    minPartialRepayPercent: 456,
-                    openingFee: 789,
-                    hardCap: _HARDCAP
-                })
+                abi.encode(
+                    LendingTerm.LendingTermParams({
+                        collateralToken: address(collateral),
+                        maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                        interestRate: _INTEREST_RATE,
+                        maxDelayBetweenPartialRepay: 123,
+                        minPartialRepayPercent: 456,
+                        openingFee: 789,
+                        hardCap: _HARDCAP
+                    })
+                )
             )
         );
         vm.label(address(term), "term");
@@ -226,154 +228,170 @@ contract LendingTermOnboardingUnitTest is ECGTest {
             1,
             address(this),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 123,
-                minPartialRepayPercent: 456,
-                openingFee: 789,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 123,
+                    minPartialRepayPercent: 456,
+                    openingFee: 789,
+                    hardCap: _HARDCAP
+                })
+            )
         );
-        vm.expectRevert("LendingTermFactory: invalid collateralToken");
+        vm.expectRevert("LendingTerm: invalid collateralToken");
         factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(0), // not a token
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 123,
-                minPartialRepayPercent: 456,
-                openingFee: 789,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(0), // not a token
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 123,
+                    minPartialRepayPercent: 456,
+                    openingFee: 789,
+                    hardCap: _HARDCAP
+                })
+            )
         );
-        vm.expectRevert(
-            "LendingTermFactory: invalid maxDebtPerCollateralToken"
-        );
+        vm.expectRevert("LendingTerm: invalid maxDebtPerCollateralToken");
         factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: 0, // no debt available
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 123,
-                minPartialRepayPercent: 456,
-                openingFee: 789,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: 0, // no debt available
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 123,
+                    minPartialRepayPercent: 456,
+                    openingFee: 789,
+                    hardCap: _HARDCAP
+                })
+            )
         );
-        vm.expectRevert("LendingTermFactory: invalid interestRate");
+        vm.expectRevert("LendingTerm: invalid interestRate");
         factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: 1e18, // 100% APR is too high
-                maxDelayBetweenPartialRepay: 123,
-                minPartialRepayPercent: 456,
-                openingFee: 789,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: 1e18, // 100% APR is too high
+                    maxDelayBetweenPartialRepay: 123,
+                    minPartialRepayPercent: 456,
+                    openingFee: 789,
+                    hardCap: _HARDCAP
+                })
+            )
         );
-        vm.expectRevert(
-            "LendingTermFactory: invalid maxDelayBetweenPartialRepay"
-        );
+        vm.expectRevert("LendingTerm: invalid maxDelayBetweenPartialRepay");
         factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 2 * 365 * 24 * 3600, // 2 years between payments is too long
-                minPartialRepayPercent: 456,
-                openingFee: 789,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 2 * 365 * 24 * 3600, // 2 years between payments is too long
+                    minPartialRepayPercent: 456,
+                    openingFee: 789,
+                    hardCap: _HARDCAP
+                })
+            )
         );
-        vm.expectRevert("LendingTermFactory: invalid minPartialRepayPercent");
+        vm.expectRevert("LendingTerm: invalid minPartialRepayPercent");
         factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 123,
-                minPartialRepayPercent: 1e18, // min repay of 100% is too high
-                openingFee: 789,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 123,
+                    minPartialRepayPercent: 1e18, // min repay of 100% is too high
+                    openingFee: 789,
+                    hardCap: _HARDCAP
+                })
+            )
         );
-        vm.expectRevert("LendingTermFactory: invalid openingFee");
+        vm.expectRevert("LendingTerm: invalid openingFee");
         factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 123,
-                minPartialRepayPercent: 456,
-                openingFee: 1e18, // 100% opening fee is too high
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 123,
+                    minPartialRepayPercent: 456,
+                    openingFee: 1e18, // 100% opening fee is too high
+                    hardCap: _HARDCAP
+                })
+            )
         );
-        vm.expectRevert("LendingTermFactory: invalid hardCap");
+        vm.expectRevert("LendingTerm: invalid hardCap");
         factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 123,
-                minPartialRepayPercent: 456,
-                openingFee: 789,
-                hardCap: 0 // hardCap of 0 makes no debt available
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 123,
+                    minPartialRepayPercent: 456,
+                    openingFee: 789,
+                    hardCap: 0 // hardCap of 0 makes no debt available
+                })
+            )
         );
-        vm.expectRevert("LendingTermFactory: invalid periodic payment params");
+        vm.expectRevert("LendingTerm: invalid periodic payment params");
         factory.createTerm(
             1,
             address(termImplementation),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 0, // incoherence between delay & minPercent
-                minPartialRepayPercent: 0.1e18,
-                openingFee: 789,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 0, // incoherence between delay & minPercent
+                    minPartialRepayPercent: 0.1e18,
+                    openingFee: 789,
+                    hardCap: _HARDCAP
+                })
+            )
         );
-        vm.expectRevert("LendingTermFactory: unknown market");
+        vm.expectRevert("LendingTerm: unknown market");
         factory.createTerm(
             12345,
             address(termImplementation),
             address(auctionHouse),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 123,
-                minPartialRepayPercent: 456,
-                openingFee: 789,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 123,
+                    minPartialRepayPercent: 456,
+                    openingFee: 789,
+                    hardCap: _HARDCAP
+                })
+            )
         );
     }
 
@@ -404,15 +422,17 @@ contract LendingTermOnboardingUnitTest is ECGTest {
                 1,
                 address(termImplementation),
                 address(auctionHouse),
-                LendingTerm.LendingTermParams({
-                    collateralToken: address(collateral),
-                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                    interestRate: _INTEREST_RATE,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: _HARDCAP
-                })
+                abi.encode(
+                    LendingTerm.LendingTermParams({
+                        collateralToken: address(collateral),
+                        maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                        interestRate: _INTEREST_RATE,
+                        maxDelayBetweenPartialRepay: 0,
+                        minPartialRepayPercent: 0,
+                        openingFee: 0,
+                        hardCap: _HARDCAP
+                    })
+                )
             )
         );
         vm.label(address(term), "term");
@@ -547,15 +567,17 @@ contract LendingTermOnboardingUnitTest is ECGTest {
                 1,
                 address(termImplementation),
                 address(auctionHouse),
-                LendingTerm.LendingTermParams({
-                    collateralToken: address(collateral),
-                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                    interestRate: _INTEREST_RATE,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: _HARDCAP
-                })
+                abi.encode(
+                    LendingTerm.LendingTermParams({
+                        collateralToken: address(collateral),
+                        maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                        interestRate: _INTEREST_RATE,
+                        maxDelayBetweenPartialRepay: 0,
+                        minPartialRepayPercent: 0,
+                        openingFee: 0,
+                        hardCap: _HARDCAP
+                    })
+                )
             )
         );
         vm.label(address(term), "term");

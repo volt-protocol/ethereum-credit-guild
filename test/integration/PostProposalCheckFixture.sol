@@ -119,15 +119,17 @@ contract PostProposalCheckFixture is PostProposalCheck {
                 1, // gauge type,
                 getAddr("LENDING_TERM_V1"), // implementation
                 getAddr("AUCTION_HOUSE"), // auctionHouse
-                LendingTerm.LendingTermParams({
-                    collateralToken: address(collateralToken),
-                    maxDebtPerCollateralToken: 1e18,
-                    interestRate: 0.04e18,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: 1e27
-                })
+                abi.encode(
+                    LendingTerm.LendingTermParams({
+                        collateralToken: address(collateralToken),
+                        maxDebtPerCollateralToken: 1e18,
+                        interestRate: 0.04e18,
+                        maxDelayBetweenPartialRepay: 0,
+                        minPartialRepayPercent: 0,
+                        openingFee: 0,
+                        hardCap: 1e27
+                    })
+                )
             )
         );
         vm.startPrank(getAddr("ONBOARD_TIMELOCK"));

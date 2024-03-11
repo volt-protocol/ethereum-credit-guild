@@ -74,15 +74,17 @@ contract AuctionHouseUnitTest is ECGTest {
                 creditMinter: address(rlcm),
                 creditToken: address(credit)
             }),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: 2000e18, // 2000, same decimals
-                interestRate: 0.10e18, // 10% APR
-                maxDelayBetweenPartialRepay: 0,
-                minPartialRepayPercent: 0,
-                openingFee: 0,
-                hardCap: 20_000_000e18 // 20M CREDIT
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: 2000e18, // 2000, same decimals
+                    interestRate: 0.10e18, // 10% APR
+                    maxDelayBetweenPartialRepay: 0,
+                    minPartialRepayPercent: 0,
+                    openingFee: 0,
+                    hardCap: 20_000_000e18 // 20M CREDIT
+                })
+            )
         );
         profitManager.initializeReferences(address(credit), address(guild));
 

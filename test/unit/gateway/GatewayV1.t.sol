@@ -71,49 +71,51 @@ contract UnitTestGatewayV1 is ECGTest {
 
     // dummy functions to be called by the gateway
     uint256 public amountSaved;
+
     function successfulFunction(uint256 amount) public {
         amountSaved = amount;
     }
 
     // mock uniswap router behavior
-    function getAmountsIn(uint256 amountOut, address[] calldata/* path*/)
-        external
-        pure
-        returns (uint256[] memory)
-    {
+    function getAmountsIn(
+        uint256 amountOut,
+        address[] calldata /* path*/
+    ) external pure returns (uint256[] memory) {
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = amountOut;
         amounts[1] = amountOut;
         return amounts;
     }
-    function getAmountsOut(uint256 amountIn, address[] calldata/* path*/)
-        external
-        pure
-        returns (uint256[] memory)
-    {
+
+    function getAmountsOut(
+        uint256 amountIn,
+        address[] calldata /* path*/
+    ) external pure returns (uint256[] memory) {
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = amountIn;
         amounts[1] = amountIn;
         return amounts;
     }
+
     function swapExactTokensForTokens(
         uint256 amountIn,
-        uint256/* amountOutMin*/,
+        uint256 /* amountOutMin*/,
         address[] calldata path,
         address to,
-        uint256/* deadline*/
+        uint256 /* deadline*/
     ) external returns (uint256[] memory) {
         uint256[] memory amounts = new uint256[](2);
         IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
         IERC20(path[1]).transfer(to, amountIn);
         return amounts;
     }
+
     function swapTokensForExactTokens(
         uint256 amountOut,
-        uint256/* amountInMax*/,
+        uint256 /* amountInMax*/,
         address[] calldata path,
         address to,
-        uint256/* deadline*/
+        uint256 /* deadline*/
     ) external returns (uint256[] memory) {
         uint256[] memory amounts = new uint256[](2);
         IERC20(path[0]).transferFrom(msg.sender, address(this), amountOut);
@@ -152,15 +154,17 @@ contract UnitTestGatewayV1 is ECGTest {
                 creditMinter: address(rlcm),
                 creditToken: address(credit)
             }),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: 1e18,
-                interestRate: 0.05e18,
-                maxDelayBetweenPartialRepay: 0,
-                minPartialRepayPercent: 0,
-                openingFee: 0,
-                hardCap: 1e27
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: 1e18,
+                    interestRate: 0.05e18,
+                    maxDelayBetweenPartialRepay: 0,
+                    minPartialRepayPercent: 0,
+                    openingFee: 0,
+                    hardCap: 1e27
+                })
+            )
         );
         psm = new SimplePSM(
             address(core),
