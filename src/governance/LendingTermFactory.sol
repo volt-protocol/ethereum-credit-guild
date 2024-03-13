@@ -109,7 +109,7 @@ contract LendingTermFactory is CoreRef {
         MarketReferences storage references = marketReferences[gaugeType];
         require(
             references.profitManager != address(0),
-            "LendingTerm: unknown market"
+            "LendingTermFactory: unknown market"
         );
 
         bytes32 salt = keccak256(
