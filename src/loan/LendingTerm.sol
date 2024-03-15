@@ -161,7 +161,7 @@ contract LendingTerm is CoreRef {
     function initialize(
         address _core,
         LendingTermReferences calldata _refs,
-        LendingTermParams calldata _params
+        bytes calldata _params
     ) external {
         // can initialize only once
         assert(address(core()) == address(0));
@@ -170,11 +170,63 @@ contract LendingTerm is CoreRef {
         // initialize storage
         _setCore(_core);
         refs = _refs;
-        params = _params;
+        params = abi.decode(_params, (LendingTermParams));
+
+        // check parameters:
+        // must be an ERC20 (maybe, at least it prevents dumb input mistakes)
+        (bool success, bytes memory returned) = params.collateralToken.call(
+            abi.encodeWithSelector(IERC20.totalSupply.selector)
+        );
+        require(
+            success && returned.length == 32,
+            "LendingTerm: invalid collateralToken"
+        );
+
+        require(
+            params.maxDebtPerCollateralToken != 0, // must be able to mint non-zero debt
+            "LendingTerm: invalid maxDebtPerCollateralToken"
+        );
+
+        require(
+            params.interestRate < 1e18, // interest rate [0, 100[% APR
+            "LendingTerm: invalid interestRate"
+        );
+
+        require(
+            params.maxDelayBetweenPartialRepay < YEAR + 1, // periodic payment every [0, 1 year]
+            "LendingTerm: invalid maxDelayBetweenPartialRepay"
+        );
+
+        require(
+            params.minPartialRepayPercent < 1e18, // periodic payment sizes [0, 100[%
+            "LendingTerm: invalid minPartialRepayPercent"
+        );
+
+        require(
+            params.openingFee <= 0.1e18, // open fee expected [0, 10]%
+            "LendingTerm: invalid openingFee"
+        );
+
+        require(
+            params.hardCap != 0, // non-zero hardcap
+            "LendingTerm: invalid hardCap"
+        );
+
+        // if one of the periodic payment parameter is used, both must be used
+        if (
+            params.minPartialRepayPercent != 0 ||
+            params.maxDelayBetweenPartialRepay != 0
+        ) {
+            require(
+                params.minPartialRepayPercent != 0 &&
+                    params.maxDelayBetweenPartialRepay != 0,
+                "LendingTerm: invalid periodic payment params"
+            );
+        }
 
         // events
         emit SetAuctionHouse(block.timestamp, _refs.auctionHouse);
-        emit SetHardCap(block.timestamp, _params.hardCap);
+        emit SetHardCap(block.timestamp, params.hardCap);
     }
 
     /// @notice get references of this term to other protocol contracts

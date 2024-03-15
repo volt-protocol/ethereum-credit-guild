@@ -31,7 +31,7 @@ contract LendingTermUnitTest is ECGTest {
     // LendingTerm params
     uint256 constant _CREDIT_PER_COLLATERAL_TOKEN = 2000e18; // 2000, same decimals
     uint256 constant _INTEREST_RATE = 0.10e18; // 10% APR
-    uint256 constant _MAX_DELAY_BETWEEN_PARTIAL_REPAY = 63115200; // 2 years
+    uint256 constant _MAX_DELAY_BETWEEN_PARTIAL_REPAY = 31557600; // 1 years
     uint256 constant _MIN_PARTIAL_REPAY_PERCENT = 0.2e18; // 20%
     uint256 constant _HARDCAP = 20_000_000e18;
 
@@ -65,15 +65,17 @@ contract LendingTermUnitTest is ECGTest {
                 creditMinter: address(rlcm),
                 creditToken: address(credit)
             }),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
-                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
-                openingFee: 0,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                    minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                    openingFee: 0,
+                    hardCap: _HARDCAP
+                })
+            )
         );
         psm = new SimplePSM(
             address(core),
@@ -168,15 +170,17 @@ contract LendingTermUnitTest is ECGTest {
                 creditMinter: address(rlcm),
                 creditToken: address(credit)
             }),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
-                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
-                openingFee: 0.05e18,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                    minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                    openingFee: 0.05e18,
+                    hardCap: _HARDCAP
+                })
+            )
         );
 
         // can initialize clone
@@ -189,15 +193,17 @@ contract LendingTermUnitTest is ECGTest {
                 creditMinter: address(rlcm),
                 creditToken: address(credit)
             }),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
-                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
-                openingFee: 0.05e18,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                    minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                    openingFee: 0.05e18,
+                    hardCap: _HARDCAP
+                })
+            )
         );
 
         // cannot initialize clone twice
@@ -211,15 +217,17 @@ contract LendingTermUnitTest is ECGTest {
                 creditMinter: address(rlcm),
                 creditToken: address(credit)
             }),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
-                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
-                openingFee: 0.05e18,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                    minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                    openingFee: 0.05e18,
+                    hardCap: _HARDCAP
+                })
+            )
         );
     }
 
@@ -305,15 +313,17 @@ contract LendingTermUnitTest is ECGTest {
         term2.initialize(
             address(core),
             term.getReferences(),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
-                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
-                openingFee: 0.05e18,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                    minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                    openingFee: 0.05e18,
+                    hardCap: _HARDCAP
+                })
+            )
         );
         vm.label(address(term2), "term2");
         guild.addGauge(1, address(term2));
@@ -1648,15 +1658,17 @@ contract LendingTermUnitTest is ECGTest {
         term2.initialize(
             address(core),
             term.getReferences(),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: 0,
-                maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
-                minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
-                openingFee: 0,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: 0,
+                    maxDelayBetweenPartialRepay: _MAX_DELAY_BETWEEN_PARTIAL_REPAY,
+                    minPartialRepayPercent: _MIN_PARTIAL_REPAY_PERCENT,
+                    openingFee: 0,
+                    hardCap: _HARDCAP
+                })
+            )
         );
         assertEq(term2.debtCeiling(), 0);
         vm.label(address(term2), "term2");

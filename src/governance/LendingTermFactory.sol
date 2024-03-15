@@ -52,7 +52,7 @@ contract LendingTermFactory is CoreRef {
         uint256 indexed when,
         uint256 indexed gaugeType,
         address indexed term,
-        LendingTerm.LendingTermParams params
+        bytes params
     );
 
     constructor(address _core, address _guildToken) CoreRef(_core) {
@@ -94,7 +94,7 @@ contract LendingTermFactory is CoreRef {
         uint256 gaugeType,
         address implementation,
         address auctionHouse,
-        LendingTerm.LendingTermParams calldata params
+        bytes calldata lendingTermParams
     ) external returns (address) {
         require(
             implementations[implementation],
@@ -104,57 +104,6 @@ contract LendingTermFactory is CoreRef {
             auctionHouses[auctionHouse],
             "LendingTermFactory: invalid auctionHouse"
         );
-        // must be an ERC20 (maybe, at least it prevents dumb input mistakes)
-        (bool success, bytes memory returned) = params.collateralToken.call(
-            abi.encodeWithSelector(IERC20.totalSupply.selector)
-        );
-        require(
-            success && returned.length == 32,
-            "LendingTermFactory: invalid collateralToken"
-        );
-
-        require(
-            params.maxDebtPerCollateralToken != 0, // must be able to mint non-zero debt
-            "LendingTermFactory: invalid maxDebtPerCollateralToken"
-        );
-
-        require(
-            params.interestRate < 1e18, // interest rate [0, 100[% APR
-            "LendingTermFactory: invalid interestRate"
-        );
-
-        require(
-            // 31557601 comes from the constant LendingTerm.YEAR() + 1
-            params.maxDelayBetweenPartialRepay < 31557601, // periodic payment every [0, 1 year]
-            "LendingTermFactory: invalid maxDelayBetweenPartialRepay"
-        );
-
-        require(
-            params.minPartialRepayPercent < 1e18, // periodic payment sizes [0, 100[%
-            "LendingTermFactory: invalid minPartialRepayPercent"
-        );
-
-        require(
-            params.openingFee <= 0.1e18, // open fee expected [0, 10]%
-            "LendingTermFactory: invalid openingFee"
-        );
-
-        require(
-            params.hardCap != 0, // non-zero hardcap
-            "LendingTermFactory: invalid hardCap"
-        );
-
-        // if one of the periodic payment parameter is used, both must be used
-        if (
-            params.minPartialRepayPercent != 0 ||
-            params.maxDelayBetweenPartialRepay != 0
-        ) {
-            require(
-                params.minPartialRepayPercent != 0 &&
-                    params.maxDelayBetweenPartialRepay != 0,
-                "LendingTermFactory: invalid periodic payment params"
-            );
-        }
 
         // check that references for this market has been set
         MarketReferences storage references = marketReferences[gaugeType];
@@ -164,17 +113,7 @@ contract LendingTermFactory is CoreRef {
         );
 
         bytes32 salt = keccak256(
-            abi.encodePacked(
-                implementation,
-                auctionHouse,
-                params.collateralToken,
-                params.maxDebtPerCollateralToken,
-                params.interestRate,
-                params.maxDelayBetweenPartialRepay,
-                params.minPartialRepayPercent,
-                params.openingFee,
-                params.hardCap
-            )
+            abi.encodePacked(implementation, auctionHouse, lendingTermParams)
         );
         address term = Clones.cloneDeterministic(implementation, salt);
         LendingTerm(term).initialize(
@@ -186,11 +125,11 @@ contract LendingTermFactory is CoreRef {
                 creditMinter: references.creditMinter,
                 creditToken: references.creditToken
             }),
-            params
+            lendingTermParams
         );
         gaugeTypes[term] = gaugeType;
         termImplementations[term] = implementation;
-        emit TermCreated(block.timestamp, gaugeType, term, params);
+        emit TermCreated(block.timestamp, gaugeType, term, lendingTermParams);
         return term;
     }
 }

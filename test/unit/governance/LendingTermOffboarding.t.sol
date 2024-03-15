@@ -84,15 +84,17 @@ contract LendingTermOffboardingUnitTest is ECGTest {
                 creditMinter: address(rlcm),
                 creditToken: address(credit)
             }),
-            LendingTerm.LendingTermParams({
-                collateralToken: address(collateral),
-                maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                interestRate: _INTEREST_RATE,
-                maxDelayBetweenPartialRepay: 0,
-                minPartialRepayPercent: 0,
-                openingFee: 0,
-                hardCap: _HARDCAP
-            })
+            abi.encode(
+                LendingTerm.LendingTermParams({
+                    collateralToken: address(collateral),
+                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                    interestRate: _INTEREST_RATE,
+                    maxDelayBetweenPartialRepay: 0,
+                    minPartialRepayPercent: 0,
+                    openingFee: 0,
+                    hardCap: _HARDCAP
+                })
+            )
         );
 
         // permissions

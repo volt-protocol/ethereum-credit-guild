@@ -37,7 +37,7 @@ contract IntegrationTestOffboardingFlows is PostProposalCheckFixture {
                 factory.gaugeTypes(address(term)),
                 factory.termImplementations(address(term)),
                 term.getReferences().auctionHouse,
-                term.getParameters()
+                abi.encode(term.getParameters())
             )
         );
     }
