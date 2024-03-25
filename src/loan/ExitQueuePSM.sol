@@ -223,7 +223,7 @@ contract ExitQueuePSM is SimplePSM {
         );
     }
 
-    /// @notice mint `amountOut` CREDIT to address `to` for a maximum of`amountIn` underlying tokens
+    /// @notice mint `targetAmountOut` CREDIT to address `to` for a maximum of`amountIn` underlying tokens
     /// It can cost less than amountIn if any tickets in the exit queue have discount fees > 0%
     /// @dev Internal function to mint CREDIT to an address for a given amount of underlying tokens
     /// @param to Address to mint CREDIT to
