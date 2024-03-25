@@ -2,6 +2,8 @@
 pragma solidity 0.8.13;
 
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
+import {CreditToken} from "@src/tokens/CreditToken.sol";
+import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
@@ -99,11 +101,16 @@ contract ExitQueuePSM is SimplePSM {
         view
         returns (uint256 totalCredit, uint256 totalCostPegToken)
     {
+        uint256 creditMultiplier = ProfitManager(profitManager)
+            .creditMultiplier();
+
         for (uint256 i = 0; i < queue.length(); i++) {
             bytes32 ticketId = queue.at(i);
             uint256 amount = _tickets[ticketId].amountRemaining;
-            uint256 costPegToken = (getRedeemAmountOut(amount) *
-                (1e18 - _tickets[ticketId].feePercent)) / 1e18;
+            uint256 costPegToken = (((amount * creditMultiplier) /
+                1e18 /
+                decimalCorrection) * (1e18 - _tickets[ticketId].feePercent)) /
+                1e18;
             totalCredit += amount;
             totalCostPegToken += costPegToken;
         }
@@ -159,7 +166,7 @@ contract ExitQueuePSM is SimplePSM {
         // the delete can be done during the mint (to get gas refund to the minter)
         uint256 amountToSend = storedTicket.amountRemaining;
         storedTicket.amountRemaining = 0;
-        ERC20(credit).safeTransfer(msg.sender, amountToSend);
+        CreditToken(credit).transfer(msg.sender, amountToSend);
         emit ExitQueueUpdate(msg.sender, ticketId, block.timestamp, 0, feePct);
     }
 
@@ -186,7 +193,11 @@ contract ExitQueuePSM is SimplePSM {
         );
 
         // transfer tokens to the PSM
-        ERC20(credit).safeTransferFrom(msg.sender, address(this), creditAmount);
+        CreditToken(credit).transferFrom(
+            msg.sender,
+            address(this),
+            creditAmount
+        );
 
         // save the exit queue ticket to the tickets mapping
         _tickets[ticketId] = ticket;
@@ -228,6 +239,9 @@ contract ExitQueuePSM is SimplePSM {
             return super._mint(to, amountIn);
         }
 
+        uint256 creditMultiplier = ProfitManager(profitManager)
+            .creditMultiplier();
+
         targetAmountOut = getMintAmountOut(amountIn);
         uint256 currentAmountOut = 0;
         uint256 amountOutRemaining = targetAmountOut;
@@ -257,8 +271,9 @@ contract ExitQueuePSM is SimplePSM {
             );
 
             // compute the pegToken price for this amount of tokens, using the discounted value
-            uint256 realAmountInCost = (getRedeemAmountOut(amountFromTicket) *
-                discount) / 1e18;
+            uint256 realAmountInCost = (((amountFromTicket * creditMultiplier) /
+                1e18 /
+                decimalCorrection) * discount) / 1e18;
 
             currentAmountOut += amountFromTicket;
             amountOutRemaining = targetAmountOut - currentAmountOut;
@@ -282,19 +297,21 @@ contract ExitQueuePSM is SimplePSM {
         if (currentAmountOut == targetAmountOut) {
             // if so, just send the token as the user would have already paid the
             // pegToken to exitQueue owner(s)
-            ERC20(credit).safeTransfer(to, currentAmountOut);
+            CreditToken(credit).transfer(to, currentAmountOut);
         } else {
             if (currentAmountOut > 0) {
                 // send the credits obtained from the exit queue, if any
-                ERC20(credit).safeTransfer(to, currentAmountOut);
+                CreditToken(credit).transfer(to, currentAmountOut);
             }
 
             // compute the amountIn using targetAmountOut minus currentAmountOut
             // targetAmountOut being the amount the user needs, i.e the total amount to mint
             // and currentAmountOut is the amount gotten from the exit queue
-            uint256 amountInToMint = getRedeemAmountOut(
-                targetAmountOut - currentAmountOut
-            );
+            uint256 amountInToMint = ((targetAmountOut - currentAmountOut) *
+                creditMultiplier) /
+                1e18 /
+                decimalCorrection;
+
             super._mint(to, amountInToMint);
         }
     }
