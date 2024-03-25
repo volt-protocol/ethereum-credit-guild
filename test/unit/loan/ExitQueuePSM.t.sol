@@ -320,9 +320,7 @@ contract ExitQueuePSMUnitTest is ECGTest {
         psm.enterExitQueue(MIN_AMOUNT, 0.01e18);
 
         // 2. try to enter again with 0.1% fee
-        vm.expectRevert(
-            "ExitQueuePSM: Can only outdiscount current high discounter"
-        );
+        vm.expectRevert("ExitQueuePSM: can only undercut queue front");
         psm.enterExitQueue(MIN_AMOUNT, 0.001e18);
     }
 

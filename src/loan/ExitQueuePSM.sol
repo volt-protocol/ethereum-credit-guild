@@ -208,7 +208,7 @@ contract ExitQueuePSM is SimplePSM {
             ExitQueueTicket memory frontTicket = getFirstTicket();
             require(
                 frontTicket.feePercent < feePct,
-                "ExitQueuePSM: Can only outdiscount current high discounter"
+                "ExitQueuePSM: can only undercut queue front"
             );
 
             queue.pushFront(ticketId);
