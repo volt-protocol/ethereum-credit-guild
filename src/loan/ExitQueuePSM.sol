@@ -74,10 +74,9 @@ contract ExitQueuePSM is SimplePSM {
     }
 
     /// @notice Retrieves the first ticket in the queue
-    /// @dev Utility function, to be used externally
     /// @return ticket The first ticket in the exit queue
     function getFirstTicket()
-        external
+        public
         view
         returns (ExitQueueTicket memory ticket)
     {
@@ -206,8 +205,7 @@ contract ExitQueuePSM is SimplePSM {
             // no fees or queue empty, push to the back of the queue
             queue.pushBack(ticketId);
         } else {
-            bytes32 frontTicketId = queue.front();
-            ExitQueueTicket memory frontTicket = _tickets[frontTicketId];
+            ExitQueueTicket memory frontTicket = getFirstTicket();
             require(
                 frontTicket.feePercent < feePct,
                 "ExitQueuePSM: Can only outdiscount current high discounter"
