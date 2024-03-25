@@ -44,12 +44,12 @@ contract ExitQueuePSM is SimplePSM {
     /// @param feePercent Fee percentage for the redemption
     /// @param timestamp Timestamp when the ticket is created
     /// @param ticketId Unique identifier for the exit queue ticket
-    event EnterExitQueue(
+    event ExitQueueUpdate(
         address indexed owner,
+        bytes32 indexed ticketId,
+        uint256 indexed timestamp,
         uint256 amount,
-        uint64 feePercent,
-        uint256 timestamp,
-        bytes32 ticketId
+        uint64 feePercent
     );
 
     /// @notice Constructor for ExitQueuePSM
@@ -160,6 +160,7 @@ contract ExitQueuePSM is SimplePSM {
         uint256 amountToSend = storedTicket.amountRemaining;
         storedTicket.amountRemaining = 0;
         ERC20(credit).safeTransfer(msg.sender, amountToSend);
+        emit ExitQueueUpdate(msg.sender, ticketId, block.timestamp, 0, feePct);
     }
 
     /// @notice Enters the exit queue with a ticket
@@ -204,12 +205,12 @@ contract ExitQueuePSM is SimplePSM {
             queue.pushFront(ticketId);
         }
 
-        emit EnterExitQueue(
+        emit ExitQueueUpdate(
             msg.sender,
-            creditAmount,
-            feePct,
+            ticketId,
             block.timestamp,
-            ticketId
+            creditAmount,
+            feePct
         );
     }
 
@@ -246,6 +247,14 @@ contract ExitQueuePSM is SimplePSM {
                 : frontTicket.amountRemaining;
 
             frontTicket.amountRemaining -= amountFromTicket;
+
+            emit ExitQueueUpdate(
+                msg.sender,
+                frontTicketId,
+                block.timestamp,
+                frontTicket.amountRemaining,
+                frontTicket.feePercent
+            );
 
             // compute the pegToken price for this amount of tokens, using the discounted value
             uint256 realAmountInCost = (getRedeemAmountOut(amountFromTicket) *
