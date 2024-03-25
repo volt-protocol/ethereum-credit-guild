@@ -12,7 +12,12 @@ contract ExitQueuePSM is SimplePSM {
     using SafeERC20 for ERC20;
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
 
+    /// @notice the minimum amount required to enter the exit queue
+    /// this is needed to avoid spamming issues
     uint256 public immutable MIN_AMOUNT;
+
+    /// @notice The delay between a user entering the queue and the same user trying to exit the queue
+    /// this is needed to avoid spamming issues
     uint256 public immutable MIN_WITHDRAW_DELAY;
 
     /// @notice represent a user's ticket in the ExitQueue
