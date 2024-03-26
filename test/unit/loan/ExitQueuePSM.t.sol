@@ -23,6 +23,7 @@ contract ExitQueuePSMUnitTest is ECGTest {
     MockERC20 token;
     ExitQueuePSM psm;
 
+    uint256 ROUNDING_ERROR_AMOUNT = 100;
     uint256 MIN_AMOUNT = 100e18;
     uint256 MIN_DELAY = 100;
 
@@ -42,7 +43,8 @@ contract ExitQueuePSMUnitTest is ECGTest {
             address(credit),
             address(token),
             MIN_AMOUNT,
-            MIN_DELAY
+            MIN_DELAY,
+            ROUNDING_ERROR_AMOUNT
         );
         profitManager.initializeReferences(address(credit), address(guild));
 
@@ -507,8 +509,9 @@ contract ExitQueuePSMUnitTest is ECGTest {
         assertEq(credit.balanceOf(address(psm)), MIN_AMOUNT);
         assertEq(psm.getQueueLength(), 1);
 
-        uint256 pegTokenAmount = psm.getRedeemAmountOut(MIN_AMOUNT / 2);
-        // here the exit queue have MIN_AMOUNT credit, will try to mint MIN_AMOUNT / 2
+        uint256 pegTokenAmount = 50e6;
+        // here the exit queue have MIN_AMOUNT credit,
+        // anotherUser will try to mint with MIN_AMOUNT / 2 pegToken
         address anotherUser = address(456789);
         token.mint(address(anotherUser), pegTokenAmount);
         vm.startPrank(anotherUser);
@@ -516,16 +519,46 @@ contract ExitQueuePSMUnitTest is ECGTest {
         psm.mint(anotherUser, pegTokenAmount);
         vm.stopPrank();
 
+        // with creditMultiplier == 1, minting CREDIT with 50 pegToken
+        // and with an exit queue ticket with 10% discount means that
+        // the amount of CREDIT obtain should be
+        // 50 / ((100 - 10)/100) = 55,5555555555... CREDIT
+        uint256 creditTakenFromTicket = (psm.getMintAmountOut(pegTokenAmount) *
+            1e18) / (1e18 - fee);
+
         // check that there is still a ticket remaining
         assertEq(psm.getQueueLength(), 1);
         // check that the ticket now holds MIN_AMOUNT/2 credit
-        assertEq(psm.getTicketById(ticketId).amountRemaining, MIN_AMOUNT / 2);
-        // checks that no new credit have been minted
-        assertEq(credit.totalSupply(), MIN_AMOUNT);
-        // checks that the user in the queue received the peg token for 90% of the value
         assertEq(
+            psm.getTicketById(ticketId).amountRemaining,
+            MIN_AMOUNT - creditTakenFromTicket
+        );
+        // checks that no new credit have been minted
+        assertApproxEqAbs(
+            credit.totalSupply(),
+            MIN_AMOUNT,
+            ROUNDING_ERROR_AMOUNT * psm.decimalCorrection()
+        );
+
+        // checks that the user in the queue received the full amount of pegToken (minus the rounding error)
+        assertApproxEqAbs(
             token.balanceOf(address(this)),
-            (pegTokenAmount * (1e18 - fee)) / 1e18
+            pegTokenAmount,
+            ROUNDING_ERROR_AMOUNT
+        );
+
+        // checks that the user received more credit than the base price
+        assertGt(
+            credit.balanceOf(anotherUser),
+            psm.getMintAmountOut(pegTokenAmount)
+        );
+
+        // checks that the user received an approx amount of credit
+        // considering the 10% discount
+        assertApproxEqAbs(
+            credit.balanceOf(anotherUser),
+            creditTakenFromTicket,
+            ROUNDING_ERROR_AMOUNT * psm.decimalCorrection()
         );
     }
 

@@ -14,6 +14,11 @@ contract ExitQueuePSM is SimplePSM {
     using SafeERC20 for ERC20;
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
 
+    /// @notice This is the value of "amountIn" that, if remaining, will not be
+    /// taken from the exit queue but using the super._mint() function to avoid
+    /// rounding errors with the possible discounted price of the exit queue tickets
+    uint256 public immutable ROUNDING_ERROR_AMOUNT;
+
     /// @notice the minimum amount required to enter the exit queue
     /// this is needed to avoid spamming issues
     uint256 public immutable MIN_AMOUNT;
@@ -61,16 +66,19 @@ contract ExitQueuePSM is SimplePSM {
     /// @param _pegToken Address of the pegged token
     /// @param _minAmount Minimum amount of CREDIT required to enter the exit queue
     /// @param _minWithdrawDelay Minimum delay required before withdrawing from the exit queue
+    /// @param _roundingErrorAmount The min amount used
     constructor(
         address _core,
         address _profitManager,
         address _credit,
         address _pegToken,
         uint256 _minAmount,
-        uint256 _minWithdrawDelay
+        uint256 _minWithdrawDelay,
+        uint256 _roundingErrorAmount
     ) SimplePSM(_core, _profitManager, _credit, _pegToken) {
         MIN_AMOUNT = _minAmount;
         MIN_WITHDRAW_DELAY = _minWithdrawDelay;
+        ROUNDING_ERROR_AMOUNT = _roundingErrorAmount; // example 100 wei
     }
 
     /// @notice Retrieves the first ticket in the queue
@@ -223,16 +231,17 @@ contract ExitQueuePSM is SimplePSM {
         );
     }
 
-    /// @notice mint `targetAmountOut` CREDIT to address `to` for a maximum of`amountIn` underlying tokens
-    /// It can cost less than amountIn if any tickets in the exit queue have discount fees > 0%
+    /// @notice mint `amountOut` CREDIT to address `to` for `amountIn` underlying tokens
+    /// the amountOut can be superior to the result of 'getMintAmountOut' because if the exit queue
+    /// holds ticket with discount, then the amountIn cost will be lower than previously assumed
     /// @dev Internal function to mint CREDIT to an address for a given amount of underlying tokens
     /// @param to Address to mint CREDIT to
     /// @param amountIn Amount of underlying tokens
-    /// @return targetAmountOut The targeted amount of CREDIT to be minted
+    /// @return amountOut The amount of credit minted
     function _mint(
         address to,
         uint256 amountIn
-    ) internal override returns (uint256 targetAmountOut) {
+    ) internal override returns (uint256 amountOut) {
         if (queue.empty()) {
             return super._mint(to, amountIn);
         }
@@ -240,11 +249,11 @@ contract ExitQueuePSM is SimplePSM {
         uint256 creditMultiplier = ProfitManager(profitManager)
             .creditMultiplier();
 
-        targetAmountOut = getMintAmountOut(amountIn);
-        uint256 currentAmountOut = 0;
-        uint256 amountOutRemaining = targetAmountOut;
+        // this is the amountIn left to be used to mint CREDIT
+        uint256 amountInLeft = amountIn;
+        amountOut = 0;
 
-        while (amountOutRemaining > 0 && !queue.empty()) {
+        while (amountInLeft > ROUNDING_ERROR_AMOUNT && !queue.empty()) {
             // get the first item in the exit queue
             bytes32 frontTicketId = queue.front();
             ExitQueueTicket storage frontTicket = _tickets[frontTicketId];
@@ -253,12 +262,19 @@ contract ExitQueuePSM is SimplePSM {
             // we will use to compute the real amountIn price
             uint64 discount = 1e18 - frontTicket.feePercent;
 
-            uint256 amountFromTicket = frontTicket.amountRemaining >
-                amountOutRemaining
-                ? amountOutRemaining
+            uint256 maxAmountOutBuyableAtDiscount = (((amountInLeft *
+                decimalCorrection *
+                1e18) / creditMultiplier) * 1e18) / discount;
+
+            // amountOutFromTicket is the amount we take from the ticket
+            // it can be less than the ticket is holding if amountInLeft to mint
+            // is not enough to buy all the ticket's holdings
+            uint256 amountOutFromTicket = frontTicket.amountRemaining >
+                maxAmountOutBuyableAtDiscount
+                ? maxAmountOutBuyableAtDiscount
                 : frontTicket.amountRemaining;
 
-            frontTicket.amountRemaining -= amountFromTicket;
+            frontTicket.amountRemaining -= amountOutFromTicket;
 
             emit ExitQueueUpdate(
                 msg.sender,
@@ -268,13 +284,15 @@ contract ExitQueuePSM is SimplePSM {
                 frontTicket.feePercent
             );
 
-            // compute the pegToken price for this amount of tokens, using the discounted value
-            uint256 realAmountInCost = (((amountFromTicket * creditMultiplier) /
+            // compute the pegToken price for this amount of tokens,
+            // using the discounted value + 1 wei
+            uint256 realAmountInCost = (((amountOutFromTicket *
+                creditMultiplier) /
                 1e18 /
                 decimalCorrection) * discount) / 1e18;
 
-            currentAmountOut += amountFromTicket;
-            amountOutRemaining = targetAmountOut - currentAmountOut;
+            amountOut += amountOutFromTicket;
+            amountInLeft -= realAmountInCost;
 
             // send realAmountInCost to ticket owner
             ERC20(pegToken).safeTransferFrom(
@@ -291,26 +309,20 @@ contract ExitQueuePSM is SimplePSM {
             }
         }
 
-        // check if the currentAmountOut (from the exitQueue) is enough for the user mint
-        if (currentAmountOut == targetAmountOut) {
+        // check if the amountInLeft to be minted is 0, this is the case when all the minting
+        // was done using exit queue tickets
+        if (amountInLeft == 0) {
             // if so, just send the token as the user would have already paid the
             // pegToken to exitQueue owner(s)
-            CreditToken(credit).transfer(to, currentAmountOut);
+            CreditToken(credit).transfer(to, amountOut);
         } else {
-            if (currentAmountOut > 0) {
+            if (amountOut > 0) {
                 // send the credits obtained from the exit queue, if any
-                CreditToken(credit).transfer(to, currentAmountOut);
+                CreditToken(credit).transfer(to, amountOut);
             }
 
-            // compute the amountIn using targetAmountOut minus currentAmountOut
-            // targetAmountOut being the amount the user needs, i.e the total amount to mint
-            // and currentAmountOut is the amount gotten from the exit queue
-            uint256 amountInToMint = ((targetAmountOut - currentAmountOut) *
-                creditMultiplier) /
-                1e18 /
-                decimalCorrection;
-
-            super._mint(to, amountInToMint);
+            uint256 minted = super._mint(to, amountInLeft);
+            amountOut += minted;
         }
     }
 
