@@ -397,7 +397,7 @@ contract GatewayV1 is Gateway {
     /// - mint gUSDC in PSM
     /// - approve gUSDC on the LendingTerm
     /// - bid in the auction
-    /// - swap sDAI to USDC on using a router (1inch, uniswap, openocean)
+    /// - swap sDAI to USDC using a router (1inch, uniswap, openocean) and preencoded call to this router
     /// - repay USDC flashloan
     /// Slippage protection of minPegTokenProfit during swap to ensure auction bid profitability
     /// @dev up to 1e12 gUSDC might be left in the gateway after execution (<0.000001$).
