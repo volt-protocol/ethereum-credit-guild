@@ -397,7 +397,7 @@ contract GatewayV1 is Gateway {
     /// - mint gUSDC in PSM
     /// - approve gUSDC on the LendingTerm
     /// - bid in the auction
-    /// - swap sDAI to USDC on Uniswap
+    /// - swap sDAI to USDC on using a router (1inch, uniswap, openocean)
     /// - repay USDC flashloan
     /// Slippage protection of minPegTokenProfit during swap to ensure auction bid profitability
     /// @dev up to 1e12 gUSDC might be left in the gateway after execution (<0.000001$).
@@ -405,10 +405,11 @@ contract GatewayV1 is Gateway {
         bytes32 loanId,
         address term,
         address psm,
-        address uniswapRouter,
         address collateralToken,
         address pegToken,
-        uint256 minPegTokenProfit
+        uint256 minPegTokenProfit,
+        address routerAddress,
+        bytes calldata routerCallData
     ) public entryPoint whenNotPaused returns (uint256) {
         // prepare calls
         bytes[] memory calls = new bytes[](6);
@@ -463,32 +464,23 @@ contract GatewayV1 is Gateway {
         );
 
         // swap received collateralTokens to pegTokens
+        // allow collateral token to be used by the router
         calls[callCursor++] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
             collateralToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
-                uniswapRouter,
+                routerAddress,
                 collateralReceived
             )
         );
-        {
-            address[] memory path = new address[](2);
-            path[0] = address(collateralToken);
-            path[1] = address(pegToken);
-            calls[callCursor++] = abi.encodeWithSignature(
-                "callExternal(address,bytes)",
-                uniswapRouter,
-                abi.encodeWithSignature(
-                    "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
-                    collateralReceived, // amount in
-                    0, // amount out min
-                    path, // path collateralToken->pegToken
-                    address(this), // to
-                    uint256(block.timestamp + 1) // deadline
-                )
-            );
-        }
+
+        // call the function on the router, using the given calldata
+        calls[callCursor++] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            routerAddress,
+            routerCallData
+        );
 
         // Initiate the flash loan
         // the balancer vault will call receiveFlashloan function on this contract before returning
@@ -512,6 +504,19 @@ contract GatewayV1 is Gateway {
             "GatewayV1: profit too low"
         );
         IERC20(pegToken).transfer(msg.sender, pegTokenBalance);
+
+        // send any remaining CREDIT, this can happen if the mint returned more credit than needed
+        uint256 remainingCredit = IERC20(_creditToken).balanceOf(address(this));
+        if(remainingCredit > 0) {
+            IERC20(_creditToken).transfer(msg.sender, remainingCredit);
+        }
+
+        // send any remaining collateralToken this can happen if the amount of collateral received
+        // was more than estimated
+        uint256 remainingCollateral = IERC20(collateralToken).balanceOf(address(this));
+        if(remainingCollateral > 0) {
+            IERC20(collateralToken).transfer(msg.sender, remainingCollateral);
+        }
 
         return pegTokenBalance;
     }
