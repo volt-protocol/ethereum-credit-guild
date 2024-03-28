@@ -21,6 +21,14 @@ interface IUniswapRouter {
         uint256 deadline
     ) external returns (uint256[] memory amounts);
 
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+
     function addLiquidity(
         address tokenA,
         address tokenB,
@@ -807,16 +815,32 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         uint256 timeStep = auctionHouse.auctionDuration() / 10 - 1;
         uint256 stop = block.timestamp + auctionHouse.auctionDuration();
         uint256 minProfit = 25e6; // min 25 USDC of profit
+
         while (profit == 0 && block.timestamp < stop) {
+            (uint256 collateralReceived, ) = auctionHouse.getBidDetail(loanId);
+            // encode the swap using uniswapv2 router
+            address[] memory path = new address[](2);
+            path[0] = address(collateralToken);
+            path[1] = address(usdc);
+            bytes memory swapData = abi.encodeWithSignature(
+                "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
+                collateralReceived, // amount in
+                0, // amount out min
+                path, // path collateralToken->pegToken
+                address(gatewayv1), // to
+                uint256(block.timestamp + 1)
+            ); // deadline
+
             try
                 gatewayv1.bidWithBalancerFlashLoan(
                     loanId,
                     address(term),
                     address(psm),
-                    UNISWAPV2_ROUTER_ADDR,
                     address(collateralToken),
                     address(usdc),
-                    minProfit
+                    minProfit,
+                    UNISWAPV2_ROUTER_ADDR,
+                    swapData
                 )
             returns (uint256 _profit) {
                 profit = _profit;

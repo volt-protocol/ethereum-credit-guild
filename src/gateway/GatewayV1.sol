@@ -412,93 +412,141 @@ contract GatewayV1 is Gateway {
         bytes calldata routerCallData
     ) public entryPoint whenNotPaused returns (uint256) {
         // prepare calls
-        bytes[] memory calls = new bytes[](6);
-        uint256 callCursor = 0;
-
-        // compute amount of pegTokens needed to cover the debt
-        address _auctionHouse = LendingTerm(term).auctionHouse();
-        (uint256 collateralReceived, uint256 creditAsked) = AuctionHouse(
-            _auctionHouse
-        ).getBidDetail(loanId);
-        uint256 flashloanPegTokenAmount = SimplePSM(psm).getRedeemAmountOut(
-            creditAsked
-        ) + 1;
-
-        // approve the psm & mint creditTokens
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            pegToken,
-            abi.encodeWithSignature(
-                "approve(address,uint256)",
-                psm,
-                flashloanPegTokenAmount
-            )
-        );
-
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            psm,
-            abi.encodeWithSignature(
-                "mint(address,uint256)",
-                address(this),
-                flashloanPegTokenAmount
-            )
-        );
-
-        // bid in auction
-        address _creditToken = LendingTerm(term).creditToken();
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            _creditToken,
-            abi.encodeWithSignature(
-                "approve(address,uint256)",
+        (
+            bytes[] memory calls,
+            uint256 flashloanPegTokenAmount,
+            address creditToken
+        ) = _prepareBidCalls(
+                loanId,
                 term,
-                creditAsked
-            )
-        );
-
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            _auctionHouse,
-            abi.encodeWithSignature("bid(bytes32)", loanId)
-        );
-
-        // swap received collateralTokens to pegTokens
-        // allow collateral token to be used by the router
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            collateralToken,
-            abi.encodeWithSignature(
-                "approve(address,uint256)",
+                psm,
+                collateralToken,
+                pegToken,
                 routerAddress,
-                collateralReceived
-            )
-        );
+                routerCallData
+            );
+
+        // Initiate the flash loan
+        // the balancer vault will call receiveFlashloan function on this contract before returning
+        {
+            IERC20[] memory ierc20Tokens = new IERC20[](1);
+            ierc20Tokens[0] = IERC20(pegToken);
+            uint256[] memory amounts = new uint256[](1);
+            amounts[0] = flashloanPegTokenAmount;
+            IBalancerFlashLoan(balancerVault).flashLoan(
+                address(this),
+                ierc20Tokens,
+                amounts,
+                abi.encodeWithSignature("executeFlashloanCalls(bytes[])", calls)
+            );
+        }
+
+        // here, the flashloan have been successfully reimbursed otherwise it would have reverted
+
+        return
+            _sendTokensToSender(
+                minPegTokenProfit,
+                pegToken,
+                creditToken,
+                collateralToken
+            );
+    }
+
+    function _prepareBidCalls(
+        bytes32 loanId,
+        address term,
+        address psm,
+        address collateralToken,
+        address pegToken,
+        address routerAddress,
+        bytes calldata routerCallData
+    )
+        internal
+        view
+        returns (
+            bytes[] memory calls,
+            uint256 flashloanPegTokenAmount,
+            address creditToken
+        )
+    {
+        calls = new bytes[](6);
+        // compute amount of pegTokens needed to cover the debt
+        {
+            address _auctionHouse = LendingTerm(term).auctionHouse();
+            (uint256 collateralReceived, uint256 creditAsked) = AuctionHouse(
+                _auctionHouse
+            ).getBidDetail(loanId);
+            flashloanPegTokenAmount =
+                SimplePSM(psm).getRedeemAmountOut(creditAsked) +
+                1;
+
+            // approve the psm & mint creditTokens
+            calls[0] = abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                pegToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    psm,
+                    flashloanPegTokenAmount
+                )
+            );
+
+            calls[1] = abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                psm,
+                abi.encodeWithSignature(
+                    "mint(address,uint256)",
+                    address(this),
+                    flashloanPegTokenAmount
+                )
+            );
+
+            // bid in auction
+            creditToken = LendingTerm(term).creditToken();
+            calls[2] = abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                creditToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    term,
+                    creditAsked
+                )
+            );
+
+            calls[3] = abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                _auctionHouse,
+                abi.encodeWithSignature("bid(bytes32)", loanId)
+            );
+
+            // swap received collateralTokens to pegTokens
+            // allow collateral token to be used by the router
+            calls[4] = abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                collateralToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    routerAddress,
+                    collateralReceived
+                )
+            );
+        }
 
         // call the function on the router, using the given calldata
-        calls[callCursor++] = abi.encodeWithSignature(
+        calls[5] = abi.encodeWithSignature(
             "callExternal(address,bytes)",
             routerAddress,
             routerCallData
         );
+    }
 
-        // Initiate the flash loan
-        // the balancer vault will call receiveFlashloan function on this contract before returning
-        IERC20[] memory ierc20Tokens = new IERC20[](1);
-        ierc20Tokens[0] = IERC20(pegToken);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = flashloanPegTokenAmount;
-        IBalancerFlashLoan(balancerVault).flashLoan(
-            address(this),
-            ierc20Tokens,
-            amounts,
-            abi.encodeWithSignature("executeFlashloanCalls(bytes[])", calls)
-        );
-
-        // here, the flashloan have been successfully reimbursed otherwise it would have reverted
-
-        // send surplus pegTokens to msg.sender
-        uint256 pegTokenBalance = IERC20(pegToken).balanceOf(address(this));
+    function _sendTokensToSender(
+        uint256 minPegTokenProfit,
+        address pegToken,
+        address creditToken,
+        address collateralToken
+    ) internal returns (uint256 pegTokenBalance) {
+        pegTokenBalance = IERC20(pegToken).balanceOf(address(this));
         require(
             pegTokenBalance > minPegTokenProfit,
             "GatewayV1: profit too low"
@@ -506,18 +554,18 @@ contract GatewayV1 is Gateway {
         IERC20(pegToken).transfer(msg.sender, pegTokenBalance);
 
         // send any remaining CREDIT, this can happen if the mint returned more credit than needed
-        uint256 remainingCredit = IERC20(_creditToken).balanceOf(address(this));
-        if(remainingCredit > 0) {
-            IERC20(_creditToken).transfer(msg.sender, remainingCredit);
+        uint256 remainingCredit = IERC20(creditToken).balanceOf(address(this));
+        if (remainingCredit > 0) {
+            IERC20(creditToken).transfer(msg.sender, remainingCredit);
         }
 
         // send any remaining collateralToken this can happen if the amount of collateral received
         // was more than estimated
-        uint256 remainingCollateral = IERC20(collateralToken).balanceOf(address(this));
-        if(remainingCollateral > 0) {
+        uint256 remainingCollateral = IERC20(collateralToken).balanceOf(
+            address(this)
+        );
+        if (remainingCollateral > 0) {
             IERC20(collateralToken).transfer(msg.sender, remainingCollateral);
         }
-
-        return pegTokenBalance;
     }
 }
