@@ -99,7 +99,8 @@ contract LendingTermOnboardingUnitTest is ECGTest {
             LendingTermFactory.MarketReferences({
                 profitManager: address(profitManager),
                 creditMinter: address(rlcm),
-                creditToken: address(credit)
+                creditToken: address(credit),
+                psm: address(psm)
             })
         );
 

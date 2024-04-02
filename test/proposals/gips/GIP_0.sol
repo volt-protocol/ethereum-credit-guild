@@ -314,7 +314,8 @@ contract GIP_0 is Proposal {
                 LendingTermFactory.MarketReferences({
                     profitManager: getAddr("PROFIT_MANAGER"),
                     creditMinter: getAddr("RATE_LIMITED_CREDIT_MINTER"),
-                    creditToken: getAddr("ERC20_GUSDC")
+                    creditToken: getAddr("ERC20_GUSDC"),
+                    psm: getAddr("PSM_USDC")
                 })
             );
             termFactory.allowImplementation(_lendingTermV1, true);
