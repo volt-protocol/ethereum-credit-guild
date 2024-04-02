@@ -18,7 +18,7 @@ contract IntegrationTestRoles is PostProposalCheck {
         string role;
     }
 
-    function testMainnetRoles() public {
+    function testCurrentRoles() public {
         string memory root = vm.projectRoot();
         string memory path = string.concat(
             root,
@@ -28,6 +28,12 @@ contract IntegrationTestRoles is PostProposalCheck {
             path = string.concat(
                 root,
                 "/protocol-configuration/roles.sepolia.json"
+            );
+        }
+        if (block.chainid == 42161) {
+            path = string.concat(
+                root,
+                "/protocol-configuration/roles.arbitrum.json"
             );
         }
         string memory json = vm.readFile(path);

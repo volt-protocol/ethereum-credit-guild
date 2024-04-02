@@ -12,6 +12,9 @@ abstract contract ECGTest is Test {
     string internal constant ADDR_PATH_SEPOLIA =
         "/protocol-configuration/addresses.sepolia.json";
 
+    string internal constant ADDR_PATH_ARBITRUM =
+        "/protocol-configuration/addresses.arbitrum.json";
+
     struct RecordedAddress {
         address addr;
         string name;
@@ -23,6 +26,9 @@ abstract contract ECGTest is Test {
 
         if (block.chainid == 11155111) {
             path = string.concat(root, ADDR_PATH_SEPOLIA);
+        }
+        if (block.chainid == 42161) {
+            path = string.concat(root, ADDR_PATH_ARBITRUM);
         }
 
         string memory json = vm.readFile(path);
@@ -36,6 +42,9 @@ abstract contract ECGTest is Test {
 
         if (block.chainid == 11155111) {
             path = string.concat(root, ADDR_PATH_SEPOLIA);
+        }
+        if (block.chainid == 42161) {
+            path = string.concat(root, ADDR_PATH_ARBITRUM);
         }
 
         string memory json = "[";
