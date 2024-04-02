@@ -548,15 +548,30 @@ contract UnitTestGatewayV1 is ECGTest {
         uint256 stop = block.timestamp + auctionHouse.auctionDuration();
         uint256 minProfit = 25e6; // min 25 pegtoken of profit
         while (profit == 0 && block.timestamp < stop) {
+            (uint256 collateralReceived, ) = auctionHouse.getBidDetail(loanId);
+            // encode the swap using uniswapv2 router
+            address[] memory path = new address[](2);
+            path[0] = address(collateral);
+            path[1] = address(pegtoken);
+            bytes memory swapData = abi.encodeWithSignature(
+                "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
+                collateralReceived, // amount in
+                0, // amount out min
+                path, // path collateralToken->pegToken
+                address(gatewayv1), // to
+                uint256(block.timestamp + 1)
+            ); // deadline
+
             try
                 gatewayv1.bidWithBalancerFlashLoan(
                     loanId,
                     address(term),
                     address(psm),
-                    address(this),
                     address(collateral),
                     address(pegtoken),
-                    minProfit
+                    minProfit,
+                    address(this), // in this test suite, 'this' is the uniswap pool
+                    swapData
                 )
             returns (uint256 _profit) {
                 profit = _profit;
