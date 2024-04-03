@@ -24,16 +24,21 @@ import {GuildTimelockController} from "@src/governance/GuildTimelockController.s
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {TestnetToken} from "@src/tokens/TestnetToken.sol";
 
-contract Arbitrum_1_MarketTest is Proposal {
+contract Arbitrum_2_MarketWETHTest is Proposal {
     function name() public view virtual returns (string memory) {
-        return "Arbitrum_1_MarketTest";
+        return "Arbitrum_2_MarketWETHTest";
     }
 
     constructor() {
-        require(block.chainid == 42161, "Arbitrum_1_MarketTest: wrong chain id");
+        require(
+            block.chainid == 42161,
+            "Arbitrum_2_MarketWETHTest: wrong chain id"
+        );
     }
 
-    function _mkt(string memory addressLabel) internal pure returns (string memory) {
+    function _mkt(
+        string memory addressLabel
+    ) private pure returns (string memory) {
         return string.concat(Strings.toString(MARKET_ID), addressLabel);
     }
 
@@ -43,26 +48,26 @@ contract Arbitrum_1_MarketTest is Proposal {
     /// --------------------------------------------------------------
     /// --------------------------------------------------------------
 
-    uint256 internal constant MARKET_ID = 999999999; // gauge type / market ID
+    uint256 internal constant MARKET_ID = 999999998; // gauge type / market ID
 
     /// @notice guild mint ratio is 10e18, meaning for 1 credit 10 guild tokens are
     /// minted in SurplusGuildMinter
-    uint256 internal constant GUILD_MINT_RATIO = 10e18;
+    uint256 internal constant GUILD_MINT_RATIO = 25_000e18;
 
     /// @notice ratio of guild tokens received per Credit earned in
     /// the Surplus Guild Minter
-    uint256 internal constant GUILD_CREDIT_REWARD_RATIO = 20 * 1e18;
+    uint256 internal constant GUILD_CREDIT_REWARD_RATIO = 50_000 * 1e18;
 
     /// @notice min borrow size in the market at launch
-    uint256 internal constant MIN_BORROW = 10 * 1e18;
+    uint256 internal constant MIN_BORROW = 0.005e18;
 
     /// @notice max total borrows in the market at launch
-    uint256 internal constant MAX_TOTAL_ISSUANCE = 1_000 * 1e18;
+    uint256 internal constant MAX_TOTAL_ISSUANCE = 0.5e18;
 
     /// @notice buffer cap
-    uint256 internal constant RLCM_BUFFER_CAP = 1_000_000 * 1e18; // 1M
+    uint256 internal constant RLCM_BUFFER_CAP = 500 * 1e18; // 500
     /// @notice rate limit per second
-    uint256 internal constant RLCM_BUFFER_REPLENISH = 11.574e18; // ~1M/day
+    uint256 internal constant RLCM_BUFFER_REPLENISH = 0.00579e18; // ~500/day
 
     /// ------------------------------------------------------------------------
     /// profit sharing configuration parameters for the Profit Manager
@@ -96,8 +101,8 @@ contract Arbitrum_1_MarketTest is Proposal {
         {
             CreditToken credit = new CreditToken(
                 getAddr("CORE"),
-                "ECG USDC-999999999",
-                "gUSDC-999999999"
+                "ECG WETH-999999998",
+                "gWETH-999999998"
             );
             RateLimitedMinter rlcm = new RateLimitedMinter(
                 getAddr("CORE"),
@@ -128,7 +133,7 @@ contract Arbitrum_1_MarketTest is Proposal {
                 getAddr("CORE"),
                 getAddr(_mkt("_PROFIT_MANAGER")),
                 getAddr(_mkt("_CREDIT")),
-                getAddr("ERC20_USDC")
+                getAddr("ERC20_WETH")
             );
 
             setAddr(_mkt("_PSM"), address(psm));
@@ -168,19 +173,25 @@ contract Arbitrum_1_MarketTest is Proposal {
                 })
             );
 
-            // WETH lending terms
+            // USDC lending terms
             {
-                uint72[2] memory borrowRatios = [100e18, 150e18];
-                uint64[4] memory interestRates = [0.08e18, 0.12e18, 0.16e18, 0.20e18];
-                string[8] memory labels = [
-                    _mkt("_TERM_WETH_100_08%"),
-                    _mkt("_TERM_WETH_100_12%"),
-                    _mkt("_TERM_WETH_100_16%"),
-                    _mkt("_TERM_WETH_100_20%"),
-                    _mkt("_TERM_WETH_150_08%"),
-                    _mkt("_TERM_WETH_150_12%"),
-                    _mkt("_TERM_WETH_150_16%"),
-                    _mkt("_TERM_WETH_150_20%")
+                uint88[3] memory borrowRatios = [
+                    // 6 decimals -> 1e12 of correction needed
+                    0.000150e18 * 1e12,
+                    0.000175e18 * 1e12,
+                    0.000200e18 * 1e12
+                ];
+                uint56[3] memory interestRates = [0.03e18, 0.04e18, 0.05e18];
+                string[9] memory labels = [
+                    _mkt("_TERM_USDC_0.000150_03%"),
+                    _mkt("_TERM_USDC_0.000150_04%"),
+                    _mkt("_TERM_USDC_0.000150_05%"),
+                    _mkt("_TERM_USDC_0.000175_03%"),
+                    _mkt("_TERM_USDC_0.000175_04%"),
+                    _mkt("_TERM_USDC_0.000175_05%"),
+                    _mkt("_TERM_USDC_0.000200_03%"),
+                    _mkt("_TERM_USDC_0.000200_04%"),
+                    _mkt("_TERM_USDC_0.000200_05%")
                 ];
                 for (uint256 i = 0; i < borrowRatios.length; i++) {
                     for (uint256 j = 0; j < interestRates.length; j++) {
@@ -189,11 +200,13 @@ contract Arbitrum_1_MarketTest is Proposal {
                             termFactory.createTerm(
                                 MARKET_ID, // gauge type,
                                 getAddr("LENDING_TERM_V1"), // implementation
-                                getAddr("AUCTION_HOUSE_6H"), // auctionHouse
+                                getAddr("AUCTION_HOUSE_12H"), // auctionHouse
                                 abi.encode(
                                     LendingTerm.LendingTermParams({
-                                        collateralToken: getAddr("ERC20_WETH"),
-                                        maxDebtPerCollateralToken: borrowRatios[i],
+                                        collateralToken: getAddr("ERC20_USDC"),
+                                        maxDebtPerCollateralToken: borrowRatios[
+                                            i
+                                        ],
                                         interestRate: interestRates[j],
                                         maxDelayBetweenPartialRepay: 0,
                                         minPartialRepayPercent: 0,
@@ -209,7 +222,7 @@ contract Arbitrum_1_MarketTest is Proposal {
         }
     }
 
-    function afterDeploy(address/* deployer*/) public virtual {
+    function afterDeploy(address /* deployer*/) public virtual {
         // grant roles to smart contracts
         bytes32[] memory roles = new bytes32[](1000);
         address[] memory addrs = new address[](1000);
@@ -252,7 +265,10 @@ contract Arbitrum_1_MarketTest is Proposal {
         // - grant GAUGE_PNL_NOTIFIER role
         GuildToken guild = GuildToken(getAddr("ERC20_GUILD"));
         RecordedAddress[] memory addresses = _read();
-        string memory search = string.concat(Strings.toString(MARKET_ID), "_TERM_");
+        string memory search = string.concat(
+            Strings.toString(MARKET_ID),
+            "_TERM_"
+        );
         for (uint256 i = 0; i < addresses.length; i++) {
             if (_contains(search, addresses[i].name)) {
                 guild.addGauge(MARKET_ID, addresses[i].addr);
@@ -288,12 +304,8 @@ contract Arbitrum_1_MarketTest is Proposal {
             OTHER_SPLIT,
             OTHER_ADDRESS
         );
-        pm.setMinBorrow(
-            MIN_BORROW
-        );
-        pm.setMaxTotalIssuance(
-            MAX_TOTAL_ISSUANCE
-        );
+        pm.setMinBorrow(MIN_BORROW);
+        pm.setMaxTotalIssuance(MAX_TOTAL_ISSUANCE);
         credit.setMaxDelegates(3);
         credit.setDelegateLockupPeriod(1 hours);
     }

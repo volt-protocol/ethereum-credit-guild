@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import {Script} from "@forge-std/Script.sol";
 
 import {Arbitrum_0_BaseContracts as p0} from "@test/proposals/gips/Arbitrum_0_BaseContracts.sol";
-import {Arbitrum_1_MarketTest as p1} from "@test/proposals/gips/Arbitrum_1_MarketTest.sol";
+import {Arbitrum_1_MarketUSDCTest as p1} from "@test/proposals/gips/Arbitrum_1_MarketUSDCTest.sol";
 import {IntegrationTestRoles} from "@test/integration/IntegrationTestRoles.sol";
 
 contract DeployArbitrum is Script, p0, p1 {
