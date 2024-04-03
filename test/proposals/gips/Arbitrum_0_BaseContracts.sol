@@ -36,36 +36,34 @@ contract Arbitrum_0_BaseContracts is Proposal {
 
     /// @notice maximum guild supply is 1b tokens, however this number can change
     /// later if new tokens are minted
-    uint256 internal constant GUILD_SUPPLY = 1_000_000_000 * 1e18;
+    uint256 internal GUILD_SUPPLY = 1_000_000_000 * 1e18;
 
     /// @notice maximum delegates for guild token
-    uint256 internal constant MAX_DELEGATES = 20;
+    uint256 internal MAX_DELEGATES = 20;
     /// @notice maximum gauges for guild token
-    uint256 internal constant MAX_GAUGES = 20;
+    uint256 internal MAX_GAUGES = 20;
 
     /// @notice delegate lockup period for GUILD
     uint256 internal DELEGATE_LOCKUP_PERIOD = 7 days;
 
-    uint256 public constant BLOCKS_PER_DAY = 7164;
+    /// @notice rough estimate of `block.number` increments per day
+    /// @dev see https://ycharts.com/indicators/ethereum_blocks_per_day
+    uint256 public BPD = 7120;
 
     // governance params
     uint256 public DAO_TIMELOCK_DELAY = 7 days;
     uint256 public ONBOARD_TIMELOCK_DELAY = 1 days;
-    uint256 public constant DAO_GOVERNOR_GUILD_VOTING_DELAY =
-        0 * BLOCKS_PER_DAY;
-    uint256 public DAO_GOVERNOR_GUILD_VOTING_PERIOD = 3 * BLOCKS_PER_DAY;
-    uint256 public constant DAO_GOVERNOR_GUILD_PROPOSAL_THRESHOLD =
-        2_500_000e18;
-    uint256 public constant DAO_GOVERNOR_GUILD_QUORUM = 25_000_000e18;
-    uint256 public constant DAO_VETO_GUILD_QUORUM = 15_000_000e18;
-    uint256 public constant ONBOARD_GOVERNOR_GUILD_VOTING_DELAY =
-        0 * BLOCKS_PER_DAY;
-    uint256 public ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD = 2 * BLOCKS_PER_DAY;
-    uint256 public constant ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD =
-        1_000_000e18;
-    uint256 public constant ONBOARD_GOVERNOR_GUILD_QUORUM = 10_000_000e18;
-    uint256 public constant ONBOARD_VETO_GUILD_QUORUM = 10_000_000e18;
-    uint256 public constant OFFBOARD_QUORUM = 10_000_000e18;
+    uint256 public DAO_GOVERNOR_GUILD_VOTING_DELAY = 0 * BPD;
+    uint256 public DAO_GOVERNOR_GUILD_VOTING_PERIOD = 3 * BPD;
+    uint256 public DAO_GOVERNOR_GUILD_PROPOSAL_THRESHOLD = 2_500_000 * 1e18;
+    uint256 public DAO_GOVERNOR_GUILD_QUORUM = 25_000_000 * 1e18;
+    uint256 public DAO_VETO_GUILD_QUORUM = 15_000_000 * 1e18;
+    uint256 public ONBOARD_GOVERNOR_GUILD_VOTING_DELAY = 0 * BPD;
+    uint256 public ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD = 2 * BPD;
+    uint256 public ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD = 1_000_000 * 1e18;
+    uint256 public ONBOARD_GOVERNOR_GUILD_QUORUM = 10_000_000 * 1e18;
+    uint256 public ONBOARD_VETO_GUILD_QUORUM = 10_000_000 * 1e18;
+    uint256 public OFFBOARD_QUORUM = 10_000_000 * 1e18;
 
     function deploy() public virtual {
         // Core
@@ -202,86 +200,94 @@ contract Arbitrum_0_BaseContracts is Proposal {
         Core core = Core(getAddr("CORE"));
 
         // grant roles to smart contracts
+        bytes32[] memory roles = new bytes32[](1000);
+        address[] memory addrs = new address[](1000);
+        uint256 n = 0;
+
         // GOVERNOR
-        core.grantRole(CoreRoles.GOVERNOR, getAddr("DAO_TIMELOCK"));
-        core.grantRole(CoreRoles.GOVERNOR, getAddr("ONBOARD_TIMELOCK"));
-        core.grantRole(CoreRoles.GOVERNOR, getAddr("OFFBOARD_GOVERNOR_GUILD"));
+        roles[n] = CoreRoles.GOVERNOR;
+        addrs[n++] = getAddr("DAO_TIMELOCK");
+        roles[n] = CoreRoles.GOVERNOR;
+        addrs[n++] = getAddr("ONBOARD_TIMELOCK");
+        roles[n] = CoreRoles.GOVERNOR;
+        addrs[n++] = getAddr("OFFBOARD_GOVERNOR_GUILD");
 
         // GUARDIAN
-        core.grantRole(CoreRoles.GUARDIAN, getAddr("TEAM_MULTISIG"));
+        roles[n] = CoreRoles.GUARDIAN;
+        addrs[n++] = getAddr("TEAM_MULTISIG");
 
         // GUILD_MINTER
-        core.grantRole(
-            CoreRoles.GUILD_MINTER,
-            getAddr("RLGM")
-        );
+        roles[n] = CoreRoles.GUILD_MINTER;
+        addrs[n++] = getAddr("RLGM");
 
         /// RATE_LIMITED_GUILD_MINTER
-        core.grantRole(
-            CoreRoles.RATE_LIMITED_GUILD_MINTER,
-            getAddr("ERC20_PREGUILD")
-        );
+        roles[n] = CoreRoles.RATE_LIMITED_GUILD_MINTER;
+        addrs[n++] = getAddr("ERC20_PREGUILD");
 
         // GAUGE_ADD
-        core.grantRole(CoreRoles.GAUGE_ADD, getAddr("DAO_TIMELOCK"));
-        core.grantRole(CoreRoles.GAUGE_ADD, getAddr("ONBOARD_TIMELOCK"));
-        core.grantRole(CoreRoles.GAUGE_ADD, deployer);
+        roles[n] = CoreRoles.GAUGE_ADD;
+        addrs[n++] = getAddr("DAO_TIMELOCK");
+        roles[n] = CoreRoles.GAUGE_ADD;
+        addrs[n++] = getAddr("ONBOARD_TIMELOCK");
+        roles[n] = CoreRoles.GAUGE_ADD;
+        addrs[n++] = deployer;
 
         // GAUGE_REMOVE
-        core.grantRole(CoreRoles.GAUGE_REMOVE, getAddr("DAO_TIMELOCK"));
-        core.grantRole(CoreRoles.GAUGE_REMOVE, getAddr("OFFBOARD_GOVERNOR_GUILD"));
+        roles[n] = CoreRoles.GAUGE_REMOVE;
+        addrs[n++] = getAddr("DAO_TIMELOCK");
+        roles[n] = CoreRoles.GAUGE_REMOVE;
+        addrs[n++] = getAddr("OFFBOARD_GOVERNOR_GUILD");
 
         // GAUGE_PARAMETERS
-        core.grantRole(CoreRoles.GAUGE_PARAMETERS, getAddr("DAO_TIMELOCK"));
-        core.grantRole(CoreRoles.GAUGE_PARAMETERS, deployer);
+        roles[n] = CoreRoles.GAUGE_PARAMETERS;
+        addrs[n++] = getAddr("DAO_TIMELOCK");
+        roles[n] = CoreRoles.GAUGE_PARAMETERS;
+        addrs[n++] = deployer;
 
         // GUILD_GOVERNANCE_PARAMETERS
-        core.grantRole(
-            CoreRoles.GUILD_GOVERNANCE_PARAMETERS,
-            getAddr("DAO_TIMELOCK")
-        );
-        core.grantRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, deployer);
+        roles[n] = CoreRoles.GUILD_GOVERNANCE_PARAMETERS;
+        addrs[n++] = getAddr("DAO_TIMELOCK");
+        roles[n] = CoreRoles.GUILD_GOVERNANCE_PARAMETERS;
+        addrs[n++] = deployer;
 
         // CREDIT_GOVERNANCE_PARAMETERS
-        core.grantRole(
-            CoreRoles.CREDIT_GOVERNANCE_PARAMETERS,
-            getAddr("DAO_TIMELOCK")
-        );
-        core.grantRole(CoreRoles.CREDIT_GOVERNANCE_PARAMETERS, deployer);
+        roles[n] = CoreRoles.CREDIT_GOVERNANCE_PARAMETERS;
+        addrs[n++] = getAddr("DAO_TIMELOCK");
+        roles[n] = CoreRoles.CREDIT_GOVERNANCE_PARAMETERS;
+        addrs[n++] = deployer;
 
         // CREDIT_REBASE_PARAMETERS
-        core.grantRole(
-            CoreRoles.CREDIT_REBASE_PARAMETERS,
-            getAddr("DAO_TIMELOCK")
-        );
+        roles[n] = CoreRoles.CREDIT_REBASE_PARAMETERS;
+        addrs[n++] = getAddr("DAO_TIMELOCK");
 
         // TIMELOCK_PROPOSER
-        core.grantRole(
-            CoreRoles.TIMELOCK_PROPOSER,
-            getAddr("DAO_GOVERNOR_GUILD")
-        );
-        core.grantRole(
-            CoreRoles.TIMELOCK_PROPOSER,
-            getAddr("ONBOARD_GOVERNOR_GUILD")
-        );
+        roles[n] = CoreRoles.TIMELOCK_PROPOSER;
+        addrs[n++] = getAddr("DAO_GOVERNOR_GUILD");
+        roles[n] = CoreRoles.TIMELOCK_PROPOSER;
+        addrs[n++] = getAddr("ONBOARD_GOVERNOR_GUILD");
 
         // TIMELOCK_EXECUTOR
-        core.grantRole(CoreRoles.TIMELOCK_EXECUTOR, address(0)); // anyone can execute
+        roles[n] = CoreRoles.TIMELOCK_EXECUTOR;
+        addrs[n++] = address(0);
 
         // TIMELOCK_CANCELLER
-        core.grantRole(CoreRoles.TIMELOCK_CANCELLER, getAddr("DAO_VETO_GUILD"));
-        core.grantRole(
-            CoreRoles.TIMELOCK_CANCELLER,
-            getAddr("ONBOARD_VETO_GUILD")
-        );
-        core.grantRole(
-            CoreRoles.TIMELOCK_CANCELLER,
-            getAddr("DAO_GOVERNOR_GUILD")
-        );
-        core.grantRole(
-            CoreRoles.TIMELOCK_CANCELLER,
-            getAddr("ONBOARD_GOVERNOR_GUILD")
-        );
+        roles[n] = CoreRoles.TIMELOCK_CANCELLER;
+        addrs[n++] = getAddr("DAO_VETO_GUILD");
+        roles[n] = CoreRoles.TIMELOCK_CANCELLER;
+        addrs[n++] = getAddr("ONBOARD_VETO_GUILD");
+        roles[n] = CoreRoles.TIMELOCK_CANCELLER;
+        addrs[n++] = getAddr("DAO_GOVERNOR_GUILD");
+        roles[n] = CoreRoles.TIMELOCK_CANCELLER;
+        addrs[n++] = getAddr("ONBOARD_GOVERNOR_GUILD");
+
+        // grant roles
+        bytes32[] memory _roles = new bytes32[](n);
+        address[] memory _addrs = new address[](n);
+        for (uint256 i = 0; i < n; i++) {
+            _roles[i] = roles[i];
+            _addrs[i] = addrs[i];
+        }
+        core.grantRoles(_roles, _addrs);
 
         // Configuration
         GuildToken(getAddr("ERC20_GUILD")).setMaxGauges(MAX_GAUGES);
