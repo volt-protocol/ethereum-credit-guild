@@ -22,7 +22,10 @@ contract CoreUnitTest is ECGTest {
     function testCreateNewRole() public {
         assertEq(core.getRoleAdmin(bytes32(uint256(12345))), bytes32(0));
         core.createRole(bytes32(uint256(12345)), CoreRoles.GOVERNOR);
-        assertEq(core.getRoleAdmin(bytes32(uint256(12345))), CoreRoles.GOVERNOR);
+        assertEq(
+            core.getRoleAdmin(bytes32(uint256(12345))),
+            CoreRoles.GOVERNOR
+        );
 
         // non-governor cannot create roles
         vm.prank(address(0xabcdef));
@@ -34,7 +37,10 @@ contract CoreUnitTest is ECGTest {
     function testOverrideHierarchy() public {
         assertEq(core.getRoleAdmin(CoreRoles.GUARDIAN), CoreRoles.GOVERNOR);
         core.createRole(CoreRoles.GUARDIAN, bytes32(uint256(12345)));
-        assertEq(core.getRoleAdmin(CoreRoles.GUARDIAN), bytes32(uint256(12345)));
+        assertEq(
+            core.getRoleAdmin(CoreRoles.GUARDIAN),
+            bytes32(uint256(12345))
+        );
     }
 
     // can batch grant roles

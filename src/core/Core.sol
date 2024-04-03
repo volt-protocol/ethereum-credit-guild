@@ -58,7 +58,10 @@ contract Core is AccessControlEnumerable {
     /// @notice batch granting of roles to various addresses
     /// @dev if msg.sender does not have admin role needed to grant any of the
     /// granted roles, the whole transaction reverts.
-    function grantRoles(bytes32[] calldata roles, address[] calldata accounts) external {
+    function grantRoles(
+        bytes32[] calldata roles,
+        address[] calldata accounts
+    ) external {
         assert(roles.length == accounts.length);
         for (uint256 i = 0; i < roles.length; i++) {
             _checkRole(getRoleAdmin(roles[i]));

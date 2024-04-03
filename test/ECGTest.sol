@@ -146,7 +146,10 @@ abstract contract ECGTest is Test {
         _write(newAddresses);
     }
 
-    function _contains(string memory what, string memory where) internal pure returns (bool) {
+    function _contains(
+        string memory what,
+        string memory where
+    ) internal pure returns (bool) {
         bytes memory whatBytes = bytes(what);
         bytes memory whereBytes = bytes(where);
 
@@ -158,7 +161,7 @@ abstract contract ECGTest is Test {
         for (uint i = 0; i <= whereBytes.length - whatBytes.length; i++) {
             bool flag = true;
             for (uint j = 0; j < whatBytes.length; j++)
-                if (whereBytes [i + j] != whatBytes [j]) {
+                if (whereBytes[i + j] != whatBytes[j]) {
                     flag = false;
                     break;
                 }

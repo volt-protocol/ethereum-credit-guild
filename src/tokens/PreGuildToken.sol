@@ -7,7 +7,6 @@ import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 /// @notice preGUILD Token
 contract PreGuildToken is ERC20Burnable {
-
     /// @notice event to track redemptions
     event Redeem(
         uint256 indexed timestamp,
@@ -18,9 +17,7 @@ contract PreGuildToken is ERC20Burnable {
     /// @notice reference to GUILD minter
     address public immutable rlgm;
 
-    constructor(
-        address _rlgm
-    ) ERC20("ECG Investor Token", "preGUILD") {
+    constructor(address _rlgm) ERC20("ECG Investor Token", "preGUILD") {
         rlgm = _rlgm;
         _mint(msg.sender, 1_000_000_000e18);
     }

@@ -39,9 +39,14 @@ contract DeployArbitrum is Script, p0, p1 {
     function name() public pure override(p0, p1) returns (string memory) {
         return "DeployProposal";
     }
-    function deploy() public override(p0, p1) pure {}
-    function afterDeploy(address deployer) public override(p0, p1) pure {}
-    function run(address deployer) public override(p0, p1) pure {}
-    function teardown(address deployer) public override(p0, p1) pure {}
-    function validate(address deployer) public override(p0, p1) pure {}
+
+    function deploy() public pure override(p0, p1) {}
+
+    function afterDeploy(address deployer) public pure override(p0, p1) {}
+
+    function run(address deployer) public pure override(p0, p1) {}
+
+    function teardown(address deployer) public pure override(p0, p1) {}
+
+    function validate(address deployer) public pure override(p0, p1) {}
 }
