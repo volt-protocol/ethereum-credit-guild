@@ -617,6 +617,10 @@ contract Arbitrum_4_MarketWETH is Proposal {
         pm.setMaxTotalIssuance(MAX_TOTAL_ISSUANCE);
         credit.setMaxDelegates(3);
         credit.setDelegateLockupPeriod(1 hours);
+        GuildToken(getAddr("ERC20_GUILD")).setCanExceedMaxGauges(
+            getAddr(_mkt("SGM")),
+            true
+        );
     }
 
     function run(address deployer) public pure virtual {}

@@ -550,6 +550,10 @@ contract Arbitrum_2_MarketUSDC is Proposal {
         pm.setMaxTotalIssuance(MAX_TOTAL_ISSUANCE);
         credit.setMaxDelegates(guild.maxDelegates());
         credit.setDelegateLockupPeriod(guild.delegateLockupPeriod());
+        GuildToken(getAddr("ERC20_GUILD")).setCanExceedMaxGauges(
+            getAddr(_mkt("SGM")),
+            true
+        );
     }
 
     function run(address deployer) public pure virtual {}

@@ -295,9 +295,6 @@ contract Arbitrum_0_BaseContracts is Proposal {
         GuildToken(getAddr("ERC20_GUILD")).setDelegateLockupPeriod(
             DELEGATE_LOCKUP_PERIOD
         );
-
-        core.renounceRole(CoreRoles.GUILD_GOVERNANCE_PARAMETERS, deployer);
-        core.renounceRole(CoreRoles.GAUGE_PARAMETERS, deployer);
     }
 
     function run(address deployer) public pure virtual {}
