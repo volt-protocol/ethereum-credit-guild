@@ -211,9 +211,9 @@ contract Arbitrum_1_MarketUSDCTest is Proposal {
                                             i
                                         ],
                                         interestRate: interestRates[j],
-                                        maxDelayBetweenPartialRepay: 0,
-                                        minPartialRepayPercent: 0,
-                                        openingFee: 0,
+                                        maxDelayBetweenPartialRepay: (i == 0 && j == 0) ? 3 hours : 0,
+                                        minPartialRepayPercent: (i == 0 && j == 0) ? 0.1e18 : 0,
+                                        openingFee: (i == 0 && j == 0) ? 0.02e18 : 0,
                                         hardCap: 10_000_000e18
                                     })
                                 )
