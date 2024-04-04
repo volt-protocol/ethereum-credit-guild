@@ -88,7 +88,7 @@ contract Arbitrum_2_MarketUSDC is Proposal {
 
     // governance params
     uint256 public constant DAO_VETO_CREDIT_QUORUM = 5_000_000e18;
-    uint256 public constant ONBOARD_VETO_CREDIT_QUORUM = 5_000_000e18;
+    uint256 public constant ONBOARD_VETO_CREDIT_QUORUM = 500_000e18;
 
     function deploy() public virtual {
         // ProfitManager
