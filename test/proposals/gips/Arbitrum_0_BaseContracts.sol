@@ -51,7 +51,7 @@ contract Arbitrum_0_BaseContracts is Proposal {
     uint256 public BPD = 7120;
 
     // governance params
-    uint256 public DAO_TIMELOCK_DELAY = 7 days;
+    uint256 public DAO_TIMELOCK_DELAY = 4 days;
     uint256 public ONBOARD_TIMELOCK_DELAY = 1 days;
     uint256 public DAO_GOVERNOR_GUILD_VOTING_DELAY = 0 * BPD;
     uint256 public DAO_GOVERNOR_GUILD_VOTING_PERIOD = 3 * BPD;
@@ -60,10 +60,10 @@ contract Arbitrum_0_BaseContracts is Proposal {
     uint256 public DAO_VETO_GUILD_QUORUM = 15_000_000 * 1e18;
     uint256 public ONBOARD_GOVERNOR_GUILD_VOTING_DELAY = 0 * BPD;
     uint256 public ONBOARD_GOVERNOR_GUILD_VOTING_PERIOD = 2 * BPD;
-    uint256 public ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD = 1_000_000 * 1e18;
-    uint256 public ONBOARD_GOVERNOR_GUILD_QUORUM = 10_000_000 * 1e18;
-    uint256 public ONBOARD_VETO_GUILD_QUORUM = 10_000_000 * 1e18;
-    uint256 public OFFBOARD_QUORUM = 10_000_000 * 1e18;
+    uint256 public ONBOARD_GOVERNOR_GUILD_PROPOSAL_THRESHOLD = 100_000 * 1e18;
+    uint256 public ONBOARD_GOVERNOR_GUILD_QUORUM = 500_000 * 1e18;
+    uint256 public ONBOARD_VETO_GUILD_QUORUM = 500_000 * 1e18;
+    uint256 public OFFBOARD_QUORUM = 500_000 * 1e18;
 
     function deploy() public virtual {
         // Core
@@ -81,7 +81,7 @@ contract Arbitrum_0_BaseContracts is Proposal {
                 CoreRoles.RATE_LIMITED_GUILD_MINTER,
                 0, // maxRateLimitPerSecond
                 0, // rateLimitPerSecond
-                uint128(GUILD_SUPPLY) // 1b
+                uint128(GUILD_SUPPLY) // bufferCap
             );
             PreGuildToken preGuild = new PreGuildToken(address(rlgm));
 

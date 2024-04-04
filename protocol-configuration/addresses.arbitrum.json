@@ -58,5 +58,69 @@
   {
     "addr": "0x912ce59144191c1204e64559fe8253a0e49e6548",
     "name": "ERC20_ARB"
+  },
+  {
+    "addr": "0x45c8fab07b64c78d03006591132ac51de82a4b22",
+    "name": "CORE"
+  },
+  {
+    "addr": "0xb8ae64f191f829fc00a4e923d460a8f2e0ba3978",
+    "name": "ERC20_GUILD"
+  },
+  {
+    "addr": "0xe38d06840c9e527b8d40309cccf4b05af0f888a5",
+    "name": "ERC20_PREGUILD"
+  },
+  {
+    "addr": "0x91806c9c67255064e5d0a333c23a6c469a8007a7",
+    "name": "RLGM"
+  },
+  {
+    "addr": "0xfb3a062236a7e08b572f17bc9ad2bbc2becb87b1",
+    "name": "AUCTION_HOUSE_6H"
+  },
+  {
+    "addr": "0x7ac2ab8143634419c5bc230a9f9955c3e29f64ef",
+    "name": "AUCTION_HOUSE_12H"
+  },
+  {
+    "addr": "0x3a595b9283b96a3aa5292f7c4c64e2fcabe7848b",
+    "name": "AUCTION_HOUSE_24H"
+  },
+  {
+    "addr": "0xd2d12e407675ec0e418bdb4dbceaa1b0c4ee6108",
+    "name": "LENDING_TERM_V1"
+  },
+  {
+    "addr": "0xfc462354dc9cac684516b49f002ae769514bbe63",
+    "name": "LENDING_TERM_FACTORY"
+  },
+  {
+    "addr": "0x5a2568b31532d9b6db228570f75b4c83f2201951",
+    "name": "DAO_GOVERNOR_GUILD"
+  },
+  {
+    "addr": "0x4400cbe9f27f7bef2c8240a5f81a75be107d5b31",
+    "name": "DAO_TIMELOCK"
+  },
+  {
+    "addr": "0x79475a4871bd4e8b8c6caae4228d98ef93622f28",
+    "name": "DAO_VETO_GUILD"
+  },
+  {
+    "addr": "0x3424f7560562468fd4f7cd268df7998090b4ab21",
+    "name": "ONBOARD_GOVERNOR_GUILD"
+  },
+  {
+    "addr": "0x0d2550d208a71805d667fb69b3aeddfd89cec48b",
+    "name": "ONBOARD_TIMELOCK"
+  },
+  {
+    "addr": "0x5447d9a5f03773bd2db67319f50103d44e31dd84",
+    "name": "ONBOARD_VETO_GUILD"
+  },
+  {
+    "addr": "0x24f663c69cd4b263cf5685a49013ff5f1c898d24",
+    "name": "OFFBOARD_GOVERNOR_GUILD"
   }
 ]
