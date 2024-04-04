@@ -24,8 +24,8 @@ contract IntegrationTestOnboardingFlows is PostProposalCheckFixture {
 
         uint256 mintAmount = governor.quorum(0);
 
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(address(this), mintAmount); /// mint quorum to contract
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(address(this), mintAmount); /// mint quorum to contract
 
         guild.delegate(address(this));
 
@@ -34,12 +34,14 @@ contract IntegrationTestOnboardingFlows is PostProposalCheckFixture {
 
     function testCreateNewTerm() public {
         /// new term so that onboard succeeds
+        LendingTerm.LendingTermParams memory params = term.getParameters();
+        params.hardCap = params.hardCap * 123456;
         term = LendingTerm(
             factory.createTerm(
                 factory.gaugeTypes(address(term)),
                 factory.termImplementations(address(term)),
                 term.getReferences().auctionHouse,
-                abi.encode(term.getParameters())
+                abi.encode(params)
             )
         );
 

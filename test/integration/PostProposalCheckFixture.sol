@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Core} from "@src/core/Core.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
@@ -23,6 +24,10 @@ import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol
 import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
 contract PostProposalCheckFixture is PostProposalCheck {
+
+    // gauge type / market ID where to run the integration test suite
+    uint256 internal constant MARKET_ID = 999999999;
+
     /// Users
     address public userOne = address(0x1111);
     address public userTwo = address(0x2222);
@@ -64,6 +69,12 @@ contract PostProposalCheckFixture is PostProposalCheck {
     RateLimitedMinter public rateLimitedGuildMinter;
     SurplusGuildMinter public surplusGuildMinter;
 
+    function _mkt(
+        string memory x
+    ) private pure returns (string memory) {
+        return string.concat(Strings.toString(MARKET_ID), x);
+    }
+
     function setUp() public virtual override {
         super.setUp();
 
@@ -79,29 +90,29 @@ contract PostProposalCheckFixture is PostProposalCheck {
 
         usdc = ERC20(getAddr("ERC20_USDC"));
         guild = GuildToken(getAddr("ERC20_GUILD"));
-        credit = CreditToken(getAddr("ERC20_GUSDC"));
+        credit = CreditToken(getAddr(_mkt("_CREDIT")));
 
         /// rate limited minters
         rateLimitedCreditMinter = RateLimitedMinter(
-            getAddr("RATE_LIMITED_CREDIT_MINTER")
+            getAddr(_mkt("_RLCM"))
         );
         rateLimitedGuildMinter = RateLimitedMinter(
-            getAddr("RATE_LIMITED_GUILD_MINTER")
+            getAddr("RLGM")
         );
         surplusGuildMinter = SurplusGuildMinter(
-            getAddr("SURPLUS_GUILD_MINTER")
+            getAddr(_mkt("_SGM"))
         );
 
-        profitManager = ProfitManager(getAddr("PROFIT_MANAGER"));
-        auctionHouse = AuctionHouse(getAddr("AUCTION_HOUSE"));
-        psm = SimplePSM(getAddr("PSM_USDC"));
+        profitManager = ProfitManager(getAddr(_mkt("_PROFIT_MANAGER")));
+        auctionHouse = AuctionHouse(getAddr("AUCTION_HOUSE_12H"));
+        psm = SimplePSM(getAddr(_mkt("_PSM")));
 
         governor = GuildGovernor(payable(getAddr("DAO_GOVERNOR_GUILD")));
         vetoGuildGovernor = GuildVetoGovernor(
             payable(getAddr("ONBOARD_VETO_GUILD"))
         );
         vetoCreditGovernor = GuildVetoGovernor(
-            payable(getAddr("ONBOARD_VETO_CREDIT"))
+            payable(getAddr(_mkt("_ONBOARD_VETO_CREDIT")))
         );
         timelock = GuildTimelockController(payable(getAddr("DAO_TIMELOCK")));
 
@@ -116,9 +127,9 @@ contract PostProposalCheckFixture is PostProposalCheck {
         collateralToken = new MockERC20();
         term = LendingTerm(
             factory.createTerm(
-                1, // gauge type,
+                MARKET_ID, // gauge type,
                 getAddr("LENDING_TERM_V1"), // implementation
-                getAddr("AUCTION_HOUSE"), // auctionHouse
+                getAddr("AUCTION_HOUSE_12H"), // auctionHouse
                 abi.encode(
                     LendingTerm.LendingTermParams({
                         collateralToken: address(collateralToken),
@@ -133,7 +144,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
             )
         );
         vm.startPrank(getAddr("ONBOARD_TIMELOCK"));
-        guild.addGauge(1, address(term));
+        guild.addGauge(MARKET_ID, address(term));
         core.grantRole(CoreRoles.GAUGE_PNL_NOTIFIER, address(term));
         core.grantRole(CoreRoles.CREDIT_BURNER, address(term));
         core.grantRole(CoreRoles.RATE_LIMITED_CREDIT_MINTER, address(term));
@@ -149,7 +160,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
         {
             /// @notice USDC mint amount
             uint256 INITIAL_USDC_MINT_AMOUNT = 100 * 1e6;
-            deal(address(usdc), userThree, INITIAL_USDC_MINT_AMOUNT);
+            dealPegToken(userThree, INITIAL_USDC_MINT_AMOUNT);
 
             vm.startPrank(userThree);
             usdc.approve(address(psm), INITIAL_USDC_MINT_AMOUNT);
@@ -165,12 +176,24 @@ contract PostProposalCheckFixture is PostProposalCheck {
             amount -= balance;
         }
 
-        uint256 usdcAmount = amount / 1e12 + 1;
-        deal(address(usdc), who, usdcAmount);
-        vm.startPrank(who);
-        usdc.approve(address(psm), usdcAmount);
-        psm.mint(who, usdcAmount);
-        vm.stopPrank();
-        assertGt(credit.balanceOf(who), amount);
+        uint256 nPegTokens = psm.getRedeemAmountOut(amount) + 1;
+        dealPegToken(address(this), nPegTokens);
+        usdc.approve(address(psm), nPegTokens);
+        psm.mint(who, nPegTokens);
+    }
+
+    function dealPegToken(address who, uint256 amount) public {
+        vm.prank(0x8aFf09e2259cacbF4Fc4e3E53F3bf799EfEEab36); // USDC masterMinter
+        (bool success1, ) = address(usdc).call(abi.encodeWithSignature(
+            "configureMinter(address,uint256)",
+            address(this),
+            type(uint256).max
+        ));
+        (bool success2, ) = address(usdc).call(abi.encodeWithSignature(
+            "mint(address,uint256)",
+            who,
+            amount
+        ));
+        require(success1 && success2, "PostProposalCheckFixture: error in dealPegToken()");
     }
 }

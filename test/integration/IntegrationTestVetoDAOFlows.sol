@@ -24,22 +24,12 @@ contract IntegrationTestVetoDAOFlows is PostProposalCheckFixture {
 
         uint256 mintAmount = governor.quorum(0);
 
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(address(this), mintAmount); /// mint quorum to contract
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(address(this), mintAmount); /// mint quorum to contract
 
         guild.delegate(address(this));
 
         vm.roll(block.number + 1); /// ensure user votes register
-
-        /// new term so that onboard succeeds
-        term = LendingTerm(
-            factory.createTerm(
-                factory.gaugeTypes(address(term)),
-                factory.termImplementations(address(term)),
-                term.getReferences().auctionHouse,
-                abi.encode(term.getParameters())
-            )
-        );
     }
 
     function testProposeFails() public {

@@ -12,8 +12,8 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
     function testVoteForGauge() public {
         uint256 mintAmount = governor.quorum(0);
         /// setup
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(address(this), mintAmount);
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(address(this), mintAmount);
         guild.delegate(address(this));
 
         assertTrue(guild.isGauge(address(term)));
@@ -50,7 +50,7 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
 
         suppliedAmount = supplyAmount;
 
-        deal(address(collateralToken), userOne, supplyAmount);
+        collateralToken.mint(userOne, supplyAmount);
 
         uint256 startingTotalSupply = credit.totalSupply();
         uint256 startingCollateralBalance = collateralToken.balanceOf(
@@ -174,7 +174,7 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
     }
 
     function _doMint(address to, uint128 amount) private {
-        deal(address(usdc), to, amount);
+        dealPegToken(to, amount);
 
         uint256 startingUsdcBalance = usdc.balanceOf(to);
         uint256 startingCreditBalance = credit.balanceOf(to);
@@ -200,7 +200,7 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
     }
 
     function testCallLoan() public returns (bytes32) {
-        uint256 supplyAmount = 10_000e18;
+        uint256 supplyAmount = 100e18;
         (bytes32 loanId, ) = _supplyCollateralUserOne(uint128(supplyAmount));
 
         testTermOffboarding();
@@ -230,7 +230,7 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
         bytes32 loanId = testCallLoan();
         uint256 creditRepayAmount = term.getLoanDebt(loanId);
 
-        uint256 profit = creditRepayAmount - 10_000e18;
+        uint256 profit = creditRepayAmount - 100e18;
 
         uint256 usdcMintAmount = creditRepayAmount / 1e12 + 1;
         uint256 startingDeployerBalance = credit.balanceOf(userThree);
@@ -277,12 +277,12 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
         );
         assertEq(
             collateralToken.balanceOf(userOne),
-            10_000e18,
+            100e18,
             "incorrect collateralToken balance userOne"
         );
         assertEq(
             credit.balanceOf(userOne),
-            10_000e18,
+            100e18,
             "incorrect credit balance userOne"
         );
         assertEq(
@@ -297,7 +297,7 @@ contract IntegrationTestBorrowCollateral is PostProposalCheckFixture {
         );
         assertEq(term.issuance(), 0, "incorrect issuance");
         assertEq(
-            startingCreditSupply - 10_000e18, /// creditRepayAmount and burned amount got taken out of supply
+            startingCreditSupply - 100e18, /// creditRepayAmount and burned amount got taken out of supply
             credit.targetTotalSupply(),
             "incorrect credit token amount burned"
         ); /// burned 9/10ths of profit

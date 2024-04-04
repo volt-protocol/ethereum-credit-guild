@@ -28,8 +28,8 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     function _mintQuorumGuildAmount() private {
         uint256 mintAmount = governor.quorum(0);
         /// setup
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(address(this), mintAmount);
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(address(this), mintAmount);
         guild.delegate(address(this));
 
         assertTrue(guild.isGauge(address(term)));
