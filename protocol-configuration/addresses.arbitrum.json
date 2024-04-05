@@ -60,6 +60,14 @@
     "name": "ERC20_ARB"
   },
   {
+    "addr": "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6 ",
+    "name": "UNISWAP_ROUTER"
+  },
+  {
+    "addr": "0xb4A35ddbb1386a2d8173F50295F111Ba1c41D92a",
+    "name": "GATEWAY"
+  },
+  {
     "addr": "0x45c8fab07b64c78d03006591132ac51de82a4b22",
     "name": "CORE"
   },
