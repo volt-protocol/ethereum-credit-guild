@@ -3,13 +3,11 @@ pragma solidity 0.8.13;
 
 import {GatewayV1} from "./GatewayV1.sol";
 
-/// @title ECG Gateway V1 - Bidder version
+/// @title ECG Gateway V1 - NO ACL version
 /// @notice Gateway to interract via multicall with the ECG
-/// Owner can select which user are allowed to use it
-contract GatewayV1_Bidder is GatewayV1 {
-
-    mapping(address=>bool) public allowedUsers;
-
+/// @dev this contract does not check if calls are allowed
+/// use at your own risk
+contract GatewayV1NoACL is GatewayV1 {
     /// @notice Executes an external call to a specified target.
     ///         Only allows allowed address to use it
     /// @param target The address of the contract to call.
@@ -18,18 +16,17 @@ contract GatewayV1_Bidder is GatewayV1 {
         address target,
         bytes calldata data
     ) public override afterEntry {
-        require(allowedUsers[_originalSender], "GatewayV1_bidder: user not allowed");
-
         (bool success, bytes memory result) = target.call(data);
         if (!success) {
             _getRevertMsg(result);
         }
     }
 
-    /// @notice set/unset a user to the allowlist
-    /// @param user the user to allow/disallow. all users are disallowed by default
-    /// @param isAllowed whether the user is allowed or not
-    function setAllowedUser(address user, bool isAllowed) public onlyOwner() {
-        allowedUsers[user] = isAllowed;
+    function allowCall(
+        address /*target*/,
+        bytes4 /*functionSelector*/,
+        bool /*allowed*/
+    ) public override view onlyOwner {
+        revert("GatewayV1NoACL: unused function");
     }
 }
