@@ -8,8 +8,8 @@ import {GatewayV1} from "./GatewayV1.sol";
 /// @dev this contract does not check if calls are allowed
 /// use at your own risk
 contract GatewayV1NoACL is GatewayV1 {
-    /// @notice Executes an external call to a specified target.
-    ///         Only allows allowed address to use it
+    /// @notice Executes an external call to a specified target. All calls are allowed
+    /// @dev anyone can use the gateway so if any funds are left in it, anyone can take them
     /// @param target The address of the contract to call.
     /// @param data The calldata to send.
     function callExternal(
