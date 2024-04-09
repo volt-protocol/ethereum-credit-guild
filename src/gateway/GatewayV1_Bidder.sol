@@ -3,12 +3,6 @@ pragma solidity 0.8.13;
 
 import {GatewayV1} from "./GatewayV1.sol";
 
-import {SimplePSM} from "@src/loan/SimplePSM.sol";
-import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
-import {ProfitManager} from "@src/governance/ProfitManager.sol";
-
-
 /// @title ECG Gateway V1 - Bidder version
 /// @notice Gateway to interract via multicall with the ECG
 /// Owner can select which user are allowed to use it
