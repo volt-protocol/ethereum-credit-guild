@@ -14,17 +14,17 @@ import {ProfitManager} from "@src/governance/ProfitManager.sol";
 /// Owner can select which user are allowed to use it
 contract GatewayV1_bidder is GatewayV1 {
 
-    mapping(address=>bool) public whitelistedUsers;
+    mapping(address=>bool) public allowedUsers;
 
     /// @notice Executes an external call to a specified target.
-    ///         Only allows whitelisted address to use it
+    ///         Only allows allowed address to use it
     /// @param target The address of the contract to call.
     /// @param data The calldata to send.
     function callExternal(
         address target,
         bytes calldata data
     ) public override afterEntry {
-        require(whitelistedUsers[_originalSender], "GatewayV1_bidder: user not whitelisted");
+        require(allowedUsers[_originalSender], "GatewayV1_bidder: user not allowed");
 
         (bool success, bytes memory result) = target.call(data);
         if (!success) {
@@ -32,7 +32,10 @@ contract GatewayV1_bidder is GatewayV1 {
         }
     }
 
-    function setUserWhitelisted(address user, bool isWhitelisted) public onlyOwner() {
-        whitelistedUsers[user] = isWhitelisted;
+    /// @notice set/unset a user to the allowlist
+    /// @param user the user to allow/disallow. all users are disallowed by default
+    /// @param isAllowed whether the user is allowed or not
+    function setAllowedUser(address user, bool isAllowed) public onlyOwner() {
+        allowedUsers[user] = isAllowed;
     }
 }
