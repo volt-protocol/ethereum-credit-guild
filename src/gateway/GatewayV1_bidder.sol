@@ -12,7 +12,7 @@ import {ProfitManager} from "@src/governance/ProfitManager.sol";
 /// @title ECG Gateway V1 - Bidder version
 /// @notice Gateway to interract via multicall with the ECG
 /// Owner can select which user are allowed to use it
-contract GatewayV1_bidder is GatewayV1 {
+contract GatewayV1_Bidder is GatewayV1 {
 
     mapping(address=>bool) public allowedUsers;
 
