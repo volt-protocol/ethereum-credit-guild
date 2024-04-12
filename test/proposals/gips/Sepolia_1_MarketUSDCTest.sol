@@ -24,15 +24,15 @@ import {GuildTimelockController} from "@src/governance/GuildTimelockController.s
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {TestnetToken} from "@src/tokens/TestnetToken.sol";
 
-contract Arbitrum_1_MarketUSDCTest is Proposal {
+contract Sepolia_1_MarketUSDCTest is Proposal {
     function name() public view virtual returns (string memory) {
-        return "Arbitrum_1_MarketUSDCTest";
+        return "Sepolia_1_MarketUSDCTest";
     }
 
     constructor() {
         require(
-            block.chainid == 42161,
-            "Arbitrum_1_MarketUSDCTest: wrong chain id"
+            block.chainid == 11155111,
+            "Sepolia_1_MarketUSDCTest: wrong chain id"
         );
     }
 
@@ -48,7 +48,7 @@ contract Arbitrum_1_MarketUSDCTest is Proposal {
     /// --------------------------------------------------------------
     /// --------------------------------------------------------------
 
-    uint256 internal constant MARKET_ID = 999999999; // gauge type / market ID
+    uint256 internal constant MARKET_ID = 42; // gauge type / market ID
 
     /// @notice guild mint ratio is 10e18, meaning for 1 credit 10 guild tokens are
     /// minted in SurplusGuildMinter
@@ -59,10 +59,10 @@ contract Arbitrum_1_MarketUSDCTest is Proposal {
     uint256 internal constant GUILD_CREDIT_REWARD_RATIO = 20 * 1e18;
 
     /// @notice min borrow size in the market at launch
-    uint256 internal constant MIN_BORROW = 10 * 1e18;
+    uint256 internal constant MIN_BORROW = 100 * 1e18;
 
     /// @notice max total borrows in the market at launch
-    uint256 internal constant MAX_TOTAL_ISSUANCE = 1_000 * 1e18;
+    uint256 internal constant MAX_TOTAL_ISSUANCE = 10_000_000 * 1e18;
 
     /// @notice buffer cap
     uint256 internal constant RLCM_BUFFER_CAP = 1_000_000 * 1e18; // 1M
@@ -77,18 +77,18 @@ contract Arbitrum_1_MarketUSDCTest is Proposal {
     uint256 internal constant SURPLUS_BUFFER_SPLIT = 0.05e18;
 
     /// @notice 90% of profits go to credit holders that opt into rebasing
-    uint256 internal constant CREDIT_SPLIT = 0.90e18;
+    uint256 internal constant CREDIT_SPLIT = 0.80e18;
 
     /// @notice 5% of profits go to guild holders staked in gauges
     uint256 internal constant GUILD_SPLIT = 0.05e18;
 
     /// @notice 0% of profits go to other
-    uint256 internal constant OTHER_SPLIT = 0;
-    address internal constant OTHER_ADDRESS = address(0);
+    uint256 internal constant OTHER_SPLIT = 0.10e18;
+    address internal constant OTHER_ADDRESS = address(0x6ef71cA9cD708883E129559F5edBFb9d9D5C6148);
 
     // governance params
-    uint256 public constant DAO_VETO_CREDIT_QUORUM = type(uint256).max;
-    uint256 public constant ONBOARD_VETO_CREDIT_QUORUM = type(uint256).max;
+    uint256 public constant DAO_VETO_CREDIT_QUORUM = 5_000_000e18;
+    uint256 public constant ONBOARD_VETO_CREDIT_QUORUM = 500_000e18;
 
     function deploy() public virtual {
         // ProfitManager
@@ -101,8 +101,8 @@ contract Arbitrum_1_MarketUSDCTest is Proposal {
         {
             CreditToken credit = new CreditToken(
                 getAddr("CORE"),
-                "ECG USDC-999999999",
-                "gUSDC-999999999"
+                "ECG USDC-42",
+                "gUSDC-42"
             );
             RateLimitedMinter rlcm = new RateLimitedMinter(
                 getAddr("CORE"),
@@ -133,7 +133,7 @@ contract Arbitrum_1_MarketUSDCTest is Proposal {
                 getAddr("CORE"),
                 getAddr(_mkt("_PROFIT_MANAGER")),
                 getAddr(_mkt("_CREDIT")),
-                getAddr("ERC20_USDC")
+                getAddr("ERC20_FAKE_USDC")
             );
 
             setAddr(_mkt("_PSM"), address(psm));
@@ -173,28 +173,22 @@ contract Arbitrum_1_MarketUSDCTest is Proposal {
                 })
             );
 
-            // WETH lending terms
+            // WBTC.fake lending terms
             {
-                uint72[2] memory borrowRatios = [
-                    // 18 decimals -> no correction needed
-                    100e18,
-                    150e18
+                uint120[2] memory borrowRatios = [
+                    // 8 decimals -> 1e12 correction needed
+                    10_000e18 * 1e12,
+                    30_000e18 * 1e12
                 ];
-                uint64[4] memory interestRates = [
+                uint64[2] memory interestRates = [
                     0.08e18,
-                    0.12e18,
-                    0.16e18,
                     0.20e18
                 ];
-                string[8] memory labels = [
-                    _mkt("_TERM_WETH_100_08%"),
-                    _mkt("_TERM_WETH_100_12%"),
-                    _mkt("_TERM_WETH_100_16%"),
-                    _mkt("_TERM_WETH_100_20%"),
-                    _mkt("_TERM_WETH_150_08%"),
-                    _mkt("_TERM_WETH_150_12%"),
-                    _mkt("_TERM_WETH_150_16%"),
-                    _mkt("_TERM_WETH_150_20%")
+                string[4] memory labels = [
+                    _mkt("_TERM_WBTC_10000_08%"),
+                    _mkt("_TERM_WBTC_10000_20%"),
+                    _mkt("_TERM_WBTC_30000_08%"),
+                    _mkt("_TERM_WBTC_30000_20%")
                 ];
                 for (uint256 i = 0; i < borrowRatios.length; i++) {
                     for (uint256 j = 0; j < interestRates.length; j++) {
@@ -206,7 +200,7 @@ contract Arbitrum_1_MarketUSDCTest is Proposal {
                                 getAddr("AUCTION_HOUSE_6H"), // auctionHouse
                                 abi.encode(
                                     LendingTerm.LendingTermParams({
-                                        collateralToken: getAddr("ERC20_WETH"),
+                                        collateralToken: getAddr("ERC20_FAKE_WBTC"),
                                         maxDebtPerCollateralToken: borrowRatios[
                                             i
                                         ],
@@ -214,7 +208,46 @@ contract Arbitrum_1_MarketUSDCTest is Proposal {
                                         maxDelayBetweenPartialRepay: (i == 0 && j == 0) ? 3 hours : 0,
                                         minPartialRepayPercent: (i == 0 && j == 0) ? 0.1e18 : 0,
                                         openingFee: (i == 0 && j == 0) ? 0.02e18 : 0,
-                                        hardCap: 10_000_000e18
+                                        hardCap: 50_000_000e18
+                                    })
+                                )
+                            )
+                        );
+                    }
+                }
+            }
+
+            // SDAI.fake lending terms
+            {
+                uint64[1] memory borrowRatios = [
+                    // 18 decimals -> no correction needed
+                    0.95e18
+                ];
+                uint64[1] memory interestRates = [
+                    0.08e18
+                ];
+                string[1] memory labels = [
+                    _mkt("_TERM_SDAI_0.95_08%")
+                ];
+                for (uint256 i = 0; i < borrowRatios.length; i++) {
+                    for (uint256 j = 0; j < interestRates.length; j++) {
+                        setAddr(
+                            labels[i * interestRates.length + j],
+                            termFactory.createTerm(
+                                MARKET_ID, // gauge type,
+                                getAddr("LENDING_TERM_V1"), // implementation
+                                getAddr("AUCTION_HOUSE_6H"), // auctionHouse
+                                abi.encode(
+                                    LendingTerm.LendingTermParams({
+                                        collateralToken: getAddr("ERC20_FAKE_SDAI"),
+                                        maxDebtPerCollateralToken: borrowRatios[
+                                            i
+                                        ],
+                                        interestRate: interestRates[j],
+                                        maxDelayBetweenPartialRepay: 0,
+                                        minPartialRepayPercent: 0,
+                                        openingFee: 0,
+                                        hardCap: 50_000_000e18
                                     })
                                 )
                             )
