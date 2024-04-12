@@ -154,5 +154,41 @@
   {
     "addr": "0x7bacae0bb37737e57fb3fe3facafd8214095d92b",
     "name": "420_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0xce805022e35fd808139d7e541f10d6e83420d84b",
+    "name": "420_CREDIT"
+  },
+  {
+    "addr": "0xd93dc512ecd0b3b17569b4ad203e4aa77fbc2495",
+    "name": "420_RLCM"
+  },
+  {
+    "addr": "0xc4c47d18fb3aba635b7805e4bf35d89ae7911050",
+    "name": "420_SGM"
+  },
+  {
+    "addr": "0x81869fcbf98ab8982b5c30529a2e7c3c24f7554e",
+    "name": "420_PSM"
+  },
+  {
+    "addr": "0x7ed904d3be134b3c44dcba0901a51c4ecdb364b1",
+    "name": "420_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x410bc78b149a3cdbf9d9739b161f75afbc9e88ba",
+    "name": "420_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x8f05958ebf233da8215ed5c8fcfb1689e01eab41",
+    "name": "420_TERM_ESWAK_1000_XXX%"
+  },
+  {
+    "addr": "0x3ba7ef7996c273f9c38ea284601b487c7d8f9bef",
+    "name": "420_TERM_BEEF_1000_XXX%"
+  },
+  {
+    "addr": "0x08de80738bed5b399bc83c07b5334648af4a2629",
+    "name": "420_TERM_VORIAN_1000_XXX%"
   }
 ]
