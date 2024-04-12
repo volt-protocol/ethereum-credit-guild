@@ -64,7 +64,7 @@ abstract contract Gateway is Ownable, Pausable {
         address target,
         bytes4 functionSelector,
         bool allowed
-    ) public onlyOwner {
+    ) public virtual onlyOwner {
         require(
             functionSelector != TRANSFER_FROM_SELECTOR,
             "Gateway: cannot allow transferFrom"
@@ -83,7 +83,7 @@ abstract contract Gateway is Ownable, Pausable {
     function callExternal(
         address target,
         bytes calldata data
-    ) public afterEntry {
+    ) public virtual afterEntry {
         // Extract the function selector from the first 4 bytes of `data`
         bytes4 functionSelector = bytes4(data[:4]);
         require(
