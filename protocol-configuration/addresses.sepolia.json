@@ -32,7 +32,7 @@
     "name": "ERC20_FAKE_SDAI"
   },
   {
-    "addr": "0x92ac88673e445097788aaa4e34176c1611baac72",
+    "addr": "0x1d09eaf23095e300a8e88fb6d0569bdcd26d5c96",
     "name": "GATEWAY"
   },
   {
@@ -150,5 +150,9 @@
   {
     "addr": "0xa6751f2cb086ccf9bb4cc4424a9de9ae97496ede",
     "name": "42_TERM_SDAI_0.95_08%"
+  },
+  {
+    "addr": "0x7bacae0bb37737e57fb3fe3facafd8214095d92b",
+    "name": "420_PROFIT_MANAGER"
   }
 ]
