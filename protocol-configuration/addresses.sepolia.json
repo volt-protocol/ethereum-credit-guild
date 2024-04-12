@@ -124,6 +124,10 @@
     "name": "42_PSM"
   },
   {
+    "addr": "0x7b8b4418990e4daf35f5c7f0165dc487b1963641",
+    "name": "42_PEG_TOKEN"
+  },
+  {
     "addr": "0x47fa48413508b979ca72fe638011ecf0556429be",
     "name": "42_DAO_VETO_CREDIT"
   },
@@ -170,6 +174,10 @@
   {
     "addr": "0x81869fcbf98ab8982b5c30529a2e7c3c24f7554e",
     "name": "420_PSM"
+  },
+  {
+    "addr": "0x1ced1eb530b5e71e6db9221a22c725e862fc0e60",
+    "name": "420_PEG_TOKEN"
   },
   {
     "addr": "0x7ed904d3be134b3c44dcba0901a51c4ecdb364b1",
