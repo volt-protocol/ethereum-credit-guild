@@ -377,7 +377,7 @@ contract LendingTermOnboardingUnitTest is ECGTest {
                 })
             )
         );
-        vm.expectRevert("LendingTerm: unknown market");
+        vm.expectRevert("LendingTermFactory: unknown market");
         factory.createTerm(
             12345,
             address(termImplementation),
