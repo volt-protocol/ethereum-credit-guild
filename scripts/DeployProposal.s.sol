@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import {Script} from "@forge-std/Script.sol";
 
-import {GIP_0 as proposal} from "@test/proposals/gips/GIP_0.sol";
+import {GIP_X as proposal} from "@test/proposals/gips/GIP_X.sol";
 
 contract DeployProposal is Script, proposal {
     uint256 public PRIVATE_KEY;
