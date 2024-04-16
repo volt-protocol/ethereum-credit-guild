@@ -137,6 +137,7 @@ contract Sepolia_2_MarketWBTCTest is Proposal {
             );
 
             setAddr(_mkt("_PSM"), address(psm));
+            setAddr(_mkt("_PEG_TOKEN"), psm.pegToken());
         }
 
         // Governance

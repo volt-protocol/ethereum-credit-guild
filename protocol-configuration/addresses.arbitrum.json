@@ -44,11 +44,11 @@
     "name": "ERC20_WSTETH"
   },
   {
-    "addr": "0x1c27Ad8a19Ba026ADaBD615F6Bc77158130cfBE4",
+    "addr": "0x1c27ad8a19ba026adabd615f6bc77158130cfbe4",
     "name": "ERC20_PT_WEETH_27JUN2024"
   },
   {
-    "addr": "0xAFD22F824D51Fb7EeD4778d303d4388AC644b026",
+    "addr": "0xafd22f824d51fb7eed4778d303d4388ac644b026",
     "name": "ERC20_PT_RSETH_27JUN2024"
   },
   {
@@ -64,11 +64,11 @@
     "name": "ERC20_ARB"
   },
   {
-    "addr": "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6 ",
+    "addr": "0x8909dc15e40173ff4699343b6eb8132c65e18ec6",
     "name": "UNISWAP_ROUTER"
   },
   {
-    "addr": "0xb4A35ddbb1386a2d8173F50295F111Ba1c41D92a",
+    "addr": "0xb4a35ddbb1386a2d8173f50295f111ba1c41d92a",
     "name": "GATEWAY"
   },
   {
