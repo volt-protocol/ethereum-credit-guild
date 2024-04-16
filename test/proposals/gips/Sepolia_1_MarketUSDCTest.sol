@@ -176,9 +176,9 @@ contract Sepolia_1_MarketUSDCTest is Proposal {
             // WBTC.fake lending terms
             {
                 uint120[2] memory borrowRatios = [
-                    // 8 decimals -> 1e12 correction needed
-                    10_000e18 * 1e12,
-                    30_000e18 * 1e12
+                    // 8 decimals -> 1e10 correction needed
+                    10_000e18 * 1e10,
+                    30_000e18 * 1e10
                 ];
                 uint64[2] memory interestRates = [
                     0.08e18,
