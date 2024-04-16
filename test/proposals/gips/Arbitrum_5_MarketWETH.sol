@@ -24,15 +24,15 @@ import {GuildTimelockController} from "@src/governance/GuildTimelockController.s
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {TestnetToken} from "@src/tokens/TestnetToken.sol";
 
-contract Arbitrum_3_MarketUSDC is Proposal {
+contract Arbitrum_5_MarketWETH is Proposal {
     function name() public view virtual returns (string memory) {
-        return "Arbitrum_3_MarketUSDC";
+        return "Arbitrum_5_MarketWETH";
     }
 
     constructor() {
         require(
             block.chainid == 42161,
-            "Arbitrum_3_MarketUSDC: wrong chain id"
+            "Arbitrum_5_MarketWETH: wrong chain id"
         );
     }
 
@@ -48,26 +48,26 @@ contract Arbitrum_3_MarketUSDC is Proposal {
     /// --------------------------------------------------------------
     /// --------------------------------------------------------------
 
-    uint256 internal constant MARKET_ID = 1; // gauge type / market ID
+    uint256 internal constant MARKET_ID = 3; // gauge type / market ID
 
     /// @notice guild mint ratio is 10e18, meaning for 1 credit 10 guild tokens are
     /// minted in SurplusGuildMinter
-    uint256 internal constant GUILD_MINT_RATIO = 10e18;
+    uint256 internal constant GUILD_MINT_RATIO = 25_000e18;
 
     /// @notice ratio of guild tokens received per Credit earned in
     /// the Surplus Guild Minter
-    uint256 internal constant GUILD_CREDIT_REWARD_RATIO = 20 * 1e18;
+    uint256 internal constant GUILD_CREDIT_REWARD_RATIO = 50_000 * 1e18;
 
     /// @notice min borrow size in the market at launch
-    uint256 internal constant MIN_BORROW = 300 * 1e18;
+    uint256 internal constant MIN_BORROW = 0.15e18;
 
     /// @notice max total borrows in the market at launch
-    uint256 internal constant MAX_TOTAL_ISSUANCE = 2_000_000 * 1e18;
+    uint256 internal constant MAX_TOTAL_ISSUANCE = 1_000 * 1e18;
 
     /// @notice buffer cap
-    uint256 internal constant RLCM_BUFFER_CAP = 1_000_000 * 1e18; // 1M
+    uint256 internal constant RLCM_BUFFER_CAP = 500 * 1e18; // 500
     /// @notice rate limit per second
-    uint256 internal constant RLCM_BUFFER_REPLENISH = 11.574e18; // ~1M/day
+    uint256 internal constant RLCM_BUFFER_REPLENISH = 0.00579e18; // ~500/day
 
     /// ------------------------------------------------------------------------
     /// profit sharing configuration parameters for the Profit Manager
@@ -87,8 +87,8 @@ contract Arbitrum_3_MarketUSDC is Proposal {
     address internal constant OTHER_ADDRESS = address(0);
 
     // governance params
-    uint256 public constant DAO_VETO_CREDIT_QUORUM = 5_000_000e18;
-    uint256 public constant ONBOARD_VETO_CREDIT_QUORUM = 500_000e18;
+    uint256 public constant DAO_VETO_CREDIT_QUORUM = 2_000e18;
+    uint256 public constant ONBOARD_VETO_CREDIT_QUORUM = 200e18;
 
     function deploy() public virtual {
         // ProfitManager
@@ -101,8 +101,8 @@ contract Arbitrum_3_MarketUSDC is Proposal {
         {
             CreditToken credit = new CreditToken(
                 getAddr("CORE"),
-                "ECG USDC-1",
-                "gUSDC-1"
+                "ECG WETH-3",
+                "gWETH-3"
             );
             RateLimitedMinter rlcm = new RateLimitedMinter(
                 getAddr("CORE"),
@@ -133,7 +133,7 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                 getAddr("CORE"),
                 getAddr(_mkt("_PROFIT_MANAGER")),
                 getAddr(_mkt("_CREDIT")),
-                getAddr("ERC20_USDC")
+                getAddr("ERC20_WETH")
             );
 
             setAddr(_mkt("_PSM"), address(psm));
@@ -175,43 +175,35 @@ contract Arbitrum_3_MarketUSDC is Proposal {
 
             // ARB lending terms
             {
-                uint64[3] memory borrowRatios = [
+                uint48[4] memory borrowRatios = [
                     // 18 decimals -> no correction needed
-                    0.25e18,
-                    0.50e18,
-                    0.75e18
+                    0.00010e18,
+                    0.00015e18,
+                    0.00020e18,
+                    0.00025e18
                 ];
-                uint64[7] memory interestRates = [
-                    0.08e18,
-                    0.10e18,
-                    0.12e18,
-                    0.14e18,
-                    0.16e18,
-                    0.18e18,
-                    0.20e18
-                ];
-                string[21] memory labels = [
-                    _mkt("_TERM_ARB_0.25_08%"),
-                    _mkt("_TERM_ARB_0.25_10%"),
-                    _mkt("_TERM_ARB_0.25_12%"),
-                    _mkt("_TERM_ARB_0.25_14%"),
-                    _mkt("_TERM_ARB_0.25_16%"),
-                    _mkt("_TERM_ARB_0.25_18%"),
-                    _mkt("_TERM_ARB_0.25_20%"),
-                    _mkt("_TERM_ARB_0.50_08%"),
-                    _mkt("_TERM_ARB_0.50_10%"),
-                    _mkt("_TERM_ARB_0.50_12%"),
-                    _mkt("_TERM_ARB_0.50_14%"),
-                    _mkt("_TERM_ARB_0.50_16%"),
-                    _mkt("_TERM_ARB_0.50_18%"),
-                    _mkt("_TERM_ARB_0.50_20%"),
-                    _mkt("_TERM_ARB_0.75_08%"),
-                    _mkt("_TERM_ARB_0.75_10%"),
-                    _mkt("_TERM_ARB_0.75_12%"),
-                    _mkt("_TERM_ARB_0.75_14%"),
-                    _mkt("_TERM_ARB_0.75_16%"),
-                    _mkt("_TERM_ARB_0.75_18%"),
-                    _mkt("_TERM_ARB_0.75_20%")
+                uint56[5] memory interestRates = [0.01e18, 0.02e18, 0.03e18, 0.04e18, 0.05e18];
+                string[20] memory labels = [
+                    _mkt("_TERM_ARB_0.00010_01%"),
+                    _mkt("_TERM_ARB_0.00010_02%"),
+                    _mkt("_TERM_ARB_0.00010_03%"),
+                    _mkt("_TERM_ARB_0.00010_04%"),
+                    _mkt("_TERM_ARB_0.00010_05%"),
+                    _mkt("_TERM_ARB_0.00015_01%"),
+                    _mkt("_TERM_ARB_0.00015_02%"),
+                    _mkt("_TERM_ARB_0.00015_03%"),
+                    _mkt("_TERM_ARB_0.00015_04%"),
+                    _mkt("_TERM_ARB_0.00015_05%"),
+                    _mkt("_TERM_ARB_0.00020_01%"),
+                    _mkt("_TERM_ARB_0.00020_02%"),
+                    _mkt("_TERM_ARB_0.00020_03%"),
+                    _mkt("_TERM_ARB_0.00020_04%"),
+                    _mkt("_TERM_ARB_0.00020_05%"),
+                    _mkt("_TERM_ARB_0.00025_01%"),
+                    _mkt("_TERM_ARB_0.00025_02%"),
+                    _mkt("_TERM_ARB_0.00025_03%"),
+                    _mkt("_TERM_ARB_0.00025_04%"),
+                    _mkt("_TERM_ARB_0.00025_05%")
                 ];
                 for (uint256 i = 0; i < borrowRatios.length; i++) {
                     for (uint256 j = 0; j < interestRates.length; j++) {
@@ -231,7 +223,7 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                                         maxDelayBetweenPartialRepay: 0,
                                         minPartialRepayPercent: 0,
                                         openingFee: 0,
-                                        hardCap: 2_000_000e18
+                                        hardCap: 800 * 1e18
                                     })
                                 )
                             )
@@ -240,69 +232,18 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                 }
             }
 
-            // WETH lending terms
+            // weETH lending terms
             {
-                uint72[6] memory borrowRatios = [
+                uint64[1] memory borrowRatios = [
                     // 18 decimals -> no correction needed
-                    500e18,
-                    750e18,
-                    1_000e18,
-                    1_500e18,
-                    2_000e18,
-                    2_500e18
+                    0.7e18
                 ];
-                uint64[7] memory interestRates = [
-                    0.08e18,
-                    0.10e18,
-                    0.12e18,
-                    0.14e18,
-                    0.16e18,
-                    0.18e18,
-                    0.20e18
-                ];
-                string[42] memory labels = [
-                    _mkt("_TERM_WETH_500_08%"),
-                    _mkt("_TERM_WETH_500_10%"),
-                    _mkt("_TERM_WETH_500_12%"),
-                    _mkt("_TERM_WETH_500_14%"),
-                    _mkt("_TERM_WETH_500_16%"),
-                    _mkt("_TERM_WETH_500_18%"),
-                    _mkt("_TERM_WETH_500_20%"),
-                    _mkt("_TERM_WETH_750_08%"),
-                    _mkt("_TERM_WETH_750_10%"),
-                    _mkt("_TERM_WETH_750_12%"),
-                    _mkt("_TERM_WETH_750_14%"),
-                    _mkt("_TERM_WETH_750_16%"),
-                    _mkt("_TERM_WETH_750_18%"),
-                    _mkt("_TERM_WETH_750_20%"),
-                    _mkt("_TERM_WETH_1000_08%"),
-                    _mkt("_TERM_WETH_1000_10%"),
-                    _mkt("_TERM_WETH_1000_12%"),
-                    _mkt("_TERM_WETH_1000_14%"),
-                    _mkt("_TERM_WETH_1000_16%"),
-                    _mkt("_TERM_WETH_1000_18%"),
-                    _mkt("_TERM_WETH_1000_20%"),
-                    _mkt("_TERM_WETH_1500_08%"),
-                    _mkt("_TERM_WETH_1500_10%"),
-                    _mkt("_TERM_WETH_1500_12%"),
-                    _mkt("_TERM_WETH_1500_14%"),
-                    _mkt("_TERM_WETH_1500_16%"),
-                    _mkt("_TERM_WETH_1500_18%"),
-                    _mkt("_TERM_WETH_1500_20%"),
-                    _mkt("_TERM_WETH_2000_08%"),
-                    _mkt("_TERM_WETH_2000_10%"),
-                    _mkt("_TERM_WETH_2000_12%"),
-                    _mkt("_TERM_WETH_2000_14%"),
-                    _mkt("_TERM_WETH_2000_16%"),
-                    _mkt("_TERM_WETH_2000_18%"),
-                    _mkt("_TERM_WETH_2000_20%"),
-                    _mkt("_TERM_WETH_2500_08%"),
-                    _mkt("_TERM_WETH_2500_10%"),
-                    _mkt("_TERM_WETH_2500_12%"),
-                    _mkt("_TERM_WETH_2500_14%"),
-                    _mkt("_TERM_WETH_2500_16%"),
-                    _mkt("_TERM_WETH_2500_18%"),
-                    _mkt("_TERM_WETH_2500_20%")
+                uint64[3] memory interestRates = [0.08e18, 0.10e18, 0.12e18];
+                string[3] memory labels = [
+                    _mkt("_TERM_WEETH_0.7_08%"),
+                    _mkt("_TERM_WEETH_0.7_10%"),
+                    _mkt("_TERM_WEETH_0.7_12%")
+                    
                 ];
                 for (uint256 i = 0; i < borrowRatios.length; i++) {
                     for (uint256 j = 0; j < interestRates.length; j++) {
@@ -311,10 +252,10 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                             termFactory.createTerm(
                                 MARKET_ID, // gauge type,
                                 getAddr("LENDING_TERM_V1"), // implementation
-                                getAddr("AUCTION_HOUSE_12H"), // auctionHouse
+                                getAddr("AUCTION_HOUSE_24H"), // auctionHouse
                                 abi.encode(
                                     LendingTerm.LendingTermParams({
-                                        collateralToken: getAddr("ERC20_WETH"),
+                                        collateralToken: getAddr("ERC20_WEETH"),
                                         maxDebtPerCollateralToken: borrowRatios[
                                             i
                                         ],
@@ -322,7 +263,7 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                                         maxDelayBetweenPartialRepay: 0,
                                         minPartialRepayPercent: 0,
                                         openingFee: 0,
-                                        hardCap: 10_000_000e18
+                                        hardCap: 100 * 1e18
                                     })
                                 )
                             )
@@ -333,59 +274,24 @@ contract Arbitrum_3_MarketUSDC is Proposal {
 
             // WBTC lending terms
             {
-                uint112[5] memory borrowRatios = [
-                    // 8 decimals -> need 1e10 of correction
-                    20_000e18 * 1e10,
-                    25_000e18 * 1e10,
-                    30_000e18 * 1e10,
-                    35_000e18 * 1e10,
-                    45_000e18 * 1e10
+                uint104[3] memory borrowRatios = [
+                    // 8 decimals -> 1e10 of correction needed
+                    14e18 * 1e10,
+                    15e18 * 1e10,
+                    16e18 * 1e10
                 ];
-                uint64[7] memory interestRates = [
-                    0.08e18,
-                    0.10e18,
-                    0.12e18,
-                    0.14e18,
-                    0.16e18,
-                    0.18e18,
-                    0.20e18
-                ];
-                string[35] memory labels = [
-                    _mkt("_TERM_WBTC_20000_08%"),
-                    _mkt("_TERM_WBTC_20000_10%"),
-                    _mkt("_TERM_WBTC_20000_12%"),
-                    _mkt("_TERM_WBTC_20000_14%"),
-                    _mkt("_TERM_WBTC_20000_16%"),
-                    _mkt("_TERM_WBTC_20000_18%"),
-                    _mkt("_TERM_WBTC_20000_20%"),
-                    _mkt("_TERM_WBTC_25000_08%"),
-                    _mkt("_TERM_WBTC_25000_10%"),
-                    _mkt("_TERM_WBTC_25000_12%"),
-                    _mkt("_TERM_WBTC_25000_14%"),
-                    _mkt("_TERM_WBTC_25000_16%"),
-                    _mkt("_TERM_WBTC_25000_18%"),
-                    _mkt("_TERM_WBTC_25000_20%"),
-                    _mkt("_TERM_WBTC_30000_08%"),
-                    _mkt("_TERM_WBTC_30000_10%"),
-                    _mkt("_TERM_WBTC_30000_12%"),
-                    _mkt("_TERM_WBTC_30000_14%"),
-                    _mkt("_TERM_WBTC_30000_16%"),
-                    _mkt("_TERM_WBTC_30000_18%"),
-                    _mkt("_TERM_WBTC_30000_20%"),
-                    _mkt("_TERM_WBTC_35000_08%"),
-                    _mkt("_TERM_WBTC_35000_10%"),
-                    _mkt("_TERM_WBTC_35000_12%"),
-                    _mkt("_TERM_WBTC_35000_14%"),
-                    _mkt("_TERM_WBTC_35000_16%"),
-                    _mkt("_TERM_WBTC_35000_18%"),
-                    _mkt("_TERM_WBTC_35000_20%"),
-                    _mkt("_TERM_WBTC_45000_08%"),
-                    _mkt("_TERM_WBTC_45000_10%"),
-                    _mkt("_TERM_WBTC_45000_12%"),
-                    _mkt("_TERM_WBTC_45000_14%"),
-                    _mkt("_TERM_WBTC_45000_16%"),
-                    _mkt("_TERM_WBTC_45000_18%"),
-                    _mkt("_TERM_WBTC_45000_20%")
+                uint56[3] memory interestRates = [0.03e18, 0.04e18, 0.05e18];
+                string[9] memory labels = [
+                    _mkt("_TERM_WBTC_14_03%"),
+                    _mkt("_TERM_WBTC_14_04%"),
+                    _mkt("_TERM_WBTC_14_05%"),
+                    _mkt("_TERM_WBTC_15_03%"),
+                    _mkt("_TERM_WBTC_15_04%"),
+                    _mkt("_TERM_WBTC_15_05%"),
+                    _mkt("_TERM_WBTC_16_03%"),
+                    _mkt("_TERM_WBTC_16_04%"),
+                    _mkt("_TERM_WBTC_16_05%")
+                    
                 ];
                 for (uint256 i = 0; i < borrowRatios.length; i++) {
                     for (uint256 j = 0; j < interestRates.length; j++) {
@@ -405,7 +311,7 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                                         maxDelayBetweenPartialRepay: 0,
                                         minPartialRepayPercent: 0,
                                         openingFee: 0,
-                                        hardCap: 10_000_000e18
+                                        hardCap: 1500 * 1e18
                                     })
                                 )
                             )
@@ -414,16 +320,11 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                 }
             }
 
-            // rETH lending terms
+            // PT-weETH-27JUN2024 lending terms
             {
-                uint72[6] memory borrowRatios = [
+                uint64[1] memory borrowRatios = [
                     // 18 decimals -> no correction needed
-                    500e18,
-                    750e18,
-                    1_000e18,
-                    1_500e18,
-                    2_000e18,
-                    2_500e18
+                    0.7e18
                 ];
                 uint64[7] memory interestRates = [
                     0.08e18,
@@ -434,49 +335,116 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                     0.18e18,
                     0.20e18
                 ];
-                string[42] memory labels = [
-                    _mkt("_TERM_RETH_500_08%"),
-                    _mkt("_TERM_RETH_500_10%"),
-                    _mkt("_TERM_RETH_500_12%"),
-                    _mkt("_TERM_RETH_500_14%"),
-                    _mkt("_TERM_RETH_500_16%"),
-                    _mkt("_TERM_RETH_500_18%"),
-                    _mkt("_TERM_RETH_500_20%"),
-                    _mkt("_TERM_RETH_750_08%"),
-                    _mkt("_TERM_RETH_750_10%"),
-                    _mkt("_TERM_RETH_750_12%"),
-                    _mkt("_TERM_RETH_750_14%"),
-                    _mkt("_TERM_RETH_750_16%"),
-                    _mkt("_TERM_RETH_750_18%"),
-                    _mkt("_TERM_RETH_750_20%"),
-                    _mkt("_TERM_RETH_1000_08%"),
-                    _mkt("_TERM_RETH_1000_10%"),
-                    _mkt("_TERM_RETH_1000_12%"),
-                    _mkt("_TERM_RETH_1000_14%"),
-                    _mkt("_TERM_RETH_1000_16%"),
-                    _mkt("_TERM_RETH_1000_18%"),
-                    _mkt("_TERM_RETH_1000_20%"),
-                    _mkt("_TERM_RETH_1500_08%"),
-                    _mkt("_TERM_RETH_1500_10%"),
-                    _mkt("_TERM_RETH_1500_12%"),
-                    _mkt("_TERM_RETH_1500_14%"),
-                    _mkt("_TERM_RETH_1500_16%"),
-                    _mkt("_TERM_RETH_1500_18%"),
-                    _mkt("_TERM_RETH_1500_20%"),
-                    _mkt("_TERM_RETH_2000_08%"),
-                    _mkt("_TERM_RETH_2000_10%"),
-                    _mkt("_TERM_RETH_2000_12%"),
-                    _mkt("_TERM_RETH_2000_14%"),
-                    _mkt("_TERM_RETH_2000_16%"),
-                    _mkt("_TERM_RETH_2000_18%"),
-                    _mkt("_TERM_RETH_2000_20%"),
-                    _mkt("_TERM_RETH_2500_08%"),
-                    _mkt("_TERM_RETH_2500_10%"),
-                    _mkt("_TERM_RETH_2500_12%"),
-                    _mkt("_TERM_RETH_2500_14%"),
-                    _mkt("_TERM_RETH_2500_16%"),
-                    _mkt("_TERM_RETH_2500_18%"),
-                    _mkt("_TERM_RETH_2500_20%")
+                string[7] memory labels = [
+                    _mkt("_TERM_ERC20_PT_WEETH_27JUN2024_0.7_08%"),
+                    _mkt("_TERM_ERC20_PT_WEETH_27JUN2024_0.7_10%"),
+                    _mkt("_TERM_ERC20_PT_WEETH_27JUN2024_0.7_12%"),
+                    _mkt("_TERM_ERC20_PT_WEETH_27JUN2024_0.7_14%"),
+                    _mkt("_TERM_ERC20_PT_WEETH_27JUN2024_0.7_16%"),
+                    _mkt("_TERM_ERC20_PT_WEETH_27JUN2024_0.7_18%"),
+                    _mkt("_TERM_ERC20_PT_WEETH_27JUN2024_0.7_20%")
+                ];
+                for (uint256 i = 0; i < borrowRatios.length; i++) {
+                    for (uint256 j = 0; j < interestRates.length; j++) {
+                        setAddr(
+                            labels[i * interestRates.length + j],
+                            termFactory.createTerm(
+                                MARKET_ID, // gauge type,
+                                getAddr("LENDING_TERM_V1"), // implementation
+                                getAddr("AUCTION_HOUSE_24H"), // auctionHouse
+                                abi.encode(
+                                    LendingTerm.LendingTermParams({
+                                        collateralToken: getAddr("ERC20_PT_WEETH_27JUN2024"),
+                                        maxDebtPerCollateralToken: borrowRatios[
+                                            i
+                                        ],
+                                        interestRate: interestRates[j],
+                                        maxDelayBetweenPartialRepay: 0,
+                                        minPartialRepayPercent: 0,
+                                        openingFee: 0,
+                                        hardCap: 100 * 1e18
+                                    })
+                                )
+                            )
+                        );
+                    }
+                }
+            }
+
+            // PT-rsETH-27JUN2024 lending terms
+            {
+                uint64[1] memory borrowRatios = [
+                    // 18 decimals -> no correction needed
+                    0.7e18
+                ];
+                uint64[7] memory interestRates = [
+                    0.08e18,
+                    0.10e18,
+                    0.12e18,
+                    0.14e18,
+                    0.16e18,
+                    0.18e18,
+                    0.20e18
+                ];
+                string[7] memory labels = [
+                    _mkt("_TERM_ERC20_PT_RSETH_27JUN2024_0.7_08%"),
+                    _mkt("_TERM_ERC20_PT_RSETH_27JUN2024_0.7_10%"),
+                    _mkt("_TERM_ERC20_PT_RSETH_27JUN2024_0.7_12%"),
+                    _mkt("_TERM_ERC20_PT_RSETH_27JUN2024_0.7_14%"),
+                    _mkt("_TERM_ERC20_PT_RSETH_27JUN2024_0.7_16%"),
+                    _mkt("_TERM_ERC20_PT_RSETH_27JUN2024_0.7_18%"),
+                    _mkt("_TERM_ERC20_PT_RSETH_27JUN2024_0.7_20%")
+                ];
+                for (uint256 i = 0; i < borrowRatios.length; i++) {
+                    for (uint256 j = 0; j < interestRates.length; j++) {
+                        setAddr(
+                            labels[i * interestRates.length + j],
+                            termFactory.createTerm(
+                                MARKET_ID, // gauge type,
+                                getAddr("LENDING_TERM_V1"), // implementation
+                                getAddr("AUCTION_HOUSE_24H"), // auctionHouse
+                                abi.encode(
+                                    LendingTerm.LendingTermParams({
+                                        collateralToken: getAddr("ERC20_PT_RSETH_27JUN2024"),
+                                        maxDebtPerCollateralToken: borrowRatios[
+                                            i
+                                        ],
+                                        interestRate: interestRates[j],
+                                        maxDelayBetweenPartialRepay: 0,
+                                        minPartialRepayPercent: 0,
+                                        openingFee: 0,
+                                        hardCap: 100 * 1e18
+                                    })
+                                )
+                            )
+                        );
+                    }
+                }
+            }
+
+            // USDC lending terms
+            {
+                uint88[4] memory borrowRatios = [
+                    // 6 decimals -> 1e12 of correction needed
+                    0.000150e18 * 1e12,
+                    0.000175e18 * 1e12,
+                    0.000200e18 * 1e12,
+                    0.000250e18 * 1e12
+                ];
+                uint56[3] memory interestRates = [0.03e18, 0.04e18, 0.05e18];
+                string[12] memory labels = [
+                    _mkt("_TERM_USDC_0.000150_03%"),
+                    _mkt("_TERM_USDC_0.000150_04%"),
+                    _mkt("_TERM_USDC_0.000150_05%"),
+                    _mkt("_TERM_USDC_0.000175_03%"),
+                    _mkt("_TERM_USDC_0.000175_04%"),
+                    _mkt("_TERM_USDC_0.000175_05%"),
+                    _mkt("_TERM_USDC_0.000200_03%"),
+                    _mkt("_TERM_USDC_0.000200_04%"),
+                    _mkt("_TERM_USDC_0.000200_05%"),
+                    _mkt("_TERM_USDC_0.000250_03%"),
+                    _mkt("_TERM_USDC_0.000250_04%"),
+                    _mkt("_TERM_USDC_0.000250_05%")
                 ];
                 for (uint256 i = 0; i < borrowRatios.length; i++) {
                     for (uint256 j = 0; j < interestRates.length; j++) {
@@ -488,7 +456,7 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                                 getAddr("AUCTION_HOUSE_12H"), // auctionHouse
                                 abi.encode(
                                     LendingTerm.LendingTermParams({
-                                        collateralToken: getAddr("ERC20_RETH"),
+                                        collateralToken: getAddr("ERC20_USDC"),
                                         maxDebtPerCollateralToken: borrowRatios[
                                             i
                                         ],
@@ -496,7 +464,7 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                                         maxDelayBetweenPartialRepay: 0,
                                         minPartialRepayPercent: 0,
                                         openingFee: 0,
-                                        hardCap: 1_000_000e18
+                                        hardCap: 1_500 * 1e18
                                     })
                                 )
                             )
@@ -505,45 +473,29 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                 }
             }
 
-            // PENDLE lending terms
+            // USDT lending terms
             {
-                uint64[3] memory borrowRatios = [
-                    // 18 decimals -> no correction needed
-                    0.5e18,
-                    1.0e18,
-                    2.0e18
+                uint88[4] memory borrowRatios = [
+                    // 6 decimals -> 1e12 of correction needed
+                    0.000150e18 * 1e12,
+                    0.000175e18 * 1e12,
+                    0.000200e18 * 1e12,
+                    0.000250e18 * 1e12
                 ];
-                uint64[7] memory interestRates = [
-                    0.08e18,
-                    0.10e18,
-                    0.12e18,
-                    0.14e18,
-                    0.16e18,
-                    0.18e18,
-                    0.20e18
-                ];
-                string[21] memory labels = [
-                    _mkt("_TERM_PENDLE_0.5_08%"),
-                    _mkt("_TERM_PENDLE_0.5_10%"),
-                    _mkt("_TERM_PENDLE_0.5_12%"),
-                    _mkt("_TERM_PENDLE_0.5_14%"),
-                    _mkt("_TERM_PENDLE_0.5_16%"),
-                    _mkt("_TERM_PENDLE_0.5_18%"),
-                    _mkt("_TERM_PENDLE_0.5_20%"),
-                    _mkt("_TERM_PENDLE_1.0_08%"),
-                    _mkt("_TERM_PENDLE_1.0_10%"),
-                    _mkt("_TERM_PENDLE_1.0_12%"),
-                    _mkt("_TERM_PENDLE_1.0_14%"),
-                    _mkt("_TERM_PENDLE_1.0_16%"),
-                    _mkt("_TERM_PENDLE_1.0_18%"),
-                    _mkt("_TERM_PENDLE_1.0_20%"),
-                    _mkt("_TERM_PENDLE_2.0_08%"),
-                    _mkt("_TERM_PENDLE_2.0_10%"),
-                    _mkt("_TERM_PENDLE_2.0_12%"),
-                    _mkt("_TERM_PENDLE_2.0_14%"),
-                    _mkt("_TERM_PENDLE_2.0_16%"),
-                    _mkt("_TERM_PENDLE_2.0_18%"),
-                    _mkt("_TERM_PENDLE_2.0_20%")
+                uint56[3] memory interestRates = [0.03e18, 0.04e18, 0.05e18];
+                string[12] memory labels = [
+                    _mkt("_TERM_USDT_0.000150_03%"),
+                    _mkt("_TERM_USDT_0.000150_04%"),
+                    _mkt("_TERM_USDT_0.000150_05%"),
+                    _mkt("_TERM_USDT_0.000175_03%"),
+                    _mkt("_TERM_USDT_0.000175_04%"),
+                    _mkt("_TERM_USDT_0.000175_05%"),
+                    _mkt("_TERM_USDT_0.000200_03%"),
+                    _mkt("_TERM_USDT_0.000200_04%"),
+                    _mkt("_TERM_USDT_0.000200_05%"),
+                    _mkt("_TERM_USDT_0.000250_03%"),
+                    _mkt("_TERM_USDT_0.000250_04%"),
+                    _mkt("_TERM_USDT_0.000250_05%")
                 ];
                 for (uint256 i = 0; i < borrowRatios.length; i++) {
                     for (uint256 j = 0; j < interestRates.length; j++) {
@@ -552,12 +504,10 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                             termFactory.createTerm(
                                 MARKET_ID, // gauge type,
                                 getAddr("LENDING_TERM_V1"), // implementation
-                                getAddr("AUCTION_HOUSE_6H"), // auctionHouse
+                                getAddr("AUCTION_HOUSE_12H"), // auctionHouse
                                 abi.encode(
                                     LendingTerm.LendingTermParams({
-                                        collateralToken: getAddr(
-                                            "ERC20_PENDLE"
-                                        ),
+                                        collateralToken: getAddr("ERC20_USDT"),
                                         maxDebtPerCollateralToken: borrowRatios[
                                             i
                                         ],
@@ -565,7 +515,89 @@ contract Arbitrum_3_MarketUSDC is Proposal {
                                         maxDelayBetweenPartialRepay: 0,
                                         minPartialRepayPercent: 0,
                                         openingFee: 0,
-                                        hardCap: 500_000e18
+                                        hardCap: 1_500 * 1e18
+                                    })
+                                )
+                            )
+                        );
+                    }
+                }
+            }
+
+            // wstETH lending terms
+            {
+                uint64[1] memory borrowRatios = [
+                    // 18 decimals -> no correction needed
+                    0.95e18
+                ];
+                uint56[5] memory interestRates = [0.01e18, 0.02e18, 0.03e18, 0.04e18, 0.05e18];
+                string[5] memory labels = [
+                    _mkt("_TERM_WSTETH_0.95_01%"),
+                    _mkt("_TERM_WSTETH_0.95_02%"),
+                    _mkt("_TERM_WSTETH_0.95_03%"),
+                    _mkt("_TERM_WSTETH_0.95_04%"),
+                    _mkt("_TERM_WSTETH_0.95_05%")
+                ];
+                for (uint256 i = 0; i < borrowRatios.length; i++) {
+                    for (uint256 j = 0; j < interestRates.length; j++) {
+                        setAddr(
+                            labels[i * interestRates.length + j],
+                            termFactory.createTerm(
+                                MARKET_ID, // gauge type,
+                                getAddr("LENDING_TERM_V1"), // implementation
+                                getAddr("AUCTION_HOUSE_24H"), // auctionHouse
+                                abi.encode(
+                                    LendingTerm.LendingTermParams({
+                                        collateralToken: getAddr("ERC20_WSTETH"),
+                                        maxDebtPerCollateralToken: borrowRatios[
+                                            i
+                                        ],
+                                        interestRate: interestRates[j],
+                                        maxDelayBetweenPartialRepay: 0,
+                                        minPartialRepayPercent: 0,
+                                        openingFee: 0,
+                                        hardCap: 500 * 1e18
+                                    })
+                                )
+                            )
+                        );
+                    }
+                }
+            }
+
+            // rETH lending terms
+            {
+                uint64[1] memory borrowRatios = [
+                    // 18 decimals -> no correction needed
+                    0.95e18
+                ];
+                uint56[5] memory interestRates = [0.01e18, 0.02e18, 0.03e18, 0.04e18, 0.05e18];
+                string[5] memory labels = [
+                    _mkt("_TERM_RETH_0.95_01%"),
+                    _mkt("_TERM_RETH_0.95_02%"),
+                    _mkt("_TERM_RETH_0.95_03%"),
+                    _mkt("_TERM_RETH_0.95_04%"),
+                    _mkt("_TERM_RETH_0.95_05%")
+                ];
+                for (uint256 i = 0; i < borrowRatios.length; i++) {
+                    for (uint256 j = 0; j < interestRates.length; j++) {
+                        setAddr(
+                            labels[i * interestRates.length + j],
+                            termFactory.createTerm(
+                                MARKET_ID, // gauge type,
+                                getAddr("LENDING_TERM_V1"), // implementation
+                                getAddr("AUCTION_HOUSE_24H"), // auctionHouse
+                                abi.encode(
+                                    LendingTerm.LendingTermParams({
+                                        collateralToken: getAddr("ERC20_RETH"),
+                                        maxDebtPerCollateralToken: borrowRatios[
+                                            i
+                                        ],
+                                        interestRate: interestRates[j],
+                                        maxDelayBetweenPartialRepay: 0,
+                                        minPartialRepayPercent: 0,
+                                        openingFee: 0,
+                                        hardCap: 400 * 1e18
                                     })
                                 )
                             )
@@ -660,8 +692,8 @@ contract Arbitrum_3_MarketUSDC is Proposal {
         );
         pm.setMinBorrow(MIN_BORROW);
         pm.setMaxTotalIssuance(MAX_TOTAL_ISSUANCE);
-        credit.setMaxDelegates(guild.maxDelegates());
-        credit.setDelegateLockupPeriod(guild.delegateLockupPeriod());
+        credit.setMaxDelegates(3);
+        credit.setDelegateLockupPeriod(1 hours);
         GuildToken(getAddr("ERC20_GUILD")).setCanExceedMaxGauges(
             getAddr(_mkt("_SGM")),
             true
