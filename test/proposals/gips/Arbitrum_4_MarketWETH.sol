@@ -48,7 +48,7 @@ contract Arbitrum_5_MarketWETH is Proposal {
     /// --------------------------------------------------------------
     /// --------------------------------------------------------------
 
-    uint256 internal constant MARKET_ID = 3; // gauge type / market ID
+    uint256 internal constant MARKET_ID = 2; // gauge type / market ID
 
     /// @notice guild mint ratio is 10e18, meaning for 1 credit 10 guild tokens are
     /// minted in SurplusGuildMinter
