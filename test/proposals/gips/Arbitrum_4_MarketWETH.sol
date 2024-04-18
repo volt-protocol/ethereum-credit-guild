@@ -24,15 +24,15 @@ import {GuildTimelockController} from "@src/governance/GuildTimelockController.s
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {TestnetToken} from "@src/tokens/TestnetToken.sol";
 
-contract Arbitrum_5_MarketWETH is Proposal {
+contract Arbitrum_4_MarketWETH is Proposal {
     function name() public view virtual returns (string memory) {
-        return "Arbitrum_5_MarketWETH";
+        return "Arbitrum_4_MarketWETH";
     }
 
     constructor() {
         require(
             block.chainid == 42161,
-            "Arbitrum_5_MarketWETH: wrong chain id"
+            "Arbitrum_4_MarketWETH: wrong chain id"
         );
     }
 
@@ -668,14 +668,20 @@ contract Arbitrum_5_MarketWETH is Proposal {
             }
         }
 
-        // grant roles
-        bytes32[] memory _roles = new bytes32[](n);
-        address[] memory _addrs = new address[](n);
-        for (uint256 i = 0; i < n; i++) {
-            _roles[i] = roles[i];
-            _addrs[i] = addrs[i];
+        // grant roles in batch of 100 at most
+        uint256 maxBatchSize = 100;
+        uint256 nBatch = (n / maxBatchSize) + 1;
+        for (uint256 batch = 0; batch < nBatch; batch++) {
+            uint256 batchSize = n >= maxBatchSize ? maxBatchSize : n;
+            bytes32[] memory _roles = new bytes32[](batchSize);
+            address[] memory _addrs = new address[](batchSize);
+            for (uint256 i = 0; i < batchSize; i++) {
+                _roles[i] = roles[batch * maxBatchSize + i];
+                _addrs[i] = addrs[batch * maxBatchSize + i];
+            }
+            Core(getAddr("CORE")).grantRoles(_roles, _addrs);
+            n -= batchSize;
         }
-        Core(getAddr("CORE")).grantRoles(_roles, _addrs);
 
         // Configuration
         ProfitManager pm = ProfitManager(getAddr(_mkt("_PROFIT_MANAGER")));
@@ -693,8 +699,8 @@ contract Arbitrum_5_MarketWETH is Proposal {
         );
         pm.setMinBorrow(MIN_BORROW);
         pm.setMaxTotalIssuance(MAX_TOTAL_ISSUANCE);
-        credit.setMaxDelegates(3);
-        credit.setDelegateLockupPeriod(1 hours);
+        credit.setMaxDelegates(guild.maxDelegates());
+        credit.setDelegateLockupPeriod(guild.delegateLockupPeriod());
         GuildToken(getAddr("ERC20_GUILD")).setCanExceedMaxGauges(
             getAddr(_mkt("_SGM")),
             true
