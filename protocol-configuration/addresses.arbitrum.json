@@ -268,11 +268,11 @@
     "name": "999999998_TERM_USDC_0.000200_05%"
   },
   {
-    "addr": "0xEd81318B543c1B32C5853B20E0cbdb8a5F2bc3E9",
+    "addr": "0xed81318b543c1b32c5853b20e0cbdb8a5f2bc3e9",
     "name": "999999998_TERM_ERC20_PT_WEETH_27JUN2024_0.7_20%"
   },
   {
-    "addr": "0x281b9aFBb619E7f4D6Ed74a676367F19D05029Cd",
+    "addr": "0x281b9afbb619e7f4d6ed74a676367f19d05029cd",
     "name": "999999998_TERM_ERC20_PT_RSETH_27JUN2024_0.7_20%"
   },
   {
@@ -1302,5 +1302,37 @@
   {
     "addr": "0x548c95d5f49ff3d2a078ad4ff21ec7c56dba092b",
     "name": "3_TERM_RETH_0.95_05%"
+  },
+  {
+    "addr": "0x7181e377b259d7c8d4cafdfe9fbe103dc5bfce45",
+    "name": "4_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0x8d8b654e2b6a0289d8f758cbccc42ab387c67b61",
+    "name": "4_CREDIT"
+  },
+  {
+    "addr": "0x22913e5a6a31eac9474190d434885614ed8459da",
+    "name": "4_RLCM"
+  },
+  {
+    "addr": "0x6995aa07b177918423d2127b885b67e7a3cec265",
+    "name": "4_SGM"
+  },
+  {
+    "addr": "0x4dc22679436e4c751bdfe6c518cd7768e999ced3",
+    "name": "4_PSM"
+  },
+  {
+    "addr": "0x912ce59144191c1204e64559fe8253a0e49e6548",
+    "name": "4_PEG_TOKEN"
+  },
+  {
+    "addr": "0xb083d5d422f455342093752b60e0c2fb4bb9f2ce",
+    "name": "4_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x17a6891002cfbe9ff42ebe3049706266a2ed5f44",
+    "name": "4_ONBOARD_VETO_CREDIT"
   }
 ]

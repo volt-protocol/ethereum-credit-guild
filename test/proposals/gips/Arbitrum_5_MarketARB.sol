@@ -165,7 +165,9 @@ contract Arbitrum_5_MarketARB is GovernorProposal {
         }
     }
 
-    function afterDeploy(address /* deployer*/) public virtual {
+    function afterDeploy(address deployer) public pure virtual {}
+
+    function run(address/* deployer*/) public virtual {
         // grant roles to smart contracts
         bytes32[] memory roles = new bytes32[](1000);
         address[] memory addrs = new address[](1000);
@@ -379,8 +381,6 @@ contract Arbitrum_5_MarketARB is GovernorProposal {
         DEBUG = true;
         _simulateGovernorSteps(governor, proposer, voter);
     }
-
-    function run(address deployer) public pure virtual {}
 
     function teardown(address deployer) public pure virtual {}
 
