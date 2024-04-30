@@ -65,6 +65,9 @@ contract Arbitrum_5_MarketARB is GovernorProposal {
     /// @notice max total borrows in the market at launch
     uint256 internal constant MAX_TOTAL_ISSUANCE = 2_000_000 * 1e18;
 
+    /// @notice gauge weight tolerance in the market at launch
+    uint256 internal constant GAUGE_WEIGHT_TOLERANCE = 9e18;
+
     /// @notice buffer cap
     uint256 internal constant RLCM_BUFFER_CAP = 1_000_000 * 1e18; // 1M
 
@@ -288,6 +291,18 @@ contract Arbitrum_5_MarketARB is GovernorProposal {
             ),
             string.concat(
                 "ProfitManager.setMaxTotalIssuance() [market ",
+                Strings.toString(MARKET_ID),
+                "]"
+            )
+        );
+        _addStep(
+            getAddr(_mkt("_PROFIT_MANAGER")),
+            abi.encodeWithSignature(
+                "setGaugeWeightTolerance(uint256)",
+                GAUGE_WEIGHT_TOLERANCE
+            ),
+            string.concat(
+                "ProfitManager.setGaugeWeightTolerance() [market ",
                 Strings.toString(MARKET_ID),
                 "]"
             )
