@@ -1,0 +1,1338 @@
+[
+  {
+    "addr": "0x0000000000000000000000000000000000000000",
+    "name": "ZERO_ADDRESS"
+  },
+  {
+    "addr": "0x1a1075cef632624153176ccf19ae0175953cf010",
+    "name": "TEAM_MULTISIG"
+  },
+  {
+    "addr": "0xce96fe7eb7186e9f894de7703b4df8ea60e2dd77",
+    "name": "ESWAK"
+  },
+  {
+    "addr": "0xc44910cd8820c5a91bdc55079353f30ea638fbc1",
+    "name": "ALFU"
+  },
+  {
+    "addr": "0xd90e9181b20d8d1b5034d9f5737804da182039f6",
+    "name": "KIRK"
+  },
+  {
+    "addr": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+    "name": "ERC20_USDC"
+  },
+  {
+    "addr": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+    "name": "ERC20_USDT"
+  },
+  {
+    "addr": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+    "name": "ERC20_WETH"
+  },
+  {
+    "addr": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+    "name": "ERC20_WBTC"
+  },
+  {
+    "addr": "0xec70dcb4a1efa46b8f2d97c310c9c4790ba5ffa8",
+    "name": "ERC20_RETH"
+  },
+  {
+    "addr": "0x5979d7b546e38e414f7e9822514be443a4800529",
+    "name": "ERC20_WSTETH"
+  },
+  {
+    "addr": "0x1c27ad8a19ba026adabd615f6bc77158130cfbe4",
+    "name": "ERC20_PT_WEETH_27JUN2024"
+  },
+  {
+    "addr": "0xafd22f824d51fb7eed4778d303d4388ac644b026",
+    "name": "ERC20_PT_RSETH_27JUN2024"
+  },
+  {
+    "addr": "0x0c880f6761f1af8d9aa9c466984b80dab9a8c9e8",
+    "name": "ERC20_PENDLE"
+  },
+  {
+    "addr": "0x35751007a407ca6feffe80b3cb397736d2cf4dbe",
+    "name": "ERC20_WEETH"
+  },
+  {
+    "addr": "0x912ce59144191c1204e64559fe8253a0e49e6548",
+    "name": "ERC20_ARB"
+  },
+  {
+    "addr": "0x8909dc15e40173ff4699343b6eb8132c65e18ec6",
+    "name": "UNISWAP_ROUTER"
+  },
+  {
+    "addr": "0xb4a35ddbb1386a2d8173f50295f111ba1c41d92a",
+    "name": "GATEWAY"
+  },
+  {
+    "addr": "0x45c8fab07b64c78d03006591132ac51de82a4b22",
+    "name": "CORE"
+  },
+  {
+    "addr": "0xb8ae64f191f829fc00a4e923d460a8f2e0ba3978",
+    "name": "ERC20_GUILD"
+  },
+  {
+    "addr": "0xe38d06840c9e527b8d40309cccf4b05af0f888a5",
+    "name": "ERC20_PREGUILD"
+  },
+  {
+    "addr": "0x91806c9c67255064e5d0a333c23a6c469a8007a7",
+    "name": "RLGM"
+  },
+  {
+    "addr": "0xfb3a062236a7e08b572f17bc9ad2bbc2becb87b1",
+    "name": "AUCTION_HOUSE_6H"
+  },
+  {
+    "addr": "0x7ac2ab8143634419c5bc230a9f9955c3e29f64ef",
+    "name": "AUCTION_HOUSE_12H"
+  },
+  {
+    "addr": "0x3a595b9283b96a3aa5292f7c4c64e2fcabe7848b",
+    "name": "AUCTION_HOUSE_24H"
+  },
+  {
+    "addr": "0xd2d12e407675ec0e418bdb4dbceaa1b0c4ee6108",
+    "name": "LENDING_TERM_V1"
+  },
+  {
+    "addr": "0xfc462354dc9cac684516b49f002ae769514bbe63",
+    "name": "LENDING_TERM_FACTORY"
+  },
+  {
+    "addr": "0x5a2568b31532d9b6db228570f75b4c83f2201951",
+    "name": "DAO_GOVERNOR_GUILD"
+  },
+  {
+    "addr": "0x4400cbe9f27f7bef2c8240a5f81a75be107d5b31",
+    "name": "DAO_TIMELOCK"
+  },
+  {
+    "addr": "0x79475a4871bd4e8b8c6caae4228d98ef93622f28",
+    "name": "DAO_VETO_GUILD"
+  },
+  {
+    "addr": "0x3424f7560562468fd4f7cd268df7998090b4ab21",
+    "name": "ONBOARD_GOVERNOR_GUILD"
+  },
+  {
+    "addr": "0x0d2550d208a71805d667fb69b3aeddfd89cec48b",
+    "name": "ONBOARD_TIMELOCK"
+  },
+  {
+    "addr": "0x5447d9a5f03773bd2db67319f50103d44e31dd84",
+    "name": "ONBOARD_VETO_GUILD"
+  },
+  {
+    "addr": "0x24f663c69cd4b263cf5685a49013ff5f1c898d24",
+    "name": "OFFBOARD_GOVERNOR_GUILD"
+  },
+  {
+    "addr": "0xe910b8f7b8f27d95a97e9d204c36d3fa3fce80bd",
+    "name": "999999999_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0xcfc43e1251bd7fd2f37766c083948497b7871aeb",
+    "name": "999999999_CREDIT"
+  },
+  {
+    "addr": "0x72ce1a88146ddaba60926d9558e94f59c7cdb73c",
+    "name": "999999999_RLCM"
+  },
+  {
+    "addr": "0xdacfde419629be343449a1ac23b29033c41f9222",
+    "name": "999999999_SGM"
+  },
+  {
+    "addr": "0x47fa48413508b979ca72fe638011ecf0556429be",
+    "name": "999999999_PSM"
+  },
+  {
+    "addr": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+    "name": "999999999_PEG_TOKEN"
+  },
+  {
+    "addr": "0x75b984d8ad22007923b03b5d40daa1917ef35313",
+    "name": "999999999_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0xa38b68b8ceb270605ac0daff29b1b48c03a9c56b",
+    "name": "999999999_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0xaf345160781ec7a6a971822758cb626198050b6e",
+    "name": "999999999_TERM_WETH_100_08%"
+  },
+  {
+    "addr": "0xba7eb8a1ed4d24e56bc41dd248a465025ce6b096",
+    "name": "999999999_TERM_WETH_100_12%"
+  },
+  {
+    "addr": "0x9c0a86feb62f83b41f5781c1077194713ed1d0a8",
+    "name": "999999999_TERM_WETH_100_16%"
+  },
+  {
+    "addr": "0xbb34b1939921f89cfd05dd3bbf90e9d7b07bdb38",
+    "name": "999999999_TERM_WETH_100_20%"
+  },
+  {
+    "addr": "0x88174cfb86e0ab1c4a460583314adbf073cda7cf",
+    "name": "999999999_TERM_WETH_150_08%"
+  },
+  {
+    "addr": "0x4e6687e90c9bacac9c0303b3a67147e0531bff2e",
+    "name": "999999999_TERM_WETH_150_12%"
+  },
+  {
+    "addr": "0x7cebb556b0913ba06d2bedfef3bc471c6175d586",
+    "name": "999999999_TERM_WETH_150_16%"
+  },
+  {
+    "addr": "0x49b245078256a90738cc3b765b389a76982e69cd",
+    "name": "999999999_TERM_WETH_150_20%"
+  },
+  {
+    "addr": "0x7bacae0bb37737e57fb3fe3facafd8214095d92b",
+    "name": "999999998_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0xce805022e35fd808139d7e541f10d6e83420d84b",
+    "name": "999999998_CREDIT"
+  },
+  {
+    "addr": "0xd93dc512ecd0b3b17569b4ad203e4aa77fbc2495",
+    "name": "999999998_RLCM"
+  },
+  {
+    "addr": "0xc4c47d18fb3aba635b7805e4bf35d89ae7911050",
+    "name": "999999998_SGM"
+  },
+  {
+    "addr": "0x81869fcbf98ab8982b5c30529a2e7c3c24f7554e",
+    "name": "999999998_PSM"
+  },
+  {
+    "addr": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+    "name": "999999998_PEG_TOKEN"
+  },
+  {
+    "addr": "0x7ed904d3be134b3c44dcba0901a51c4ecdb364b1",
+    "name": "999999998_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x410bc78b149a3cdbf9d9739b161f75afbc9e88ba",
+    "name": "999999998_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x2c40ec3bf8cdd5cf4937b8e9bd65f7a473e3537a",
+    "name": "999999998_TERM_USDC_0.000150_03%"
+  },
+  {
+    "addr": "0xe90403fbb41a08887af6b162bbf379634811d645",
+    "name": "999999998_TERM_USDC_0.000150_04%"
+  },
+  {
+    "addr": "0x9b866f15477ceb0bcde2dcb64c7f58491b5d6268",
+    "name": "999999998_TERM_USDC_0.000150_05%"
+  },
+  {
+    "addr": "0x7e59a1b483a7c90f50086ab6b702ebeefa04b866",
+    "name": "999999998_TERM_USDC_0.000175_03%"
+  },
+  {
+    "addr": "0xc3c896ae8a0ec77808da5b2049b470b4716385f0",
+    "name": "999999998_TERM_USDC_0.000175_04%"
+  },
+  {
+    "addr": "0x8ef6fff880e5e0f7b0b58dcc4e1bb4e5e412c3fa",
+    "name": "999999998_TERM_USDC_0.000175_05%"
+  },
+  {
+    "addr": "0x47c213b223f0bf45576560e7dc6e9b609d95db09",
+    "name": "999999998_TERM_USDC_0.000200_03%"
+  },
+  {
+    "addr": "0x58b797406d08fc3a86648c611a24a61dabe45fb3",
+    "name": "999999998_TERM_USDC_0.000200_04%"
+  },
+  {
+    "addr": "0x89b920d12e77175a146e2b560493c0076b793384",
+    "name": "999999998_TERM_USDC_0.000200_05%"
+  },
+  {
+    "addr": "0xEd81318B543c1B32C5853B20E0cbdb8a5F2bc3E9",
+    "name": "999999998_TERM_ERC20_PT_WEETH_27JUN2024_0.7_20%"
+  },
+  {
+    "addr": "0x281b9aFBb619E7f4D6Ed74a676367F19D05029Cd",
+    "name": "999999998_TERM_ERC20_PT_RSETH_27JUN2024_0.7_20%"
+  },
+  {
+    "addr": "0x9722bec2524b4b4e37df3acd24f1431f66c62706",
+    "name": "1_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0xd5fd8456aa96aaa07c23605e9a8d2ce5f737f145",
+    "name": "1_CREDIT"
+  },
+  {
+    "addr": "0x8b88a4b6d3759ea9013e9dca92026e29a5b63d70",
+    "name": "1_RLCM"
+  },
+  {
+    "addr": "0xb94aaae7472a694dd959c8497b2f09730391dc52",
+    "name": "1_SGM"
+  },
+  {
+    "addr": "0xc273c03d7f28f570c6765be50322bc06bdd4bfab",
+    "name": "1_PSM"
+  },
+  {
+    "addr": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+    "name": "1_PEG_TOKEN"
+  },
+  {
+    "addr": "0xaf12c360253d15514929ec4ce62c570a9c76bad9",
+    "name": "1_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0xa9e0613244d86c25287bfefe7e8c219aa91d2a7a",
+    "name": "1_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x0f474bc3deebdab1b8335071f26240520f7ad372",
+    "name": "1_TERM_ARB_0.25_08%"
+  },
+  {
+    "addr": "0x549f00c4527c793d94c636cf4b8140e429fd5899",
+    "name": "1_TERM_ARB_0.25_10%"
+  },
+  {
+    "addr": "0x62f41202bd0b51d7842b6dcd1fb3ec41d3f15c7c",
+    "name": "1_TERM_ARB_0.25_12%"
+  },
+  {
+    "addr": "0x4f0445c9b371ee220c53184a7b6631b2e11e69dd",
+    "name": "1_TERM_ARB_0.25_14%"
+  },
+  {
+    "addr": "0x0c42975d4cbcebe1f8d5687ec9f93f8f28e3547c",
+    "name": "1_TERM_ARB_0.25_16%"
+  },
+  {
+    "addr": "0x2ef2ce8c97bc72f1adf779f8595f335e3be8bf18",
+    "name": "1_TERM_ARB_0.25_18%"
+  },
+  {
+    "addr": "0x795a9cacca9eac42eca0b2dc644fa17ef87036da",
+    "name": "1_TERM_ARB_0.25_20%"
+  },
+  {
+    "addr": "0xe13b68e3f3fc793542b341a89319bc9b1e56f946",
+    "name": "1_TERM_ARB_0.50_08%"
+  },
+  {
+    "addr": "0x5abadd0f72a66089e359c3915dd65c3ab9e818d1",
+    "name": "1_TERM_ARB_0.50_10%"
+  },
+  {
+    "addr": "0x313ef4cfac3a698ed985ab09f6d2531d77fab6cb",
+    "name": "1_TERM_ARB_0.50_12%"
+  },
+  {
+    "addr": "0xaa73dca19918989b613f51f173677cd996a4b28b",
+    "name": "1_TERM_ARB_0.50_14%"
+  },
+  {
+    "addr": "0x7e72bd64d9f36b0680cc5a12043fd1ff01245d5b",
+    "name": "1_TERM_ARB_0.50_16%"
+  },
+  {
+    "addr": "0xb0cd558da563aa0c3af60857952c782c6797e78d",
+    "name": "1_TERM_ARB_0.50_18%"
+  },
+  {
+    "addr": "0xc449dcad0bba0963e2672d486de7c2f3edfc1307",
+    "name": "1_TERM_ARB_0.50_20%"
+  },
+  {
+    "addr": "0x0f17f0573721e1333941202c074e230751b5f2cb",
+    "name": "1_TERM_ARB_0.75_08%"
+  },
+  {
+    "addr": "0x94e5a189a07ddaedb28d62f16eb81866ac3f568d",
+    "name": "1_TERM_ARB_0.75_10%"
+  },
+  {
+    "addr": "0xf807da7ce4f5d07ad6d5461905864a3baa9ea05a",
+    "name": "1_TERM_ARB_0.75_12%"
+  },
+  {
+    "addr": "0x2356d296b741496aa9a250ff29bed9d62275e82a",
+    "name": "1_TERM_ARB_0.75_14%"
+  },
+  {
+    "addr": "0x3dc32052750bb8d84ccb9e6ef12adcbd391b529d",
+    "name": "1_TERM_ARB_0.75_16%"
+  },
+  {
+    "addr": "0x5d543240a8415b932133ef168f853f3920815135",
+    "name": "1_TERM_ARB_0.75_18%"
+  },
+  {
+    "addr": "0xc39d0eeeae40db32319e400638d3f88428e21ac6",
+    "name": "1_TERM_ARB_0.75_20%"
+  },
+  {
+    "addr": "0x9644f023cf855a3006d895ed1aa065b968ecd574",
+    "name": "1_TERM_WETH_500_08%"
+  },
+  {
+    "addr": "0xe70d42f44b332ff5d16d3efecb94876bcf35413c",
+    "name": "1_TERM_WETH_500_10%"
+  },
+  {
+    "addr": "0x72ec6aa23341671521dada2229b26da4c5f25b06",
+    "name": "1_TERM_WETH_500_12%"
+  },
+  {
+    "addr": "0xc770e0c206b1233612fcf4540641d5bd2851cdb9",
+    "name": "1_TERM_WETH_500_14%"
+  },
+  {
+    "addr": "0x77681862209aebfae66ab0048e17182cf34fc8ba",
+    "name": "1_TERM_WETH_500_16%"
+  },
+  {
+    "addr": "0xef91baee27325d3dfeccf7cd67bb46a4c5becf9a",
+    "name": "1_TERM_WETH_500_18%"
+  },
+  {
+    "addr": "0xfb69deaa81d3736477e9c18889c3aad4354bc6ce",
+    "name": "1_TERM_WETH_500_20%"
+  },
+  {
+    "addr": "0xa512bffc26b51c9aa008fb6edcfdca4f0bb1304f",
+    "name": "1_TERM_WETH_750_08%"
+  },
+  {
+    "addr": "0xaf8f56d9584cae8521230513ad125d33214602af",
+    "name": "1_TERM_WETH_750_10%"
+  },
+  {
+    "addr": "0xa91d7c28e5b5f86f3dc4bd54eedcee356405b709",
+    "name": "1_TERM_WETH_750_12%"
+  },
+  {
+    "addr": "0xf1ef3466b158a8bf6f3662ad61d3aa3cb9938366",
+    "name": "1_TERM_WETH_750_14%"
+  },
+  {
+    "addr": "0x8c863cce04b9ceb8536fe6b6c1c582a80d2cce82",
+    "name": "1_TERM_WETH_750_16%"
+  },
+  {
+    "addr": "0xc08665990775626fab10842da754770521b2b8d3",
+    "name": "1_TERM_WETH_750_18%"
+  },
+  {
+    "addr": "0xca3427ea195cdc6352c9ac52114e1537217ad728",
+    "name": "1_TERM_WETH_750_20%"
+  },
+  {
+    "addr": "0x2a41a42596cf6a49934cbed06d6b323e075169ec",
+    "name": "1_TERM_WETH_1000_08%"
+  },
+  {
+    "addr": "0xeb19fa13de7830f1f8dedc8b8c294645cac8f1c5",
+    "name": "1_TERM_WETH_1000_10%"
+  },
+  {
+    "addr": "0xf28ccc7be020561a848a61601e61d614290fe440",
+    "name": "1_TERM_WETH_1000_12%"
+  },
+  {
+    "addr": "0xc93133e18519acda7ff995b99cdfd5eea8c56eb1",
+    "name": "1_TERM_WETH_1000_14%"
+  },
+  {
+    "addr": "0x88f535c9b947acaf4a533bbc92835a60424c2c0f",
+    "name": "1_TERM_WETH_1000_16%"
+  },
+  {
+    "addr": "0x1a25c791ed085e1eb1d2d61224a7a6318e11cbf8",
+    "name": "1_TERM_WETH_1000_18%"
+  },
+  {
+    "addr": "0x2264807c5068eab38887f750b39a26535ff2148d",
+    "name": "1_TERM_WETH_1000_20%"
+  },
+  {
+    "addr": "0x456f63ceffcf9c571ab3efa1a66d8f8718a8f0ad",
+    "name": "1_TERM_WETH_1500_08%"
+  },
+  {
+    "addr": "0x11f9b9a008fe31076a753deed60f6fcb2bd549c4",
+    "name": "1_TERM_WETH_1500_10%"
+  },
+  {
+    "addr": "0x07407f0ee2347fcbee19bce4eb148f54617f78cf",
+    "name": "1_TERM_WETH_1500_12%"
+  },
+  {
+    "addr": "0x01feb7478519a979cbafc7e554f3e6f0c80cf414",
+    "name": "1_TERM_WETH_1500_14%"
+  },
+  {
+    "addr": "0x14f7ddd7ccb5771acd190f6f0bb9f32e168916a0",
+    "name": "1_TERM_WETH_1500_16%"
+  },
+  {
+    "addr": "0x07c018f531b5f94fb98ccca7c1552348cf997774",
+    "name": "1_TERM_WETH_1500_18%"
+  },
+  {
+    "addr": "0x108b3bb0cd5b5b16785688a50e37961ac861e3c6",
+    "name": "1_TERM_WETH_1500_20%"
+  },
+  {
+    "addr": "0x38bd3f31958ea950af41a5af41ec3565c585b640",
+    "name": "1_TERM_WETH_2000_08%"
+  },
+  {
+    "addr": "0xff13345ed8aeed7f4ebd10131282fc1c47a710f5",
+    "name": "1_TERM_WETH_2000_10%"
+  },
+  {
+    "addr": "0x4b7a7f5adbed5a05303d324a69b2127e9133773c",
+    "name": "1_TERM_WETH_2000_12%"
+  },
+  {
+    "addr": "0xcfb5d5cd613674ec2b68057d410141894a5d9015",
+    "name": "1_TERM_WETH_2000_14%"
+  },
+  {
+    "addr": "0xf0d79e2f553b308ab2664880f5c16c0aee211834",
+    "name": "1_TERM_WETH_2000_16%"
+  },
+  {
+    "addr": "0x8ce4c83c4d5204c7a312ba03c6dfb482213b1bbc",
+    "name": "1_TERM_WETH_2000_18%"
+  },
+  {
+    "addr": "0x90d86a539df32e88eeb4cd2489c0d2180749f559",
+    "name": "1_TERM_WETH_2000_20%"
+  },
+  {
+    "addr": "0xf6bcecf66ae9e248c6099276741bca588bfd19db",
+    "name": "1_TERM_WETH_2500_08%"
+  },
+  {
+    "addr": "0xfa5154e2233ce70a59f192c881fc6719485f0795",
+    "name": "1_TERM_WETH_2500_10%"
+  },
+  {
+    "addr": "0xfa7fb72b26fe7566497b1a3d161e28ab6c7776b7",
+    "name": "1_TERM_WETH_2500_12%"
+  },
+  {
+    "addr": "0x18f112500ec4e392db5bb62f6008c0368c990c9b",
+    "name": "1_TERM_WETH_2500_14%"
+  },
+  {
+    "addr": "0x13a5abcd8acc516062cd22222d9af84455ffa4ac",
+    "name": "1_TERM_WETH_2500_16%"
+  },
+  {
+    "addr": "0x30b72b89d1f6cc0e6fe79c89c28b83d5146d4ae6",
+    "name": "1_TERM_WETH_2500_18%"
+  },
+  {
+    "addr": "0x59ba97ad5dcb1d3d674646d1a81c02b3315e3acb",
+    "name": "1_TERM_WETH_2500_20%"
+  },
+  {
+    "addr": "0xf0d8af1d1822935b16b67589588171b7b5948d8f",
+    "name": "1_TERM_WBTC_20000_08%"
+  },
+  {
+    "addr": "0xee0cd1c2f35e5069ed9226af3b5b287d5f03ec17",
+    "name": "1_TERM_WBTC_20000_10%"
+  },
+  {
+    "addr": "0xc58290aef112c6e4453863ffffd4c2c6a0441ed3",
+    "name": "1_TERM_WBTC_20000_12%"
+  },
+  {
+    "addr": "0xbe5c20a60b4c83f8eead1fc01feec42790392758",
+    "name": "1_TERM_WBTC_20000_14%"
+  },
+  {
+    "addr": "0x3853bd2fb09a5f3697d202dcbaa45aa77207c274",
+    "name": "1_TERM_WBTC_20000_16%"
+  },
+  {
+    "addr": "0x5abac9dd1dd065b93ba3f50b7f4dde3657b3c1ac",
+    "name": "1_TERM_WBTC_20000_18%"
+  },
+  {
+    "addr": "0x5d25d2d50b62659701cfe9509ef19971204c3bc1",
+    "name": "1_TERM_WBTC_20000_20%"
+  },
+  {
+    "addr": "0x5b8894eca05a5fc71a4f4ee18f1b6cc35c7c5cfa",
+    "name": "1_TERM_WBTC_25000_08%"
+  },
+  {
+    "addr": "0xd6a42f9e8b9229897d030dcb8167ff14a973873c",
+    "name": "1_TERM_WBTC_25000_10%"
+  },
+  {
+    "addr": "0x77bf1b725e9a140e6bb50e4293529349e99432ca",
+    "name": "1_TERM_WBTC_25000_12%"
+  },
+  {
+    "addr": "0x1ca7d17530118ed2da0b73942e444033bd2be55b",
+    "name": "1_TERM_WBTC_25000_14%"
+  },
+  {
+    "addr": "0xce27be01873dcdc20dfc1d759a5c748166396a66",
+    "name": "1_TERM_WBTC_25000_16%"
+  },
+  {
+    "addr": "0xc43ed92ced52b17831af309769e2c4ee0a30df52",
+    "name": "1_TERM_WBTC_25000_18%"
+  },
+  {
+    "addr": "0x7709fc338bab11f07a1cb0da2ac5e2b999d7e853",
+    "name": "1_TERM_WBTC_25000_20%"
+  },
+  {
+    "addr": "0xfe4535450c47c02132e623b841bfdad98810f495",
+    "name": "1_TERM_WBTC_30000_08%"
+  },
+  {
+    "addr": "0x8008b048ec5a6e180eabe07647ef8805f3f7db71",
+    "name": "1_TERM_WBTC_30000_10%"
+  },
+  {
+    "addr": "0x7263ec25939b0f748273341b741c0f461c1b02d3",
+    "name": "1_TERM_WBTC_30000_12%"
+  },
+  {
+    "addr": "0x2603ba381422115f61e234df367a57849dcf96ac",
+    "name": "1_TERM_WBTC_30000_14%"
+  },
+  {
+    "addr": "0xed0c60347e01643df77c0625b5fa8bdb25acdc1c",
+    "name": "1_TERM_WBTC_30000_16%"
+  },
+  {
+    "addr": "0x3a26fab3afe6b3eb21e6ba131d00cfbb8b9f589a",
+    "name": "1_TERM_WBTC_30000_18%"
+  },
+  {
+    "addr": "0xa36308f13028c4029b7f7721ae81e94862509a95",
+    "name": "1_TERM_WBTC_30000_20%"
+  },
+  {
+    "addr": "0x1134cb3d7e67cd90a4b52db0239ef048da0c1cc5",
+    "name": "1_TERM_WBTC_35000_08%"
+  },
+  {
+    "addr": "0x114389022af950e852d20319d3a0d2ca69b4e1d2",
+    "name": "1_TERM_WBTC_35000_10%"
+  },
+  {
+    "addr": "0x19021b1c6f4cd62c980d3fa326cd230403c6fb77",
+    "name": "1_TERM_WBTC_35000_12%"
+  },
+  {
+    "addr": "0xbac44f75e52285784150a54c39043d8a2d069663",
+    "name": "1_TERM_WBTC_35000_14%"
+  },
+  {
+    "addr": "0x832a6def92ec535adfb46ef2457d235d4a1aa862",
+    "name": "1_TERM_WBTC_35000_16%"
+  },
+  {
+    "addr": "0x7a05e99126b945a90ea253114d01f1b3988fd281",
+    "name": "1_TERM_WBTC_35000_18%"
+  },
+  {
+    "addr": "0x74ae6aefde95c23cacf9b2b46f74b24ae353e75c",
+    "name": "1_TERM_WBTC_35000_20%"
+  },
+  {
+    "addr": "0x41c0e76db016bda1860f555e02d6deddd7638a90",
+    "name": "1_TERM_WBTC_45000_08%"
+  },
+  {
+    "addr": "0xe257589a63847cf9bf4761863119952438a9e485",
+    "name": "1_TERM_WBTC_45000_10%"
+  },
+  {
+    "addr": "0xb484efdf79dce636f0b0a61e8234e621a89c9748",
+    "name": "1_TERM_WBTC_45000_12%"
+  },
+  {
+    "addr": "0x093c404432b089acd1892a4b348a7ae6ae946756",
+    "name": "1_TERM_WBTC_45000_14%"
+  },
+  {
+    "addr": "0x076769fc80294fea7e834fa0a6586a9d092d976e",
+    "name": "1_TERM_WBTC_45000_16%"
+  },
+  {
+    "addr": "0x6ee7ddcad55fe7a1b0338a51aee1c583f2054692",
+    "name": "1_TERM_WBTC_45000_18%"
+  },
+  {
+    "addr": "0x5138efbec6554fa12ed6d8f472471d96242eed9b",
+    "name": "1_TERM_WBTC_45000_20%"
+  },
+  {
+    "addr": "0xfcec53014e469c35b0fb38fcc9782dee83b082d1",
+    "name": "1_TERM_RETH_500_08%"
+  },
+  {
+    "addr": "0x3f60564d5d76f8b18bf8f1ad57dd66785123238e",
+    "name": "1_TERM_RETH_500_10%"
+  },
+  {
+    "addr": "0x1ea4cdf004ec940c86a12af72f5cd86612934cf3",
+    "name": "1_TERM_RETH_500_12%"
+  },
+  {
+    "addr": "0x66f789b62549895bfd01e2d5c51dbc425946e693",
+    "name": "1_TERM_RETH_500_14%"
+  },
+  {
+    "addr": "0x8634cab2d6654a176cac6606be1cdb32c67a3dc4",
+    "name": "1_TERM_RETH_500_16%"
+  },
+  {
+    "addr": "0xabd1bc86376a08d0f0ec8c4c20071a66adabb418",
+    "name": "1_TERM_RETH_500_18%"
+  },
+  {
+    "addr": "0x4877ef2a89605fd8c11954ceb3f9febdb9e88033",
+    "name": "1_TERM_RETH_500_20%"
+  },
+  {
+    "addr": "0x75c94c8b39bab925a3f4d20be81537ddf844d6d1",
+    "name": "1_TERM_RETH_750_08%"
+  },
+  {
+    "addr": "0x63eac2607ca35719083aa65f94d43ac1ae8269ad",
+    "name": "1_TERM_RETH_750_10%"
+  },
+  {
+    "addr": "0x7acabdc7ddf36e37a3c199c081a383d6ec65a427",
+    "name": "1_TERM_RETH_750_12%"
+  },
+  {
+    "addr": "0xd091f700d99c93f159a01d2716fc669f6294504e",
+    "name": "1_TERM_RETH_750_14%"
+  },
+  {
+    "addr": "0x212285e7e152aed3420db5e6c1105822e32b872c",
+    "name": "1_TERM_RETH_750_16%"
+  },
+  {
+    "addr": "0x647e88d4da2541336b83194ac1321e96b2c2e86a",
+    "name": "1_TERM_RETH_750_18%"
+  },
+  {
+    "addr": "0x55dc609a38c4babb1a9744de95cbc77ce648ff5a",
+    "name": "1_TERM_RETH_750_20%"
+  },
+  {
+    "addr": "0xa3b9bffa0ab6bc9ee78207bbbbb79381c0d491cc",
+    "name": "1_TERM_RETH_1000_08%"
+  },
+  {
+    "addr": "0xa81815eddd6e2868292d0c19e001ba9a94f40be8",
+    "name": "1_TERM_RETH_1000_10%"
+  },
+  {
+    "addr": "0x8968e69f267f172112c48db5cf2767a397a8fa78",
+    "name": "1_TERM_RETH_1000_12%"
+  },
+  {
+    "addr": "0x848f5d86487d020eb43564fe26db5e17904f73bc",
+    "name": "1_TERM_RETH_1000_14%"
+  },
+  {
+    "addr": "0x9d6db74ac065e34de3b8b2ce5ab79c8f4db25800",
+    "name": "1_TERM_RETH_1000_16%"
+  },
+  {
+    "addr": "0xeebe3af5f1ec9cf659fe1c1c4ba41e0768b26e9c",
+    "name": "1_TERM_RETH_1000_18%"
+  },
+  {
+    "addr": "0xd21a297577841cfbd2c7cb7ece4851c6b26a12f4",
+    "name": "1_TERM_RETH_1000_20%"
+  },
+  {
+    "addr": "0xebb572cc4b8135dab7a57c863ed1eef90f708579",
+    "name": "1_TERM_RETH_1500_08%"
+  },
+  {
+    "addr": "0xbcd74388d49dd3042d9c083353106b1c6dc8cb12",
+    "name": "1_TERM_RETH_1500_10%"
+  },
+  {
+    "addr": "0x979b0e30d43dc306a5dc12f6fe84990be4c88249",
+    "name": "1_TERM_RETH_1500_12%"
+  },
+  {
+    "addr": "0x339117afb7ef7bfa36003463e61643b93b6e8d87",
+    "name": "1_TERM_RETH_1500_14%"
+  },
+  {
+    "addr": "0x6f4ffe2004afb87239aa35e076e3635d484384a8",
+    "name": "1_TERM_RETH_1500_16%"
+  },
+  {
+    "addr": "0x4f2a37d2f49897de39cb6f843a9f9be45507ddea",
+    "name": "1_TERM_RETH_1500_18%"
+  },
+  {
+    "addr": "0x74e01b7b08c1c0a79978caa12571f61425766923",
+    "name": "1_TERM_RETH_1500_20%"
+  },
+  {
+    "addr": "0x67cf8c209960cbc5428377afbb1f4fae929655aa",
+    "name": "1_TERM_RETH_2000_08%"
+  },
+  {
+    "addr": "0x74d92e7423138c5cdf2b55ed52f0d6ecfe889d56",
+    "name": "1_TERM_RETH_2000_10%"
+  },
+  {
+    "addr": "0x45af5795bbdf7752c7ee729274ee699ed1ae4942",
+    "name": "1_TERM_RETH_2000_12%"
+  },
+  {
+    "addr": "0x4fcfd08996b047f299abc253c872c0bcb748b36b",
+    "name": "1_TERM_RETH_2000_14%"
+  },
+  {
+    "addr": "0xa64233dce86f6a14c2c48ef3a185edc2fb085d58",
+    "name": "1_TERM_RETH_2000_16%"
+  },
+  {
+    "addr": "0xd1b159ee5f51673b0d3c2eafb5d189d7ee604911",
+    "name": "1_TERM_RETH_2000_18%"
+  },
+  {
+    "addr": "0x7b84438cd2977b8b090c39d62992bfd44234425b",
+    "name": "1_TERM_RETH_2000_20%"
+  },
+  {
+    "addr": "0x421005c76a9ab7cf92b9cae25baa25f4f1fae4ec",
+    "name": "1_TERM_RETH_2500_08%"
+  },
+  {
+    "addr": "0x8eb3cf18131afd404bea46fa457507f9418fe08b",
+    "name": "1_TERM_RETH_2500_10%"
+  },
+  {
+    "addr": "0xdf59dbfaa9751f10e808b694c830111a20254082",
+    "name": "1_TERM_RETH_2500_12%"
+  },
+  {
+    "addr": "0xe7d2e6427c3f2796758527a8627e40dc1e00f2b8",
+    "name": "1_TERM_RETH_2500_14%"
+  },
+  {
+    "addr": "0x9bc4f5e6683dcfbc79021f9486b8b006df2a515c",
+    "name": "1_TERM_RETH_2500_16%"
+  },
+  {
+    "addr": "0x2a1df57d7ded0bcb1f9d23fe6c82bc39ece627f8",
+    "name": "1_TERM_RETH_2500_18%"
+  },
+  {
+    "addr": "0x5b6df6e29fce58111516fa56492e775859ccab63",
+    "name": "1_TERM_RETH_2500_20%"
+  },
+  {
+    "addr": "0xc6bfd0c382c70d25b525c19c2a8ccf2a6067d3cc",
+    "name": "1_TERM_PENDLE_0.5_08%"
+  },
+  {
+    "addr": "0x5e96440eb79cc6d7ff39a7ce5a65da09b0caf5d3",
+    "name": "1_TERM_PENDLE_0.5_10%"
+  },
+  {
+    "addr": "0x51cfa430aad27eaa354f749db1cc087bcd8c39a1",
+    "name": "1_TERM_PENDLE_0.5_12%"
+  },
+  {
+    "addr": "0x3064eaf187e346cd1aade283cb618f3fc37af49b",
+    "name": "1_TERM_PENDLE_0.5_14%"
+  },
+  {
+    "addr": "0x98c19c91307bb7a95a387b8e220caf364b8f77cb",
+    "name": "1_TERM_PENDLE_0.5_16%"
+  },
+  {
+    "addr": "0xacff51fa3a77edfe12ab1fc50640a59553b7e32d",
+    "name": "1_TERM_PENDLE_0.5_18%"
+  },
+  {
+    "addr": "0x798e41e8ae21c5efce18db3504b1554658d4023a",
+    "name": "1_TERM_PENDLE_0.5_20%"
+  },
+  {
+    "addr": "0x92d7b5a43fabd029f28f75ed8e1011718dc91958",
+    "name": "1_TERM_PENDLE_1.0_08%"
+  },
+  {
+    "addr": "0x92d5fa90d599bb696da97adeba2b3ef0de67d157",
+    "name": "1_TERM_PENDLE_1.0_10%"
+  },
+  {
+    "addr": "0x8156a09ff60075ce9d2135d18fa69eeb7dc5136c",
+    "name": "1_TERM_PENDLE_1.0_12%"
+  },
+  {
+    "addr": "0xef7b5603194a6c65ac01db4c3a6d7146d7882c07",
+    "name": "1_TERM_PENDLE_1.0_14%"
+  },
+  {
+    "addr": "0x2a9dbc4beb3b5c38401072bc5274413de46a83b8",
+    "name": "1_TERM_PENDLE_1.0_16%"
+  },
+  {
+    "addr": "0xced779224b0298311ca4e08385713c7c82e38d7e",
+    "name": "1_TERM_PENDLE_1.0_18%"
+  },
+  {
+    "addr": "0x6735f7ad2dda7a2af3a98744af2613b62d8a5e36",
+    "name": "1_TERM_PENDLE_1.0_20%"
+  },
+  {
+    "addr": "0xa87ad668dba14b44c38a7c4881a0578cf2d50319",
+    "name": "1_TERM_PENDLE_2.0_08%"
+  },
+  {
+    "addr": "0xce5292833250dbc8e22237a2edab918e83b7f912",
+    "name": "1_TERM_PENDLE_2.0_10%"
+  },
+  {
+    "addr": "0x087449e2daebf4507e28ed6f9bb97aca458184c1",
+    "name": "1_TERM_PENDLE_2.0_12%"
+  },
+  {
+    "addr": "0x3774a6f01510efa343d099ed537f13fa8744480e",
+    "name": "1_TERM_PENDLE_2.0_14%"
+  },
+  {
+    "addr": "0xccb072e5be20ceaca78330a2ce29d75a2898b623",
+    "name": "1_TERM_PENDLE_2.0_16%"
+  },
+  {
+    "addr": "0x094c4a04c7bcd67fdcf2dd45b358baadc5f96178",
+    "name": "1_TERM_PENDLE_2.0_18%"
+  },
+  {
+    "addr": "0x1810f352f9c17effe66b7178c5e66e92e88295d9",
+    "name": "1_TERM_PENDLE_2.0_20%"
+  },
+  {
+    "addr": "0x5d87b2f530e9c1e605eee48e41c10534b7e29c78",
+    "name": "3_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0xafbe44e79e9affb25ced16d971933219d1d6ec8d",
+    "name": "3_CREDIT"
+  },
+  {
+    "addr": "0xcd73a3f1aaca330e8bf358e1baf9677836f62ee8",
+    "name": "3_RLCM"
+  },
+  {
+    "addr": "0x55ab4c8a5f11f8e62d7822d5aed778784df12afd",
+    "name": "3_SGM"
+  },
+  {
+    "addr": "0x475840078280bae8ef2428dbe151c7b349cf3f50",
+    "name": "3_PSM"
+  },
+  {
+    "addr": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+    "name": "3_PEG_TOKEN"
+  },
+  {
+    "addr": "0x1fa34cbe3b74eb75bb7cbf137e709fd061933133",
+    "name": "3_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x4279b0859f7388fa7314f41224936dac4875d4f6",
+    "name": "3_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x5c65942c117e57742e40f7581f1fee4cb8c260dc",
+    "name": "3_TERM_ARB_0.00010_01%"
+  },
+  {
+    "addr": "0x7493e635b3891e9e7ce41e49169528e6378e8d42",
+    "name": "3_TERM_ARB_0.00010_02%"
+  },
+  {
+    "addr": "0x2220460514aa7f891b1748a5bdb0511683187fc2",
+    "name": "3_TERM_ARB_0.00010_03%"
+  },
+  {
+    "addr": "0x8d95be4f090ed6e922648d3c132a03e79f3e4c6e",
+    "name": "3_TERM_ARB_0.00010_04%"
+  },
+  {
+    "addr": "0xeff3314674e3edeef302fe8263c39bdbe7a2d64e",
+    "name": "3_TERM_ARB_0.00010_05%"
+  },
+  {
+    "addr": "0x8e4bc5a77b6e391fd05d868785c4ec22926832c7",
+    "name": "3_TERM_ARB_0.00015_01%"
+  },
+  {
+    "addr": "0xf5c472deee2483ad93ea70b81383b5a6e84f86bb",
+    "name": "3_TERM_ARB_0.00015_02%"
+  },
+  {
+    "addr": "0x7b4f8be9e1182b9e4cdbfeaa1c85b3d877f2bc61",
+    "name": "3_TERM_ARB_0.00015_03%"
+  },
+  {
+    "addr": "0x7049e9d5e491cae4d5215c9cc8e2da3f3e172e1c",
+    "name": "3_TERM_ARB_0.00015_04%"
+  },
+  {
+    "addr": "0x17224a9c3c4554ca8acaa3b7ffc53baa9c8e8c41",
+    "name": "3_TERM_ARB_0.00015_05%"
+  },
+  {
+    "addr": "0xe122b753175c0e58bc10e4fbc0ceed0ca0095540",
+    "name": "3_TERM_ARB_0.00020_01%"
+  },
+  {
+    "addr": "0x61fc44b844f708e3e596ad32e3f1a9ba821fcda6",
+    "name": "3_TERM_ARB_0.00020_02%"
+  },
+  {
+    "addr": "0x884f2f23d76f948c497b9ebdc52d03a5376a798b",
+    "name": "3_TERM_ARB_0.00020_03%"
+  },
+  {
+    "addr": "0x62d2dc5f8274bbc3ea79f33f055edcb77d48f6f6",
+    "name": "3_TERM_ARB_0.00020_04%"
+  },
+  {
+    "addr": "0xeed385ed44c6944addc8ad57c34e9550e14d872a",
+    "name": "3_TERM_ARB_0.00020_05%"
+  },
+  {
+    "addr": "0xda6e58a3a8fafbd1e617b75b2219332ddcc77650",
+    "name": "3_TERM_ARB_0.00025_01%"
+  },
+  {
+    "addr": "0x11505ca05bef57f7f26ab2fd5774afb121c398b1",
+    "name": "3_TERM_ARB_0.00025_02%"
+  },
+  {
+    "addr": "0x35a9d6ef1d125a11d81fd45e3961270252e484d6",
+    "name": "3_TERM_ARB_0.00025_03%"
+  },
+  {
+    "addr": "0xc7f3ebcd3f3da5a8bdf0841a4e935f0e1ba70c27",
+    "name": "3_TERM_ARB_0.00025_04%"
+  },
+  {
+    "addr": "0x8f9e778876e9a28d0e4c850024c8789585b7d566",
+    "name": "3_TERM_ARB_0.00025_05%"
+  },
+  {
+    "addr": "0x0fa9e5815a34990c3ca42703a576be674d0f621a",
+    "name": "3_TERM_WEETH_0.7_08%"
+  },
+  {
+    "addr": "0x9456e262a68bf2bc8cb9265278d0f8ad657d8652",
+    "name": "3_TERM_WEETH_0.7_10%"
+  },
+  {
+    "addr": "0x2173fe77e9ff8e75e72035d6f090711801c6b035",
+    "name": "3_TERM_WEETH_0.7_12%"
+  },
+  {
+    "addr": "0x3b5b074ab56f808448c5b04144a7a2f83df3c3b7",
+    "name": "3_TERM_WBTC_14_03%"
+  },
+  {
+    "addr": "0x12e4cdaffd54b9ce0555d7cc3dfce151d50a1350",
+    "name": "3_TERM_WBTC_14_04%"
+  },
+  {
+    "addr": "0xc382ec61380b991d2029aaedea7547ec32a5b66b",
+    "name": "3_TERM_WBTC_14_05%"
+  },
+  {
+    "addr": "0x0658c81b4edc3b94686ac204174b0edfce884962",
+    "name": "3_TERM_WBTC_15_03%"
+  },
+  {
+    "addr": "0xaa19fcc1b1b06b9b82558bd1da56462f85fc9b13",
+    "name": "3_TERM_WBTC_15_04%"
+  },
+  {
+    "addr": "0x2e464418151424c0875610ee53573df2fbb51d93",
+    "name": "3_TERM_WBTC_15_05%"
+  },
+  {
+    "addr": "0x977f93f6373b1f2a5e17ea6227665061a46a0eb2",
+    "name": "3_TERM_WBTC_16_03%"
+  },
+  {
+    "addr": "0x045e7238278d8bb6f2ce0c66d7a4047b417b3507",
+    "name": "3_TERM_WBTC_16_04%"
+  },
+  {
+    "addr": "0xc246f125dad5242208d5051b47d4cbcf611f799a",
+    "name": "3_TERM_WBTC_16_05%"
+  },
+  {
+    "addr": "0xcc2bb4bf184a456d00cf22b8e19ef5e410e373a7",
+    "name": "3_TERM_ERC20_PT_WEETH_27JUN2024_0.7_08%"
+  },
+  {
+    "addr": "0x92a661ad3a8d68b4aa3174f71ed5e2fefa74e224",
+    "name": "3_TERM_ERC20_PT_WEETH_27JUN2024_0.7_10%"
+  },
+  {
+    "addr": "0x66b7297c3adb28b3a7fd562604089ad659b8c09b",
+    "name": "3_TERM_ERC20_PT_WEETH_27JUN2024_0.7_12%"
+  },
+  {
+    "addr": "0xdf36b3326a4a54a9518a2a7e2c4fd49661047971",
+    "name": "3_TERM_ERC20_PT_WEETH_27JUN2024_0.7_14%"
+  },
+  {
+    "addr": "0x06ef42e61c8b209ac0bf1aa49f24f2f06dc447a1",
+    "name": "3_TERM_ERC20_PT_WEETH_27JUN2024_0.7_16%"
+  },
+  {
+    "addr": "0xea8c2daeb6196709ac8d76ac8c9bf4675e368f1c",
+    "name": "3_TERM_ERC20_PT_WEETH_27JUN2024_0.7_18%"
+  },
+  {
+    "addr": "0x3d15fa9ddc3a522080358db03d5ee56eefdbe8c8",
+    "name": "3_TERM_ERC20_PT_WEETH_27JUN2024_0.7_20%"
+  },
+  {
+    "addr": "0xb9e256a5a311f454b646f24ae1ba084c4a6de788",
+    "name": "3_TERM_ERC20_PT_RSETH_27JUN2024_0.7_08%"
+  },
+  {
+    "addr": "0x54f3bd7670e765b1c8b3574ca8b6d56057d2acdb",
+    "name": "3_TERM_ERC20_PT_RSETH_27JUN2024_0.7_10%"
+  },
+  {
+    "addr": "0x15628c74f8b6e481e62ddd11f77ee2174d1589d8",
+    "name": "3_TERM_ERC20_PT_RSETH_27JUN2024_0.7_12%"
+  },
+  {
+    "addr": "0xdf2d842ec70b9ab040b7a79a927d1f5e3fde65af",
+    "name": "3_TERM_ERC20_PT_RSETH_27JUN2024_0.7_14%"
+  },
+  {
+    "addr": "0xa9bad8e7b3b6c84aa53c4602267847416eab24db",
+    "name": "3_TERM_ERC20_PT_RSETH_27JUN2024_0.7_16%"
+  },
+  {
+    "addr": "0xfa8f3cdf2334a58e998e9679a0d3f855863ac9d2",
+    "name": "3_TERM_ERC20_PT_RSETH_27JUN2024_0.7_18%"
+  },
+  {
+    "addr": "0x8077f78f244e71ce1ce38ebf8482647e4b2f14c2",
+    "name": "3_TERM_ERC20_PT_RSETH_27JUN2024_0.7_20%"
+  },
+  {
+    "addr": "0xc09bb017a9b2fa364d060119a90267cc09e449fe",
+    "name": "3_TERM_USDC_0.000150_03%"
+  },
+  {
+    "addr": "0x43ee18971ed50b0e57ac2276ffac5d4865f913bf",
+    "name": "3_TERM_USDC_0.000150_04%"
+  },
+  {
+    "addr": "0x435178917ff78a5ad6b1dedf65b13f9871d5748a",
+    "name": "3_TERM_USDC_0.000150_05%"
+  },
+  {
+    "addr": "0xab5d30679e1396d33bdebe1298e132d8e3d5c8f0",
+    "name": "3_TERM_USDC_0.000175_03%"
+  },
+  {
+    "addr": "0xe5a81c6426624ac75505a4c286e73d035169c05a",
+    "name": "3_TERM_USDC_0.000175_04%"
+  },
+  {
+    "addr": "0xb5cf95a5adb77394ea04341d497c7002a4cf17be",
+    "name": "3_TERM_USDC_0.000175_05%"
+  },
+  {
+    "addr": "0x1c912179e69e31a5c70397832b7be9459632a6d0",
+    "name": "3_TERM_USDC_0.000200_03%"
+  },
+  {
+    "addr": "0x5d60c337603c961bf09654049b0de7c82b7d68ad",
+    "name": "3_TERM_USDC_0.000200_04%"
+  },
+  {
+    "addr": "0xa627dd09180e5bfb4fe5a0d17d1ba562255be75f",
+    "name": "3_TERM_USDC_0.000200_05%"
+  },
+  {
+    "addr": "0xd5a06a1bfdebf59392094a5ba332d88e651dc42d",
+    "name": "3_TERM_USDC_0.000250_03%"
+  },
+  {
+    "addr": "0x99f3afbb6ace401c33646f3f6c53994de147dd19",
+    "name": "3_TERM_USDC_0.000250_04%"
+  },
+  {
+    "addr": "0x0bd3b56bd57f230d650f0140ea32f716d0f96db7",
+    "name": "3_TERM_USDC_0.000250_05%"
+  },
+  {
+    "addr": "0x94a8599d03b784d6a35961afc7e655d44e46153e",
+    "name": "3_TERM_USDT_0.000150_03%"
+  },
+  {
+    "addr": "0x2cd9a8fa076aafeed06fe300ddabb45ac3a92811",
+    "name": "3_TERM_USDT_0.000150_04%"
+  },
+  {
+    "addr": "0xb7bc46098ce668c261bb07ffe85e8d7417e60d3b",
+    "name": "3_TERM_USDT_0.000150_05%"
+  },
+  {
+    "addr": "0xa755f46deeb4dda15b12fc7fa2fb68ff5789d875",
+    "name": "3_TERM_USDT_0.000175_03%"
+  },
+  {
+    "addr": "0x7d7130ccd87172838299bc5c2ded040063685ac7",
+    "name": "3_TERM_USDT_0.000175_04%"
+  },
+  {
+    "addr": "0xf73be9b20fe0dda72c7b28dbb83cf1471337f409",
+    "name": "3_TERM_USDT_0.000175_05%"
+  },
+  {
+    "addr": "0xc46d5f3655fc6102ba6d5fc4e66da8e021d2f72a",
+    "name": "3_TERM_USDT_0.000200_03%"
+  },
+  {
+    "addr": "0x4de2652a2db3681d1a64e9dbf3672163aca66039",
+    "name": "3_TERM_USDT_0.000200_04%"
+  },
+  {
+    "addr": "0x9bf7315bbe9c590142bae3a49b321cda12f170c4",
+    "name": "3_TERM_USDT_0.000200_05%"
+  },
+  {
+    "addr": "0x745b845aef433d5926d9ed39a02de1c170022cc4",
+    "name": "3_TERM_USDT_0.000250_03%"
+  },
+  {
+    "addr": "0xc0051025b92f75f7435f9f464f0c65a2f6563b5b",
+    "name": "3_TERM_USDT_0.000250_04%"
+  },
+  {
+    "addr": "0x02d45c6484deda1626b8b1fd582e9fc4248d0acf",
+    "name": "3_TERM_USDT_0.000250_05%"
+  },
+  {
+    "addr": "0xb5cece4bb0f9595a0212a6e418395bfce69d2623",
+    "name": "3_TERM_WSTETH_0.95_01%"
+  },
+  {
+    "addr": "0x8aa80c45f65f2b6a953c8478aeff35746b8ea637",
+    "name": "3_TERM_WSTETH_0.95_02%"
+  },
+  {
+    "addr": "0x863a61922b9435ee7bf6352e36ee0fe406f32fc0",
+    "name": "3_TERM_WSTETH_0.95_03%"
+  },
+  {
+    "addr": "0x0b3c054fb1d20c9d3e3b16e2fce672ddcf44b40e",
+    "name": "3_TERM_WSTETH_0.95_04%"
+  },
+  {
+    "addr": "0x65e9c01d7899428216e8c4af059aef0509cadf48",
+    "name": "3_TERM_WSTETH_0.95_05%"
+  },
+  {
+    "addr": "0xe519170c1edeccca54d93b61678196f5a078d1a1",
+    "name": "3_TERM_RETH_0.95_01%"
+  },
+  {
+    "addr": "0xecffdab905b7a6cac349d31672c28805b5ff9fc8",
+    "name": "3_TERM_RETH_0.95_02%"
+  },
+  {
+    "addr": "0xb95d9fabbe218c866b343f8f03399be7d9a32c4c",
+    "name": "3_TERM_RETH_0.95_03%"
+  },
+  {
+    "addr": "0xe8af03c9d4335b30efb62d6873576600fbf84e8f",
+    "name": "3_TERM_RETH_0.95_04%"
+  },
+  {
+    "addr": "0x548c95d5f49ff3d2a078ad4ff21ec7c56dba092b",
+    "name": "3_TERM_RETH_0.95_05%"
+  },
+  {
+    "addr": "0x7181e377b259d7c8d4cafdfe9fbe103dc5bfce45",
+    "name": "4_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0x8d8b654e2b6a0289d8f758cbccc42ab387c67b61",
+    "name": "4_CREDIT"
+  },
+  {
+    "addr": "0x22913e5a6a31eac9474190d434885614ed8459da",
+    "name": "4_RLCM"
+  },
+  {
+    "addr": "0x6995aa07b177918423d2127b885b67e7a3cec265",
+    "name": "4_SGM"
+  },
+  {
+    "addr": "0x4dc22679436e4c751bdfe6c518cd7768e999ced3",
+    "name": "4_PSM"
+  },
+  {
+    "addr": "0x912ce59144191c1204e64559fe8253a0e49e6548",
+    "name": "4_PEG_TOKEN"
+  },
+  {
+    "addr": "0xb083d5d422f455342093752b60e0c2fb4bb9f2ce",
+    "name": "4_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x17a6891002cfbe9ff42ebe3049706266a2ed5f44",
+    "name": "4_ONBOARD_VETO_CREDIT"
+  }
+]

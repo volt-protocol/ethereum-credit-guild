@@ -9,8 +9,8 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
     function testVoteForGauge() public {
         uint256 mintAmount = governor.quorum(0);
         /// setup
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(address(this), mintAmount);
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(address(this), mintAmount);
         guild.delegate(address(this));
 
         assertTrue(guild.isGauge(address(term)));
@@ -107,7 +107,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
     }
 
     function _doMint(address to, uint128 amount) private returns (uint256) {
-        deal(address(usdc), to, amount);
+        dealPegToken(to, amount);
 
         uint256 startingUsdcBalance = usdc.balanceOf(to);
         uint256 startingCreditBalance = credit.balanceOf(to);

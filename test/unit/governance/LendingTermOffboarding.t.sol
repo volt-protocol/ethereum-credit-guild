@@ -14,6 +14,7 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
 import {ProfitManager} from "@src/governance/ProfitManager.sol";
 import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
+import {LendingTermFactory} from "@src/governance/LendingTermFactory.sol";
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 
 contract LendingTermOffboardingUnitTest is ECGTest {
@@ -26,6 +27,7 @@ contract LendingTermOffboardingUnitTest is ECGTest {
     SimplePSM private psm;
     LendingTerm private term;
     AuctionHouse auctionHouse;
+    LendingTermFactory private factory;
     RateLimitedMinter rlcm;
     LendingTermOffboarding private offboarder;
     address private constant alice = address(0x616c696365);
@@ -67,33 +69,42 @@ contract LendingTermOffboardingUnitTest is ECGTest {
             address(collateral)
         );
         profitManager.initializeReferences(address(credit), address(guild));
+        factory = new LendingTermFactory(address(core), address(guild));
         offboarder = new LendingTermOffboarding(
             address(core),
             address(guild),
-            address(psm),
+            address(factory),
             _QUORUM
         );
         auctionHouse = new AuctionHouse(address(core), 650, 1800, 0);
-        term = LendingTerm(Clones.clone(address(new LendingTerm())));
-        term.initialize(
-            address(core),
-            LendingTerm.LendingTermReferences({
+        LendingTerm termImplementation = new LendingTerm();
+        factory.allowImplementation(address(termImplementation), true);
+        factory.allowAuctionHouse(address(auctionHouse), true);
+        factory.setMarketReferences(
+            1,
+            LendingTermFactory.MarketReferences({
                 profitManager: address(profitManager),
-                guildToken: address(guild),
-                auctionHouse: address(auctionHouse),
                 creditMinter: address(rlcm),
-                creditToken: address(credit)
-            }),
-            abi.encode(
-                LendingTerm.LendingTermParams({
-                    collateralToken: address(collateral),
-                    maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
-                    interestRate: _INTEREST_RATE,
-                    maxDelayBetweenPartialRepay: 0,
-                    minPartialRepayPercent: 0,
-                    openingFee: 0,
-                    hardCap: _HARDCAP
-                })
+                creditToken: address(credit),
+                psm: address(psm)
+            })
+        );
+        term = LendingTerm(
+            factory.createTerm(
+                1,
+                address(termImplementation),
+                address(auctionHouse),
+                abi.encode(
+                    LendingTerm.LendingTermParams({
+                        collateralToken: address(collateral),
+                        maxDebtPerCollateralToken: _CREDIT_PER_COLLATERAL_TOKEN,
+                        interestRate: _INTEREST_RATE,
+                        maxDelayBetweenPartialRepay: 0,
+                        minPartialRepayPercent: 0,
+                        openingFee: 0,
+                        hardCap: _HARDCAP
+                    })
+                )
             )
         );
 

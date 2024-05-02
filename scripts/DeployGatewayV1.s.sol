@@ -20,7 +20,8 @@ contract DeployGatewayV1 is Script {
 
     // TERMS
     address public SDAI_TERM = 0x938998fca53D8BFD91BC1726D26238e9Eada596C;
-    address public SDAI_TERM_REPAY_1SEC = 0x427425372b643fc082328b70A0466302179260f5;
+    address public SDAI_TERM_REPAY_1SEC =
+        0x427425372b643fc082328b70A0466302179260f5;
     address public WBTC_TERM = 0x820E8F9399514264Fd8CB21cEE5F282c723131f6;
 
     // OTHERS
@@ -102,7 +103,11 @@ contract DeployGatewayV1 is Script {
             true
         );
         gatewayv1.allowCall(SDAI_TERM, getSelector("repay(bytes32)"), true);
-        gatewayv1.allowCall(SDAI_TERM_REPAY_1SEC, getSelector("repay(bytes32)"), true);
+        gatewayv1.allowCall(
+            SDAI_TERM_REPAY_1SEC,
+            getSelector("repay(bytes32)"),
+            true
+        );
         gatewayv1.allowCall(WBTC_TERM, getSelector("repay(bytes32)"), true);
 
         // allow redeem and mint on the psm

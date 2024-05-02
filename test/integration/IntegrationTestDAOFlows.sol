@@ -26,20 +26,22 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
 
         uint256 mintAmount = governor.quorum(0);
 
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(address(this), mintAmount); /// mint quorum to contract
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(address(this), mintAmount); /// mint quorum to contract
 
         guild.delegate(address(this));
 
         vm.roll(block.number + 1); /// ensure user votes register
 
         /// new term so that onboard succeeds
+        LendingTerm.LendingTermParams memory params = term.getParameters();
+        params.hardCap = params.hardCap * 123456;
         term = LendingTerm(
             factory.createTerm(
                 factory.gaugeTypes(address(term)),
                 factory.termImplementations(address(term)),
                 term.getReferences().auctionHouse,
-                abi.encode(term.getParameters())
+                abi.encode(params)
             )
         );
     }
@@ -542,8 +544,8 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
 
         assertEq(governor.proposalThreshold(), newProposalThreshold);
 
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(userOne, newProposalThreshold); /// mint quorum amount to user one
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(userOne, newProposalThreshold); /// mint quorum amount to user one
 
         vm.startPrank(userOne);
         guild.delegate(userOne);
@@ -633,8 +635,8 @@ contract IntegrationTestDAOFlows is PostProposalCheckFixture {
 
         assertEq(governor.quorum(0), newQuorum, "new quorum not set");
 
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(userOne, newQuorum); /// mint new quorum amount to user one
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(userOne, newQuorum); /// mint new quorum amount to user one
 
         vm.startPrank(userOne);
         guild.delegate(userOne);

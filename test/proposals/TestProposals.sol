@@ -5,7 +5,7 @@ import {console} from "@forge-std/console.sol";
 import {ECGTest} from "@test/ECGTest.sol";
 import {Proposal} from "@test/proposals/proposalTypes/Proposal.sol";
 
-import {GIP_0} from "@test/proposals/gips/GIP_0.sol";
+import {GIP_X} from "@test/proposals/gips/GIP_X.sol";
 
 /*
 How to use:
@@ -36,11 +36,11 @@ contract TestProposals is ECGTest {
         DO_TEARDOWN = vm.envOr("DO_TEARDOWN", true);
         DO_VALIDATE = vm.envOr("DO_VALIDATE", true);
 
-        proposals.push(Proposal(address(new GIP_0())));
+        proposals.push(Proposal(address(new GIP_X())));
         nProposals = proposals.length;
 
         vm.label(address(this), "TestProposals");
-        vm.label(address(proposals[0]), "GIP_0");
+        vm.label(address(proposals[0]), "GIP_X");
     }
 
     function setDebug(bool value) public {

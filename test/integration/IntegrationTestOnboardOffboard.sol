@@ -20,12 +20,16 @@ import {PostProposalCheckFixture} from "@test/integration/PostProposalCheckFixtu
 contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
     function setUp() public override {
         super.setUp();
+
+        /// new term so that onboard succeeds
+        LendingTerm.LendingTermParams memory params = term.getParameters();
+        params.hardCap = params.hardCap * 123456;
         term = LendingTerm(
             factory.createTerm(
                 factory.gaugeTypes(address(term)),
                 factory.termImplementations(address(term)),
                 term.getReferences().auctionHouse,
-                abi.encode(term.getParameters())
+                abi.encode(params)
             )
         );
 
@@ -33,8 +37,8 @@ contract IntegrationTestOnboardOffboard is PostProposalCheckFixture {
         guild.enableTransfer();
 
         uint256 mintAmount = onboarder.quorum(0);
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(address(this), mintAmount); /// mint all of the guild to this contract
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(address(this), mintAmount); /// mint all of the guild to this contract
         guild.delegate(address(this));
         vm.roll(block.number + 1); /// ensure user votes register
     }

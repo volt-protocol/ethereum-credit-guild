@@ -6,6 +6,7 @@ import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {SimplePSM} from "@src/loan/SimplePSM.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
 import {LendingTerm} from "@src/loan/LendingTerm.sol";
+import {LendingTermFactory} from "@src/governance/LendingTermFactory.sol";
 
 /// @notice Utils to offboard a LendingTerm.
 /// This contract works somewhat similarly to a Veto governor: any GUILD holder can poll for the removal
@@ -41,8 +42,8 @@ contract LendingTermOffboarding is CoreRef {
     /// @notice reference to the GUILD token
     address public immutable guildToken;
 
-    /// @notice reference to the PSM
-    address public immutable psm;
+    /// @notice reference to the LendingTermFactory
+    address public immutable factory;
 
     /// @notice list of removal polls created.
     /// keys = [snapshotBlock][termAddress] -> quorum supporting the removal.
@@ -71,11 +72,11 @@ contract LendingTermOffboarding is CoreRef {
     constructor(
         address _core,
         address _guildToken,
-        address _psm,
+        address _factory,
         uint256 _quorum
     ) CoreRef(_core) {
         guildToken = _guildToken;
-        psm = _psm;
+        factory = _factory;
         quorum = _quorum;
     }
 
@@ -184,6 +185,9 @@ contract LendingTermOffboarding is CoreRef {
 
         // if there are no other offboardings in progress, this is the
         // first offboarding to start, so we pause psm redemptions
+        (, , , address psm) = LendingTermFactory(factory).marketReferences(
+            LendingTermFactory(factory).gaugeTypes(term)
+        );
         if (
             nOffboardingsInProgress++ == 0 &&
             !SimplePSM(psm).redemptionsPaused()
@@ -222,6 +226,9 @@ contract LendingTermOffboarding is CoreRef {
 
         // if there are no other offboardings in progress, this is the
         // last offboarding to end, so we unpause psm redemptions
+        (, , , address psm) = LendingTermFactory(factory).marketReferences(
+            LendingTermFactory(factory).gaugeTypes(term)
+        );
         if (
             --nOffboardingsInProgress == 0 && SimplePSM(psm).redemptionsPaused()
         ) {
@@ -254,6 +261,9 @@ contract LendingTermOffboarding is CoreRef {
 
         // if there are no other offboardings in progress, this is the
         // last offboarding to end, so we unpause psm redemptions
+        (, , , address psm) = LendingTermFactory(factory).marketReferences(
+            LendingTermFactory(factory).gaugeTypes(term)
+        );
         if (
             --nOffboardingsInProgress == 0 && SimplePSM(psm).redemptionsPaused()
         ) {

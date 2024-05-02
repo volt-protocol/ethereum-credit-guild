@@ -549,6 +549,11 @@ contract UnitTestGatewayV1 is ECGTest {
         uint256 minProfit = 25e6; // min 25 pegtoken of profit
         while (profit == 0 && block.timestamp < stop) {
             (uint256 collateralReceived, ) = auctionHouse.getBidDetail(loanId);
+            // keep 1 wei of extra collateral unused to test the sweep function
+            // (any extra collateral should be forwarded to caller)
+            if (collateralReceived != 0) {
+                collateralReceived = collateralReceived - 1;
+            }
             // encode the swap using uniswapv2 router
             address[] memory path = new address[](2);
             path[0] = address(collateral);

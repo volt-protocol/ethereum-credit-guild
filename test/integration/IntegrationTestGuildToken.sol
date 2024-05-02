@@ -18,8 +18,8 @@ contract IntegrationTestGuildToken is PostProposalCheckFixture {
     function _mintGuildToUser(address to, uint96 amount) private {
         uint256 startingBalance = guild.balanceOf(to);
 
-        vm.prank(teamMultisig);
-        rateLimitedGuildMinter.mint(to, amount);
+        vm.prank(address(rateLimitedGuildMinter));
+        guild.mint(to, amount);
 
         assertEq(guild.balanceOf(to), startingBalance + amount);
     }

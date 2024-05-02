@@ -99,7 +99,8 @@ contract LendingTermOnboardingUnitTest is ECGTest {
             LendingTermFactory.MarketReferences({
                 profitManager: address(profitManager),
                 creditMinter: address(rlcm),
-                creditToken: address(credit)
+                creditToken: address(credit),
+                psm: address(psm)
             })
         );
 
@@ -376,7 +377,7 @@ contract LendingTermOnboardingUnitTest is ECGTest {
                 })
             )
         );
-        vm.expectRevert("LendingTerm: unknown market");
+        vm.expectRevert("LendingTermFactory: unknown market");
         factory.createTerm(
             12345,
             address(termImplementation),

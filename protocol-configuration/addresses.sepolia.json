@@ -8,123 +8,195 @@
     "name": "TEAM_MULTISIG"
   },
   {
-    "addr": "0xb027658e189F9814663631b12B9CDF8dd7CC977C",
+    "addr": "0xb027658e189f9814663631b12b9cdf8dd7cc977c",
     "name": "ESWAK"
   },
   {
-    "addr": "0xbad06297eB7878502E045319a7c4a8904b49BEEF",
+    "addr": "0xd90e9181b20d8d1b5034d9f5737804da182039f6",
+    "name": "KIRK"
+  },
+  {
+    "addr": "0xbad06297eb7878502e045319a7c4a8904b49beef",
     "name": "BADBEEF"
   },
   {
-    "addr": "0xb63C817ab0Bf103bF0149fb18fe22CdEAb5EF7b1",
-    "name": "TOMTOM"
-  },
-  {
-    "addr": "0xfc2290dbf4db882b6d3d07ecb1e00d0531b45680",
-    "name": "CORE"
-  },
-  {
     "addr": "0x7b8b4418990e4daf35f5c7f0165dc487b1963641",
-    "name": "ERC20_USDC"
+    "name": "ERC20_FAKE_USDC"
   },
   {
     "addr": "0x1ced1eb530b5e71e6db9221a22c725e862fc0e60",
-    "name": "ERC20_WBTC"
+    "name": "ERC20_FAKE_WBTC"
   },
   {
     "addr": "0x9f07498d9f4903b10db57a3bd1d91b6b64aed61e",
-    "name": "ERC20_SDAI"
+    "name": "ERC20_FAKE_SDAI"
   },
   {
-    "addr": "0x92AC88673e445097788Aaa4e34176C1611BAAc72",
+    "addr": "0x1d09eaf23095e300a8e88fb6d0569bdcd26d5c96",
     "name": "GATEWAY"
   },
   {
-    "addr": "0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008",
+    "addr": "0xc532a74256d3db42d0bf7a0400fefdbad7694008",
     "name": "UNISWAP_ROUTER"
   },
   {
-    "addr": "0x8738c00828c8e6883326ea5ba104cacff95808e0",
-    "name": "PROFIT_MANAGER"
+    "addr": "0xb8ae64f191f829fc00a4e923d460a8f2e0ba3978",
+    "name": "CORE"
   },
   {
-    "addr": "0x7dff544f61b262d7218811f78c94c3b2f4e3dca1",
-    "name": "ERC20_GUSDC"
-  },
-  {
-    "addr": "0x79e2b8553da5361d90ed08a9e3f2f3e5e5ff2f8f",
+    "addr": "0x91806c9c67255064e5d0a333c23a6c469a8007a7",
     "name": "ERC20_GUILD"
   },
   {
-    "addr": "0x81aa07eb1b22e3d3b9c7cc728640721064cad4a9",
-    "name": "RATE_LIMITED_CREDIT_MINTER"
+    "addr": "0xfb3a062236a7e08b572f17bc9ad2bbc2becb87b1",
+    "name": "ERC20_PREGUILD"
   },
   {
-    "addr": "0x9594af6eea97b43673bb046db152428b13c48377",
-    "name": "RATE_LIMITED_GUILD_MINTER"
+    "addr": "0xe38d06840c9e527b8d40309cccf4b05af0f888a5",
+    "name": "RLGM"
   },
   {
-    "addr": "0x7386c5ffbb710e543a0f3c40c1e7ee1ddcaedf51",
-    "name": "SURPLUS_GUILD_MINTER"
+    "addr": "0x7ac2ab8143634419c5bc230a9f9955c3e29f64ef",
+    "name": "AUCTION_HOUSE_6H"
   },
   {
-    "addr": "0x912e76518b318c209ef7ff04d119967acae3569e",
-    "name": "AUCTION_HOUSE"
+    "addr": "0x3a595b9283b96a3aa5292f7c4c64e2fcabe7848b",
+    "name": "AUCTION_HOUSE_12H"
   },
   {
-    "addr": "0x87b22b22666c15c11b8632c8a132ee820b783061",
+    "addr": "0xd2d12e407675ec0e418bdb4dbceaa1b0c4ee6108",
+    "name": "AUCTION_HOUSE_24H"
+  },
+  {
+    "addr": "0x4400cbe9f27f7bef2c8240a5f81a75be107d5b31",
     "name": "LENDING_TERM_V1"
   },
   {
-    "addr": "0xc19d710f13a725fd67021e8c45bdedffe95202e3",
-    "name": "PSM_USDC"
+    "addr": "0x3424f7560562468fd4f7cd268df7998090b4ab21",
+    "name": "LENDING_TERM_FACTORY"
   },
   {
-    "addr": "0x14025e6f3ac44d6d2212605bce695b7d379c2350",
+    "addr": "0x79475a4871bd4e8b8c6caae4228d98ef93622f28",
     "name": "DAO_GOVERNOR_GUILD"
   },
   {
-    "addr": "0x34badf7afe7c981d7b399f092f4557bef09c1b6f",
+    "addr": "0x5a2568b31532d9b6db228570f75b4c83f2201951",
     "name": "DAO_TIMELOCK"
   },
   {
-    "addr": "0x76b513119671176a87fa538e5814c50dd49e3e66",
-    "name": "DAO_VETO_CREDIT"
-  },
-  {
-    "addr": "0x6ef90254dd61782ead7d95974d1d47f4f7d2d377",
+    "addr": "0x0d2550d208a71805d667fb69b3aeddfd89cec48b",
     "name": "DAO_VETO_GUILD"
   },
   {
-    "addr": "0x3274ebe53c4fa1d0a59ad8fadbc6f944186b408e",
+    "addr": "0x5447d9a5f03773bd2db67319f50103d44e31dd84",
     "name": "ONBOARD_GOVERNOR_GUILD"
   },
   {
-    "addr": "0x1026847b30385606d3a22e62d5ede3b1b8e2448a",
+    "addr": "0xfc462354dc9cac684516b49f002ae769514bbe63",
     "name": "ONBOARD_TIMELOCK"
   },
   {
-    "addr": "0xd09195208a829990b0b72ef6d08d9637779338c8",
-    "name": "ONBOARD_VETO_CREDIT"
-  },
-  {
-    "addr": "0x68e47e70f66a484fcb0cef215a46d76300b2e2b2",
+    "addr": "0x24f663c69cd4b263cf5685a49013ff5f1c898d24",
     "name": "ONBOARD_VETO_GUILD"
   },
   {
-    "addr": "0xb2aed7b9dce6826d510a2559da83afd5a2af9405",
+    "addr": "0x5ae217de26f6ff5f481c6e10ec48b2cf2fc857c8",
     "name": "OFFBOARD_GOVERNOR_GUILD"
   },
   {
-    "addr": "0x938998fca53d8bfd91bc1726d26238e9eada596c",
-    "name": "TERM_SDAI_1"
+    "addr": "0x467e0efa4053ec759a31883eebf88a37347159b1",
+    "name": "42_PROFIT_MANAGER"
   },
   {
-    "addr": "0x820e8f9399514264fd8cb21cee5f282c723131f6",
-    "name": "TERM_WBTC_1"
+    "addr": "0xe910b8f7b8f27d95a97e9d204c36d3fa3fce80bd",
+    "name": "42_CREDIT"
   },
   {
-    "addr": "0xd3ecfc72fe299b58764e12ac38d59f20fc287052",
-    "name": "LENDING_TERM_FACTORY"
+    "addr": "0xcfc43e1251bd7fd2f37766c083948497b7871aeb",
+    "name": "42_RLCM"
+  },
+  {
+    "addr": "0x72ce1a88146ddaba60926d9558e94f59c7cdb73c",
+    "name": "42_SGM"
+  },
+  {
+    "addr": "0xdacfde419629be343449a1ac23b29033c41f9222",
+    "name": "42_PSM"
+  },
+  {
+    "addr": "0x7b8b4418990e4daf35f5c7f0165dc487b1963641",
+    "name": "42_PEG_TOKEN"
+  },
+  {
+    "addr": "0x47fa48413508b979ca72fe638011ecf0556429be",
+    "name": "42_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x75b984d8ad22007923b03b5d40daa1917ef35313",
+    "name": "42_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0xf7eccb480c9b667da675d914c21bc8b5d026db1f",
+    "name": "42_TERM_WBTC_10000_08%"
+  },
+  {
+    "addr": "0x9bdebb8032d63724b1fc9e38d74dac825b8f3eff",
+    "name": "42_TERM_WBTC_10000_20%"
+  },
+  {
+    "addr": "0x17342b0335f411add7d202e9b6da184f17124073",
+    "name": "42_TERM_WBTC_30000_08%"
+  },
+  {
+    "addr": "0x9e4fb9da153e37433e86099db45031d0fe46d9ea",
+    "name": "42_TERM_WBTC_30000_20%"
+  },
+  {
+    "addr": "0xa6751f2cb086ccf9bb4cc4424a9de9ae97496ede",
+    "name": "42_TERM_SDAI_0.95_08%"
+  },
+  {
+    "addr": "0x7bacae0bb37737e57fb3fe3facafd8214095d92b",
+    "name": "420_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0xce805022e35fd808139d7e541f10d6e83420d84b",
+    "name": "420_CREDIT"
+  },
+  {
+    "addr": "0xd93dc512ecd0b3b17569b4ad203e4aa77fbc2495",
+    "name": "420_RLCM"
+  },
+  {
+    "addr": "0xc4c47d18fb3aba635b7805e4bf35d89ae7911050",
+    "name": "420_SGM"
+  },
+  {
+    "addr": "0x81869fcbf98ab8982b5c30529a2e7c3c24f7554e",
+    "name": "420_PSM"
+  },
+  {
+    "addr": "0x1ced1eb530b5e71e6db9221a22c725e862fc0e60",
+    "name": "420_PEG_TOKEN"
+  },
+  {
+    "addr": "0x7ed904d3be134b3c44dcba0901a51c4ecdb364b1",
+    "name": "420_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x410bc78b149a3cdbf9d9739b161f75afbc9e88ba",
+    "name": "420_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x8f05958ebf233da8215ed5c8fcfb1689e01eab41",
+    "name": "420_TERM_ESWAK_1000_XXX%"
+  },
+  {
+    "addr": "0x3ba7ef7996c273f9c38ea284601b487c7d8f9bef",
+    "name": "420_TERM_BEEF_1000_XXX%"
+  },
+  {
+    "addr": "0x08de80738bed5b399bc83c07b5334648af4a2629",
+    "name": "420_TERM_VORIAN_1000_XXX%"
   }
 ]

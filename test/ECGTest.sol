@@ -12,6 +12,9 @@ abstract contract ECGTest is Test {
     string internal constant ADDR_PATH_SEPOLIA =
         "/protocol-configuration/addresses.sepolia.json";
 
+    string internal constant ADDR_PATH_ARBITRUM =
+        "/protocol-configuration/addresses.arbitrum.json";
+
     struct RecordedAddress {
         address addr;
         string name;
@@ -23,6 +26,9 @@ abstract contract ECGTest is Test {
 
         if (block.chainid == 11155111) {
             path = string.concat(root, ADDR_PATH_SEPOLIA);
+        }
+        if (block.chainid == 42161) {
+            path = string.concat(root, ADDR_PATH_ARBITRUM);
         }
 
         string memory json = vm.readFile(path);
@@ -36,6 +42,9 @@ abstract contract ECGTest is Test {
 
         if (block.chainid == 11155111) {
             path = string.concat(root, ADDR_PATH_SEPOLIA);
+        }
+        if (block.chainid == 42161) {
+            path = string.concat(root, ADDR_PATH_ARBITRUM);
         }
 
         string memory json = "[";
@@ -135,5 +144,41 @@ abstract contract ECGTest is Test {
             )
         );
         _write(newAddresses);
+    }
+
+    function _contains(
+        string memory what,
+        string memory where
+    ) internal pure returns (bool) {
+        bytes memory whatBytes = bytes(what);
+        bytes memory whereBytes = bytes(where);
+
+        if (whatBytes.length > whereBytes.length) {
+            return false;
+        }
+
+        bool found = false;
+        for (uint i = 0; i <= whereBytes.length - whatBytes.length; i++) {
+            bool flag = true;
+            for (uint j = 0; j < whatBytes.length; j++)
+                if (whereBytes[i + j] != whatBytes[j]) {
+                    flag = false;
+                    break;
+                }
+            if (flag) {
+                found = true;
+                break;
+            }
+        }
+        return found;
+    }
+
+    function _substring(string memory str, uint startIndex, uint endIndex) public pure returns (string memory) {
+        bytes memory strBytes = bytes(str);
+        bytes memory result = new bytes(endIndex-startIndex);
+        for(uint i = startIndex; i < endIndex; i++) {
+            result[i - startIndex] = strBytes[i];
+        }
+        return string(result);
     }
 }

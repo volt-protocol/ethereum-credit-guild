@@ -33,6 +33,7 @@ contract LendingTermFactory is CoreRef {
         address profitManager;
         address creditMinter;
         address creditToken;
+        address psm;
     }
 
     /// @notice emitted when a lending term implementation's "allowed" status changes
