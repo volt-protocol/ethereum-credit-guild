@@ -379,7 +379,7 @@ contract Arbitrum_5_MarketARB is GovernorProposal {
         address proposer = getAddr("TEAM_MULTISIG");
         address voter = getAddr("TEAM_MULTISIG");
         DEBUG = true;
-        _simulateGovernorSteps(governor, proposer, voter);
+        _simulateGovernorSteps(name(), governor, proposer, voter);
     }
 
     function teardown(address deployer) public pure virtual {}

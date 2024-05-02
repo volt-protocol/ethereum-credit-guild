@@ -14,6 +14,7 @@ abstract contract GovernorProposal is MultiStepProposal {
     /// @param proposer account to propose/queue/execute the proposal on the governor
     /// @param voter account that will castVote and has enough tokens to meet quorum
     function _simulateGovernorSteps(
+        string memory proposalTitle,
         address _governor,
         address proposer,
         address voter
@@ -26,7 +27,7 @@ abstract contract GovernorProposal is MultiStepProposal {
         address[] memory targets = new address[](steps.length);
         uint256[] memory values = new uint256[](steps.length);
         bytes[] memory payloads = new bytes[](steps.length);
-        string memory description = "";
+        string memory description = string.concat(proposalTitle, "\n\n");
 
         for (uint256 i = 0; i < steps.length; i++) {
             targets[i] = steps[i].target;
@@ -35,7 +36,8 @@ abstract contract GovernorProposal is MultiStepProposal {
             description = string.concat(description, "- ", steps[i].description, "\n");
         }
 
-        description = string.concat(description, "#proposer=", Strings.toHexString(proposer), "\n");
+        // proposer protection
+        description = string.concat(description, "\n#proposer=", Strings.toHexString(proposer), "\n");
 
         uint256 proposalId = governor.hashProposal(targets, values, payloads, keccak256(bytes(description)));
 
