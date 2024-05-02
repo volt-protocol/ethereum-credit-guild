@@ -85,11 +85,20 @@ abstract contract GovernorProposal is MultiStepProposal {
         }
 
         if (governor.state(proposalId) == IGovernor.ProposalState.Active) {
-            if (DEBUG) {
-                console.log("proposal active, castVote & roll votingPeriod blocks");
+            if (governor.hasVoted(proposalId, voter)) {
+                if (DEBUG) {
+                    console.log("proposal active, already voted");
+                }
+            } else {
+                if (DEBUG) {
+                    console.log("proposal active, castVote");
+                }
+                vm.prank(voter);
+                governor.castVote(proposalId, 1);
             }
-            vm.prank(voter);
-            governor.castVote(proposalId, 1);
+            if (DEBUG) {
+                console.log("proposal active, roll votingPeriod blocks");
+            }
             vm.roll(block.number + votingPeriod + 1);
         }
 
