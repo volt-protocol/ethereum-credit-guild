@@ -26,9 +26,6 @@ contract SurplusGuildMinter is CoreRef {
     /// @notice minimum number of CREDIT to stake
     uint256 public constant MIN_STAKE = 1e18;
 
-    /// @notice reference number of seconds in 1 year
-    uint256 public constant YEAR = 31557600;
-
     /// @notice emitted when a user stakes CREDIT on a target lending term
     event Stake(
         uint256 indexed timestamp,
