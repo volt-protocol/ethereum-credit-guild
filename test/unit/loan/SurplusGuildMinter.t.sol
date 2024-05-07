@@ -460,6 +460,18 @@ contract SurplusGuildMinterUnitTest is ECGTest {
         assertEq(sgm.rewardRatio(), 3e18);
     }
 
+    // test governor setter for MIN_STAKE
+    function testSetMinStake() public {
+        assertEq(sgm.MIN_STAKE(), 1e18);
+
+        vm.expectRevert("UNAUTHORIZED");
+        sgm.setMinStake(0.001e18);
+
+        vm.prank(governor);
+        sgm.setMinStake(0.001e18);
+        assertEq(sgm.MIN_STAKE(), 0.001e18);
+    }
+
     // test with multiple users, some gauges with losses and some not
     function testMultipleUsers() public {
         // add a 2 terms with equal weight

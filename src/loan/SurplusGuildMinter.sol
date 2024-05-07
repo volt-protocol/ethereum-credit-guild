@@ -23,8 +23,6 @@ import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 /// the reward ratio execute, this contract should be pinged with `getRewards` for
 /// all users that have pending rewards.
 contract SurplusGuildMinter is CoreRef {
-    /// @notice minimum number of CREDIT to stake
-    uint256 public constant MIN_STAKE = 1e18;
 
     /// @notice emitted when a user stakes CREDIT on a target lending term
     event Stake(
@@ -49,6 +47,8 @@ contract SurplusGuildMinter is CoreRef {
     event MintRatioUpdate(uint256 indexed timestamp, uint256 ratio);
     /// @notice emitted when the rewardRatio is updated
     event RewardRatioUpdate(uint256 indexed timestamp, uint256 ratio);
+    /// @notice emitted when the MIN_STAKE is updated
+    event MinStakeUpdate(uint256 indexed timestamp, uint256 minStake);
 
     /// @notice reference to the ProfitManager
     address public immutable profitManager;
@@ -71,6 +71,12 @@ contract SurplusGuildMinter is CoreRef {
     /// expressed with 18 decimals, e.g. a ratio of 2e18 would provide 2e18
     /// GUILD tokens to a user that stakes earned 1e18 CREDIT tokens.
     uint256 public rewardRatio;
+
+    /// @notice minimum number of CREDIT to stake
+    /// @dev this variable name is in capital case to conserve retrocompatibility
+    /// where MIN_STAKE used to be a public constant, but there is now a setter
+    /// for it and it's a regular storage variable.
+    uint256 public MIN_STAKE = 1e18;
 
     struct UserStake {
         uint48 stakeTime;
@@ -336,5 +342,13 @@ contract SurplusGuildMinter is CoreRef {
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         rewardRatio = _rewardRatio;
         emit RewardRatioUpdate(block.timestamp, _rewardRatio);
+    }
+
+    /// @notice governor-only function to set the minimum stake
+    function setMinStake(
+        uint256 _minStake
+    ) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        MIN_STAKE = _minStake;
+        emit MinStakeUpdate(block.timestamp, _minStake);
     }
 }
