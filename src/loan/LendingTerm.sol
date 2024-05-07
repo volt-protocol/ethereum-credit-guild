@@ -162,7 +162,7 @@ contract LendingTerm is CoreRef {
         address _core,
         LendingTermReferences calldata _refs,
         bytes calldata _params
-    ) external {
+    ) public virtual {
         // can initialize only once
         assert(address(core()) == address(0));
         assert(_core != address(0));
@@ -280,7 +280,7 @@ contract LendingTerm is CoreRef {
     function _getLoanDebt(
         bytes32 loanId,
         uint256 creditMultiplier
-    ) internal view returns (uint256) {
+    ) internal virtual view returns (uint256) {
         Loan storage loan = loans[loanId];
         uint256 borrowTime = loan.borrowTime;
 
@@ -452,7 +452,7 @@ contract LendingTerm is CoreRef {
         address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount
-    ) internal returns (bytes32 loanId) {
+    ) internal virtual returns (bytes32 loanId) {
         require(borrowAmount != 0, "LendingTerm: cannot borrow 0");
         require(collateralAmount != 0, "LendingTerm: cannot stake 0");
 
