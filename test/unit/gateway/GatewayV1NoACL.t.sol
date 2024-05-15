@@ -10,6 +10,11 @@ contract UnitTestGatewayV1NoACL is ECGTest {
     address gatewayOwner = address(10101);
     GatewayV1NoACL public gatewayv1;
 
+    uint256 public amount = 0;
+    function workingFunction(uint256 _amount) public {
+        amount = _amount;
+    }
+
     function revertingFunction(uint256 /*amount*/) public pure {
         revert("I told you I would revert");
     }
@@ -47,17 +52,15 @@ contract UnitTestGatewayV1NoACL is ECGTest {
         _singleCallExternal(address(this), data);
     }
 
-    /// @notice Ensures that calls to non-allowed targets are properly restricted
     function testCallExternalShouldWork() public {
         bytes memory data = abi.encodeWithSignature(
-            "nonAllowedFunction(uint256,string)",
-            42,
-            "Hello"
+            "workingFunction(uint256)",
+            42
         );
-        _singleCallExternal(address(1), data);
+        _singleCallExternal(address(this), data);
+        assertEq(amount, 42);
     }
-
-    /// @notice Ensures that calls to non-allowed targets are properly restricted
+    
     function testTransferFromShouldNotWork() public {
         bytes memory data = abi.encodeWithSignature(
             "transferFrom(address,address,uint256)",
