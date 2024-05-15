@@ -2,25 +2,7 @@
 pragma solidity 0.8.13;
 
 import {ECGTest} from "@test/ECGTest.sol";
-
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-
-import {Core} from "@src/core/Core.sol";
-import {Gateway} from "@src/gateway/Gateway.sol";
-import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GatewayV1NoACL} from "@src/gateway/GatewayV1NoACL.sol";
-import {MockERC20} from "@test/mock/MockERC20.sol";
-import {SimplePSM} from "@src/loan/SimplePSM.sol";
-import {GuildToken} from "@src/tokens/GuildToken.sol";
-import {CreditToken} from "@src/tokens/CreditToken.sol";
-import {LendingTerm} from "@src/loan/LendingTerm.sol";
-import {AuctionHouse} from "@src/loan/AuctionHouse.sol";
-import {ProfitManager} from "@src/governance/ProfitManager.sol";
-import {MockBalancerVault} from "@test/mock/MockBalancerVault.sol";
-import {RateLimitedMinter} from "@src/rate-limits/RateLimitedMinter.sol";
 
 /// @title Test suite for the GatewayV1 contract
 contract UnitTestGatewayV1NoACL is ECGTest {
