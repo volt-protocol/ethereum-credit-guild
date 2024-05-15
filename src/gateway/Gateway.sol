@@ -15,7 +15,7 @@ abstract contract Gateway is Ownable, Pausable {
 
     // never allow transferFrom to be whitelisted
     // this avoid human error
-    bytes4 private constant TRANSFER_FROM_SELECTOR =
+    bytes4 internal constant TRANSFER_FROM_SELECTOR =
         bytes4(keccak256("transferFrom(address,address,uint256)"));
 
     /// @notice emitted when a call is allowed or not by the function allowCall

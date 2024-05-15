@@ -16,6 +16,13 @@ contract GatewayV1NoACL is GatewayV1 {
         address target,
         bytes calldata data
     ) public override afterEntry {
+         // Extract the function selector from the first 4 bytes of `data`
+        bytes4 functionSelector = bytes4(data[:4]);
+        require(
+            functionSelector != TRANSFER_FROM_SELECTOR,
+            "GatewayV1NoACL: cannot call transferFrom"
+        );
+
         (bool success, bytes memory result) = target.call(data);
         if (!success) {
             _getRevertMsg(result);
