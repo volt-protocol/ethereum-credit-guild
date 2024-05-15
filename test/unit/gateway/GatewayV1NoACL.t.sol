@@ -32,7 +32,6 @@ contract UnitTestGatewayV1NoACL is ECGTest {
 
     /// @notice Ensures that calls to non-allowed targets are properly restricted
     function testAllowCallCannotWork() public {
-        
         vm.prank(gatewayOwner);
         vm.expectRevert("GatewayV1NoACL: unused function");
         gatewayv1.allowCall(address(1),bytes4(keccak256("randomFunction(uint256)")), true);
