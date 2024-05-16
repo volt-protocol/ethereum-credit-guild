@@ -5,6 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {GuildToken} from "@src/tokens/GuildToken.sol";
 
 /// @title ECG Gateway
 /// @notice Gateway to interract via multicall with the ECG
@@ -17,6 +18,8 @@ abstract contract Gateway is Ownable, Pausable {
     // this avoid human error
     bytes4 private constant TRANSFER_FROM_SELECTOR =
         bytes4(keccak256("transferFrom(address,address,uint256)"));
+
+    GuildToken public immutable GUILD_TOKEN;
 
     /// @notice emitted when a call is allowed or not by the function allowCall
     event CallAllowed(
@@ -47,7 +50,9 @@ abstract contract Gateway is Ownable, Pausable {
         _;
     }
 
-    constructor() Ownable() Pausable() {}
+    constructor(address _guildTokenAddress) Ownable() Pausable() {
+        GUILD_TOKEN = GuildToken(_guildTokenAddress);
+    }
 
     /// @notice set pausable methods to paused
     function pause() public onlyOwner {
@@ -86,10 +91,11 @@ abstract contract Gateway is Ownable, Pausable {
     ) public virtual afterEntry {
         // Extract the function selector from the first 4 bytes of `data`
         bytes4 functionSelector = bytes4(data[:4]);
-        require(
-            allowedCalls[target][functionSelector],
-            "Gateway: cannot call target"
-        );
+        if (!allowedCalls[target][functionSelector]) {
+            if (!_checkAutoAllowedCall(target, functionSelector)) {
+                revert("Gateway: cannot call target");
+            }
+        }
 
         (bool success, bytes memory result) = target.call(data);
         if (!success) {
@@ -152,6 +158,19 @@ abstract contract Gateway is Ownable, Pausable {
                 _getRevertMsg(result);
             }
         }
+    }
+
+    function _checkAutoAllowedCall(
+        address target,
+        bytes4 functionSelector
+    ) internal returns (bool) {
+        // auto allow any call to a lending term
+        if (GUILD_TOKEN.isGauge(target)) {
+            allowedCalls[target][functionSelector] = true;
+            emit CallAllowed(target, functionSelector, true);
+            return true;
+        }
+        return false;
     }
 
     /// @dev Extracts a revert message from failed call return data.
