@@ -110,6 +110,19 @@ contract UnitTestGatewayV1 is ECGTest {
         return amounts;
     }
 
+    function swapExactTokensForTokensButSends1(
+        uint256 amountIn,
+        uint256 /* amountOutMin*/,
+        address[] calldata path,
+        address to,
+        uint256 /* deadline*/
+    ) external returns (uint256[] memory) {
+        uint256[] memory amounts = new uint256[](2);
+        IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
+        IERC20(path[1]).transfer(to, 1);
+        return amounts;
+    }
+
     function swapTokensForExactTokens(
         uint256 amountOut,
         uint256 /* amountInMax*/,
@@ -301,6 +314,13 @@ contract UnitTestGatewayV1 is ECGTest {
             address(this),
             getSelector(
                 "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)"
+            ),
+            true
+        );
+        gatewayv1.allowCall(
+            address(this),
+            getSelector(
+                "swapExactTokensForTokensButSends1(uint256,uint256,address[],address,uint256)"
             ),
             true
         );
@@ -496,6 +516,196 @@ contract UnitTestGatewayV1 is ECGTest {
         assertEq(pegtoken.balanceOf(address(gatewayv1)), 0);
         assertEq(loan.collateralAmount, 10_000e18);
         assertEq(loan.borrowAmount, borrowAmount);
+    }
+
+    // borrow with flashloan
+    function testBorrowWithBalancerFlashLoanConsumePermitFails() public {
+        // alice will get a loan with a permit, 10x leverage on collateral
+        uint256 collateralAmount = 1000e18;
+        collateral.mint(alice, collateralAmount);
+        uint256 flashloanPegTokenAmount = 9000e18;
+
+        // encode the swap using uniswapv2 router
+        address[] memory path = new address[](2);
+        path[0] = address(pegtoken);
+        path[1] = address(collateral);
+        uint256[] memory amountsOut = getAmountsOut(
+            flashloanPegTokenAmount,
+            path
+        );
+        uint256 minCollateralToReceive = amountsOut[0];
+
+        bytes memory routerCallData = abi.encodeWithSignature(
+            "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
+            flashloanPegTokenAmount, // amount in
+            minCollateralToReceive, // amount out min
+            path, // path collateralToken->pegToken
+            address(gatewayv1), // to
+            uint256(block.timestamp + 1)
+        ); // deadline
+
+        // sign permit collateral -> Gateway
+        PermitData memory permitCollateral = getPermitData(
+            ERC20Permit(collateral),
+            collateralAmount,
+            address(gatewayv1),
+            alice,
+            alicePrivateKey
+        );
+
+        // only borrow for the amount of collateral we received after swapping the flashloan
+        // meaning the user collateral is added for overcollateralization
+        uint256 borrowAmount = minCollateralToReceive;
+
+        // sign permit gUSDC -> gateway
+        PermitData memory permitDataCredit = getPermitData(
+            ERC20Permit(credit),
+            borrowAmount,
+            address(gatewayv1),
+            alice,
+            alicePrivateKey
+        );
+
+        bytes[] memory pullCollateralCalls = new bytes[](2);
+        pullCollateralCalls[0] = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            collateral,
+            collateralAmount,
+            permitCollateral.deadline,
+            permitCollateral.v,
+            permitCollateral.r,
+            permitCollateral.s
+        );
+        pullCollateralCalls[1] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)",
+            collateral,
+            collateralAmount
+        );
+
+        bytes memory consumePermitBorrowedCreditCall = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            credit,
+            borrowAmount,
+            permitDataCredit.deadline,
+            0,
+            0x124,
+            0x15747
+        );
+
+        // call borrowWithBalancerFlashLoan
+        vm.prank(alice);
+        vm.expectRevert(
+            "GatewayV1: consumePermitBorrowedCreditCall calls failed"
+        );
+        gatewayv1.borrowWithBalancerFlashLoan(
+            GatewayV1.BorrowWithBalancerFlashLoanInput(
+                address(term),
+                address(psm),
+                address(collateral),
+                address(pegtoken),
+                flashloanPegTokenAmount,
+                minCollateralToReceive,
+                borrowAmount,
+                pullCollateralCalls,
+                consumePermitBorrowedCreditCall,
+                address(this), // router, address(this) simulates univ2 router
+                routerCallData
+            )
+        );
+    }
+
+    // borrow with flashloan
+    function testBorrowWithBalancerFlashLoanButRevertsBecauseBadSwap() public {
+        // alice will get a loan with a permit, 10x leverage on collateral
+        uint256 collateralAmount = 1000e18;
+        collateral.mint(alice, collateralAmount);
+        uint256 flashloanPegTokenAmount = 9000e18;
+
+        // encode the swap using uniswapv2 router
+        address[] memory path = new address[](2);
+        path[0] = address(pegtoken);
+        path[1] = address(collateral);
+        uint256[] memory amountsOut = getAmountsOut(
+            flashloanPegTokenAmount,
+            path
+        );
+        uint256 minCollateralToReceive = amountsOut[0];
+
+        bytes memory routerCallData = abi.encodeWithSignature(
+            "swapExactTokensForTokensButSends1(uint256,uint256,address[],address,uint256)",
+            flashloanPegTokenAmount, // amount in
+            minCollateralToReceive, // amount out min
+            path, // path collateralToken->pegToken
+            address(gatewayv1), // to
+            uint256(block.timestamp + 1)
+        ); // deadline
+
+        // sign permit collateral -> Gateway
+        PermitData memory permitCollateral = getPermitData(
+            ERC20Permit(collateral),
+            collateralAmount,
+            address(gatewayv1),
+            alice,
+            alicePrivateKey
+        );
+
+        // only borrow for the amount of collateral we received after swapping the flashloan
+        // meaning the user collateral is added for overcollateralization
+        uint256 borrowAmount = minCollateralToReceive;
+
+        // sign permit gUSDC -> gateway
+        PermitData memory permitDataCredit = getPermitData(
+            ERC20Permit(credit),
+            borrowAmount,
+            address(gatewayv1),
+            alice,
+            alicePrivateKey
+        );
+
+        bytes[] memory pullCollateralCalls = new bytes[](2);
+        pullCollateralCalls[0] = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            collateral,
+            collateralAmount,
+            permitCollateral.deadline,
+            permitCollateral.v,
+            permitCollateral.r,
+            permitCollateral.s
+        );
+        pullCollateralCalls[1] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)",
+            collateral,
+            collateralAmount
+        );
+
+        bytes memory consumePermitBorrowedCreditCall = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            credit,
+            borrowAmount,
+            permitDataCredit.deadline,
+            permitDataCredit.v,
+            permitDataCredit.r,
+            permitDataCredit.s
+        );
+
+        // call borrowWithBalancerFlashLoan
+        vm.prank(alice);
+        vm.expectRevert("GatewayV1: not enough collateral received from swap");
+        gatewayv1.borrowWithBalancerFlashLoan(
+            GatewayV1.BorrowWithBalancerFlashLoanInput(
+                address(term),
+                address(psm),
+                address(collateral),
+                address(pegtoken),
+                flashloanPegTokenAmount,
+                minCollateralToReceive,
+                borrowAmount,
+                pullCollateralCalls,
+                consumePermitBorrowedCreditCall,
+                address(this), // router, address(this) simulates univ2 router
+                routerCallData
+            )
+        );
     }
 
     // repay with flashloan

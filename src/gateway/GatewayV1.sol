@@ -77,8 +77,12 @@ contract GatewayV1 is Gateway {
             "GatewayV1: sender is not balancer"
         );
 
-        (bool success, ) = address(this).call(afterReceiveCall);
-        require(success, "GatewayV1: afterReceiveCall failed");
+        (bool success, bytes memory result) = address(this).call(
+            afterReceiveCall
+        );
+        if (!success) {
+            _getRevertMsg(result);
+        }
 
         // Transfer back the required amounts to the Balancer Vault
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -205,7 +209,10 @@ contract GatewayV1 is Gateway {
         (bool success, ) = address(this).call(
             inputs.consumePermitBorrowedCreditCall
         );
-        require(success, "GatewayV1: allowBorrowedCreditCall calls failed");
+        require(
+            success,
+            "GatewayV1: consumePermitBorrowedCreditCall calls failed"
+        );
         // consume allowance of the credit token
         consumeAllowance(creditToken, inputs.borrowAmount);
 
