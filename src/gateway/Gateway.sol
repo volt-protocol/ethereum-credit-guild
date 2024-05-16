@@ -160,6 +160,13 @@ abstract contract Gateway is Ownable, Pausable {
         }
     }
 
+
+
+    /// @notice Checks if a call is automatically allowed based on the target address
+    /// @dev Automatically allows calls to a lending term if the target is a gauge according to GUILD_TOKEN
+    /// @param target The address of the contract being called
+    /// @param functionSelector The function selector of the method being called
+    /// @return bool Returns true if the call is automatically allowed, false otherwise
     function _checkAutoAllowedCall(
         address target,
         bytes4 functionSelector
