@@ -7,6 +7,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {GatewayV1} from "@src/gateway/GatewayV1.sol";
 import {Gateway} from "@src/gateway/Gateway.sol";
 import {MockERC20} from "../../mock/MockERC20.sol";
+import {MockERC20Gauges} from "../../mock/MockERC20Gauges.sol";
 
 /// @title Test suite for the Gateway contract
 contract UnitTestGatewayGeneric is ECGTest {
@@ -21,6 +22,8 @@ contract UnitTestGatewayGeneric is ECGTest {
     /// @notice Address used as factory owner in tests
     address gatewayOwner = address(10101);
 
+    /// @notice address of a term to test the auto allow feature
+    address termAddress = address(10501);
     /// @notice Signature for an allowed function call (revertingFunction(uint256)
     bytes4 allowedSig1 = bytes4(0x826b700f);
     /// @notice Signature for an allowed function call (successfulFunction(uint256)
@@ -30,6 +33,8 @@ contract UnitTestGatewayGeneric is ECGTest {
     MockERC20 mockToken;
     /// @notice Address used as an allowed target external calls
     address allowedTarget;
+
+    MockERC20Gauges guild;
 
     /// @notice Retrieves the bytecode of a contract at a specific address for testing purposes
     function getCode(address _addr) public view returns (bytes memory) {
@@ -66,10 +71,12 @@ contract UnitTestGatewayGeneric is ECGTest {
 
     /// @notice Sets up the test by deploying the AccountFactory contract
     function setUp() public {
+        guild = new MockERC20Gauges();
+        guild.addGauge(0, termAddress);
         allowedTarget = address(this);
 
         vm.startPrank(gatewayOwner);
-        gateway = new GatewayV1();
+        gateway = new GatewayV1(address(guild));
         gateway.allowCall(allowedTarget, allowedSig1, true);
         gateway.allowCall(allowedTarget, allowedSig2, true);
         vm.stopPrank();
@@ -90,6 +97,8 @@ contract UnitTestGatewayGeneric is ECGTest {
 
         // allowedCalls should return false for any calls by default except the one whitelisted
         assertEq(gateway.allowedCalls(target, functionSelector), false);
+
+        assertEq(guild.isGauge(termAddress), true);
     }
 
     /// @notice Tests that non-owners cannot allow calls
@@ -168,6 +177,17 @@ contract UnitTestGatewayGeneric is ECGTest {
         );
         vm.expectRevert("Gateway: cannot call target");
         _singleCallExternal(allowedTarget, data);
+    }
+
+    /// @notice Checks that calls with non-allowed signatures are prohibited
+    function testCallExternalShouldWorkOnNonAllowedSignature() public {
+        bytes memory data = abi.encodeWithSignature(
+            "nonAllowedFunction(uint256,string)",
+            42,
+            "Hello"
+        );
+
+        _singleCallExternal(termAddress, data);
     }
 
     /// @notice Verifies that failing external calls revert as expected

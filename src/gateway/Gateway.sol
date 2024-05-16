@@ -87,10 +87,10 @@ abstract contract Gateway is Ownable, Pausable {
     /// @param data The calldata to send.
     function callExternal(
         address target,
-        bytes calldata data
+        bytes memory data
     ) public virtual afterEntry {
         // Extract the function selector from the first 4 bytes of `data`
-        bytes4 functionSelector = bytes4(data[:4]);
+        bytes4 functionSelector = _getSelector(data);
         if (!allowedCalls[target][functionSelector]) {
             if (!_checkAutoAllowedCall(target, functionSelector)) {
                 revert("Gateway: cannot call target");
@@ -160,8 +160,6 @@ abstract contract Gateway is Ownable, Pausable {
         }
     }
 
-
-
     /// @notice Checks if a call is automatically allowed based on the target address
     /// @dev Automatically allows calls to a lending term if the target is a gauge according to GUILD_TOKEN
     /// @param target The address of the contract being called
@@ -194,5 +192,9 @@ abstract contract Gateway is Ownable, Pausable {
             _returnData := add(_returnData, 0x04)
         }
         revert(abi.decode(_returnData, (string))); // All that remains is the revert string
+    }
+
+    function _getSelector(bytes memory data) internal pure returns (bytes4) {
+        return bytes4(bytes.concat(data[0], data[1], data[2], data[3]));
     }
 }

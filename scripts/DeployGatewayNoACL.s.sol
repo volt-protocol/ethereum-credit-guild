@@ -23,7 +23,7 @@ contract DeployGatewayNoACL is Script {
         _parseEnv();
 
         vm.startBroadcast(PRIVATE_KEY);
-        new GatewayV1NoACL();
+        new GatewayV1NoACL(0xb8ae64F191F829fC00A4E923D460a8F2E0ba3978);
         vm.stopBroadcast();
     }
 }
