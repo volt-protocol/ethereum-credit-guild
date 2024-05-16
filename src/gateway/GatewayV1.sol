@@ -18,35 +18,6 @@ interface IBalancerFlashLoan {
     ) external;
 }
 
-/// @notice simple interface for uniswap router
-interface IUniswapRouter {
-    function swapTokensForExactTokens(
-        uint256 amountOut,
-        uint256 amountInMax,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
-    function swapExactTokensForTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
-    function getAmountsIn(
-        uint256 amountOut,
-        address[] calldata path
-    ) external view returns (uint256[] memory amounts);
-
-    function getAmountsOut(
-        uint256 amountIn,
-        address[] calldata path
-    ) external view returns (uint256[] memory amounts);
-}
-
 /// @title ECG Gateway V1
 /// @notice Gateway to interract via multicall with the ECG
 /// Owner can select which calls are allowed
@@ -92,21 +63,20 @@ contract GatewayV1 is Gateway {
     /// @param tokens Array of ERC20 tokens received in the flash loan.
     /// @param amounts Array of amounts for each token received.
     /// @param feeAmounts Array of fee amounts for each token received.
-    /// @param encodedCalls encoded calls to be made after receiving the flashloaned token(s)
+    /// @param afterReceiveCall encoded calls to be made after receiving the flashloaned token(s)
     function receiveFlashLoan(
         IERC20[] memory tokens,
         uint256[] memory amounts,
         uint256[] memory feeAmounts,
-        bytes memory encodedCalls
+        bytes memory afterReceiveCall
     ) external afterEntry {
         require(
             msg.sender == balancerVault,
             "GatewayV1: sender is not balancer"
         );
 
-        // // execute the storedCalls stored in the multicallWithBalancerFlashLoan function
-        (bool success, ) = address(this).call(encodedCalls);
-        require(success, "GatewayV1: encoded calls failed");
+        (bool success, ) = address(this).call(afterReceiveCall);
+        require(success, "GatewayV1: afterReceiveCall failed");
 
         // Transfer back the required amounts to the Balancer Vault
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -115,97 +85,155 @@ contract GatewayV1 is Gateway {
     }
 
     /// @notice execute a borrow with a balancer flashloan
-    /// Example flow :
-    /// - flashloan sDAI from Balancer
-    /// - pull user sDAI to the Gateway
-    /// - borrow gUSDC from the term, with sDAI collateral
-    /// - pull the gUSDC borrowed to the Gateway
-    /// - Redeem gUSDC for USDC in the PSM
-    /// - Swap USDC for sDAI on Uniswap
-    /// - repay sDAI flashloan
-    /// Slippage protection of maxLoanDebt when borrowing gUSDC from the term
-    /// @dev 1 wei of USDC will be left in the gateway after execution (<0.000001$).
+    /// borrow with flashloan flow:
+    /// - flashloan {pegToken} from Balancer
+    /// - swap {pegToken} obtained from Balancer to {collateralToken}, using {routerAddress} and {routerCallData}
+    /// - pull user {collateralToken} from user to the Gateway
+    /// - borrow on behalf {creditToken} from the term, with {collateralToken + flashloanCollateralToken} collateral
+    /// - pull the {creditToken} borrowed to the Gateway
+    /// - Redeem {creditToken} for {pegToken} in the PSM
+    /// - repay {pegToken} flashloan
+    /// - send remaining {pegToken} to the user if any
+    /// @param term the lending term to borrow from
+    /// @param psm the PSM to redeem the borrowed creditToken
+    /// @param collateralToken the collateral token
+    /// @param pegToken the peg token
+    /// @param flashloanPegTokenAmount the amount of peg tokens to flashloan from Balancer
+    /// @param minCollateralToReceive the min amount of collateral token to receive after the swap
+    /// @param borrowAmount the amount of credit to borrow
+    /// @param pullCollateralCalls the calls to make to pull the collateral tokens from the user to the gateway. either consumePermit + consumeAllowance or just consumeAllowance
+    /// @param consumePermitBorrowedCreditCall the call to make to consume the allowance of credit tokens received by the user
+    /// @param routerAddress the address of the router to swap the peg tokens to the collateral tokens
+    /// @param routerCallData the call data to make to swap the peg tokens to the collateral tokens
     function borrowWithBalancerFlashLoan(
         address term,
         address psm,
-        address uniswapRouter,
         address collateralToken,
         address pegToken,
-        uint256 collateralAmount,
-        uint256 flashloanCollateralAmount,
-        uint256 maxLoanDebt,
+        uint256 flashloanPegTokenAmount,
+        uint256 minCollateralToReceive,
+        uint256 borrowAmount,
         bytes[] memory pullCollateralCalls,
-        bytes memory allowBorrowedCreditCall
+        bytes memory consumePermitBorrowedCreditCall,
+        address routerAddress,
+        bytes calldata routerCallData
     ) public entryPoint whenNotPaused {
-        // this function performs 8 more calls than the number of calls in 'pullCollateralCalls'
-        bytes[] memory calls = new bytes[](pullCollateralCalls.length + 8);
-        uint256 callCursor = 0;
+        // Initiate the flash loan
+        // the balancer vault will call receiveFlashloan function on this contract before returning
+        IERC20[] memory ierc20Tokens = new IERC20[](1);
+        ierc20Tokens[0] = IERC20(pegToken);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = flashloanPegTokenAmount;
+        IBalancerFlashLoan(balancerVault).flashLoan(
+            address(this),
+            ierc20Tokens,
+            amounts,
+            abi.encodeWithSignature(
+                "borrowWithBalancerFlashLoanAfterReceive(address,address,address,address,uint256,uint256,uint256,bytes[],bytes,address,bytes)",
+                term,
+                psm,
+                collateralToken,
+                pegToken,
+                flashloanPegTokenAmount,
+                borrowAmount,
+                pullCollateralCalls,
+                consumePermitBorrowedCreditCall,
+                minCollateralToReceive,
+                routerAddress,
+                routerCallData
+            )
+        );
 
-        // after flashloan tokens are received, first calls are to pull collateral
-        // tokens from the user to the gateway, e.g. consumePermit + consumeAllowance
+        // here, the flashloan have been successfully reimbursed otherwise it would have reverted
+        // we can sweep the remaining pegToken (if any) to the user
+        sweep(pegToken);
+    }
+
+    /// @notice execute a borrow with a balancer flashloan after receiving the flashloaned tokens
+    /// see borrowWithBalancerFlashLoanV2 for details
+    function borrowWithBalancerFlashLoanAfterReceive(
+        address term,
+        address psm,
+        address collateralToken,
+        address pegToken,
+        uint256 flashloanPegTokenAmount,
+        uint256 minCollateralToReceive,
+        uint256 creditToBorrow,
+        bytes[] memory pullCollateralCalls,
+        bytes memory consumePermitBorrowedCreditCall,
+        address routerAddress,
+        bytes calldata routerCallData
+    ) public afterEntry {
+        // approve the swap router to swap the {pegToken} for {collateralToken}
+        callExternal(
+            pegToken,
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                routerAddress,
+                flashloanPegTokenAmount
+            )
+        );
+        // then we swap the pegToken to the collateralToken using the router
+        callExternal(routerAddress, routerCallData);
+
+        // check we received enoug collateral token
+        require(
+            IERC20(collateralToken).balanceOf(address(this)) >=
+                minCollateralToReceive,
+            "GatewayV1: not enough collateral received from swap"
+        );
+
+        // execute calls to pull collateral tokens from the user to the gateway,
+        // e.g. consumePermit + consumeAllowance
         // or just consumeAllowance if the user has already approved the gateway
         for (uint256 i = 0; i < pullCollateralCalls.length; i++) {
-            calls[callCursor++] = pullCollateralCalls[i];
+            _executeCalls(pullCollateralCalls);
         }
 
+        // this is the collateral amount from the user + flashloaned swap result
+        uint256 totalCollateralAmount = IERC20(collateralToken).balanceOf(
+            address(this)
+        );
         // approve the term before borrow
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
+        callExternal(
             collateralToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
                 term,
-                collateralAmount + flashloanCollateralAmount
+                totalCollateralAmount
             )
         );
 
-        // do borrow in order to have, after psm redeem, exactly the amount of pegTokens
-        // needed to swap back to {flashloanCollateralAmount} collateralTokens
-        uint256 pegTokenAmount;
-        {
-            address[] memory path = new address[](2);
-            path[0] = pegToken;
-            path[1] = collateralToken;
-            uint256[] memory amountsIn = IUniswapRouter(uniswapRouter)
-                .getAmountsIn(flashloanCollateralAmount, path);
-            pegTokenAmount = amountsIn[0];
-        }
-        uint256 creditToBorrow = SimplePSM(psm).getMintAmountOut(
-            pegTokenAmount + 1
-        );
-        require(creditToBorrow < maxLoanDebt, "GatewayV1: loan debt too high");
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            term,
+        // borrow creditToBorrow on behalf of the original sender
+        callExternal(
+            collateralToken,
             abi.encodeWithSignature(
                 "borrowOnBehalf(uint256,uint256,address)",
                 creditToBorrow,
-                collateralAmount + flashloanCollateralAmount,
-                msg.sender
+                totalCollateralAmount,
+                _originalSender
             )
         );
 
+        address creditToken = LendingTerm(term).creditToken();
         // pull borrowed credit to the gateway
-        address _creditToken = LendingTerm(term).creditToken();
-        calls[callCursor++] = allowBorrowedCreditCall;
-        calls[callCursor++] = abi.encodeWithSignature(
-            "consumeAllowance(address,uint256)",
-            _creditToken,
-            creditToBorrow
-        );
+        // consume the permit
+        (bool success, ) = address(this).call(consumePermitBorrowedCreditCall);
+        // consume allowance of the credit token
+        consumeAllowance(creditToken, creditToBorrow);
+        require(success, "GatewayV1: allowBorrowedCreditCall calls failed");
 
         // redeem credit tokens to pegTokens in the PSM
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            _creditToken,
+        callExternal(
+            creditToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
                 psm,
                 creditToBorrow
             )
         );
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
+
+        callExternal(
             psm,
             abi.encodeWithSignature(
                 "redeem(address,uint256)",
@@ -214,49 +242,11 @@ contract GatewayV1 is Gateway {
             )
         );
 
-        // swap pegTokens for collateralTokens in order to be able to repay the flashloan
-        calls[callCursor++] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            pegToken,
-            abi.encodeWithSignature(
-                "approve(address,uint256)",
-                uniswapRouter,
-                pegTokenAmount
-            )
+        require(
+            IERC20(pegToken).balanceOf(address(this)) >=
+                flashloanPegTokenAmount,
+            "GatewayV1: pegToken balance too low to reimburse flashloan"
         );
-
-        {
-            address[] memory path = new address[](2);
-            path[0] = address(pegToken);
-            path[1] = address(collateralToken);
-            calls[callCursor++] = abi.encodeWithSignature(
-                "callExternal(address,bytes)",
-                uniswapRouter,
-                abi.encodeWithSignature(
-                    "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
-                    flashloanCollateralAmount, // amount out
-                    pegTokenAmount, // amount in max
-                    path, // path pegToken->collateralToken
-                    address(this), // to
-                    uint256(block.timestamp + 1) // deadline
-                )
-            );
-        }
-
-        // Initiate the flash loan
-        // the balancer vault will call receiveFlashloan function on this contract before returning
-        IERC20[] memory ierc20Tokens = new IERC20[](1);
-        ierc20Tokens[0] = IERC20(collateralToken);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = flashloanCollateralAmount;
-        IBalancerFlashLoan(balancerVault).flashLoan(
-            address(this),
-            ierc20Tokens,
-            amounts,
-            abi.encodeWithSignature("executeFlashloanCalls(bytes[])", calls)
-        );
-
-        // here, the flashloan have been successfully reimbursed otherwise it would have reverted
     }
 
     /// @notice execute a repay with a balancer flashloan.
@@ -442,7 +432,6 @@ contract GatewayV1 is Gateway {
         }
 
         // here, the flashloan have been successfully reimbursed otherwise it would have reverted
-
         return
             _sendTokensToSender(
                 minPegTokenProfit,
@@ -540,6 +529,12 @@ contract GatewayV1 is Gateway {
         );
     }
 
+    /// @notice send the tokens to the original sender, ensuring that at least minPegTokenProfit pegTokens are sent
+    /// @param minPegTokenToSend the minimum amount of pegTokens to send to the original sender
+    /// @param pegToken the peg token
+    /// @param creditToken the credit token
+    /// @param collateralToken the collateral token
+    /// @return pegTokenBalance the amount of pegTokens sent to the original sender
     function _sendTokensToSender(
         uint256 minPegTokenProfit,
         address pegToken,
