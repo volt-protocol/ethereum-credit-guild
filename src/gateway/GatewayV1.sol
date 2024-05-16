@@ -149,97 +149,88 @@ contract GatewayV1 is Gateway {
     /// @notice execute a borrow with a balancer flashloan after receiving the flashloaned tokens
     /// see borrowWithBalancerFlashLoanV2 for details
     function borrowWithBalancerFlashLoanAfterReceive(
-        address term,
-        address psm,
-        address collateralToken,
-        address pegToken,
-        uint256 flashloanPegTokenAmount,
-        uint256 minCollateralToReceive,
-        uint256 creditToBorrow,
-        bytes[] memory pullCollateralCalls,
-        bytes memory consumePermitBorrowedCreditCall,
-        address routerAddress,
-        bytes calldata routerCallData
+        BorrowWithBalancerFlashLoanInput memory inputs
     ) public afterEntry {
         // approve the swap router to swap the {pegToken} for {collateralToken}
         callExternal(
-            pegToken,
+            inputs.pegToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
-                routerAddress,
-                flashloanPegTokenAmount
+                inputs.routerAddress,
+                inputs.flashloanPegTokenAmount
             )
         );
         // then we swap the pegToken to the collateralToken using the router
-        callExternal(routerAddress, routerCallData);
+        callExternal(inputs.routerAddress, inputs.routerCallData);
 
         // check we received enoug collateral token
         require(
-            IERC20(collateralToken).balanceOf(address(this)) >=
-                minCollateralToReceive,
+            IERC20(inputs.collateralToken).balanceOf(address(this)) >=
+                inputs.minCollateralToReceive,
             "GatewayV1: not enough collateral received from swap"
         );
 
         // execute calls to pull collateral tokens from the user to the gateway,
         // e.g. consumePermit + consumeAllowance
         // or just consumeAllowance if the user has already approved the gateway
-        _executeCalls(pullCollateralCalls);
+        _executeCalls(inputs.pullCollateralCalls);
 
         // this is the collateral amount from the user + flashloaned swap result
-        uint256 totalCollateralAmount = IERC20(collateralToken).balanceOf(
-            address(this)
-        );
+        uint256 totalCollateralAmount = IERC20(inputs.collateralToken)
+            .balanceOf(address(this));
         // approve the term before borrow
         callExternal(
-            collateralToken,
+            inputs.collateralToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
-                term,
+                inputs.term,
                 totalCollateralAmount
             )
         );
 
-        // borrow creditToBorrow on behalf of the original sender
+        // borrow borrowAmount on behalf of the original sender
         callExternal(
-            collateralToken,
+            inputs.term,
             abi.encodeWithSignature(
                 "borrowOnBehalf(uint256,uint256,address)",
-                creditToBorrow,
+                inputs.borrowAmount,
                 totalCollateralAmount,
                 _originalSender
             )
         );
 
-        address creditToken = LendingTerm(term).creditToken();
+        address creditToken = LendingTerm(inputs.term).creditToken();
         // pull borrowed credit to the gateway
         // consume the permit
-        (bool success, ) = address(this).call(consumePermitBorrowedCreditCall);
-        // consume allowance of the credit token
-        consumeAllowance(creditToken, creditToBorrow);
+        (bool success, ) = address(this).call(
+            inputs.consumePermitBorrowedCreditCall
+        );
         require(success, "GatewayV1: allowBorrowedCreditCall calls failed");
+        // consume allowance of the credit token
+        consumeAllowance(creditToken, inputs.borrowAmount);
 
         // redeem credit tokens to pegTokens in the PSM
         callExternal(
             creditToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
-                psm,
-                creditToBorrow
+                inputs.psm,
+                inputs.borrowAmount
             )
         );
 
         callExternal(
-            psm,
+            inputs.psm,
             abi.encodeWithSignature(
                 "redeem(address,uint256)",
                 address(this),
-                creditToBorrow
+                inputs.borrowAmount
             )
         );
 
         require(
-            IERC20(pegToken).balanceOf(address(this)) >=
-                flashloanPegTokenAmount,
+            IERC20(inputs.pegToken).balanceOf(address(this)) >=
+                inputs.flashloanPegTokenAmount,
             "GatewayV1: pegToken balance too low to reimburse flashloan"
         );
     }

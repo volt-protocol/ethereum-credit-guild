@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.13;
 
-import {ECGTest} from "@test/ECGTest.sol";
+import {ECGTest, console} from "@test/ECGTest.sol";
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -125,9 +125,6 @@ contract UnitTestGatewayV1 is ECGTest {
 
     /// @notice Sets up the test by deploying the AccountFactory contract
     function setUp() public {
-        vm.prank(gatewayOwner);
-        gatewayv1 = new GatewayV1(address(guild));
-
         core = new Core();
 
         profitManager = new ProfitManager(address(core));
@@ -203,6 +200,9 @@ contract UnitTestGatewayV1 is ECGTest {
         pegtoken.approve(address(psm), 1e27);
         psm.mint(address(this), 1e27);
         credit.enterRebase();
+
+        vm.prank(gatewayOwner);
+        gatewayv1 = new GatewayV1(address(guild));
 
         // labels
         vm.label(address(core), "core");
@@ -407,7 +407,7 @@ contract UnitTestGatewayV1 is ECGTest {
             flashloanPegTokenAmount,
             path
         );
-        uint256 minCollateralToReceive = (amountsOut[0] * 95) / 100; // allow 5% slippage
+        uint256 minCollateralToReceive = amountsOut[0];
 
         bytes memory routerCallData = abi.encodeWithSignature(
             "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
@@ -427,7 +427,9 @@ contract UnitTestGatewayV1 is ECGTest {
             alicePrivateKey
         );
 
-        uint256 borrowAmount = collateralAmount + minCollateralToReceive;
+        // only borrow for the amount of collateral we received after swapping the flashloan
+        // meaning the user collateral is added for overcollateralization
+        uint256 borrowAmount = minCollateralToReceive;
 
         // sign permit gUSDC -> gateway
         PermitData memory permitDataCredit = getPermitData(
@@ -487,12 +489,13 @@ contract UnitTestGatewayV1 is ECGTest {
             abi.encode(alice, address(term), block.timestamp)
         );
         LendingTerm.Loan memory loan = LendingTerm(term).getLoan(loanId);
+
         assertEq(collateral.balanceOf(alice), 0);
         assertEq(pegtoken.balanceOf(alice), 0);
-        assertLt(collateral.balanceOf(address(gatewayv1)), 1e13);
-        assertLt(pegtoken.balanceOf(address(gatewayv1)), 1e7);
+        assertEq(collateral.balanceOf(address(gatewayv1)), 0);
+        assertEq(pegtoken.balanceOf(address(gatewayv1)), 0);
         assertEq(loan.collateralAmount, 10_000e18);
-        assertLt(loan.borrowAmount, 9_900e18);
+        assertEq(loan.borrowAmount, borrowAmount);
     }
 
     // repay with flashloan
