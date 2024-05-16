@@ -291,30 +291,22 @@ contract GatewayV1 is Gateway {
     }
 
     function repayWithBalancerFlashLoanAfterReceive(
-        bytes32 loanId,
-        address term,
-        address psm,
-        address collateralToken,
-        address pegToken,
-        uint256 minCollateralRemaining,
-        bytes[] memory pullCollateralCalls,
-        address routerAddress,
-        bytes calldata routerCallData,
+        RepayWithBalancerFlashLoanInput memory inputs,
         uint256 debt,
         uint256 flashloanPegTokenAmount
     ) public afterEntry {
         // approve the psm & mint creditTokens
         callExternal(
-            pegToken,
+            inputs.pegToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
-                psm,
+                inputs.psm,
                 flashloanPegTokenAmount
             )
         );
 
         callExternal(
-            psm,
+            inputs.psm,
             abi.encodeWithSignature(
                 "mint(address,uint256)",
                 address(this),
@@ -323,14 +315,21 @@ contract GatewayV1 is Gateway {
         );
 
         // repay the loan
-        address _creditToken = LendingTerm(term).creditToken();
+        address _creditToken = LendingTerm(inputs.term).creditToken();
 
         callExternal(
             _creditToken,
-            abi.encodeWithSignature("approve(address,uint256)", term, debt)
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                inputs.term,
+                debt
+            )
         );
 
-        callExternal(term, abi.encodeWithSignature("repay(bytes32)", loanId));
+        callExternal(
+            inputs.term,
+            abi.encodeWithSignature("repay(bytes32)", inputs.loanId)
+        );
 
         // execute calls to pull collateral tokens from the user to the gateway,
         // e.g. consumePermit + consumeAllowance
@@ -338,29 +337,29 @@ contract GatewayV1 is Gateway {
         // this is done because the lending term is sending the collateral to the borrower
         // when repaying, not the gateway. So the gateway needs to pull the collateral back from the
         // user to itself
-        _executeCalls(pullCollateralCalls);
+        _executeCalls(inputs.pullCollateralCalls);
 
         /// - swap {collateralToken} to {pegToken} using {routerAddress} and {routerCallData}
         // approve the swap router to swap the {collateralToken} for {pegToken}
         callExternal(
-            collateralToken,
+            inputs.collateralToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
-                routerAddress,
-                IERC20(collateralToken).balanceOf(address(this))
+                inputs.routerAddress,
+                IERC20(inputs.collateralToken).balanceOf(address(this))
             )
         );
         // then we swap the pegToken to the collateralToken using the router
-        callExternal(routerAddress, routerCallData);
+        callExternal(inputs.routerAddress, inputs.routerCallData);
 
         require(
-            IERC20(collateralToken).balanceOf(address(this)) >=
-                minCollateralRemaining,
+            IERC20(inputs.collateralToken).balanceOf(address(this)) >=
+                inputs.minCollateralRemaining,
             "GatewayV1: collateral token balance too low"
         );
 
         require(
-            IERC20(pegToken).balanceOf(address(this)) >=
+            IERC20(inputs.pegToken).balanceOf(address(this)) >=
                 flashloanPegTokenAmount,
             "GatewayV1: pegToken balance too low to reimburse flashloan"
         );
