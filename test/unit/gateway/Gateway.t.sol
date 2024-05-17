@@ -202,6 +202,23 @@ contract UnitTestGatewayGeneric is ECGTest {
         _singleCallExternal(address(1), data);
     }
 
+    /// @notice Checks that calls with with transfer-from cannot work even on fully allowed addresses
+    function testCallExternalShouldFailForTransferEvenForAllowedAddress()
+        public
+    {
+        vm.prank(gatewayOwner);
+        gateway.allowAddress(address(mockToken), true);
+
+        bytes memory data = abi.encodeWithSignature(
+            "transferFrom(address,address,uint256)",
+            address(1),
+            address(1),
+            42
+        );
+        vm.expectRevert("Gateway: cannot call transferFrom");
+        _singleCallExternal(address(mockToken), data);
+    }
+
     /// @notice Checks that calls with non-allowed signatures are prohibited
     function testCallExternalShouldFailOnNonAllowedSignature() public {
         bytes memory data = abi.encodeWithSignature(
@@ -214,7 +231,7 @@ contract UnitTestGatewayGeneric is ECGTest {
     }
 
     /// @notice Checks that calls with non-allowed signatures are prohibited
-    function testCallExternalShouldWorkOnNonAllowedSignature() public {
+    function testCallExternalShouldWorkOnTermOnNonAllowedSignature() public {
         bytes memory data = abi.encodeWithSignature(
             "nonAllowedFunction(uint256,string)",
             42,

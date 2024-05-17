@@ -22,10 +22,7 @@ abstract contract Gateway is Ownable, Pausable {
     GuildToken public immutable GUILD_TOKEN;
 
     /// @notice emitted when a an address is allowed or not by the function allowAddress
-    event AddressAllowed(
-        address indexed target,
-        bool isAllowed
-    );
+    event AddressAllowed(address indexed target, bool isAllowed);
     /// @notice emitted when a call is allowed or not by the function allowCall
     event CallAllowed(
         address indexed target,
@@ -79,7 +76,7 @@ abstract contract Gateway is Ownable, Pausable {
         bool allowed
     ) public virtual onlyOwner {
         allowedAddresses[target] = allowed;
-        emit AddressAllowed(target , allowed);
+        emit AddressAllowed(target, allowed);
     }
 
     /// @notice allow (or disallow) a function call for a target address
@@ -109,7 +106,15 @@ abstract contract Gateway is Ownable, Pausable {
     ) public virtual afterEntry {
         // Extract the function selector from the first 4 bytes of `data`
         bytes4 functionSelector = _getSelector(data);
-        if(!allowedAddresses[target] && !allowedCalls[target][functionSelector]) {
+
+        require(
+            functionSelector != TRANSFER_FROM_SELECTOR,
+            "Gateway: cannot call transferFrom"
+        );
+
+        if (
+            !allowedAddresses[target] && !allowedCalls[target][functionSelector]
+        ) {
             if (!_checkAutoAllowedAddress(target)) {
                 revert("Gateway: cannot call target");
             }
@@ -182,9 +187,7 @@ abstract contract Gateway is Ownable, Pausable {
     /// @dev Automatically allows calls to a lending term if the target is a gauge according to GUILD_TOKEN
     /// @param target The address of the contract being called
     /// @return bool Returns true if the call is automatically allowed, false otherwise
-    function _checkAutoAllowedAddress(
-        address target
-    ) internal returns (bool) {
+    function _checkAutoAllowedAddress(address target) internal returns (bool) {
         // auto allow any call to a lending term
         if (GUILD_TOKEN.isGauge(target)) {
             allowedAddresses[target] = true;
