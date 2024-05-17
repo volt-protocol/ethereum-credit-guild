@@ -45,6 +45,11 @@ interface IUniswapRouter {
         uint256 amountIn,
         address[] calldata path
     ) external view returns (uint256[] memory amounts);
+
+    function getAmountsIn(
+        uint256 amountOut,
+        address[] memory path
+    ) external view returns (uint256[] memory);
 }
 
 interface IWeightedPoolFactory {
@@ -340,7 +345,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     function testGatewayLoanWithPermit() public {
         // alice will get a loan with a permit
         dealToken(address(collateralToken), alice, 1000e18);
-        uint256 collateralAmount = 100e18; // 100 collateral
+        uint256 collateralAmount = 1000e18; // 1000 collateral
         uint256 debtAmount = getBorrowAmountFromCollateralAmount(
             collateralAmount
         );
@@ -438,14 +443,14 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         // alice should now have 100 USDC after creating a loan and redeeming the
         // credits to USDC via the psm
         // at most 1 wei of error
-        assertGt(usdc.balanceOf(alice), 100e6 - 2);
+        assertGt(usdc.balanceOf(alice), 1000e6 - 2);
     }
 
     // multicall scenario with without permit
     function testGatewayLoanWithoutPermit() public {
         // alice will get a loan with a permit
         dealToken(address(collateralToken), alice, 1000e18);
-        uint256 collateralAmount = 100e18; // 100 collateral
+        uint256 collateralAmount = 1000e18; // 1000 collateral
         uint256 debtAmount = getBorrowAmountFromCollateralAmount(
             collateralAmount
         );
@@ -509,18 +514,18 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         vm.prank(alice);
         gatewayv1.multicall(calls);
 
-        // alice should now have 100 USDC after creating a loan and redeeming the
+        // alice should now have 1000 USDC after creating a loan and redeeming the
         // credits to USDC via the psm
         // at most 1 wei of error
-        assertGt(usdc.balanceOf(alice), 100e6 - 2);
+        assertGt(usdc.balanceOf(alice), 1000e6 - 2);
     }
 
     // multicall with flashloan
     function testGatewayLoanWithBalancerFlasloan() public {
         // alice will get a loan with a permit
         dealToken(address(collateralToken), alice, 1000e18);
-        uint256 collateralAmount = 25e18; // 25 collateral
-        uint256 flashloanAmount = 75e18; // 75 flashloan collateral
+        uint256 collateralAmount = 100e18; // 100 collateral
+        uint256 flashloanAmount = 300e18; // 300 flashloan collateral
         uint256 debtAmount = getBorrowAmountFromCollateralAmount(
             collateralAmount + flashloanAmount
         );
@@ -673,8 +678,8 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
 
         // alice should now have a bit less than her starting collateral, redeemed to USDC
         // after the swap, so allow 5% diff
-        assertLt(usdc.balanceOf(alice), 25e6);
-        assertApproxEqRel(usdc.balanceOf(alice), 25e6, 0.05e18);
+        assertLt(usdc.balanceOf(alice), 100e6);
+        assertApproxEqRel(usdc.balanceOf(alice), 100e6, 0.05e18);
     }
 
     // borrow with flashloan
@@ -786,55 +791,92 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     }
 
     // repay with flashloan
-    // function testRepayWithBalancerFlashLoan() public {
-    //     testBorrowWithBalancerFlashLoan();
-    //     bytes32 loanId = keccak256(
-    //         abi.encode(alice, address(term), block.timestamp)
-    //     );
-    //     vm.warp(block.timestamp + 3 days);
-    //     vm.roll(block.number + 1);
+    function testRepayWithBalancerFlashLoan() public {
+        testBorrowWithBalancerFlashLoan();
+        bytes32 loanId = keccak256(
+            abi.encode(alice, address(term), block.timestamp)
+        );
+        vm.warp(block.timestamp + 3 days);
+        vm.roll(block.number + 1);
 
-    //     uint256 collateralAmount = LendingTerm(term)
-    //         .getLoan(loanId)
-    //         .collateralAmount;
-    //     uint256 maxCollateralSold = (collateralAmount * 95) / 100;
+        uint256 collateralAmount = LendingTerm(term)
+            .getLoan(loanId)
+            .collateralAmount;
 
-    //     // sign permit collateral -> Gateway
-    //     PermitData memory permitCollateral = getPermitData(
-    //         ERC20Permit(collateralToken),
-    //         maxCollateralSold,
-    //         address(gatewayv1),
-    //         alice,
-    //         alice_private_key
-    //     );
-    //     bytes memory allowCollateralTokenCall = abi.encodeWithSignature(
-    //         "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
-    //         collateralToken,
-    //         maxCollateralSold,
-    //         permitCollateral.deadline,
-    //         permitCollateral.v,
-    //         permitCollateral.r,
-    //         permitCollateral.s
-    //     );
+        uint256 debtToBePaid = LendingTerm(term).getLoanDebt(loanId);
 
-    //     // call repayWithBalancerFlashLoan
-    //     vm.prank(alice);
-    //     gatewayv1.repayWithBalancerFlashLoan(
-    //         loanId,
-    //         address(term),
-    //         address(psm),
-    //         UNISWAPV2_ROUTER_ADDR,
-    //         address(collateralToken),
-    //         address(usdc),
-    //         maxCollateralSold,
-    //         allowCollateralTokenCall
-    //     );
+        // sign permit collateral -> Gateway
+        PermitData memory permitCollateral = getPermitData(
+            ERC20Permit(collateralToken),
+            collateralAmount,
+            address(gatewayv1),
+            alice,
+            alice_private_key
+        );
 
-    //     assertGt(collateralToken.balanceOf(alice), 900e18);
-    //     assertEq(usdc.balanceOf(alice), 0);
-    //     assertLt(collateralToken.balanceOf(address(gatewayv1)), 1e13);
-    //     assertLt(usdc.balanceOf(address(gatewayv1)), 1e7);
-    // }
+        bytes[] memory pullCollateralCalls = new bytes[](2);
+        pullCollateralCalls[0] = abi.encodeWithSignature(
+            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            collateralToken,
+            collateralAmount,
+            permitCollateral.deadline,
+            permitCollateral.v,
+            permitCollateral.r,
+            permitCollateral.s
+        );
+        pullCollateralCalls[1] = abi.encodeWithSignature(
+            "consumeAllowance(address,uint256)",
+            collateralToken,
+            collateralAmount
+        );
+
+        // encode the swap using uniswapv2 router
+        // selling collateral for pegToken (usdc)
+        address[] memory path = new address[](2);
+        path[0] = address(collateralToken);
+        path[1] = address(usdc);
+
+        uint256 flashloanPegTokenAmount = SimplePSM(psm).getRedeemAmountOut(
+            debtToBePaid
+        ) + 1;
+
+        uint256[] memory amountCollateralToSell = IUniswapRouter(
+            UNISWAPV2_ROUTER_ADDR
+        ).getAmountsIn(flashloanPegTokenAmount, path);
+
+        uint256 minCollateralRemaining = collateralAmount -
+            amountCollateralToSell[0] -
+            1;
+
+        bytes memory routerCallData = abi.encodeWithSignature(
+            "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
+            amountCollateralToSell[0], // amount in
+            flashloanPegTokenAmount, // amount out min
+            path, // path collateralToken->pegToken
+            address(gatewayv1), // to
+            uint256(block.timestamp + 1)
+        ); // deadline
+
+        // call repayWithBalancerFlashLoan
+        vm.prank(alice);
+        gatewayv1.repayWithBalancerFlashLoan(
+            GatewayV1.RepayWithBalancerFlashLoanInput(
+                loanId,
+                address(term),
+                address(psm),
+                address(collateralToken),
+                address(usdc),
+                minCollateralRemaining,
+                pullCollateralCalls,
+                UNISWAPV2_ROUTER_ADDR,
+                routerCallData
+            )
+        );
+        assertGt(collateralToken.balanceOf(alice), 900e18);
+        assertEq(usdc.balanceOf(alice), 0);
+        assertEq(collateralToken.balanceOf(address(gatewayv1)), 0);
+        assertEq(usdc.balanceOf(address(gatewayv1)), 0);
+    }
 
     // bid with flashloan
     function testBidWithBalancerFlashLoan() public {
