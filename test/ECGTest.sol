@@ -211,7 +211,7 @@ abstract contract ECGTest is Test {
             FiatTokenV1(usdc).configureMinter(address(this), type(uint256).max);
             FiatTokenV1(usdc).mint(to, amount);
         } else {
-            deal(token, address(this), amount);
+            deal(token, to, amount);
         }
     }
 }
