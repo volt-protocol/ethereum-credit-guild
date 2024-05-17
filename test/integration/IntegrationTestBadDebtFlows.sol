@@ -30,7 +30,7 @@ contract IntegrationTestBadDebtFlows is PostProposalCheckFixture {
         uint256 borrowAmount,
         uint128 supplyAmount
     ) private returns (bytes32 loanId) {
-        deal(address(collateralToken), userOne, supplyAmount);
+        dealToken(address(collateralToken), userOne, supplyAmount);
 
         uint256 startingCreditSupply = credit.totalSupply();
         uint256 startingBuffer = rateLimitedCreditMinter.buffer();

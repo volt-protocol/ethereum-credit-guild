@@ -5,6 +5,17 @@ import {Test} from "@forge-std/Test.sol";
 import {console} from "@forge-std/console.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
+interface FiatTokenV1 {
+    function masterMinter() external returns (address);
+
+    function mint(address _to, uint256 _amount) external returns (bool);
+
+    function configureMinter(
+        address minter,
+        uint256 minterAmount
+    ) external returns (bool);
+}
+
 abstract contract ECGTest is Test {
     string internal constant ADDR_PATH =
         "/protocol-configuration/addresses.json";
@@ -173,12 +184,34 @@ abstract contract ECGTest is Test {
         return found;
     }
 
-    function _substring(string memory str, uint startIndex, uint endIndex) public pure returns (string memory) {
+    function _substring(
+        string memory str,
+        uint startIndex,
+        uint endIndex
+    ) public pure returns (string memory) {
         bytes memory strBytes = bytes(str);
-        bytes memory result = new bytes(endIndex-startIndex);
-        for(uint i = startIndex; i < endIndex; i++) {
+        bytes memory result = new bytes(endIndex - startIndex);
+        for (uint i = startIndex; i < endIndex; i++) {
             result[i - startIndex] = strBytes[i];
         }
         return string(result);
+    }
+
+    function dealToken(address token, address to, uint256 amount) public {
+        address usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+        // uniswap router for mainnet or sepolia
+        if (block.chainid == 42161) {
+            usdc = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
+        }
+
+        if (token == usdc) {
+            // if usdc, needs to mint as the master minter
+            address masterMint = FiatTokenV1(usdc).masterMinter();
+            vm.prank(masterMint);
+            FiatTokenV1(usdc).configureMinter(address(this), type(uint256).max);
+            FiatTokenV1(usdc).mint(to, amount);
+        } else {
+            deal(token, address(this), amount);
+        }
     }
 }

@@ -304,14 +304,16 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
             UNISWAPV2_ROUTER_ADDR = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
         } else if (block.chainid == 11155111) {
             UNISWAPV2_ROUTER_ADDR = 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008;
+        } else if (block.chainid == 42161) {
+            UNISWAPV2_ROUTER_ADDR = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
         }
         vm.label(UNISWAPV2_ROUTER_ADDR, "Uniswap_Router");
         vm.label(address(usdc), "USDC");
         vm.label(address(collateralToken), "COLLATERAL_TOKEN");
 
         // give tokens to the team multisig
-        deal(address(usdc), teamMultisig, 100_000_000e6);
-        deal(address(collateralToken), teamMultisig, 100_000_000e18);
+        dealToken(address(usdc), teamMultisig, 100_000_000e6);
+        dealToken(address(collateralToken), teamMultisig, 100_000_000e18);
         vm.startPrank(teamMultisig);
         deployGatewayV1();
         deployUniv2Pool();
@@ -327,7 +329,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     // multicall scenario with permit
     function testGatewayLoanWithPermit() public {
         // alice will get a loan with a permit
-        deal(address(collateralToken), alice, 1000e18);
+        dealToken(address(collateralToken), alice, 1000e18);
         uint256 collateralAmount = 100e18; // 100 collateral
         uint256 debtAmount = getBorrowAmountFromCollateralAmount(
             collateralAmount
@@ -432,7 +434,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     // multicall scenario with without permit
     function testGatewayLoanWithoutPermit() public {
         // alice will get a loan with a permit
-        deal(address(collateralToken), alice, 1000e18);
+        dealToken(address(collateralToken), alice, 1000e18);
         uint256 collateralAmount = 100e18; // 100 collateral
         uint256 debtAmount = getBorrowAmountFromCollateralAmount(
             collateralAmount
@@ -506,7 +508,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     // multicall with flashloan
     function testGatewayLoanWithBalancerFlasloan() public {
         // alice will get a loan with a permit
-        deal(address(collateralToken), alice, 1000e18);
+        dealToken(address(collateralToken), alice, 1000e18);
         uint256 collateralAmount = 25e18; // 25 collateral
         uint256 flashloanAmount = 75e18; // 75 flashloan collateral
         uint256 debtAmount = getBorrowAmountFromCollateralAmount(
@@ -669,7 +671,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     function testBorrowWithBalancerFlashLoan() public {
         // alice will get a loan with a permit, 10x leverage on collateral
         uint256 collateralAmount = 1000e18;
-        deal(address(collateralToken), alice, collateralAmount);
+        dealToken(address(collateralToken), alice, collateralAmount);
         uint256 flashloanPegTokenAmount = 9000e6;
 
         // encode the swap using uniswapv2 router
@@ -678,7 +680,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         path[1] = address(collateralToken);
         uint256[] memory amountsOut = IUniswapRouter(UNISWAPV2_ROUTER_ADDR)
             .getAmountsOut(flashloanPegTokenAmount, path);
-        uint256 minCollateralToReceive = (amountsOut[0] * 95) / 100; // allow 5% slippage
+        uint256 minCollateralToReceive = amountsOut[0];
 
         bytes memory routerCallData = abi.encodeWithSignature(
             "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
@@ -698,9 +700,12 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
             alice_private_key
         );
 
+        // only borrow for the amount of collateral we received after swapping the flashloan
+        // meaning the user collateral is added for overcollateralization
         uint256 borrowAmount = getBorrowAmountFromCollateralAmount(
-            collateralAmount + minCollateralToReceive
+            collateralAmount
         );
+
         // sign permit gUSDC -> gateway
         PermitData memory permitDataCredit = getPermitData(
             ERC20Permit(credit),
@@ -759,12 +764,13 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
             abi.encode(alice, address(term), block.timestamp)
         );
         LendingTerm.Loan memory loan = LendingTerm(term).getLoan(loanId);
+
         assertEq(collateralToken.balanceOf(alice), 0);
         assertEq(usdc.balanceOf(alice), 0);
-        assertLt(collateralToken.balanceOf(address(gatewayv1)), 1e13);
-        assertLt(usdc.balanceOf(address(gatewayv1)), 1e7);
+        assertEq(collateralToken.balanceOf(address(gatewayv1)), 0);
+        assertEq(usdc.balanceOf(address(gatewayv1)), 0);
         assertEq(loan.collateralAmount, 10_000e18);
-        assertLt(loan.borrowAmount, 9_900e18);
+        assertEq(loan.borrowAmount, borrowAmount);
     }
 
     // repay with flashloan
