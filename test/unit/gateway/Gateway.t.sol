@@ -57,6 +57,10 @@ contract UnitTestGatewayGeneric is ECGTest {
     // functions to be called by the gateway
     uint256 public amountSaved;
 
+    function nonAllowedFunction(uint256 amount, string memory /*str*/) public {
+        amountSaved = amount;
+    }
+
     function revertingFunction(uint256 /*amount*/) public pure {
         revert("I told you I would revert");
     }
@@ -107,11 +111,26 @@ contract UnitTestGatewayGeneric is ECGTest {
         gateway.allowCall(address(1), 0x01020304, true);
     }
 
+    /// @notice Tests that non-owners cannot allow calls
+    function testAllowAddressShouldRevertIfNotOwner() public {
+        vm.expectRevert("Ownable: caller is not the owner");
+        gateway.allowAddress(address(1), true);
+    }
+
     /// @notice Tests that transferFrom cannot be allowed
     function testAllowCallShouldRevertIfTransferFrom() public {
         vm.prank(gatewayOwner);
         vm.expectRevert("Gateway: cannot allow transferFrom");
         gateway.allowCall(address(1), 0x23b872dd, true);
+    }
+
+    function testAllowAddressShouldWorkIfOwner(address target) public {
+        vm.prank(gatewayOwner);
+        gateway.allowAddress(target, true);
+        assertEq(gateway.allowedAddresses(target), true);
+        vm.prank(gatewayOwner);
+        gateway.allowAddress(target, false);
+        assertEq(gateway.allowedAddresses(target), false);
     }
 
     /// @notice Tests that the gateway owner can successfully allow and disallow calls
@@ -155,6 +174,21 @@ contract UnitTestGatewayGeneric is ECGTest {
             data
         );
         gateway.multicall(calls);
+    }
+
+    /// @notice Ensures that calls to non-allowed targets are properly restricted
+    function testCallExternalShouldWorkOnAllowedAddress() public {
+        vm.prank(gatewayOwner);
+        gateway.allowAddress(address(this), true);
+        assertEq(gateway.allowedAddresses(address(this)), true);
+
+        bytes memory data = abi.encodeWithSignature(
+            "nonAllowedFunction(uint256,string)",
+            42,
+            "Hello"
+        );
+        _singleCallExternal(address(this), data);
+        assertEq(amountSaved, 42);
     }
 
     /// @notice Ensures that calls to non-allowed targets are properly restricted

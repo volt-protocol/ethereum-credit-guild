@@ -21,12 +21,21 @@ abstract contract Gateway is Ownable, Pausable {
 
     GuildToken public immutable GUILD_TOKEN;
 
+    /// @notice emitted when a an address is allowed or not by the function allowAddress
+    event AddressAllowed(
+        address indexed target,
+        bool isAllowed
+    );
     /// @notice emitted when a call is allowed or not by the function allowCall
     event CallAllowed(
         address indexed target,
         bytes4 functionSelector,
         bool isAllowed
     );
+
+    /// @notice mapping of allowed target where all call are allowed
+    /// For example allowing all function on the 1inch router
+    mapping(address => bool) public allowedAddresses;
 
     /// @notice mapping of allowed signatures per target address
     /// For example allowing "approve" on a token
@@ -65,6 +74,15 @@ abstract contract Gateway is Ownable, Pausable {
     }
 
     /// @notice allow (or disallow) a function call for a target address
+    function allowAddress(
+        address target,
+        bool allowed
+    ) public virtual onlyOwner {
+        allowedAddresses[target] = allowed;
+        emit AddressAllowed(target , allowed);
+    }
+
+    /// @notice allow (or disallow) a function call for a target address
     function allowCall(
         address target,
         bytes4 functionSelector,
@@ -91,8 +109,8 @@ abstract contract Gateway is Ownable, Pausable {
     ) public virtual afterEntry {
         // Extract the function selector from the first 4 bytes of `data`
         bytes4 functionSelector = _getSelector(data);
-        if (!allowedCalls[target][functionSelector]) {
-            if (!_checkAutoAllowedCall(target, functionSelector)) {
+        if(!allowedAddresses[target] && !allowedCalls[target][functionSelector]) {
+            if (!_checkAutoAllowedAddress(target)) {
                 revert("Gateway: cannot call target");
             }
         }
@@ -163,16 +181,14 @@ abstract contract Gateway is Ownable, Pausable {
     /// @notice Checks if a call is automatically allowed based on the target address
     /// @dev Automatically allows calls to a lending term if the target is a gauge according to GUILD_TOKEN
     /// @param target The address of the contract being called
-    /// @param functionSelector The function selector of the method being called
     /// @return bool Returns true if the call is automatically allowed, false otherwise
-    function _checkAutoAllowedCall(
-        address target,
-        bytes4 functionSelector
+    function _checkAutoAllowedAddress(
+        address target
     ) internal returns (bool) {
         // auto allow any call to a lending term
         if (GUILD_TOKEN.isGauge(target)) {
-            allowedCalls[target][functionSelector] = true;
-            emit CallAllowed(target, functionSelector, true);
+            allowedAddresses[target] = true;
+            emit AddressAllowed(target, true);
             return true;
         }
         return false;
