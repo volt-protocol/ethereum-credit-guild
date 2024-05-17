@@ -11,6 +11,7 @@ import {console} from "@forge-std/console.sol";
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
+import {SimplePSM} from "@src/loan/SimplePSM.sol";
 
 interface IUniswapRouter {
     function swapTokensForExactTokens(
@@ -92,7 +93,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
     address public UNISWAPV2_ROUTER_ADDR = address(0);
     GatewayV1 public gatewayv1 = new GatewayV1(address(guild));
     IWeightedPoolFactory public balancerFactory =
-        IWeightedPoolFactory(0x7920BFa1b2041911b354747CA7A6cDD2dfC50Cfd);
+        IWeightedPoolFactory(address(0));
 
     uint256 public alice_private_key = 0x42424242421111111;
     address public alice = vm.addr(alice_private_key);
@@ -302,10 +303,19 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         // uniswap router for mainnet or sepolia
         if (block.chainid == 1) {
             UNISWAPV2_ROUTER_ADDR = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+            balancerFactory = IWeightedPoolFactory(
+                0x897888115Ada5773E02aA29F775430BFB5F34c51
+            );
         } else if (block.chainid == 11155111) {
             UNISWAPV2_ROUTER_ADDR = 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008;
+            balancerFactory = IWeightedPoolFactory(
+                0x7920BFa1b2041911b354747CA7A6cDD2dfC50Cfd
+            );
         } else if (block.chainid == 42161) {
             UNISWAPV2_ROUTER_ADDR = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
+            balancerFactory = IWeightedPoolFactory(
+                0xc7E5ED1054A24Ef31D827E6F86caA58B3Bc168d7
+            );
         }
         vm.label(UNISWAPV2_ROUTER_ADDR, "Uniswap_Router");
         vm.label(address(usdc), "USDC");
@@ -680,7 +690,7 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         path[1] = address(collateralToken);
         uint256[] memory amountsOut = IUniswapRouter(UNISWAPV2_ROUTER_ADDR)
             .getAmountsOut(flashloanPegTokenAmount, path);
-        uint256 minCollateralToReceive = amountsOut[0];
+        uint256 minCollateralToReceive = amountsOut[1];
 
         bytes memory routerCallData = abi.encodeWithSignature(
             "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
@@ -700,10 +710,9 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
             alice_private_key
         );
 
-        // only borrow for the amount of collateral we received after swapping the flashloan
-        // meaning the user collateral is added for overcollateralization
-        uint256 borrowAmount = getBorrowAmountFromCollateralAmount(
-            collateralAmount
+        // borrow the amount of credit needed to reimburse the flashloan exactly
+        uint256 borrowAmount = SimplePSM(psm).getMintAmountOut(
+            flashloanPegTokenAmount
         );
 
         // sign permit gUSDC -> gateway
@@ -769,7 +778,10 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         assertEq(usdc.balanceOf(alice), 0);
         assertEq(collateralToken.balanceOf(address(gatewayv1)), 0);
         assertEq(usdc.balanceOf(address(gatewayv1)), 0);
-        assertEq(loan.collateralAmount, 10_000e18);
+        assertEq(
+            loan.collateralAmount,
+            collateralAmount + minCollateralToReceive
+        );
         assertEq(loan.borrowAmount, borrowAmount);
     }
 

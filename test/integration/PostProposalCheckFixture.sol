@@ -24,9 +24,8 @@ import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol
 import {GuildTimelockController} from "@src/governance/GuildTimelockController.sol";
 
 contract PostProposalCheckFixture is PostProposalCheck {
-
     // gauge type / market ID where to run the integration test suite
-    uint256 internal constant MARKET_ID = 999999999;
+    uint256 internal constant MARKET_ID = 1;
 
     /// Users
     address public userOne = address(0x1111);
@@ -69,9 +68,7 @@ contract PostProposalCheckFixture is PostProposalCheck {
     RateLimitedMinter public rateLimitedGuildMinter;
     SurplusGuildMinter public surplusGuildMinter;
 
-    function _mkt(
-        string memory x
-    ) private pure returns (string memory) {
+    function _mkt(string memory x) private pure returns (string memory) {
         return string.concat(Strings.toString(MARKET_ID), x);
     }
 
@@ -93,15 +90,9 @@ contract PostProposalCheckFixture is PostProposalCheck {
         credit = CreditToken(getAddr(_mkt("_CREDIT")));
 
         /// rate limited minters
-        rateLimitedCreditMinter = RateLimitedMinter(
-            getAddr(_mkt("_RLCM"))
-        );
-        rateLimitedGuildMinter = RateLimitedMinter(
-            getAddr("RLGM")
-        );
-        surplusGuildMinter = SurplusGuildMinter(
-            getAddr(_mkt("_SGM"))
-        );
+        rateLimitedCreditMinter = RateLimitedMinter(getAddr(_mkt("_RLCM")));
+        rateLimitedGuildMinter = RateLimitedMinter(getAddr("RLGM"));
+        surplusGuildMinter = SurplusGuildMinter(getAddr(_mkt("_SGM")));
 
         profitManager = ProfitManager(getAddr(_mkt("_PROFIT_MANAGER")));
         auctionHouse = AuctionHouse(getAddr("AUCTION_HOUSE_12H"));
@@ -184,16 +175,19 @@ contract PostProposalCheckFixture is PostProposalCheck {
 
     function dealPegToken(address who, uint256 amount) public {
         vm.prank(0x8aFf09e2259cacbF4Fc4e3E53F3bf799EfEEab36); // USDC masterMinter
-        (bool success1, ) = address(usdc).call(abi.encodeWithSignature(
-            "configureMinter(address,uint256)",
-            address(this),
-            type(uint256).max
-        ));
-        (bool success2, ) = address(usdc).call(abi.encodeWithSignature(
-            "mint(address,uint256)",
-            who,
-            amount
-        ));
-        require(success1 && success2, "PostProposalCheckFixture: error in dealPegToken()");
+        (bool success1, ) = address(usdc).call(
+            abi.encodeWithSignature(
+                "configureMinter(address,uint256)",
+                address(this),
+                type(uint256).max
+            )
+        );
+        (bool success2, ) = address(usdc).call(
+            abi.encodeWithSignature("mint(address,uint256)", who, amount)
+        );
+        require(
+            success1 && success2,
+            "PostProposalCheckFixture: error in dealPegToken()"
+        );
     }
 }
