@@ -479,7 +479,7 @@ contract IntegrationTestSurplusGuildMinter is PostProposalCheckFixture {
     ) private returns (bytes32 loanId) {
         _allocateGauge();
 
-        deal(address(collateralToken), userOne, supplyAmount);
+        dealToken(address(collateralToken), userOne, supplyAmount);
 
         uint256 startingTotalSupply = credit.totalSupply();
         uint256 issuanceBefore = term.issuance();

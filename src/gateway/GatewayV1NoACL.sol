@@ -8,6 +8,8 @@ import {GatewayV1} from "./GatewayV1.sol";
 /// @dev this contract does not check if calls are allowed
 /// use at your own risk
 contract GatewayV1NoACL is GatewayV1 {
+    constructor(address _guildTokenAddress) GatewayV1(_guildTokenAddress) {}
+
     /// @notice Executes an external call to a specified target. All calls are allowed
     /// @dev anyone can use the gateway so if any funds are left in it, anyone can take them
     /// @param target The address of the contract to call.
@@ -26,7 +28,7 @@ contract GatewayV1NoACL is GatewayV1 {
         address /*target*/,
         bytes4 /*functionSelector*/,
         bool /*allowed*/
-    ) public override view onlyOwner {
+    ) public view override onlyOwner {
         revert("GatewayV1NoACL: unused function");
     }
 }
