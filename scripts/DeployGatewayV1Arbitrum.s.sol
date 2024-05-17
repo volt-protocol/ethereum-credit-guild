@@ -5,8 +5,7 @@ import {Script, console} from "@forge-std/Script.sol";
 import {GatewayV1} from "@src/gateway/GatewayV1.sol";
 
 /// @notice
-/// deploy like that to verify:
-/// forge script scripts/DeployGatewayV1.s.sol:DeployGatewayV1 -vvvv --rpc-url {{RPC URL}} --broadcast --etherscan-api-key {ETHERSCAN KEY} --verify --verifier-url https://api-sepolia.etherscan.io/api --chain-id 11155111 --verifier etherscan --force --slow
+/// forge script scripts/DeployGatewayV1Arbitrum.s.sol:DeployGatewayV1Arbitrum -vvvv --rpc-url {{RPC URL}} --broadcast --verify --with-gas-price 10000000
 contract DeployGatewayV1Arbitrum is Script {
     uint256 public PRIVATE_KEY;
     GatewayV1 public gatewayv1;
