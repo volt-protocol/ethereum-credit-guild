@@ -199,7 +199,7 @@ abstract contract ECGTest is Test {
 
     function dealToken(address token, address to, uint256 amount) public {
         address usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-        // uniswap router for mainnet or sepolia
+        // usdc switch for arbitrum
         if (block.chainid == 42161) {
             usdc = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
         }
