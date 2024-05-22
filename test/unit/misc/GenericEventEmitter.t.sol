@@ -15,7 +15,6 @@ contract UnitTestGenericEventEmitter is ECGTest {
         address someAddress;
     }
 
-    /// @notice Sets up the test by deploying the AccountFactory contract
     function setUp() public {
         eventEmitter = new GenericEventEmitter();
     }
