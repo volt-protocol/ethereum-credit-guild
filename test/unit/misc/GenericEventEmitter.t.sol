@@ -23,7 +23,6 @@ contract UnitTestGenericEventEmitter is ECGTest {
     event GenericEvent(
         bytes32 indexed eventType,
         uint256 timestamp,
-        address origin,
         bytes data
     );
 
@@ -36,7 +35,7 @@ contract UnitTestGenericEventEmitter is ECGTest {
 
         bytes memory data = abi.encode(testData);
         vm.expectEmit(true, false, false, true, address(eventEmitter));
-        emit GenericEvent(keccak256("TestType"), block.timestamp, tx.origin, data);
+        emit GenericEvent(keccak256("TestType"), block.timestamp, data);
 
         vm.prank(bob);
         eventEmitter.log(eventType, data);
@@ -47,7 +46,7 @@ contract UnitTestGenericEventEmitter is ECGTest {
         string memory testData = '{"someValue":42,"sponsor": "this_is_alice","sponsored": "this_is_bob"}';
 
         vm.expectEmit(true, false, false, true, address(eventEmitter));
-        emit GenericEvent(keccak256("TestTypeWithString"), block.timestamp, tx.origin, bytes(testData));
+        emit GenericEvent(keccak256("TestTypeWithString"), block.timestamp, bytes(testData));
 
         vm.prank(bob);
         eventEmitter.log(eventType, bytes(testData));

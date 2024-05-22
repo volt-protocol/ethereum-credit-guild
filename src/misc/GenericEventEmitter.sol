@@ -12,11 +12,10 @@ contract GenericEventEmitter {
     event GenericEvent(
         bytes32 indexed id,
         uint256 timestamp,
-        address origin,
         bytes data
     );
 
     function log(bytes32 id, bytes memory data) public {
-        emit GenericEvent(id, block.timestamp, tx.origin, data);
+        emit GenericEvent(id, block.timestamp, data);
     }
 }
