@@ -68,7 +68,7 @@
     "name": "UNISWAP_ROUTER"
   },
   {
-    "addr": "0xCa41f1Eeb2394D78b335F3547b28ccb3A0e561bc",
+    "addr": "0xca41f1eeb2394d78b335f3547b28ccb3a0e561bc",
     "name": "GATEWAY"
   },
   {
@@ -268,11 +268,11 @@
     "name": "999999998_TERM_USDC_0.000200_05%"
   },
   {
-    "addr": "0xEd81318B543c1B32C5853B20E0cbdb8a5F2bc3E9",
+    "addr": "0xed81318b543c1b32c5853b20e0cbdb8a5f2bc3e9",
     "name": "999999998_TERM_ERC20_PT_WEETH_27JUN2024_0.7_20%"
   },
   {
-    "addr": "0x281b9aFBb619E7f4D6Ed74a676367F19D05029Cd",
+    "addr": "0x281b9afbb619e7f4d6ed74a676367f19d05029cd",
     "name": "999999998_TERM_ERC20_PT_RSETH_27JUN2024_0.7_20%"
   },
   {
@@ -1336,7 +1336,39 @@
     "name": "4_ONBOARD_VETO_CREDIT"
   },
   {
-    "addr": "0x221A0f68770658C15B525d0F89F5da2baAB5f321",
+    "addr": "0x221a0f68770658c15b525d0f89f5da2baab5f321",
     "name": "ERC20_OD"
+  },
+  {
+    "addr": "0xc99db08dde67269bf90f6ca6e821f3aea22b4461",
+    "name": "5_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0x4139724fcb5e27d9f13be9928e4436a32d12e00b",
+    "name": "5_CREDIT"
+  },
+  {
+    "addr": "0x8a6cd49356806fdc8ead08e9aa721aa59ae4e9e1",
+    "name": "5_RLCM"
+  },
+  {
+    "addr": "0x71215ac6faf015aea177675543a8635beb08d183",
+    "name": "5_SGM"
+  },
+  {
+    "addr": "0x9c54ade47b22cd9c661ccd269f84d40eade32373",
+    "name": "5_PSM"
+  },
+  {
+    "addr": "0x221a0f68770658c15b525d0f89f5da2baab5f321",
+    "name": "5_PEG_TOKEN"
+  },
+  {
+    "addr": "0x700a82aa0d30da528b0960756b769c57af2b7118",
+    "name": "5_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x0d4121cfc45e489dc70088994c5dba04602d5476",
+    "name": "5_ONBOARD_VETO_CREDIT"
   }
 ]
