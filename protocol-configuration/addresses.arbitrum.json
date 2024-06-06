@@ -1370,5 +1370,9 @@
   {
     "addr": "0x0d4121cfc45e489dc70088994c5dba04602d5476",
     "name": "5_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x809bb8a9cf00f432c1c506742da020743d5d1877",
+    "name": "AUCTION_HOUSE_30MIN_6H"
   }
 ]
