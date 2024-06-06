@@ -24,7 +24,7 @@ import {GuildTimelockController} from "@src/governance/GuildTimelockController.s
 import {LendingTermOffboarding} from "@src/governance/LendingTermOffboarding.sol";
 import {TestnetToken} from "@src/tokens/TestnetToken.sol";
 
-contract Arbitrum_5_MarketARB is GovernorProposal {
+contract Arbitrum_7_MarketOD is GovernorProposal {
     function name() public view virtual returns (string memory) {
         return "Arbitrum_7_MarketOD";
     }
@@ -350,7 +350,7 @@ contract Arbitrum_5_MarketARB is GovernorProposal {
         );
         // Initial mint
         _addStep(
-            getAddr("ERC20_ARB"),
+            getAddr("ERC20_OD"),
             abi.encodeWithSignature(
                 "approve(address,uint256)",
                 getAddr(_mkt("_PSM")),
