@@ -49,7 +49,7 @@ contract Arbitrum_10_MarketstUSD is GovernorProposal {
     /// --------------------------------------------------------------
 
     string internal constant PEG_TOKEN = "stUSD";
-    uint256 internal constant MARKET_ID = 9; // gauge type / market ID
+    uint256 internal constant MARKET_ID = 8; // gauge type / market ID
 
     /// @notice guild mint ratio is 10e18, meaning for 1 credit 10 guild tokens are
     /// minted in SurplusGuildMinter
