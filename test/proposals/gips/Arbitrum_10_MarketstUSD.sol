@@ -374,7 +374,7 @@ contract Arbitrum_10_MarketstUSD is GovernorProposal {
             ),
             string.concat(
                 "Initial PSM.mintAndEnterRebase() with ",
-                strings.toString(INITIAL_MINT),
+                Strings.toString(INITIAL_MINT),
                 " ",
                 PEG_TOKEN,
                 " [market ",
