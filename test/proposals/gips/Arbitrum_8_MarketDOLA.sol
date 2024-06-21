@@ -373,7 +373,9 @@ contract Arbitrum_8_MarketDOLA is GovernorProposal {
                 INITIAL_MINT
             ),
             string.concat(
-                "Initial PSM.mintAndEnterRebase() with 10 ",
+                "Initial PSM.mintAndEnterRebase() with ",
+                strings.toString(INITIAL_MINT),
+                " ",
                 PEG_TOKEN,
                 " [market ",
                 Strings.toString(MARKET_ID),
