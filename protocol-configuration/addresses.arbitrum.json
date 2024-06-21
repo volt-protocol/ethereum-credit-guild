@@ -44,6 +44,10 @@
     "name": "ERC20_WSTETH"
   },
   {
+    "addr": "0x5979d7b546e38e414f7e9822514be443a4800529",
+    "name": "ERC20_wstETH"
+  },
+  {
     "addr": "0x1c27ad8a19ba026adabd615f6bc77158130cfbe4",
     "name": "ERC20_PT_WEETH_27JUN2024"
   },
