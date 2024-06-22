@@ -1446,5 +1446,37 @@
   {
     "addr": "0xfa536218dff93ce11cf9bf681cc5ebda7fe8f158",
     "name": "7_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x56b0c1e888b36029c17defa0c1b2f165b7ab30db",
+    "name": "8_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0x63bebf6e5152ddef1445e24b456f8128a9fda7fc",
+    "name": "8_CREDIT"
+  },
+  {
+    "addr": "0x934abd5210f995e511a06bbaf4f88ebf1223b665",
+    "name": "8_RLCM"
+  },
+  {
+    "addr": "0x72c0a3d34aabd20db73a38c494f6e6be503f4a5b",
+    "name": "8_SGM"
+  },
+  {
+    "addr": "0x287a2fae4943d58893556a9fb7f0fa93121992b1",
+    "name": "8_PSM"
+  },
+  {
+    "addr": "0x0022228a2cc5e7ef0274a7baa600d44da5ab5776",
+    "name": "8_PEG_TOKEN"
+  },
+  {
+    "addr": "0xba2148b30a0a08e97e483178d977bbe5aa5b1a78",
+    "name": "8_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x976ed7df3ec49e20032a303110298a3a3ba3af36",
+    "name": "8_ONBOARD_VETO_CREDIT"
   }
 ]
