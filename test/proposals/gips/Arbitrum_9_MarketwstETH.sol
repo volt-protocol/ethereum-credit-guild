@@ -357,7 +357,7 @@ contract Arbitrum_9_MarketwstETH is GovernorProposal {
             getAddr(_mkt("_SGM")),
             abi.encodeWithSignature("setMinStake(uint256)", MIN_STAKE),
             string.concat(
-                "ProfitManager.setMinStake() [market ",
+                "SurplusGuildMinter.setMinStake() [market ",
                 Strings.toString(MARKET_ID),
                 "]"
             )
