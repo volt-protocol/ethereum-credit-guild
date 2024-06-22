@@ -1340,6 +1340,10 @@
     "name": "ERC20_OD"
   },
   {
+    "addr": "0x6a7661795c374c0bfc635934efaddff3a7ee23b6",
+    "name": "ERC20_DOLA"
+  },
+  {
     "addr": "0xc99db08dde67269bf90f6ca6e821f3aea22b4461",
     "name": "5_PROFIT_MANAGER"
   },
