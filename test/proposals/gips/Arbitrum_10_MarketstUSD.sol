@@ -172,7 +172,10 @@ contract Arbitrum_10_MarketstUSD is GovernorProposal {
         }
     }
 
-    function afterDeploy(address deployer) public pure virtual {}
+    function afterDeploy(address/* deployer*/) public virtual {
+        vm.prank(0x8f8BccE4c180B699F81499005281fA89440D1e95);
+        ERC20(getAddr(_mkt("_PEG_TOKEN"))).transfer(getAddr("DAO_TIMELOCK"), INITIAL_MINT);
+    }
 
     function run(address /* deployer*/) public virtual {
         // grant roles to smart contracts
