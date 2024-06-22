@@ -48,7 +48,7 @@ contract Arbitrum_9_MarketwstETH is GovernorProposal {
     /// --------------------------------------------------------------
     /// --------------------------------------------------------------
 
-    string internal constant PEG_TOKEN = "wstETH";
+    string internal constant PEG_TOKEN = "WSTETH";
     uint256 internal constant MARKET_ID = 7; // gauge type / market ID
 
     /// @notice guild mint ratio is 25_000e18, meaning for 1 credit 25k guild tokens are
@@ -60,7 +60,10 @@ contract Arbitrum_9_MarketwstETH is GovernorProposal {
     uint256 internal constant GUILD_CREDIT_REWARD_RATIO = 50_000 * 1e18;
 
     /// @notice min borrow size in the market at launch
-    uint256 internal constant MIN_BORROW = 15e18;
+    uint256 internal constant MIN_BORROW = 0.15e18;
+
+    /// @notice min stake size in the market at launch
+    uint256 internal constant MIN_STAKE = 0.001e18;
 
     /// @notice max total borrows in the market at launch
     uint256 internal constant MAX_TOTAL_ISSUANCE = 1_000 * 1e18;
@@ -95,7 +98,7 @@ contract Arbitrum_9_MarketwstETH is GovernorProposal {
     uint256 public constant DAO_VETO_CREDIT_QUORUM = 4_000e18;
     uint256 public constant ONBOARD_VETO_CREDIT_QUORUM = 400e18;
 
-    uint256 public constant INITIAL_MINT = 0.01e18;
+    uint256 public constant INITIAL_MINT = 0.005e18;
 
     function deploy() public virtual {
         // ProfitManager
@@ -346,6 +349,15 @@ contract Arbitrum_9_MarketwstETH is GovernorProposal {
             ),
             string.concat(
                 "GuildToken.setCanExceedMaxGauges() [market ",
+                Strings.toString(MARKET_ID),
+                "]"
+            )
+        );
+        _addStep(
+            getAddr(_mkt("_SGM")),
+            abi.encodeWithSignature("setMinStake(uint256)", MIN_STAKE),
+            string.concat(
+                "ProfitManager.setMinStake() [market ",
                 Strings.toString(MARKET_ID),
                 "]"
             )
