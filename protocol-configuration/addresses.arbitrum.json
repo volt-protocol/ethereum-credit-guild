@@ -44,7 +44,7 @@
     "name": "ERC20_WSTETH"
   },
   {
-    "addr": "0x0022228a2cc5E7eF0274A7Baa600d44da5aB5776",
+    "addr": "0x0022228a2cc5e7ef0274a7baa600d44da5ab5776",
     "name": "ERC20_stUSD"
   },
   {
@@ -1382,5 +1382,37 @@
   {
     "addr": "0x809bb8a9cf00f432c1c506742da020743d5d1877",
     "name": "AUCTION_HOUSE_30MIN_6H"
+  },
+  {
+    "addr": "0x702f7a6e88fec841aedad4088f31c54ff573941b",
+    "name": "6_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0x2170eea4d493e53e835d59f8ac559d007bc9a527",
+    "name": "6_CREDIT"
+  },
+  {
+    "addr": "0x10a5ceaf1a37f286b5d089e403155860aa9c052c",
+    "name": "6_RLCM"
+  },
+  {
+    "addr": "0xaa5bb0ffbfabec29a0df298b4b6a1a8e24cfe17e",
+    "name": "6_SGM"
+  },
+  {
+    "addr": "0x2294a1361c150207ff96122b374a40b2c5aac0db",
+    "name": "6_PSM"
+  },
+  {
+    "addr": "0x6a7661795c374c0bfc635934efaddff3a7ee23b6",
+    "name": "6_PEG_TOKEN"
+  },
+  {
+    "addr": "0x007bab197bf76f748697b8333cf742b86f01b4c8",
+    "name": "6_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x827400f870db7ac4d6343a0141cc13b17aaa9651",
+    "name": "6_ONBOARD_VETO_CREDIT"
   }
 ]
