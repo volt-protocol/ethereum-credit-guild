@@ -30,7 +30,7 @@ contract LendingTermAdjustable is LendingTerm {
     mapping(bytes32 => uint256) internal loanOpenInterestIndex;
 
     /// @notice returns the current interest index
-    function _interestIndex() internal view returns (uint256) {
+    function _getCurrentInterestIndex() internal view returns (uint256) {
         InterestIndex memory _interestIndex = __interestIndex;
         uint256 elapsed = block.timestamp - _interestIndex.lastUpdate;
         uint256 increment = (_interestIndex.lastValue *
@@ -44,7 +44,7 @@ contract LendingTermAdjustable is LendingTerm {
     /// @notice checkpoints the interest index.
     /// Should be called every time there is an interest rate change.
     function _checkpointInterestIndex() internal {
-        uint256 idx = _interestIndex();
+        uint256 idx = _getCurrentInterestIndex();
         if (idx == 0) {
             // for first-ever checkpoint, set value to 1e18
             idx = 1e18;
@@ -76,7 +76,7 @@ contract LendingTermAdjustable is LendingTerm {
     ) internal override returns (bytes32) {
         bytes32 loanId = super._borrow(payer, borrower, borrowAmount, collateralAmount);
         _checkpointInterestIndex();
-        loanOpenInterestIndex[loanId] = _interestIndex();
+        loanOpenInterestIndex[loanId] = _getCurrentInterestIndex();
         return loanId;
     }
 
@@ -103,7 +103,7 @@ contract LendingTermAdjustable is LendingTerm {
 
         // compute interest owed
         uint256 borrowAmount = loan.borrowAmount;
-        uint256 currentIndex = _interestIndex();
+        uint256 currentIndex = _getCurrentInterestIndex();
         uint256 openIndex = loanOpenInterestIndex[loanId];
         uint256 loanDebt = (currentIndex * borrowAmount) / openIndex;
         uint256 _openingFee = params.openingFee;
