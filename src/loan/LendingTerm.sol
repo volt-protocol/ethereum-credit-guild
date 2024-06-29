@@ -452,7 +452,7 @@ contract LendingTerm is CoreRef {
         address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount
-    ) internal returns (bytes32 loanId) {
+    ) internal virtual returns (bytes32 loanId) {
         require(borrowAmount != 0, "LendingTerm: cannot borrow 0");
         require(collateralAmount != 0, "LendingTerm: cannot stake 0");
 
@@ -572,7 +572,7 @@ contract LendingTerm is CoreRef {
         address borrower,
         bytes32 loanId,
         uint256 collateralToAdd
-    ) internal {
+    ) internal virtual {
         require(collateralToAdd != 0, "LendingTerm: cannot add 0");
 
         Loan storage loan = loans[loanId];
@@ -614,7 +614,7 @@ contract LendingTerm is CoreRef {
         address repayer,
         bytes32 loanId,
         uint256 debtToRepay
-    ) internal {
+    ) internal virtual {
         Loan storage loan = loans[loanId];
 
         // check the loan is open
@@ -689,7 +689,7 @@ contract LendingTerm is CoreRef {
     }
 
     /// @notice repay an open loan
-    function _repay(address repayer, bytes32 loanId) internal {
+    function _repay(address repayer, bytes32 loanId) internal virtual {
         Loan storage loan = loans[loanId];
 
         // check the loan is open
@@ -741,13 +741,25 @@ contract LendingTerm is CoreRef {
         issuance -= borrowAmount;
 
         // return the collateral to the borrower
-        IERC20(params.collateralToken).safeTransfer(
+        _repay_returnCollateralToBorrower(
+            loanId,
             loan.borrower,
             loan.collateralAmount
         );
 
         // emit event
         emit LoanClose(block.timestamp, loanId, LoanCloseType.Repay, loanDebt);
+    }
+
+    function _repay_returnCollateralToBorrower(
+        bytes32/* loanId*/,
+        address borrower,
+        uint256 collateralAmount
+    ) internal virtual {
+        IERC20(params.collateralToken).safeTransfer(
+            borrower,
+            collateralAmount
+        );
     }
 
     /// @notice repay an open loan
@@ -761,7 +773,7 @@ contract LendingTerm is CoreRef {
         address caller,
         bytes32 loanId,
         address _auctionHouse
-    ) internal {
+    ) internal virtual {
         Loan storage loan = loans[loanId];
 
         // check that the loan exists
@@ -826,6 +838,10 @@ contract LendingTerm is CoreRef {
     /// This function is made for emergencies where collateral is frozen or other reverting
     /// conditions on collateral transfers that prevent regular repay() or call() loan closing.
     function forgive(bytes32 loanId) external onlyCoreRole(CoreRoles.GOVERNOR) {
+        _forgive(loanId);
+    }
+
+    function _forgive(bytes32 loanId) internal virtual {
         Loan storage loan = loans[loanId];
 
         // check that the loan exists
@@ -907,6 +923,38 @@ contract LendingTerm is CoreRef {
         // save loan state
         loans[loanId].closeTime = uint48(block.timestamp);
 
+        // handle token movements based on auction result
+        _onBid_handleAuctionResult(
+            loanId,
+            bidder,
+            collateralToBorrower,
+            collateralToBidder,
+            creditFromBidder,
+            borrowAmount,
+            principal,
+            interest,
+            pnl
+        );
+
+        emit LoanClose(
+            block.timestamp,
+            loanId,
+            LoanCloseType.Call,
+            creditFromBidder
+        );
+    }
+
+    function _onBid_handleAuctionResult(
+        bytes32 loanId,
+        address bidder,
+        uint256 collateralToBorrower,
+        uint256 collateralToBidder,
+        uint256 creditFromBidder,
+        uint256 borrowAmount,
+        uint256 principal,
+        uint256 interest,
+        int256 pnl
+    ) internal virtual {
         // pull credit from bidder
         if (creditFromBidder != 0) {
             CreditToken(refs.creditToken).transferFrom(
@@ -956,13 +1004,6 @@ contract LendingTerm is CoreRef {
                 collateralToBidder
             );
         }
-
-        emit LoanClose(
-            block.timestamp,
-            loanId,
-            LoanCloseType.Call,
-            creditFromBidder
-        );
     }
 
     /// @notice set the address of the auction house.
