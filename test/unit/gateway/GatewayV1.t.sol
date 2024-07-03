@@ -494,13 +494,16 @@ contract UnitTestGatewayV1 is ECGTest {
                 address(psm),
                 address(collateral),
                 address(pegtoken),
+                address(pegtoken),
                 flashloanPegTokenAmount,
                 minCollateralToReceive,
                 borrowAmount,
                 pullCollateralCalls,
                 consumePermitBorrowedCreditCall,
                 address(this), // router, address(this) simulates univ2 router
-                routerCallData
+                routerCallData,
+                address(0),
+                bytes("")
             )
         );
 
@@ -603,13 +606,16 @@ contract UnitTestGatewayV1 is ECGTest {
                 address(psm),
                 address(collateral),
                 address(pegtoken),
+                address(pegtoken),
                 flashloanPegTokenAmount,
                 minCollateralToReceive,
                 borrowAmount,
                 pullCollateralCalls,
                 consumePermitBorrowedCreditCall,
                 address(this), // router, address(this) simulates univ2 router
-                routerCallData
+                routerCallData,
+                address(0),
+                bytes("")
             )
         );
     }
@@ -697,13 +703,16 @@ contract UnitTestGatewayV1 is ECGTest {
                 address(psm),
                 address(collateral),
                 address(pegtoken),
+                address(pegtoken),
                 flashloanPegTokenAmount,
                 minCollateralToReceive,
                 borrowAmount,
                 pullCollateralCalls,
                 consumePermitBorrowedCreditCall,
                 address(this), // router, address(this) simulates univ2 router
-                routerCallData
+                routerCallData,
+                address(0),
+                bytes("")
             )
         );
     }

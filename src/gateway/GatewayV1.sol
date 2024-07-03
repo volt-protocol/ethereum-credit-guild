@@ -107,13 +107,16 @@ contract GatewayV1 is Gateway {
         address psm;
         address collateralToken;
         address pegToken;
-        uint256 flashloanPegTokenAmount;
+        address flashloanedToken;
+        uint256 flashloanAmount;
         uint256 minCollateralToReceive;
         uint256 borrowAmount;
         bytes[] pullCollateralCalls;
         bytes consumePermitBorrowedCreditCall;
         address routerAddress;
         bytes routerCallData;
+        address routerAddressToFlashloanedToken;
+        bytes routerCallDataToFlashloanedToken;
     }
 
     /// @notice execute a borrow with a balancer flashloan
@@ -132,22 +135,23 @@ contract GatewayV1 is Gateway {
         // Initiate the flash loan
         // the balancer vault will call receiveFlashloan function on this contract before returning
         IERC20[] memory ierc20Tokens = new IERC20[](1);
-        ierc20Tokens[0] = IERC20(inputs.pegToken);
+        ierc20Tokens[0] = IERC20(inputs.flashloanedToken);
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = inputs.flashloanPegTokenAmount;
+        amounts[0] = inputs.flashloanAmount;
         IBalancerFlashLoan(balancerVault).flashLoan(
             address(this),
             ierc20Tokens,
             amounts,
             abi.encodeWithSignature(
-                "borrowWithBalancerFlashLoanAfterReceive((address,address,address,address,uint256,uint256,uint256,bytes[],bytes,address,bytes))",
+                "borrowWithBalancerFlashLoanAfterReceive((address,address,address,address,address,uint256,uint256,uint256,bytes[],bytes,address,bytes,address,bytes))",
                 inputs
             )
         );
 
         // here, the flashloan have been successfully reimbursed otherwise it would have reverted
-        // we can sweep the remaining pegToken (if any) to the user
+        // we can sweep the remaining pegToken and flashloaned tokens (if any) to the user
         sweep(inputs.pegToken);
+        sweep(inputs.flashloanedToken);
     }
 
     /// @notice execute a borrow with a balancer flashloan after receiving the flashloaned tokens
@@ -155,16 +159,16 @@ contract GatewayV1 is Gateway {
     function borrowWithBalancerFlashLoanAfterReceive(
         BorrowWithBalancerFlashLoanInput memory inputs
     ) public afterEntry {
-        // approve the swap router to swap the {pegToken} for {collateralToken}
+        // approve the swap router to swap the {flashloanedToken} for {collateralToken}
         callExternal(
-            inputs.pegToken,
+            inputs.flashloanedToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
                 inputs.routerAddress,
-                inputs.flashloanPegTokenAmount
+                inputs.flashloanAmount
             )
         );
-        // then we swap the pegToken to the collateralToken using the router
+        // then we swap the {flashloanedToken} to the {collateralToken} using the router
         callExternal(inputs.routerAddress, inputs.routerCallData);
 
         // check we received enoug collateral token
@@ -235,10 +239,27 @@ contract GatewayV1 is Gateway {
             )
         );
 
+        // if a router address is provided in inputs.routerAddressToFlashloanedToken, we swap the received pegToken amount to the flashloaned token
+        // this is not always used, for example when the flashloaned token is the peg token, this is useless
+        if (inputs.routerAddressToFlashloanedToken != address(0)) {
+            callExternal(
+                inputs.pegToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    inputs.routerAddressToFlashloanedToken,
+                    IERC20(inputs.pegToken).balanceOf(address(this))
+                )
+            );
+            callExternal(
+                inputs.routerAddressToFlashloanedToken,
+                inputs.routerCallDataToFlashloanedToken
+            );
+        }
+
         require(
-            IERC20(inputs.pegToken).balanceOf(address(this)) >=
-                inputs.flashloanPegTokenAmount,
-            "GatewayV1: pegToken balance too low to reimburse flashloan"
+            IERC20(inputs.flashloanedToken).balanceOf(address(this)) >=
+                inputs.flashloanAmount,
+            "GatewayV1: flashloan token balance too low to reimburse flashloan"
         );
     }
 
@@ -356,7 +377,7 @@ contract GatewayV1 is Gateway {
                 IERC20(inputs.collateralToken).balanceOf(address(this))
             )
         );
-        // then we swap the pegToken to the collateralToken using the router
+
         callExternal(inputs.routerAddress, inputs.routerCallData);
 
         require(
