@@ -393,6 +393,22 @@ contract GatewayV1 is Gateway {
         );
     }
 
+    /// @notice input for bidWithBalancerFlashLoan
+    struct BidWithBalancerFlashLoanInput {
+        bytes32 loanId;
+        address term;
+        address psm;
+        address collateralToken;
+        address pegToken;
+        address flashloanedToken;
+        uint256 flashloanAmount;
+        uint256 minProfit; // in flashloaned token
+        address routerAddress; // this can be null if flashloanedToken is the pegToken
+        bytes routerCallData; // this can be null if flashloanedToken is the pegToken
+        address routerAddressToFlashloanedToken;
+        bytes routerCallDataToFlashloanedToken;
+    }
+
     /// @notice bid in an auction with a balancer flashloan.
     /// Example flow :
     /// - flashloan USDC from Balancer
@@ -404,140 +420,127 @@ contract GatewayV1 is Gateway {
     /// Slippage protection of minPegTokenProfit during swap to ensure auction bid profitability
     /// @dev up to 1e12 gUSDC might be left in the gateway after execution (<0.000001$).
     function bidWithBalancerFlashLoan(
-        bytes32 loanId,
-        address term,
-        address psm,
-        address collateralToken,
-        address pegToken,
-        uint256 minPegTokenProfit,
-        address routerAddress,
-        bytes calldata routerCallData
-    ) public entryPoint whenNotPaused returns (uint256) {
-        // prepare calls
-        (
-            bytes[] memory calls,
-            uint256 flashloanPegTokenAmount,
-            address creditToken
-        ) = _prepareBidCalls(
-                loanId,
-                term,
-                psm,
-                collateralToken,
-                pegToken,
-                routerAddress,
-                routerCallData
-            );
-
+        BidWithBalancerFlashLoanInput memory inputs
+    ) public entryPoint whenNotPaused returns (uint256 profit) {
         // Initiate the flash loan
         // the balancer vault will call receiveFlashloan function on this contract before returning
-        {
-            IERC20[] memory ierc20Tokens = new IERC20[](1);
-            ierc20Tokens[0] = IERC20(pegToken);
-            uint256[] memory amounts = new uint256[](1);
-            amounts[0] = flashloanPegTokenAmount;
-            IBalancerFlashLoan(balancerVault).flashLoan(
-                address(this),
-                ierc20Tokens,
-                amounts,
-                abi.encodeWithSignature("executeFlashloanCalls(bytes[])", calls)
-            );
-        }
+        IERC20[] memory ierc20Tokens = new IERC20[](1);
+        ierc20Tokens[0] = IERC20(inputs.flashloanedToken);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = inputs.flashloanAmount;
+        IBalancerFlashLoan(balancerVault).flashLoan(
+            address(this),
+            ierc20Tokens,
+            amounts,
+            abi.encodeWithSignature(
+                "bidWithBalancerFlashLoanAfterReceive((bytes32,address,address,address,address,address,uint256,uint256,address,bytes,address,bytes))",
+                inputs
+            )
+        );
 
-        // here, the flashloan have been successfully reimbursed otherwise it would have reverted
-        return
-            _sendTokensToSender(
-                minPegTokenProfit,
-                pegToken,
-                creditToken,
-                collateralToken
-            );
+        // here, we can check if we have at least minProfit in the flashloaned token
+        profit = IERC20(inputs.flashloanedToken).balanceOf(address(this));
+        require(profit >= inputs.minProfit, "GatewayV1: profit too low");
+
+        // then we can sweep all tokens to user
+        sweep(inputs.flashloanedToken);
+        sweep(inputs.pegToken);
+        sweep(inputs.collateralToken);
+
+        return profit;
     }
 
-    function _prepareBidCalls(
-        bytes32 loanId,
-        address term,
-        address psm,
-        address collateralToken,
-        address pegToken,
-        address routerAddress,
-        bytes calldata routerCallData
-    )
-        internal
-        view
-        returns (
-            bytes[] memory calls,
-            uint256 flashloanPegTokenAmount,
-            address creditToken
-        )
-    {
-        calls = new bytes[](6);
-        // compute amount of pegTokens needed to cover the debt
+    function bidWithBalancerFlashLoanAfterReceive(
+        BidWithBalancerFlashLoanInput memory inputs
+    ) public afterEntry {
+        // here we have flashloned tokens, if the flashloaned token is different than the pegToken
+        // we need to approve the router to swap the flashloaned token for the pegToken
+        if (inputs.flashloanedToken != inputs.pegToken) {
+            callExternal(
+                inputs.flashloanedToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    inputs.routerAddress,
+                    inputs.flashloanAmount
+                )
+            );
+
+            // then perform the swap using router and routercalldata
+            callExternal(inputs.routerAddress, inputs.routerCallData);
+        }
+
+        // then, we need to mint credit using the amount of pegToken we swapped,
+        // for that we need to approve peg token to the psm
+        callExternal(
+            inputs.pegToken,
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                inputs.psm,
+                IERC20(inputs.pegToken).balanceOf(address(this))
+            )
+        );
+
+        callExternal(
+            inputs.psm,
+            abi.encodeWithSignature(
+                "mint(address,uint256)",
+                address(this),
+                IERC20(inputs.pegToken).balanceOf(address(this))
+            )
+        );
+
+        // now that we have credits, we can check that we have enough credit to repay the loan
         {
-            address _auctionHouse = LendingTerm(term).auctionHouse();
-            (uint256 collateralReceived, uint256 creditAsked) = AuctionHouse(
-                _auctionHouse
-            ).getBidDetail(loanId);
-            flashloanPegTokenAmount =
-                SimplePSM(psm).getRedeemAmountOut(creditAsked) +
-                1;
-
-            // approve the psm & mint creditTokens
-            calls[0] = abi.encodeWithSignature(
-                "callExternal(address,bytes)",
-                pegToken,
-                abi.encodeWithSignature(
-                    "approve(address,uint256)",
-                    psm,
-                    flashloanPegTokenAmount
-                )
+            address _auctionHouse = LendingTerm(inputs.term).auctionHouse();
+            address _creditToken = LendingTerm(inputs.term).creditToken();
+            (, uint256 creditAsked) = AuctionHouse(_auctionHouse).getBidDetail(
+                inputs.loanId
+            );
+            require(
+                IERC20(_creditToken).balanceOf(address(this)) >= creditAsked,
+                "GatewayV1: credit balance too low"
             );
 
-            calls[1] = abi.encodeWithSignature(
-                "callExternal(address,bytes)",
-                psm,
-                abi.encodeWithSignature(
-                    "mint(address,uint256)",
-                    address(this),
-                    flashloanPegTokenAmount
-                )
-            );
-
-            // bid in auction
-            creditToken = LendingTerm(term).creditToken();
-            calls[2] = abi.encodeWithSignature(
-                "callExternal(address,bytes)",
-                creditToken,
+            // if we have enough credit, we can approve the credit token to the term
+            callExternal(
+                _creditToken,
                 abi.encodeWithSignature(
                     "approve(address,uint256)",
-                    term,
+                    inputs.term,
                     creditAsked
                 )
             );
 
-            calls[3] = abi.encodeWithSignature(
-                "callExternal(address,bytes)",
+            // and then we can bid on the auction house
+            callExternal(
                 _auctionHouse,
-                abi.encodeWithSignature("bid(bytes32)", loanId)
-            );
-
-            // swap received collateralTokens to pegTokens
-            // allow collateral token to be used by the router
-            calls[4] = abi.encodeWithSignature(
-                "callExternal(address,bytes)",
-                collateralToken,
-                abi.encodeWithSignature(
-                    "approve(address,uint256)",
-                    routerAddress,
-                    collateralReceived
-                )
+                abi.encodeWithSignature("bid(bytes32)", inputs.loanId)
             );
         }
 
-        // call the function on the router, using the given calldata
-        calls[5] = abi.encodeWithSignature(
-            "callExternal(address,bytes)",
-            routerAddress,
-            routerCallData
+        // here, we should have received some collateral, we need to swap collateral to flashloanedToken
+        // to be able to reimburse the flashloan
+        // allow collateral token to be used by the router
+        callExternal(
+            inputs.collateralToken,
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                inputs.routerAddressToFlashloanedToken,
+                IERC20(inputs.collateralToken).balanceOf(address(this))
+            )
+        );
+
+        // then perform the swap
+        callExternal(
+            inputs.routerAddressToFlashloanedToken,
+            inputs.routerCallDataToFlashloanedToken
+        );
+
+        // here we can check that we have enough to reimburse the flashloan
+        require(
+            IERC20(inputs.flashloanedToken).balanceOf(address(this)) >=
+                inputs.flashloanAmount,
+            "GatewayV1: flashloan token balance too low to reimburse flashloan"
         );
     }
 
