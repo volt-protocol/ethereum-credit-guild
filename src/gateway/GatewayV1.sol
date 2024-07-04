@@ -270,10 +270,14 @@ contract GatewayV1 is Gateway {
         address psm;
         address collateralToken;
         address pegToken;
+        address flashloanedToken;
+        uint256 flashloanAmount;
         uint256 minCollateralRemaining;
         bytes[] pullCollateralCalls;
-        address routerAddress;
-        bytes routerCallData;
+        address routerAddress; // this can be null if flashloanedToken is the pegToken
+        bytes routerCallData; // this can be null if flashloanedToken is the pegToken
+        address routerAddressToFlashloanedToken;
+        bytes routerCallDataToFlashloanedToken;
     }
 
     /// @notice execute a repay with a balancer flashloan.
@@ -289,26 +293,19 @@ contract GatewayV1 is Gateway {
     function repayWithBalancerFlashLoan(
         RepayWithBalancerFlashLoanInput memory inputs
     ) public entryPoint whenNotPaused {
-        // compute amount of pegTokens needed to cover the debt
-        uint256 debt = LendingTerm(inputs.term).getLoanDebt(inputs.loanId);
-        uint256 flashloanPegTokenAmount = SimplePSM(inputs.psm)
-            .getRedeemAmountOut(debt) + 1;
-
         // Initiate the flash loan
         // the balancer vault will call receiveFlashloan function on this contract before returning
         IERC20[] memory ierc20Tokens = new IERC20[](1);
-        ierc20Tokens[0] = IERC20(inputs.pegToken);
+        ierc20Tokens[0] = IERC20(inputs.flashloanedToken);
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = flashloanPegTokenAmount;
+        amounts[0] = inputs.flashloanAmount;
         IBalancerFlashLoan(balancerVault).flashLoan(
             address(this),
             ierc20Tokens,
             amounts,
             abi.encodeWithSignature(
-                "repayWithBalancerFlashLoanAfterReceive((bytes32,address,address,address,address,uint256,bytes[],address,bytes),uint256,uint256)",
-                inputs,
-                debt,
-                flashloanPegTokenAmount
+                "repayWithBalancerFlashLoanAfterReceive((bytes32,address,address,address,address,address,uint256,uint256,bytes[],address,bytes,address,bytes))",
+                inputs
             )
         );
 
@@ -319,17 +316,31 @@ contract GatewayV1 is Gateway {
     }
 
     function repayWithBalancerFlashLoanAfterReceive(
-        RepayWithBalancerFlashLoanInput memory inputs,
-        uint256 debt,
-        uint256 flashloanPegTokenAmount
+        RepayWithBalancerFlashLoanInput memory inputs
     ) public afterEntry {
+        // here we have flashloned tokens, if the flashloaned token is different than the pegToken
+        // we need to approve the router to swap the flashloaned token for the pegToken
+        if (inputs.flashloanedToken != inputs.pegToken) {
+            callExternal(
+                inputs.flashloanedToken,
+                abi.encodeWithSignature(
+                    "approve(address,uint256)",
+                    inputs.routerAddress,
+                    inputs.flashloanAmount
+                )
+            );
+
+            // then perform the swap using router and routercalldata
+            callExternal(inputs.routerAddress, inputs.routerCallData);
+        }
+
         // approve the psm & mint creditTokens
         callExternal(
             inputs.pegToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
                 inputs.psm,
-                flashloanPegTokenAmount
+                IERC20(inputs.pegToken).balanceOf(address(this))
             )
         );
 
@@ -338,13 +349,21 @@ contract GatewayV1 is Gateway {
             abi.encodeWithSignature(
                 "mint(address,uint256)",
                 address(this),
-                flashloanPegTokenAmount
+                IERC20(inputs.pegToken).balanceOf(address(this))
             )
         );
 
         // repay the loan
         address _creditToken = LendingTerm(inputs.term).creditToken();
 
+        // ensure we have enough credit to repay the debt
+        uint256 debt = LendingTerm(inputs.term).getLoanDebt(inputs.loanId);
+        require(
+            IERC20(_creditToken).balanceOf(address(this)) >= debt,
+            "GatewayV1: credit balance too low"
+        );
+
+        // approve the credit token to the term
         callExternal(
             _creditToken,
             abi.encodeWithSignature(
@@ -373,12 +392,15 @@ contract GatewayV1 is Gateway {
             inputs.collateralToken,
             abi.encodeWithSignature(
                 "approve(address,uint256)",
-                inputs.routerAddress,
+                inputs.routerAddressToFlashloanedToken,
                 IERC20(inputs.collateralToken).balanceOf(address(this))
             )
         );
 
-        callExternal(inputs.routerAddress, inputs.routerCallData);
+        callExternal(
+            inputs.routerAddressToFlashloanedToken,
+            inputs.routerCallDataToFlashloanedToken
+        );
 
         require(
             IERC20(inputs.collateralToken).balanceOf(address(this)) >=
@@ -388,9 +410,11 @@ contract GatewayV1 is Gateway {
 
         require(
             IERC20(inputs.pegToken).balanceOf(address(this)) >=
-                flashloanPegTokenAmount,
-            "GatewayV1: pegToken balance too low to reimburse flashloan"
+                inputs.flashloanAmount,
+            "GatewayV1: flashloaned token balance too low to reimburse flashloan"
         );
+
+        sweep(_creditToken);
     }
 
     /// @notice input for bidWithBalancerFlashLoan
@@ -490,9 +514,9 @@ contract GatewayV1 is Gateway {
         );
 
         // now that we have credits, we can check that we have enough credit to repay the loan
+        address _creditToken = LendingTerm(inputs.term).creditToken();
         {
             address _auctionHouse = LendingTerm(inputs.term).auctionHouse();
-            address _creditToken = LendingTerm(inputs.term).creditToken();
             (, uint256 creditAsked) = AuctionHouse(_auctionHouse).getBidDetail(
                 inputs.loanId
             );
@@ -542,6 +566,8 @@ contract GatewayV1 is Gateway {
                 inputs.flashloanAmount,
             "GatewayV1: flashloan token balance too low to reimburse flashloan"
         );
+
+        sweep(_creditToken);
     }
 
     /// @notice send the tokens to the original sender, ensuring that at least minPegTokenProfit pegTokens are sent

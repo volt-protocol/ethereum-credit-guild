@@ -869,8 +869,12 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
                 address(psm),
                 address(collateralToken),
                 address(usdc),
+                address(usdc),
+                flashloanPegTokenAmount,
                 minCollateralRemaining,
                 pullCollateralCalls,
+                address(0),
+                bytes(""),
                 UNISWAPV2_ROUTER_ADDR,
                 routerCallData
             )

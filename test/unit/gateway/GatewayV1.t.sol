@@ -793,8 +793,12 @@ contract UnitTestGatewayV1 is ECGTest {
                 address(psm),
                 address(collateral),
                 address(pegtoken),
+                address(pegtoken),
+                flashloanPegTokenAmount,
                 minCollateralRemaining,
                 pullCollateralCalls,
+                address(0),
+                bytes(""),
                 address(this),
                 routerCallData
             )
