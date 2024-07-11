@@ -68,6 +68,10 @@
     "name": "ERC20_ARB"
   },
   {
+    "addr": "0x12275dcb9048680c4be40942ea4d92c74c63b844",
+    "name": "ERC20_eUSD"
+  },
+  {
     "addr": "0x8909dc15e40173ff4699343b6eb8132c65e18ec6",
     "name": "UNISWAP_ROUTER"
   },
@@ -1478,5 +1482,37 @@
   {
     "addr": "0x976ed7df3ec49e20032a303110298a3a3ba3af36",
     "name": "8_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0xb61c1f7cd9fce302a5c4416724c98810ea98f463",
+    "name": "9_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0xb6cc9bbd136bde153c380a987ef6b365ba9f7669",
+    "name": "9_CREDIT"
+  },
+  {
+    "addr": "0x74f1e2d3252c1cd7e0237213bd1ff099f1bf7073",
+    "name": "9_RLCM"
+  },
+  {
+    "addr": "0x0d81cf2515c02a7cdbd110c41e8dce2bb1983962",
+    "name": "9_SGM"
+  },
+  {
+    "addr": "0x3a3da0ff74b9265e7c74a9b2c62173cbedd6a582",
+    "name": "9_PSM"
+  },
+  {
+    "addr": "0x12275dcb9048680c4be40942ea4d92c74c63b844",
+    "name": "9_PEG_TOKEN"
+  },
+  {
+    "addr": "0x36520fc6ea092f5da1c41efbce4dbea1630ee7d6",
+    "name": "9_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x2d12b58707b1c68e6e40c60a0e3ba9510f2dfe4e",
+    "name": "9_ONBOARD_VETO_CREDIT"
   }
 ]
