@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {Core} from "@src/core/Core.sol";
 import {CoreRef} from "@src/core/CoreRef.sol";
 import {CoreRoles} from "@src/core/CoreRoles.sol";
 import {GuildToken} from "@src/tokens/GuildToken.sol";
@@ -17,7 +18,7 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 */
 contract RewardSweeper is CoreRef {
     /// @notice reference to GUILD token.
-    address public guild;
+    address public immutable guild;
 
     /// @notice address receiving swept rewards.
     address public receiver;
@@ -42,8 +43,7 @@ contract RewardSweeper is CoreRef {
     ) external {
         require(msg.sender == receiver, "RewardSweeper: invalid sender");
         require(GuildToken(guild).isGauge(gauge) || GuildToken(guild).isDeprecatedGauge(gauge), "RewardSweeper: invalid gauge");
-        address collateralToken = LendingTerm(gauge).collateralToken();
-        require(collateralToken != token, "RewardSweeper: invalid token");
+        require(LendingTerm(gauge).collateralToken() != token, "RewardSweeper: invalid token");
 
         uint256 amount = IERC20(token).balanceOf(gauge);
         if (amount != 0) {
@@ -61,5 +61,12 @@ contract RewardSweeper is CoreRef {
 
             emit Sweep(block.timestamp, gauge, token, amount);
         }
+    }
+
+    /// @notice deactivate sweeper
+    function deactivate() external {
+        require(msg.sender == receiver, "RewardSweeper: invalid sender");
+        core().renounceRole(CoreRoles.GOVERNOR, address(this));
+        selfdestruct(payable(receiver));
     }
 }

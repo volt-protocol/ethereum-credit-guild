@@ -183,4 +183,14 @@ contract RewardSweeperUnitTest is ECGTest {
         assertEq(reward.balanceOf(msig), rewardAmount);
         assertEq(reward.balanceOf(address(term)), 0);
     }
+
+    function testDeactivate() public {
+        vm.expectRevert("RewardSweeper: invalid sender");
+        sweeper.deactivate(); // nok, no prank
+
+        vm.prank(sweeper.receiver());
+        sweeper.deactivate();
+
+        assertEq(core.hasRole(CoreRoles.GOVERNOR, address(sweeper)), false);
+    }
 }
