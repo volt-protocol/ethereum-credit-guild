@@ -191,7 +191,6 @@ contract LendingTermAdjustableUnitTest is ECGTest {
     // setting maxDebtPerCollateralToken can make loans callable
     function testLoansBecomeCallable() public {
         // prepare
-        uint256 period = term.YEAR();
         collateral.mint(address(this), 1 ether * 2);
         collateral.approve(address(term), 1 ether * 2);
 
