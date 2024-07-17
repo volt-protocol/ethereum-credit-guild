@@ -41,7 +41,7 @@ contract DeployGatewayV1 is Script {
         _parseEnv();
 
         vm.startBroadcast(PRIVATE_KEY);
-        gatewayv1 = new GatewayV1();
+        gatewayv1 = new GatewayV1(0xb8ae64F191F829fC00A4E923D460a8F2E0ba3978);
         allowCalls();
         vm.stopBroadcast();
     }
