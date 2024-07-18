@@ -1514,5 +1514,17 @@
   {
     "addr": "0x2d12b58707b1c68e6e40c60a0e3ba9510f2dfe4e",
     "name": "9_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0xaf70c222a868c876e887fa1061fdeac03edf9d2b",
+    "name": "LENDING_TERM_V2"
+  },
+  {
+    "addr": "0x45af76ada2158b3914a2b6a901e2b85c44e0f27f",
+    "name": "TERM_PARAM_GOVERNOR_GUILD"
+  },
+  {
+    "addr": "0xc027f6e2710f414caadb98ca82c9d864d6cd947e",
+    "name": "REWARD_SWEEPER"
   }
 ]
