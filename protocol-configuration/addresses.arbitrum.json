@@ -44,6 +44,10 @@
     "name": "ERC20_WSTETH"
   },
   {
+    "addr": "0x0022228a2cc5e7ef0274a7baa600d44da5ab5776",
+    "name": "ERC20_stUSD"
+  },
+  {
     "addr": "0x1c27ad8a19ba026adabd615f6bc77158130cfbe4",
     "name": "ERC20_PT_WEETH_27JUN2024"
   },
@@ -62,6 +66,10 @@
   {
     "addr": "0x912ce59144191c1204e64559fe8253a0e49e6548",
     "name": "ERC20_ARB"
+  },
+  {
+    "addr": "0x12275dcb9048680c4be40942ea4d92c74c63b844",
+    "name": "ERC20_eUSD"
   },
   {
     "addr": "0x8909dc15e40173ff4699343b6eb8132c65e18ec6",
@@ -1340,6 +1348,10 @@
     "name": "ERC20_OD"
   },
   {
+    "addr": "0x6a7661795c374c0bfc635934efaddff3a7ee23b6",
+    "name": "ERC20_DOLA"
+  },
+  {
     "addr": "0xc99db08dde67269bf90f6ca6e821f3aea22b4461",
     "name": "5_PROFIT_MANAGER"
   },
@@ -1374,5 +1386,133 @@
   {
     "addr": "0x809bb8a9cf00f432c1c506742da020743d5d1877",
     "name": "AUCTION_HOUSE_30MIN_6H"
+  },
+  {
+    "addr": "0x702f7a6e88fec841aedad4088f31c54ff573941b",
+    "name": "6_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0x2170eea4d493e53e835d59f8ac559d007bc9a527",
+    "name": "6_CREDIT"
+  },
+  {
+    "addr": "0x10a5ceaf1a37f286b5d089e403155860aa9c052c",
+    "name": "6_RLCM"
+  },
+  {
+    "addr": "0xaa5bb0ffbfabec29a0df298b4b6a1a8e24cfe17e",
+    "name": "6_SGM"
+  },
+  {
+    "addr": "0x2294a1361c150207ff96122b374a40b2c5aac0db",
+    "name": "6_PSM"
+  },
+  {
+    "addr": "0x6a7661795c374c0bfc635934efaddff3a7ee23b6",
+    "name": "6_PEG_TOKEN"
+  },
+  {
+    "addr": "0x007bab197bf76f748697b8333cf742b86f01b4c8",
+    "name": "6_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x827400f870db7ac4d6343a0141cc13b17aaa9651",
+    "name": "6_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x7854fe2f7615c89c7413549e2b479f49888d4be4",
+    "name": "7_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0x808831ec837534e28a24097122875a6ee39c6a38",
+    "name": "7_CREDIT"
+  },
+  {
+    "addr": "0x880fb3452cad26461daec7ca1de684dee3b431ba",
+    "name": "7_RLCM"
+  },
+  {
+    "addr": "0x7c171a82f73e9c030cf9133606d883883c826acb",
+    "name": "7_SGM"
+  },
+  {
+    "addr": "0x5d97b82f188e21b7be0e30f8080eadfa902bd1c1",
+    "name": "7_PSM"
+  },
+  {
+    "addr": "0x5979d7b546e38e414f7e9822514be443a4800529",
+    "name": "7_PEG_TOKEN"
+  },
+  {
+    "addr": "0x8d2aaa1b2595e9e11c0ae5504c9eaf48a691d544",
+    "name": "7_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0xfa536218dff93ce11cf9bf681cc5ebda7fe8f158",
+    "name": "7_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0x56b0c1e888b36029c17defa0c1b2f165b7ab30db",
+    "name": "8_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0x63bebf6e5152ddef1445e24b456f8128a9fda7fc",
+    "name": "8_CREDIT"
+  },
+  {
+    "addr": "0x934abd5210f995e511a06bbaf4f88ebf1223b665",
+    "name": "8_RLCM"
+  },
+  {
+    "addr": "0x72c0a3d34aabd20db73a38c494f6e6be503f4a5b",
+    "name": "8_SGM"
+  },
+  {
+    "addr": "0x287a2fae4943d58893556a9fb7f0fa93121992b1",
+    "name": "8_PSM"
+  },
+  {
+    "addr": "0x0022228a2cc5e7ef0274a7baa600d44da5ab5776",
+    "name": "8_PEG_TOKEN"
+  },
+  {
+    "addr": "0xba2148b30a0a08e97e483178d977bbe5aa5b1a78",
+    "name": "8_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x976ed7df3ec49e20032a303110298a3a3ba3af36",
+    "name": "8_ONBOARD_VETO_CREDIT"
+  },
+  {
+    "addr": "0xb61c1f7cd9fce302a5c4416724c98810ea98f463",
+    "name": "9_PROFIT_MANAGER"
+  },
+  {
+    "addr": "0xb6cc9bbd136bde153c380a987ef6b365ba9f7669",
+    "name": "9_CREDIT"
+  },
+  {
+    "addr": "0x74f1e2d3252c1cd7e0237213bd1ff099f1bf7073",
+    "name": "9_RLCM"
+  },
+  {
+    "addr": "0x0d81cf2515c02a7cdbd110c41e8dce2bb1983962",
+    "name": "9_SGM"
+  },
+  {
+    "addr": "0x3a3da0ff74b9265e7c74a9b2c62173cbedd6a582",
+    "name": "9_PSM"
+  },
+  {
+    "addr": "0x12275dcb9048680c4be40942ea4d92c74c63b844",
+    "name": "9_PEG_TOKEN"
+  },
+  {
+    "addr": "0x36520fc6ea092f5da1c41efbce4dbea1630ee7d6",
+    "name": "9_DAO_VETO_CREDIT"
+  },
+  {
+    "addr": "0x2d12b58707b1c68e6e40c60a0e3ba9510f2dfe4e",
+    "name": "9_ONBOARD_VETO_CREDIT"
   }
 ]
