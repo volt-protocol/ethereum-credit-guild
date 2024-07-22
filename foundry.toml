@@ -4,6 +4,7 @@ fs_permissions = [{ access = "read-write", path = "./protocol-configuration"}]
 # compilation
 optimizer = true
 optimizer_runs = 200
+evm_version = 'cancun'
 
 # paths
 src = 'src'
