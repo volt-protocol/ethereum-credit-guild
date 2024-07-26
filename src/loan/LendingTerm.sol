@@ -162,7 +162,7 @@ contract LendingTerm is CoreRef {
         address _core,
         LendingTermReferences calldata _refs,
         bytes calldata _params
-    ) external {
+    ) public virtual {
         // can initialize only once
         assert(address(core()) == address(0));
         assert(_core != address(0));
@@ -280,7 +280,7 @@ contract LendingTerm is CoreRef {
     function _getLoanDebt(
         bytes32 loanId,
         uint256 creditMultiplier
-    ) internal view returns (uint256) {
+    ) internal virtual view returns (uint256) {
         Loan storage loan = loans[loanId];
         uint256 borrowTime = loan.borrowTime;
 
@@ -452,7 +452,7 @@ contract LendingTerm is CoreRef {
         address borrower,
         uint256 borrowAmount,
         uint256 collateralAmount
-    ) internal returns (bytes32 loanId) {
+    ) internal virtual returns (bytes32 loanId) {
         require(borrowAmount != 0, "LendingTerm: cannot borrow 0");
         require(collateralAmount != 0, "LendingTerm: cannot stake 0");
 
@@ -522,11 +522,7 @@ contract LendingTerm is CoreRef {
         RateLimitedMinter(refs.creditMinter).mint(borrower, borrowAmount);
 
         // pull the collateral from the borrower
-        IERC20(params.collateralToken).safeTransferFrom(
-            payer,
-            address(this),
-            collateralAmount
-        );
+        _transferCollateralIn(payer, collateralAmount);
 
         // emit event
         emit LoanOpen(
@@ -586,11 +582,7 @@ contract LendingTerm is CoreRef {
         loans[loanId].collateralAmount += collateralToAdd;
 
         // pull the collateral from the borrower
-        IERC20(params.collateralToken).safeTransferFrom(
-            borrower,
-            address(this),
-            collateralToAdd
-        );
+        _transferCollateralIn(borrower, collateralToAdd);
 
         // emit event
         emit LoanAddCollateral(
@@ -741,10 +733,7 @@ contract LendingTerm is CoreRef {
         issuance -= borrowAmount;
 
         // return the collateral to the borrower
-        IERC20(params.collateralToken).safeTransfer(
-            loan.borrower,
-            loan.collateralAmount
-        );
+        _transferCollateralOut(loan.borrower, loan.collateralAmount);
 
         // emit event
         emit LoanClose(block.timestamp, loanId, LoanCloseType.Repay, loanDebt);
@@ -943,18 +932,12 @@ contract LendingTerm is CoreRef {
 
         // send collateral to borrower
         if (collateralToBorrower != 0) {
-            IERC20(params.collateralToken).safeTransfer(
-                loans[loanId].borrower,
-                collateralToBorrower
-            );
+            _transferCollateralOut(loans[loanId].borrower, collateralToBorrower);
         }
 
         // send collateral to bidder
         if (collateralToBidder != 0) {
-            IERC20(params.collateralToken).safeTransfer(
-                bidder,
-                collateralToBidder
-            );
+            _transferCollateralOut(bidder, collateralToBidder);
         }
 
         emit LoanClose(
@@ -990,5 +973,15 @@ contract LendingTerm is CoreRef {
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         params.hardCap = _newValue;
         emit SetHardCap(block.timestamp, _newValue);
+    }
+
+    /// @notice transfer collateral in to the term
+    function _transferCollateralIn(address from, uint256 amount) internal virtual {
+        IERC20(params.collateralToken).safeTransferFrom(from, address(this), amount);
+    }
+
+    /// @notice transfer collateral out of the term
+    function _transferCollateralOut(address to, uint256 amount) internal virtual {
+        IERC20(params.collateralToken).safeTransfer(to, amount);
     }
 }

@@ -11,12 +11,11 @@ import {LendingTerm} from "@src/loan/LendingTerm.sol";
 import {GuildGovernor} from "@src/governance/GuildGovernor.sol";
 import {LendingTermFactory} from "@src/governance/LendingTermFactory.sol";
 
-/// @notice Utils to onboard a LendingTerm. Also acts as a LendingTerm factory.
+/// @notice Utils to onboard a LendingTerm.
 /// This contract acts as Governor, but users cannot queue arbitrary proposals,
 /// they can only queue LendingTerm onboarding proposals.
 /// When a vote is successful, the LendingTerm onboarding is queued in the Timelock,
 /// where CREDIT holders can veto the onboarding.
-/// Only terms that have been deployed through this factory can be onboarded.
 /// A term can be onboarded for the first time, or re-onboarded after it has been offboarded.
 contract LendingTermOnboarding is GuildGovernor {
     /// @notice minimum delay between proposals of onboarding of a given term
@@ -74,7 +73,9 @@ contract LendingTermOnboarding is GuildGovernor {
     function proposeOnboard(
         address term
     ) external whenNotPaused returns (uint256 proposalId) {
-        // Check that the term has been created by this factory
+        // Check that the term has been created by the factory
+        // and that the term's implementation & auctionHouse are still
+        // valid to use.
         bool validImpl = LendingTermFactory(factory).implementations(
             LendingTermFactory(factory).termImplementations(term)
         );
