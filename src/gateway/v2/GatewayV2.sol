@@ -22,7 +22,7 @@ contract GatewayV2 is Ownable, Pausable, FlashloanReceiver, CallAllowList {
 
     /// @notice Execute an action with the Gateway without flashloan
     function action(bytes memory call) public entryPoint whenNotPaused {
-          _call(address(this), call);
+        _call(address(this), call);
     }
 
     /// @notice Executes multiple calls in a single transaction.

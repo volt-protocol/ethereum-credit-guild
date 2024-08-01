@@ -5,8 +5,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 abstract contract CallAllowList is Ownable {
 
-    /// @notice emitted when a an address is allowed or not by the function allowAddress
-    event AddressAllowed(address indexed target, bool isAllowed);
     /// @notice emitted when a call is allowed or not by the function allowCall
     event CallAllowed(
         address indexed target,
@@ -14,33 +12,20 @@ abstract contract CallAllowList is Ownable {
         bool isAllowed
     );
 
-    /// @notice mapping of allowed target where all call are allowed
-    /// For example allowing all function on the 1inch router
-    mapping(address => bool) public allowedAddresses;
-
     /// @notice mapping of allowed signatures per target address
     /// For example allowing "approve" on a token
     mapping(address => mapping(bytes4 => bool)) public allowedCalls;
 
-    /// @notice allow by address (all functions)
-    function allowByAddress(
-        address target,
-        bool allowed
-    ) public virtual onlyOwner {
-        allowedAddresses[target] = allowed;
-        emit AddressAllowed(target, allowed);
-    }
-
     /// @notice allow by function address + selector
-    function allowBySelector(
+    function allowCall(
         address target,
         bytes4 selector,
         bool allowed
     ) public virtual onlyOwner {
-        _allowBySelector(target, selector, allowed);
+        _allowCall(target, selector, allowed);
     }
 
-    function _allowBySelector(
+    function _allowCall(
         address target,
         bytes4 selector,
         bool allowed
@@ -56,21 +41,18 @@ abstract contract CallAllowList is Ownable {
             // never allow transferFrom(address,uint256)
             return false;
         }
-        if (allowedAddresses[target]) {
-            return true;
-        }
         if (allowedCalls[target][selector]) {
             return true;
         }
-        if (_dynamicAllowBySelector(target, selector)) {
-            _allowBySelector(target, selector, true);
+        if (_dynamicAllowCall(target, selector)) {
+            _allowCall(target, selector, true);
             return true;
         }
         return false;
     }
 
     /// @notice optional override for dynamic addition of allowed calls
-    function _dynamicAllowBySelector(
+    function _dynamicAllowCall(
         address/* target*/,
         bytes4/* selector*/
     ) internal virtual returns (bool) {

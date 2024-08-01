@@ -44,8 +44,8 @@ contract GatewayV2UnitTest is ECGTest {
 
     function testActionWithFlashLoan() public {
         // allowlist configuration
-        gw.allowByAddress(address(token1), true);
-        gw.allowBySelector(address(this), 0x58b80a4b, true);
+        gw.allowCall(address(token1), 0x40c10f19, true); // mint(address,uint256)
+        gw.allowCall(address(this), 0x58b80a4b, true); // initiateToken1UniswapV3Flashloan(uint256)
 
         gw.actionWithFlashLoan(
             address(token1), // flashloanToken
