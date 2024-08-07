@@ -763,13 +763,16 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
                 address(psm),
                 address(collateralToken),
                 address(usdc),
+                address(usdc),
                 flashloanPegTokenAmount,
                 minCollateralToReceive,
                 borrowAmount,
                 pullCollateralCalls,
                 consumePermitBorrowedCreditCall,
                 UNISWAPV2_ROUTER_ADDR,
-                routerCallData
+                routerCallData,
+                address(0),
+                bytes("")
             )
         );
 
@@ -866,8 +869,12 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
                 address(psm),
                 address(collateralToken),
                 address(usdc),
+                address(usdc),
+                flashloanPegTokenAmount,
                 minCollateralRemaining,
                 pullCollateralCalls,
+                address(0),
+                bytes(""),
                 UNISWAPV2_ROUTER_ADDR,
                 routerCallData
             )
@@ -906,7 +913,9 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
         uint256 minProfit = 25e6; // min 25 USDC of profit
 
         while (profit == 0 && block.timestamp < stop) {
-            (uint256 collateralReceived, ) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
+            uint256 flashloanAmount = psm.getRedeemAmountOut(creditAsked) + 1;
             // encode the swap using uniswapv2 router
             address[] memory path = new address[](2);
             path[0] = address(collateralToken);
@@ -922,14 +931,20 @@ contract IntegrationTestGatewayV1 is PostProposalCheckFixture {
 
             try
                 gatewayv1.bidWithBalancerFlashLoan(
-                    loanId,
-                    address(term),
-                    address(psm),
-                    address(collateralToken),
-                    address(usdc),
-                    minProfit,
-                    UNISWAPV2_ROUTER_ADDR,
-                    swapData
+                    GatewayV1.BidWithBalancerFlashLoanInput(
+                        loanId,
+                        address(term),
+                        address(psm),
+                        address(collateralToken),
+                        address(usdc),
+                        address(usdc),
+                        flashloanAmount,
+                        minProfit,
+                        address(0),
+                        bytes(""),
+                        UNISWAPV2_ROUTER_ADDR,
+                        swapData
+                    )
                 )
             returns (uint256 _profit) {
                 profit = _profit;

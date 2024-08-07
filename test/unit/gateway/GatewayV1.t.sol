@@ -494,13 +494,16 @@ contract UnitTestGatewayV1 is ECGTest {
                 address(psm),
                 address(collateral),
                 address(pegtoken),
+                address(pegtoken),
                 flashloanPegTokenAmount,
                 minCollateralToReceive,
                 borrowAmount,
                 pullCollateralCalls,
                 consumePermitBorrowedCreditCall,
                 address(this), // router, address(this) simulates univ2 router
-                routerCallData
+                routerCallData,
+                address(0),
+                bytes("")
             )
         );
 
@@ -603,13 +606,16 @@ contract UnitTestGatewayV1 is ECGTest {
                 address(psm),
                 address(collateral),
                 address(pegtoken),
+                address(pegtoken),
                 flashloanPegTokenAmount,
                 minCollateralToReceive,
                 borrowAmount,
                 pullCollateralCalls,
                 consumePermitBorrowedCreditCall,
                 address(this), // router, address(this) simulates univ2 router
-                routerCallData
+                routerCallData,
+                address(0),
+                bytes("")
             )
         );
     }
@@ -697,13 +703,16 @@ contract UnitTestGatewayV1 is ECGTest {
                 address(psm),
                 address(collateral),
                 address(pegtoken),
+                address(pegtoken),
                 flashloanPegTokenAmount,
                 minCollateralToReceive,
                 borrowAmount,
                 pullCollateralCalls,
                 consumePermitBorrowedCreditCall,
                 address(this), // router, address(this) simulates univ2 router
-                routerCallData
+                routerCallData,
+                address(0),
+                bytes("")
             )
         );
     }
@@ -784,8 +793,12 @@ contract UnitTestGatewayV1 is ECGTest {
                 address(psm),
                 address(collateral),
                 address(pegtoken),
+                address(pegtoken),
+                flashloanPegTokenAmount,
                 minCollateralRemaining,
                 pullCollateralCalls,
+                address(0),
+                bytes(""),
                 address(this),
                 routerCallData
             )
@@ -824,12 +837,16 @@ contract UnitTestGatewayV1 is ECGTest {
         uint256 stop = block.timestamp + auctionHouse.auctionDuration();
         uint256 minProfit = 25e6; // min 25 pegtoken of profit
         while (profit == 0 && block.timestamp < stop) {
-            (uint256 collateralReceived, ) = auctionHouse.getBidDetail(loanId);
+            (uint256 collateralReceived, uint256 creditAsked) = auctionHouse
+                .getBidDetail(loanId);
             // keep 1 wei of extra collateral unused to test the sweep function
             // (any extra collateral should be forwarded to caller)
             if (collateralReceived != 0) {
                 collateralReceived = collateralReceived - 1;
             }
+
+            uint256 flashloanAmount = psm.getRedeemAmountOut(creditAsked) + 1;
+
             // encode the swap using uniswapv2 router
             address[] memory path = new address[](2);
             path[0] = address(collateral);
@@ -845,14 +862,20 @@ contract UnitTestGatewayV1 is ECGTest {
 
             try
                 gatewayv1.bidWithBalancerFlashLoan(
-                    loanId,
-                    address(term),
-                    address(psm),
-                    address(collateral),
-                    address(pegtoken),
-                    minProfit,
-                    address(this), // in this test suite, 'this' is the uniswap pool
-                    swapData
+                    GatewayV1.BidWithBalancerFlashLoanInput(
+                        loanId,
+                        address(term),
+                        address(psm),
+                        address(collateral),
+                        address(pegtoken),
+                        address(pegtoken),
+                        flashloanAmount,
+                        minProfit,
+                        address(0),
+                        bytes(""),
+                        address(this), // in this test suite, 'this' is the uniswap pool
+                        swapData
+                    )
                 )
             returns (uint256 _profit) {
                 profit = _profit;
