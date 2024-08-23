@@ -47,10 +47,31 @@ contract GatewayV2UnitTest is ECGTest {
         gw.allowCall(address(token1), 0x40c10f19, true); // mint(address,uint256)
         gw.allowCall(address(this), 0x58b80a4b, true); // initiateToken1UniswapV3Flashloan(uint256)
 
+        // build actions
+        bytes[] memory withFlashloanCalls = new bytes[](2);
+        // arbitrary action
+        withFlashloanCalls[0] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            address(token1),
+            abi.encodeWithSignature(
+                "mint(address,uint256)",
+                address(gw),
+                67
+            )
+        );
+        // repay flashloan
+        withFlashloanCalls[1] = abi.encodeWithSignature(
+            "callExternal(address,bytes)",
+            address(token1),
+            abi.encodeWithSignature(
+                "transfer(address,uint256)",
+                address(this),
+                1100
+            )
+        );
+
+        // do action with flashloan
         gw.actionWithFlashLoan(
-            address(token1), // flashloanToken
-            1000, // flashloanAmount
-            100, // flashloanFee
             address(this), // flashloanProvider
             abi.encodeWithSignature("initiateToken1UniswapV3Flashloan(uint256)", 1000), // initiateFlashloanCall
             abi.encodeWithSignature( // preFlashloanCall
@@ -63,13 +84,8 @@ contract GatewayV2UnitTest is ECGTest {
                 )
             ),
             abi.encodeWithSignature( // withFlashloanCall
-                "callExternal(address,bytes)",
-                address(token1),
-                abi.encodeWithSignature(
-                    "mint(address,uint256)",
-                    address(gw),
-                    67
-                )
+                "multicall(bytes[])",
+                withFlashloanCalls
             ),
             abi.encodeWithSignature( // postFlashloanCall
                 "callExternal(address,bytes)",

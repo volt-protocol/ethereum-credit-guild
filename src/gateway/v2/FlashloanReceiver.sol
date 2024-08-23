@@ -13,12 +13,6 @@ abstract contract FlashloanReceiver is EntryGuard, LowLevelCall, Pausable {
 
     // keccak256(abi.encode(uint256(keccak256("ecg.storage.gateway.flashloanProvider")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant _SLOT_FLASHLOAN_PROVIDER = 0xc0b4846dffbaf021cf5493af440aba0010f84b495c6da5f6bdc8f33c4014a800;
-    // keccak256(abi.encode(uint256(keccak256("ecg.storage.gateway.flashloanToken")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant _SLOT_FLASHLOAN_TOKEN = 0xb171977de5e0be753b6b27a95d648d37e2c0b684c56a955ca38681e22de6a500;
-    // keccak256(abi.encode(uint256(keccak256("ecg.storage.gateway.flashloanAmount")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant _SLOT_FLASHLOAN_AMOUNT = 0x2837d0abf4cb716bd4a569eb90915c2813b45a56962010f6acd221d6da060900;
-    // keccak256(abi.encode(uint256(keccak256("ecg.storage.gateway.flashloanFee")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant _SLOT_FLASHLOAN_FEE = 0x8beaf72728a3820c3512f1ed473d1e460045613aa803096527a31dbe3bd07800;
     // keccak256(abi.encode(uint256(keccak256("ecg.storage.gateway.flashloanCall")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant _SLOT_FLASHLOAN_CALL = 0x00582406970a5f4f653f08368825d166534bfe985acacb314acb165f7895f300;
 
@@ -32,9 +26,6 @@ abstract contract FlashloanReceiver is EntryGuard, LowLevelCall, Pausable {
 
     /// @notice execute an action after receiving a flashloan
     function actionWithFlashLoan(
-        address flashloanToken,
-        uint256 flashloanAmount,
-        uint256 flashloanFee,
         address flashloanProvider,
         bytes memory initiateFlashloanCall,
         bytes memory preFlashloanCall,
@@ -49,9 +40,6 @@ abstract contract FlashloanReceiver is EntryGuard, LowLevelCall, Pausable {
 
         // tstores
         TStorageLib._address(_SLOT_FLASHLOAN_PROVIDER, flashloanProvider);
-        TStorageLib._address(_SLOT_FLASHLOAN_TOKEN, flashloanToken);
-        TStorageLib._uint256(_SLOT_FLASHLOAN_AMOUNT, flashloanAmount);
-        TStorageLib._uint256(_SLOT_FLASHLOAN_FEE, flashloanFee);
         TStorageLib._bytes(_SLOT_FLASHLOAN_CALL, withFlashloanCall);
 
         // pre-flashloan call
@@ -66,21 +54,17 @@ abstract contract FlashloanReceiver is EntryGuard, LowLevelCall, Pausable {
         }
 
         TStorageLib._address(_SLOT_FLASHLOAN_PROVIDER, address(0));
-        TStorageLib._address(_SLOT_FLASHLOAN_TOKEN, address(0));
-        TStorageLib._uint256(_SLOT_FLASHLOAN_AMOUNT, 0);
-        TStorageLib._uint256(_SLOT_FLASHLOAN_FEE, 0);
         TStorageLib._bytes(_SLOT_FLASHLOAN_CALL, "");
     }
 
     /// @notice Fallback function is used to handle flashloan callback because
     /// every flashloan provider has a different callback function they call after
     /// sending funds.
+    /// @dev do not forget to transfer back tokens to flashloan provider or approve
+    /// flashloaned tokens to the flashloan provider inside the flashloanCall
     fallback() external payable afterEntry {
         // tloads
         address flashloanProvider = TStorageLib._address(_SLOT_FLASHLOAN_PROVIDER);
-        address flashloanToken = TStorageLib._address(_SLOT_FLASHLOAN_TOKEN);
-        uint256 flashloanAmount = TStorageLib._uint256(_SLOT_FLASHLOAN_AMOUNT);
-        uint256 flashloanFee = TStorageLib._uint256(_SLOT_FLASHLOAN_FEE);
         bytes memory flashloanCall = TStorageLib._bytes(_SLOT_FLASHLOAN_CALL);
 
         // check sender
@@ -88,17 +72,15 @@ abstract contract FlashloanReceiver is EntryGuard, LowLevelCall, Pausable {
             msg.sender == flashloanProvider,
             "FlashloanReceiver: invalid sender"
         );
-    
-        // perform calls
-        if (flashloanCall.length != 0) {
-            _call(address(this), flashloanCall);
-        }
 
-        // repay flashloan
-        IERC20(flashloanToken).transfer(
-            flashloanProvider,
-            flashloanAmount + flashloanFee
+        // perform calls
+        // we have to repay flashloan (transfer or approve),
+        // so we know there needs to be a flashloanCall
+        require(
+            flashloanCall.length != 0,
+            "FlashloanReceiver: no flashloan call"
         );
+        _call(address(this), flashloanCall);
     }
 
     // can receive ETH
