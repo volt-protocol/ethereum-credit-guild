@@ -16,20 +16,6 @@ library TStorageLib {
             tstore(slot, value)
         }
     }
-    
-    function _uint256(bytes32 slot) internal view returns (uint256 value) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            value := tload(slot)
-        }
-    }
-
-    function _uint256(bytes32 slot, uint256 value) internal {
-        /// @solidity memory-safe-assembly
-        assembly {
-            tstore(slot, value)
-        }
-    }
 
     function _bytes(bytes32 slot) internal view returns (bytes memory value) {
         uint256 length;

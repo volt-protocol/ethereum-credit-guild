@@ -91,4 +91,11 @@ contract GatewayV2 is Ownable, Pausable, FlashloanReceiver, CallAllowList {
     ) internal override returns (bool) {
         return _callAllowed(provider, data);
     }
+    /// @notice allow all external calls
+    function _dynamicAllowCall(
+        address/* target*/,
+        bytes4/* selector*/
+    ) internal override pure returns (bool) {
+        return true;
+    }
 }

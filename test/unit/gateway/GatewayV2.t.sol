@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {ECGTest, console} from "@test/ECGTest.sol";
 
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {GatewayV2} from "@src/gateway/v2/GatewayV2.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 
@@ -40,6 +41,10 @@ contract GatewayV2UnitTest is ECGTest {
         require(success, "Flashloan call reverted");
         require(token1.balanceOf(address(this)) >= amount * 110 / 100, "Flashloan not repaid");
         token1.burn(amount * 110 / 100);
+    }
+
+    function revertWithMessage(string memory message) public pure {
+        revert(message);
     }
 
     function testActionWithFlashLoan() public {
@@ -98,5 +103,147 @@ contract GatewayV2UnitTest is ECGTest {
             )
         );
         assertEq(token1.balanceOf(address(gw)), 123);
+    }
+
+    function testPausability() public {
+        gw.pause();
+        vm.expectRevert("Pausable: paused");
+        gw.action(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                address(token1),
+                abi.encodeWithSignature(
+                    "mint(address,uint256)",
+                    address(this),
+                    123
+                )
+            )
+        );
+        gw.unpause();
+        gw.action(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                address(token1),
+                abi.encodeWithSignature(
+                    "mint(address,uint256)",
+                    address(this),
+                    123
+                )
+            )
+        );
+        assertEq(token1.balanceOf(address(this)), 123);
+    }
+
+    function testCheckBalanceAtLeast() public {
+        vm.expectRevert("GatewayV2: token balance too low");
+        gw.action(
+            abi.encodeWithSignature(
+                "checkBalanceAtLeast(address,uint256)",
+                address(token1),
+                100
+            )
+        );
+        token1.mint(address(gw), 100);
+        gw.action(
+            abi.encodeWithSignature(
+                "checkBalanceAtLeast(address,uint256)",
+                address(token1),
+                100
+            )
+        );
+    }
+
+    function testPullPermitTokens() public {
+        uint256 amount = 1000;
+        uint256 deadline = block.timestamp + 100;
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256(
+                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+                ),
+                alice,
+                address(gw),
+                amount,
+                token1.nonces(alice),
+                deadline
+            )
+        );
+        bytes32 digest = ECDSA.toTypedDataHash(
+            token1.DOMAIN_SEPARATOR(),
+            structHash
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePrivateKey, digest);
+
+        token1.mint(alice, amount);
+
+        vm.prank(alice);
+        gw.action(
+            abi.encodeWithSignature(
+                "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+                address(token1),
+                amount,
+                deadline,
+                v,
+                r,
+                s
+            )
+        );
+        
+        assertEq(token1.balanceOf(alice), amount);
+        assertEq(token1.balanceOf(address(gw)), 0);
+        assertEq(token1.allowance(alice, address(gw)), amount);
+
+        // someone else cannot transferFrom alice's tokens
+        vm.expectRevert("GatewayV2: forbidden external call");
+        gw.action(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                address(token1),
+                abi.encodeWithSignature(
+                    "transferFrom(address,address,uint256)",
+                    alice,
+                    bob,
+                    amount
+                )
+            )
+        );
+
+        vm.prank(alice);
+        gw.action(
+            abi.encodeWithSignature(
+                "consumeAllowance(address,uint256)",
+                address(token1),
+                amount
+            )
+        );
+
+        assertEq(token1.balanceOf(alice), 0);
+        assertEq(token1.balanceOf(address(gw)), amount);
+        assertEq(token1.allowance(alice, address(gw)), 0);
+
+        gw.action(
+            abi.encodeWithSignature(
+                "sweep(address)",
+                address(token1)
+            )
+        );
+
+        assertEq(token1.balanceOf(address(this)), amount);
+        assertEq(token1.balanceOf(alice), 0);
+        assertEq(token1.balanceOf(address(gw)), 0);
+    }
+
+    function testErrorForwarding() public {
+        vm.expectRevert("test error");
+        gw.action(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                address(this),
+                abi.encodeWithSignature(
+                    "revertWithMessage(string)",
+                    "test error"
+                )
+            )
+        );
     }
 }
