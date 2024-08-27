@@ -62,7 +62,7 @@ abstract contract FlashloanReceiver is EntryGuard, LowLevelCall, Pausable {
     /// sending funds.
     /// @dev do not forget to transfer back tokens to flashloan provider or approve
     /// flashloaned tokens to the flashloan provider inside the flashloanCall
-    fallback() external payable afterEntry {
+    fallback(bytes calldata/* data*/) external payable afterEntry returns (bytes memory) {
         // tloads
         address flashloanProvider = TStorageLib._address(_SLOT_FLASHLOAN_PROVIDER);
         bytes memory flashloanCall = TStorageLib._bytes(_SLOT_FLASHLOAN_CALL);
@@ -81,6 +81,15 @@ abstract contract FlashloanReceiver is EntryGuard, LowLevelCall, Pausable {
             "FlashloanReceiver: no flashloan call"
         );
         _call(address(this), flashloanCall);
+
+        // Return true using assembly to build the bytes output
+        // Some flashloan providers expect a boolean return value to
+        // indicate success or failure of the flashloan callback.
+        assembly {
+            let ptr := mload(0x40) // Allocate memory for the return data (32 bytes)
+            mstore(ptr, 1) // Store the boolean value 'true' (1) at the memory location
+            return(ptr, 32) // Return 32 bytes from the memory location
+        }
     }
 
     // can receive ETH
