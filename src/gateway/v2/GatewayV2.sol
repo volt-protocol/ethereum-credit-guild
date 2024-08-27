@@ -48,6 +48,17 @@ contract GatewayV2 is Ownable, Pausable, FlashloanReceiver, CallAllowList {
         _call(target, data);
     }
 
+    /// @notice Used for intermediary checks on token balances
+    function checkBalanceAtLeast(
+        address token,
+        uint256 amount
+    ) public view afterEntry {
+        require(
+            IERC20(token).balanceOf(address(this)) >= amount,
+            "GatewayV2: token balance too low"
+        );
+    }
+
     /// @notice function to consume a permit allowanced
     function consumePermit(
         address token,
@@ -91,6 +102,7 @@ contract GatewayV2 is Ownable, Pausable, FlashloanReceiver, CallAllowList {
     ) internal override returns (bool) {
         return _callAllowed(provider, data);
     }
+
     /// @notice allow all external calls
     function _dynamicAllowCall(
         address/* target*/,
