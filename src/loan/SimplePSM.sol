@@ -105,11 +105,7 @@ contract SimplePSM is CoreRef {
         address to,
         uint256 amountIn
     ) external whenNotPaused returns (uint256 amountOut) {
-        amountOut = getMintAmountOut(amountIn);
-        pegTokenBalance += amountIn;
-        ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
-        CreditToken(credit).mint(to, amountOut);
-        emit Mint(block.timestamp, to, amountIn, amountOut);
+        return _mint(to, amountIn);
     }
 
     /// @notice mint `amountOut` CREDIT to `msg.sender` for `amountIn` underlying tokens
@@ -122,12 +118,9 @@ contract SimplePSM is CoreRef {
             !CreditToken(credit).isRebasing(msg.sender),
             "SimplePSM: already rebasing"
         );
-        amountOut = getMintAmountOut(amountIn);
-        pegTokenBalance += amountIn;
-        ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
-        CreditToken(credit).mint(msg.sender, amountOut);
+
+        amountOut = _mint(msg.sender, amountIn);
         CreditToken(credit).forceEnterRebase(msg.sender);
-        emit Mint(block.timestamp, msg.sender, amountIn, amountOut);
     }
 
     /// @notice redeem `amountIn` CREDIT for `amountOut` underlying tokens and send to address `to`
@@ -152,5 +145,16 @@ contract SimplePSM is CoreRef {
     ) external onlyCoreRole(CoreRoles.GOVERNOR) {
         redemptionsPaused = paused;
         emit RedemptionsPaused(block.timestamp, paused);
+    }
+
+    function _mint(
+        address to,
+        uint256 amountIn
+    ) internal virtual returns (uint256 amountOut) {
+        amountOut = getMintAmountOut(amountIn);
+        pegTokenBalance += amountIn;
+        ERC20(pegToken).safeTransferFrom(msg.sender, address(this), amountIn);
+        CreditToken(credit).mint(to, amountOut);
+        emit Mint(block.timestamp, to, amountIn, amountOut);
     }
 }
