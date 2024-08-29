@@ -4,11 +4,20 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
-import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {CallAllowList} from "@src/gateway/v2/CallAllowList.sol";
 import {FlashloanReceiver} from "@src/gateway/v2/FlashloanReceiver.sol";
 
-contract GatewayV2 is Ownable, Pausable, FlashloanReceiver, CallAllowList {
+/// @title GatewayV2
+/// @notice util to multicall actions on other contracts and use flashloans
+/// /!\ WARNING: Do not use this contract with tokens that have functions
+/// other than transferFrom for transferring after setting an allowance. This includes
+/// ERC721 tokens with safeTransferFrom or ERC20 tokens with alternative transfer functions.
+/// If user A sets an allowance on the Gateway, user B could potentially call the Gateway
+/// and withdraw tokens from any user who has set an allowance.
+/// This vulnerability exists even with permit signatures and atomic permit/transferFrom operations.
+/// After broadcasting, a mempool observer could front-run the transaction and withdraw
+/// the tokens using the now-public signature.
+/// @author eswak
+contract GatewayV2 is Ownable, Pausable, FlashloanReceiver {
 
     /// @notice set pausable methods to paused
     function pause() public onlyOwner {
@@ -40,46 +49,32 @@ contract GatewayV2 is Ownable, Pausable, FlashloanReceiver, CallAllowList {
         address target,
         bytes memory data
     ) public afterEntry {
-        require(
-            _callAllowed(target, data),
-            "GatewayV2: forbidden external call"
-        );
-
+        bytes4 selector = bytes4(bytes.concat(data[0], data[1], data[2], data[3]));
+        require(selector != 0x23b872dd, "GatewayV2: transferFrom forbidden");
         _call(target, data);
     }
 
-    /// @notice Used for intermediary checks on token balances
+    /// @notice Used for intermediary step checks on token balances
     function checkBalanceAtLeast(
         address token,
         uint256 amount
     ) public view afterEntry {
         require(
             IERC20(token).balanceOf(address(this)) >= amount,
-            "GatewayV2: token balance too low"
+            "GatewayV2: balance too low"
         );
     }
 
-    /// @notice function to consume a permit allowanced
-    function consumePermit(
-        address token,
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
+    /// @notice Emitted by emitEvent, used for arbitrary event emitting
+    event Event(uint256 indexed timestamp, address indexed sender, string text);
+    /// @notice Used for arbitrary event emitting
+    function emitEvent(
+        string memory text
     ) public afterEntry {
-        IERC20Permit(token).permit(
-            _getOriginalSender(),
-            address(this),
-            amount,
-            deadline,
-            v,
-            r,
-            s
-        );
+        emit Event(block.timestamp, _getOriginalSender(), text);
     }
 
-    /// @notice function to consume an allowance (transferFrom) from msg.sender to the gateway
+    /// @notice function to consume an allowance (transferFrom to the gateway)
     function consumeAllowance(address token, uint256 amount) public afterEntry {
         IERC20(token).transferFrom(_getOriginalSender(), address(this), amount);
     }
@@ -89,25 +84,8 @@ contract GatewayV2 is Ownable, Pausable, FlashloanReceiver, CallAllowList {
     /// @dev it means anyone can sweep any tokens left on this contract between transactions
     function sweep(address token) public afterEntry {
         uint256 balance = IERC20(token).balanceOf(address(this));
-        if (balance > 0) {
+        if (balance != 0) {
             IERC20(token).transfer(_getOriginalSender(), balance);
         }
-    }
-
-    /// @notice implement call restrictions for flashloan providers,
-    /// they will have to be allowed like external calls.
-    function _isFlashloanProviderWhitelisted(
-        address provider,
-        bytes memory data
-    ) internal override returns (bool) {
-        return _callAllowed(provider, data);
-    }
-
-    /// @notice allow all external calls
-    function _dynamicAllowCall(
-        address/* target*/,
-        bytes4/* selector*/
-    ) internal override pure returns (bool) {
-        return true;
     }
 }

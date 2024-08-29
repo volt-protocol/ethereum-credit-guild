@@ -6,6 +6,7 @@ import {ECGTest, console} from "@test/ECGTest.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {GatewayV2} from "@src/gateway/v2/GatewayV2.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
+import {LowLevelCall} from "@src/gateway/v2/LowLevelCall.sol";
 
 contract GatewayV2UnitTest is ECGTest {
     // test users
@@ -47,11 +48,16 @@ contract GatewayV2UnitTest is ECGTest {
         revert(message);
     }
 
-    function testActionWithFlashLoan() public {
-        // allowlist configuration
-        gw.allowCall(address(token1), 0x40c10f19, true); // mint(address,uint256)
-        gw.allowCall(address(this), 0x58b80a4b, true); // initiateToken1UniswapV3Flashloan(uint256)
+    function revertWithoutMessage() public pure {
+        revert();
+    }
 
+    error CustomError(string msg);
+    function revertWithCustomError(string memory message) public pure {
+        revert CustomError(message);
+    }
+
+    function testActionWithFlashLoan() public {
         // build actions
         bytes[] memory withFlashloanCalls = new bytes[](2);
         // arbitrary action
@@ -135,7 +141,7 @@ contract GatewayV2UnitTest is ECGTest {
     }
 
     function testCheckBalanceAtLeast() public {
-        vm.expectRevert("GatewayV2: token balance too low");
+        vm.expectRevert("GatewayV2: balance too low");
         gw.action(
             abi.encodeWithSignature(
                 "checkBalanceAtLeast(address,uint256)",
@@ -179,13 +185,18 @@ contract GatewayV2UnitTest is ECGTest {
         vm.prank(alice);
         gw.action(
             abi.encodeWithSignature(
-                "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+                "callExternal(address,bytes)",
                 address(token1),
-                amount,
-                deadline,
-                v,
-                r,
-                s
+                abi.encodeWithSignature(
+                    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)",
+                    alice, // owner
+                    address(gw), // spender
+                    amount, // value
+                    deadline, // deadline
+                    v, // v
+                    r, // r
+                    s // s
+                )
             )
         );
         
@@ -194,7 +205,8 @@ contract GatewayV2UnitTest is ECGTest {
         assertEq(token1.allowance(alice, address(gw)), amount);
 
         // someone else cannot transferFrom alice's tokens
-        vm.expectRevert("GatewayV2: forbidden external call");
+        vm.expectRevert("GatewayV2: transferFrom forbidden");
+        vm.prank(bob);
         gw.action(
             abi.encodeWithSignature(
                 "callExternal(address,bytes)",
@@ -234,6 +246,7 @@ contract GatewayV2UnitTest is ECGTest {
     }
 
     function testErrorForwarding() public {
+        // regular revert string
         vm.expectRevert("test error");
         gw.action(
             abi.encodeWithSignature(
@@ -243,6 +256,51 @@ contract GatewayV2UnitTest is ECGTest {
                     "revertWithMessage(string)",
                     "test error"
                 )
+            )
+        );
+
+        // <=4 char message
+        vm.expectRevert(bytes("AAAA"));
+        gw.action(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                address(this),
+                abi.encodeWithSignature(
+                    "revertWithMessage(string)",
+                    "AAAA"
+                )
+            )
+        );
+
+        // revert without reason
+        vm.expectRevert(bytes(""));
+        gw.action(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                address(this),
+                abi.encodeWithSignature("revertWithoutMessage()")
+            )
+        );
+
+        // custom error
+        vm.expectRevert(abi.encodeWithSelector(CustomError.selector, "test error 2"));
+        gw.action(
+            abi.encodeWithSignature(
+                "callExternal(address,bytes)",
+                address(this),
+                abi.encodeWithSignature("revertWithCustomError(string)", "test error 2")
+            )
+        );
+    }
+
+    function testEmitEvent() public {
+        vm.expectEmit();
+        emit GatewayV2.Event(block.timestamp, alice, "test event");
+        vm.prank(alice);
+        gw.action(
+            abi.encodeWithSignature(
+                "emitEvent(string)",
+                "test event"
             )
         );
     }

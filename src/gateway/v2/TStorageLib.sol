@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+/// @title TStorageLib
+/// @notice Util library to store and load values in transient storage
+/// @author eswak
 library TStorageLib {
 
     function _address(bytes32 slot) internal view returns (address value) {

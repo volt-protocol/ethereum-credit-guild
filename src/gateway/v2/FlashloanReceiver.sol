@@ -9,20 +9,13 @@ import {LowLevelCall} from "./LowLevelCall.sol";
 
 /// @title FlashloanReceiver
 /// @notice util to receive flashloans
+/// @author eswak
 abstract contract FlashloanReceiver is EntryGuard, LowLevelCall, Pausable {
 
     // keccak256(abi.encode(uint256(keccak256("ecg.storage.gateway.flashloanProvider")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant _SLOT_FLASHLOAN_PROVIDER = 0xc0b4846dffbaf021cf5493af440aba0010f84b495c6da5f6bdc8f33c4014a800;
     // keccak256(abi.encode(uint256(keccak256("ecg.storage.gateway.flashloanCall")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant _SLOT_FLASHLOAN_CALL = 0x00582406970a5f4f653f08368825d166534bfe985acacb314acb165f7895f300;
-
-    /// @notice optional override for checking whitelists of flashloan providers
-    function _isFlashloanProviderWhitelisted(
-        address/* provider*/,
-        bytes memory/* data*/
-    ) internal virtual returns (bool) {
-        return true;
-    }
 
     /// @notice execute an action after receiving a flashloan
     function actionWithFlashLoan(
@@ -32,12 +25,6 @@ abstract contract FlashloanReceiver is EntryGuard, LowLevelCall, Pausable {
         bytes memory withFlashloanCall,
         bytes memory postFlashloanCall
     ) external entryPoint whenNotPaused {
-        // check allowlist
-        require(
-            _isFlashloanProviderWhitelisted(flashloanProvider, initiateFlashloanCall),
-            "FlashloanReceiver: invalid provider"
-        );
-
         // tstores
         TStorageLib._address(_SLOT_FLASHLOAN_PROVIDER, flashloanProvider);
         TStorageLib._bytes(_SLOT_FLASHLOAN_CALL, withFlashloanCall);

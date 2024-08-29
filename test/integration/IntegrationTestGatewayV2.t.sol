@@ -68,13 +68,18 @@ contract IntegrationTestGatewayV2 is ECGTest {
         // build gw calls array
         bytes[] memory calls = new bytes[](5);
         calls[0] = abi.encodeWithSignature(
-            "consumePermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+            "callExternal(address,bytes)",
             address(token),
-            123,
-            permitCollateral.deadline,
-            permitCollateral.v,
-            permitCollateral.r,
-            permitCollateral.s
+            abi.encodeWithSignature(
+                "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)",
+                alice,
+                address(gw),
+                123,
+                permitCollateral.deadline,
+                permitCollateral.v,
+                permitCollateral.r,
+                permitCollateral.s
+            )
         );
         calls[1] = abi.encodeWithSignature(
             "consumeAllowance(address,uint256)",

@@ -3,7 +3,10 @@ pragma solidity 0.8.24;
 
 import {TStorageLib} from "@src/gateway/v2/TStorageLib.sol";
 
-/// @title Util contract to manage reentrancy
+/// @title EntryGuard
+/// @notice Util contract to manage reentrancy with entry points
+/// and functions that can be called after an entry point.
+/// @author eswak
 abstract contract EntryGuard {
 
     // keccak256(abi.encode(uint256(keccak256("ecg.storage.gateway.originalSender")) - 1)) & ~bytes32(uint256(0xff))
