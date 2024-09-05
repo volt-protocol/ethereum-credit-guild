@@ -80,6 +80,10 @@
     "name": "GATEWAY"
   },
   {
+    "addr": "0x688c58400283c63dc091a86f728c9516ca28cb03",
+    "name": "GATEWAY_V2"
+  },
+  {
     "addr": "0x45c8fab07b64c78d03006591132ac51de82a4b22",
     "name": "CORE"
   },
